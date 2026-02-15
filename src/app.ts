@@ -19,6 +19,8 @@ export class App {
   private autoSave: AutoSaveService
   private repository: MusicRepository
   private currentFilter: ListenStatus | 'all' = 'all'
+  private isReady = false
+  private addFormInitialized = false
 
   constructor() {
     this.driver = new SqlJsDriver('/sql-wasm.wasm')
@@ -28,6 +30,9 @@ export class App {
   }
 
   async initialize(): Promise<void> {
+    // Bind the submit handler immediately so the form never falls back to native GET navigation.
+    this.setupAddForm()
+
     // Initialize persistence
     await this.persistence.initialize()
 
@@ -50,6 +55,7 @@ export class App {
 
     // Start auto-save
     this.autoSave.start()
+    this.isReady = true
 
     // Initialize UI
     this.initializeUI()
@@ -60,16 +66,25 @@ export class App {
   }
 
   private initializeUI(): void {
-    this.setupAddForm()
     this.setupFilterBar()
     this.setupEventDelegation()
     this.renderMusicList()
   }
 
   private setupAddForm(): void {
+    if (this.addFormInitialized) return
+
     const form = document.getElementById('add-form') as HTMLFormElement
+    this.addFormInitialized = true
+
     form.addEventListener('submit', async (e) => {
       e.preventDefault()
+
+      if (!this.isReady) {
+        alert('App is still loading. Please try again in a moment.')
+        return
+      }
+
       const formData = new FormData(form)
       const url = formData.get('url') as string
       const title = formData.get('title') as string || undefined
