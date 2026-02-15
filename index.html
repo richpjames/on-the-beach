@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Track music you want to listen to">
+  <title>On The Beach</title>
+  <link rel="stylesheet" href="/src/styles/main.css">
+</head>
+<body>
+  <div id="app">
+    <header class="header">
+      <h1>On The Beach</h1>
+      <p class="header__subtitle">Music Tracking</p>
+    </header>
+
+    <main class="main">
+      <section class="add-section">
+        <form id="add-form" class="add-form">
+          <div class="add-form__row">
+            <input
+              type="url"
+              id="url-input"
+              name="url"
+              placeholder="Paste a music link..."
+              required
+              class="input"
+            >
+            <button type="submit" class="btn btn--primary">Add</button>
+          </div>
+
+          <details class="add-form__details">
+            <summary>More options</summary>
+            <div class="add-form__extra">
+              <input type="text" name="title" placeholder="Title (optional)" class="input">
+              <input type="text" name="artist" placeholder="Artist (optional)" class="input">
+              <select name="itemType" class="input">
+                <option value="album">Album</option>
+                <option value="ep">EP</option>
+                <option value="single">Single</option>
+                <option value="track">Track</option>
+                <option value="mix">Mix</option>
+              </select>
+            </div>
+          </details>
+        </form>
+      </section>
+
+      <section class="filter-section">
+        <div id="filter-bar" class="filter-bar">
+          <button class="filter-btn active" data-filter="all">All</button>
+          <button class="filter-btn" data-filter="to-listen">To Listen</button>
+          <button class="filter-btn" data-filter="listened">Listened</button>
+          <button class="filter-btn" data-filter="to-revisit">Revisit</button>
+        </div>
+      </section>
+
+      <section class="list-section">
+        <div id="music-list" class="music-list">
+          <!-- Music items inserted by JS -->
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>

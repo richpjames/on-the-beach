@@ -1,0 +1,307 @@
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+:root {
+  --bg: #0a0a0a;
+  --bg-card: #141414;
+  --bg-input: #1a1a1a;
+  --text: #e5e5e5;
+  --text-muted: #737373;
+  --accent: #3b82f6;
+  --accent-hover: #2563eb;
+  --border: #262626;
+  --success: #22c55e;
+  --warning: #eab308;
+  --danger: #ef4444;
+  --radius: 8px;
+  --radius-sm: 4px;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.5;
+  min-height: 100vh;
+}
+
+#app {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 2rem 1rem;
+}
+
+/* Header */
+.header {
+  text-align: center;
+  margin-bottom: 2rem;
+}
+
+.header h1 {
+  font-size: 2rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+.header__subtitle {
+  color: var(--text-muted);
+  font-size: 0.875rem;
+}
+
+/* Form */
+.add-section {
+  margin-bottom: 2rem;
+}
+
+.add-form__row {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.add-form__details {
+  margin-top: 0.75rem;
+}
+
+.add-form__details summary {
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 0.875rem;
+}
+
+.add-form__extra {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}
+
+.add-form__extra select {
+  grid-column: span 2;
+}
+
+/* Inputs */
+.input {
+  flex: 1;
+  padding: 0.75rem 1rem;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text);
+  font-size: 1rem;
+}
+
+.input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.input::placeholder {
+  color: var(--text-muted);
+}
+
+/* Buttons */
+.btn {
+  padding: 0.75rem 1.5rem;
+  border: none;
+  border-radius: var(--radius);
+  font-size: 1rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.btn--primary {
+  background: var(--accent);
+  color: white;
+}
+
+.btn--primary:hover {
+  background: var(--accent-hover);
+}
+
+.btn--ghost {
+  background: transparent;
+  color: var(--text-muted);
+  padding: 0.5rem;
+}
+
+.btn--ghost:hover {
+  color: var(--text);
+}
+
+.btn--danger:hover {
+  color: var(--danger);
+}
+
+/* Filter bar */
+.filter-section {
+  margin-bottom: 1.5rem;
+}
+
+.filter-bar {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.filter-btn {
+  padding: 0.5rem 1rem;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: 9999px;
+  color: var(--text-muted);
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.filter-btn:hover {
+  border-color: var(--text-muted);
+}
+
+.filter-btn.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: white;
+}
+
+/* Music list */
+.music-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.empty-state {
+  text-align: center;
+  padding: 3rem 1rem;
+  color: var(--text-muted);
+}
+
+/* Music card */
+.music-card {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.music-card__content {
+  flex: 1;
+  min-width: 0;
+}
+
+.music-card__title {
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.music-card__artist {
+  color: var(--text-muted);
+  font-size: 0.875rem;
+}
+
+.music-card__meta {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+
+.music-card__actions {
+  display: flex;
+  gap: 0.25rem;
+}
+
+/* Badges */
+.badge {
+  display: inline-block;
+  padding: 0.25rem 0.5rem;
+  border-radius: var(--radius-sm);
+  font-size: 0.75rem;
+  font-weight: 500;
+  text-transform: capitalize;
+}
+
+.badge--to-listen {
+  background: rgba(59, 130, 246, 0.2);
+  color: #60a5fa;
+}
+
+.badge--listening {
+  background: rgba(234, 179, 8, 0.2);
+  color: #facc15;
+}
+
+.badge--listened {
+  background: rgba(34, 197, 94, 0.2);
+  color: #4ade80;
+}
+
+.badge--to-revisit {
+  background: rgba(168, 85, 247, 0.2);
+  color: #c084fc;
+}
+
+.badge--done {
+  background: rgba(115, 115, 115, 0.2);
+  color: #a3a3a3;
+}
+
+.badge--source {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--text-muted);
+}
+
+/* Status select dropdown */
+.status-select {
+  padding: 0.25rem 0.5rem;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  font-size: 0.75rem;
+  cursor: pointer;
+}
+
+.status-select:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+/* Links */
+a {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: underline;
+}
+
+/* Error state */
+.error-screen {
+  text-align: center;
+  padding: 3rem 1rem;
+}
+
+.error-screen h1 {
+  color: var(--danger);
+  margin-bottom: 1rem;
+}
+
+.error-screen pre {
+  background: var(--bg-card);
+  padding: 1rem;
+  border-radius: var(--radius);
+  overflow-x: auto;
+  font-size: 0.875rem;
+  margin-top: 1rem;
+}
