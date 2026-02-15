@@ -241,6 +241,16 @@ export class App {
     list.addEventListener('click', async (e) => {
       const target = e.target as HTMLElement
 
+      // Stack dropdown
+      if (target.dataset.action === 'stack' || target.closest('[data-action="stack"]')) {
+        const card = target.closest('[data-item-id]') as HTMLElement
+        const id = Number(card?.dataset.itemId)
+        if (id) {
+          await this.renderStackDropdown(card, id)
+        }
+        return
+      }
+
       // Delete button
       if (target.dataset.action === 'delete') {
         const card = target.closest('[data-item-id]') as HTMLElement
@@ -405,6 +415,12 @@ export class App {
               </svg>
             </a>
           ` : ''}
+          <button class="btn btn--ghost" data-action="stack" title="Manage stacks">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="12" y1="5" x2="12" y2="19"></line>
+              <line x1="5" y1="12" x2="19" y2="12"></line>
+            </svg>
+          </button>
           <button class="btn btn--ghost btn--danger" data-action="delete" title="Delete">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <polyline points="3 6 5 6 21 6"></polyline>
@@ -414,6 +430,80 @@ export class App {
         </div>
       </article>
     `
+  }
+
+  private async renderStackDropdown(cardEl: HTMLElement, itemId: number): Promise<void> {
+    // Remove any existing dropdown
+    document.querySelectorAll('.stack-dropdown').forEach(el => el.remove())
+
+    const stacks = await this.stackRepository.listStacks()
+    const itemStacks = await this.stackRepository.getStacksForItem(itemId)
+    const itemStackIds = new Set(itemStacks.map(s => s.id))
+
+    const dropdown = document.createElement('div')
+    dropdown.className = 'stack-dropdown'
+    dropdown.innerHTML = `
+      ${stacks.map(s => `
+        <label class="stack-dropdown__item">
+          <input type="checkbox" class="stack-dropdown__checkbox"
+                 data-stack-id="${s.id}" ${itemStackIds.has(s.id) ? 'checked' : ''}>
+          ${this.escapeHtml(s.name)}
+        </label>
+      `).join('')}
+      <div class="stack-dropdown__new">
+        <input type="text" class="stack-dropdown__new-input input"
+               placeholder="New stack...">
+      </div>
+    `
+
+    const actionsEl = cardEl.querySelector('.music-card__actions')!
+    ;(actionsEl as HTMLElement).style.position = 'relative'
+    actionsEl.appendChild(dropdown)
+
+    // Handle checkbox toggles
+    dropdown.addEventListener('change', async (e) => {
+      const target = e.target as HTMLInputElement
+      if (!target.classList.contains('stack-dropdown__checkbox')) return
+      const stackId = Number(target.dataset.stackId)
+      if (target.checked) {
+        await this.stackRepository.addItemToStack(itemId, stackId)
+      } else {
+        await this.stackRepository.removeItemFromStack(itemId, stackId)
+      }
+      await this.renderStackBar()
+    })
+
+    // Handle new stack creation
+    const newInput = dropdown.querySelector('.stack-dropdown__new-input') as HTMLInputElement
+    newInput.addEventListener('keydown', async (e) => {
+      if (e.key !== 'Enter') return
+      const name = newInput.value.trim()
+      if (!name) return
+      const stack = await this.stackRepository.createStack(name)
+      await this.stackRepository.addItemToStack(itemId, stack.id)
+      await this.renderStackBar()
+      await this.renderStackDropdown(cardEl, itemId)
+    })
+
+    // Close on Escape
+    const closeOnEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        dropdown.remove()
+        document.removeEventListener('keydown', closeOnEscape)
+      }
+    }
+    document.addEventListener('keydown', closeOnEscape)
+
+    // Close on outside click (setTimeout to avoid same click closing it)
+    setTimeout(() => {
+      const clickOutside = (e: MouseEvent) => {
+        if (!dropdown.contains(e.target as Node)) {
+          dropdown.remove()
+          document.removeEventListener('click', clickOutside)
+        }
+      }
+      document.addEventListener('click', clickOutside)
+    }, 0)
   }
 
   private escapeHtml(text: string): string {
