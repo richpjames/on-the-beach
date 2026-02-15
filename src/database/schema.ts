@@ -72,6 +72,24 @@ INSERT OR IGNORE INTO sources (name, display_name, url_pattern) VALUES
     ('mixcloud', 'Mixcloud', 'mixcloud.com'),
     ('physical', 'Physical Media', NULL);
 
+-- Stacks: User-created categories for organizing music
+CREATE TABLE IF NOT EXISTS stacks (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL UNIQUE,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+-- Junction table: Many-to-many relationship between music items and stacks
+CREATE TABLE IF NOT EXISTS music_item_stacks (
+    music_item_id INTEGER NOT NULL REFERENCES music_items(id) ON DELETE CASCADE,
+    stack_id INTEGER NOT NULL REFERENCES stacks(id) ON DELETE CASCADE,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    PRIMARY KEY (music_item_id, stack_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_music_item_stacks_stack_id ON music_item_stacks(stack_id);
+CREATE INDEX IF NOT EXISTS idx_music_item_stacks_music_item_id ON music_item_stacks(music_item_id);
+
 -- View for full music items with joins
 CREATE VIEW IF NOT EXISTS v_music_items_full AS
 SELECT
