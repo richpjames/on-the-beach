@@ -41,3 +41,7 @@ Data is stored locally in your browser using IndexedDB. Clearing site data will 
 
 ## Deployment
 - Coolify alpha runbook: `docs/deployment/coolify-alpha.md`
+
+## License
+This project is licensed under PolyForm Noncommercial License 1.0.0.
+See `LICENSE` for details.
