@@ -97,9 +97,21 @@ export interface MusicItemFilters {
   listenStatus?: ListenStatus | ListenStatus[]
   purchaseIntent?: PurchaseIntent | PurchaseIntent[]
   search?: string
+  stackId?: number
 }
 
 export interface PaginatedResult<T> {
   items: T[]
   total: number
+}
+
+// Stacks
+export interface Stack {
+  id: number
+  name: string
+  created_at: string
+}
+
+export interface StackWithCount extends Stack {
+  item_count: number
 }
