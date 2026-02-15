@@ -1,12 +1,13 @@
 import { SqlJsDriver } from './database/driver'
 import { IndexedDBPersistence } from './database/persistence'
 import { MusicRepository } from './repository/music-repository'
+import { StackRepository } from './repository/stack-repository'
 import { AutoSaveService } from './services/auto-save'
 import { SyncService } from './services/sync'
 import { AuthService } from './services/auth'
 import type { SyncServiceConfig } from './services/sync'
 import { SCHEMA } from './database/schema'
-import type { MusicItemFull, ListenStatus, ItemType } from './types'
+import type { MusicItemFull, ListenStatus, ItemType, Stack, StackWithCount, MusicItemFilters } from './types'
 
 const STATUS_LABELS: Record<ListenStatus, string> = {
   'to-listen': 'To Listen',
@@ -30,6 +31,9 @@ export class App {
   private autoSave: AutoSaveService
   private repository: MusicRepository
   private currentFilter: ListenStatus | 'all' = 'all'
+  private currentStack: number | null = null
+  private stackRepository!: StackRepository
+  private stacks: StackWithCount[] = []
   private isReady = false
   private addFormInitialized = false
   private syncService: SyncService | null
@@ -42,6 +46,7 @@ export class App {
     this.persistence = new IndexedDBPersistence()
     this.autoSave = new AutoSaveService(this.driver, this.persistence)
     this.repository = new MusicRepository(this.driver)
+    this.stackRepository = new StackRepository(this.driver)
     if (options.sync) {
       this.syncService = new SyncService(this.driver, options.sync.authService, options.sync.config)
       this.syncIntervalMs = options.sync.intervalMs ?? 60_000
@@ -91,7 +96,9 @@ export class App {
 
   private initializeUI(): void {
     this.setupFilterBar()
+    this.setupStackBar()
     this.setupEventDelegation()
+    this.renderStackBar()
     this.renderMusicList()
   }
 
@@ -185,6 +192,48 @@ export class App {
     })
   }
 
+  private async renderStackBar(): Promise<void> {
+    this.stacks = await this.stackRepository.listStacks()
+    const bar = document.getElementById('stack-bar')!
+    const allBtn = bar.querySelector('[data-stack="all"]')!
+    const manageBtn = document.getElementById('manage-stacks-btn')!
+
+    // Remove old dynamic tabs
+    bar.querySelectorAll('.stack-tab[data-stack-id]').forEach(el => el.remove())
+
+    // Insert stack tabs before the manage button
+    for (const stack of this.stacks) {
+      const btn = document.createElement('button')
+      btn.className = `stack-tab${this.currentStack === stack.id ? ' active' : ''}`
+      btn.dataset.stackId = String(stack.id)
+      btn.textContent = stack.name
+      bar.insertBefore(btn, manageBtn)
+    }
+
+    // Update active state on All button
+    allBtn.className = `stack-tab${this.currentStack === null ? ' active' : ''}`
+  }
+
+  private setupStackBar(): void {
+    const bar = document.getElementById('stack-bar')
+    if (!bar) return
+
+    bar.addEventListener('click', (e) => {
+      const target = e.target as HTMLElement
+      const tab = target.closest('.stack-tab') as HTMLElement | null
+      if (!tab || tab.id === 'manage-stacks-btn') return
+
+      if (tab.dataset.stack === 'all') {
+        this.currentStack = null
+      } else if (tab.dataset.stackId) {
+        this.currentStack = Number(tab.dataset.stackId)
+      }
+
+      this.renderStackBar()
+      this.renderMusicList()
+    })
+  }
+
   private setupEventDelegation(): void {
     const list = document.getElementById('music-list')
     if (!list) return
@@ -228,11 +277,15 @@ export class App {
   private async renderMusicList(): Promise<void> {
     const container = document.getElementById('music-list')!
 
-    const filters = this.currentFilter !== 'all'
-      ? { listenStatus: this.currentFilter }
-      : undefined
-
-    const result = await this.repository.listMusicItems(filters)
+    const filters: MusicItemFilters = {}
+    if (this.currentFilter !== 'all') {
+      filters.listenStatus = this.currentFilter
+    }
+    if (this.currentStack !== null) {
+      filters.stackId = this.currentStack
+    }
+    const hasFilters = Object.keys(filters).length > 0
+    const result = await this.repository.listMusicItems(hasFilters ? filters : undefined)
 
     if (result.items.length === 0) {
       const message = this.currentFilter === 'all'
