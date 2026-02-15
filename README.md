@@ -38,3 +38,6 @@ Data is stored locally in your browser using IndexedDB. Clearing site data will 
 ## Notes
 - The sql.js WebAssembly file is served from `public/sql-wasm.wasm`.
 - The app auto-saves changes and forces a save on page unload.
+
+## Deployment
+- Coolify alpha runbook: `docs/deployment/coolify-alpha.md`
