@@ -433,3 +433,75 @@ a:hover {
   font-size: 0.875rem;
   padding: 0.25rem 0.5rem;
 }
+
+/* Stack management panel */
+.stack-manage {
+  margin-top: 0.75rem;
+  padding: 1rem;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.stack-manage__item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.stack-manage__name {
+  flex: 1;
+  font-size: 0.875rem;
+}
+
+.stack-manage__count {
+  color: var(--text-muted);
+  font-size: 0.75rem;
+}
+
+.stack-manage__rename-btn,
+.stack-manage__delete-btn,
+.stack-manage__rename-confirm {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 0.75rem;
+  padding: 0.25rem 0.5rem;
+}
+
+.stack-manage__rename-btn:hover,
+.stack-manage__rename-confirm:hover {
+  color: var(--text);
+}
+
+.stack-manage__delete-btn:hover {
+  color: var(--danger);
+}
+
+.stack-manage__rename-input {
+  flex: 1;
+  padding: 0.25rem 0.5rem;
+  font-size: 0.875rem;
+}
+
+.stack-manage__create {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--border);
+}
+
+.stack-manage__create .input {
+  flex: 1;
+  padding: 0.5rem;
+  font-size: 0.875rem;
+}
+
+.stack-manage__create .btn {
+  padding: 0.5rem 1rem;
+  font-size: 0.875rem;
+}

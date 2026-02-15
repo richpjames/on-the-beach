@@ -98,6 +98,7 @@ export class App {
   private initializeUI(): void {
     this.setupFilterBar()
     this.setupStackBar()
+    this.setupStackManagePanel()
     this.setupEventDelegation()
     this.renderStackBar()
     this.renderMusicList()
@@ -454,6 +455,84 @@ export class App {
         </div>
       </article>
     `
+  }
+
+  private async renderStackManagePanel(): Promise<void> {
+    const stacks = await this.stackRepository.listStacks()
+    const list = document.getElementById('stack-manage-list')!
+    list.innerHTML = stacks.map(s => `
+      <div class="stack-manage__item" data-manage-stack-id="${s.id}">
+        <span class="stack-manage__name">${this.escapeHtml(s.name)}</span>
+        <span class="stack-manage__count">${s.item_count} items</span>
+        <button class="stack-manage__rename-btn">rename</button>
+        <button class="stack-manage__delete-btn">delete</button>
+      </div>
+    `).join('')
+  }
+
+  private setupStackManagePanel(): void {
+    const panel = document.getElementById('stack-manage')!
+    const manageBtn = document.getElementById('manage-stacks-btn')!
+
+    manageBtn.addEventListener('click', () => {
+      const isHidden = panel.hidden
+      panel.hidden = !isHidden
+      if (!panel.hidden) {
+        this.renderStackManagePanel()
+      }
+    })
+
+    document.getElementById('stack-manage-create-btn')?.addEventListener('click', async () => {
+      const input = document.getElementById('stack-manage-input') as HTMLInputElement
+      const name = input.value.trim()
+      if (!name) return
+      await this.stackRepository.createStack(name)
+      input.value = ''
+      await this.renderStackBar()
+      await this.renderStackManagePanel()
+    })
+
+    document.getElementById('stack-manage-list')?.addEventListener('click', async (e) => {
+      const target = e.target as HTMLElement
+      const item = target.closest('[data-manage-stack-id]') as HTMLElement
+      if (!item) return
+      const stackId = Number(item.dataset.manageStackId)
+
+      if (target.classList.contains('stack-manage__rename-btn')) {
+        const nameEl = item.querySelector('.stack-manage__name')!
+        const currentName = nameEl.textContent!.trim()
+        item.innerHTML = `
+          <input type="text" class="stack-manage__rename-input input" value="${this.escapeHtml(currentName)}">
+          <button class="stack-manage__rename-confirm">save</button>
+        `
+        const renameInput = item.querySelector('.stack-manage__rename-input') as HTMLInputElement
+        renameInput.focus()
+        renameInput.select()
+      }
+
+      if (target.classList.contains('stack-manage__rename-confirm')) {
+        const renameInput = item.querySelector('.stack-manage__rename-input') as HTMLInputElement
+        const newName = renameInput.value.trim()
+        if (newName) {
+          await this.stackRepository.renameStack(stackId, newName)
+          await this.renderStackBar()
+          await this.renderStackManagePanel()
+        }
+      }
+
+      if (target.classList.contains('stack-manage__delete-btn')) {
+        const stack = this.stacks.find(s => s.id === stackId)
+        if (confirm(`Delete "${stack?.name}"? Links won't be deleted, just untagged.`)) {
+          await this.stackRepository.deleteStack(stackId)
+          if (this.currentStack === stackId) {
+            this.currentStack = null
+          }
+          await this.renderStackBar()
+          await this.renderStackManagePanel()
+          await this.renderMusicList()
+        }
+      }
+    })
   }
 
   private renderAddFormStackChips(): void {
