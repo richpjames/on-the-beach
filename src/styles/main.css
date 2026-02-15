@@ -386,3 +386,50 @@ a:hover {
   padding: 0.35rem 0.5rem;
   font-size: 0.875rem;
 }
+
+/* Stack picker (add form) */
+.stack-picker {
+  grid-column: span 2;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  position: relative;
+}
+
+.stack-picker__chips {
+  display: flex;
+  gap: 0.25rem;
+  flex-wrap: wrap;
+}
+
+.stack-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.25rem 0.5rem;
+  background: rgba(59, 130, 246, 0.2);
+  color: #60a5fa;
+  border-radius: var(--radius-sm);
+  font-size: 0.75rem;
+}
+
+.stack-chip__remove {
+  background: none;
+  border: none;
+  color: inherit;
+  cursor: pointer;
+  padding: 0;
+  font-size: 1rem;
+  line-height: 1;
+  opacity: 0.7;
+}
+
+.stack-chip__remove:hover {
+  opacity: 1;
+}
+
+.stack-picker__add {
+  font-size: 0.875rem;
+  padding: 0.25rem 0.5rem;
+}

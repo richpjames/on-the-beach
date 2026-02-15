@@ -36,6 +36,7 @@ export class App {
   private stacks: StackWithCount[] = []
   private isReady = false
   private addFormInitialized = false
+  private addFormSelectedStacks: number[] = []
   private syncService: SyncService | null
   private syncIntervalMs: number
   private syncTimer: ReturnType<typeof setInterval> | null = null
@@ -108,6 +109,22 @@ export class App {
     const form = document.getElementById('add-form') as HTMLFormElement
     this.addFormInitialized = true
 
+    // Stack picker button
+    document.getElementById('add-form-stack-btn')?.addEventListener('click', () => {
+      this.showAddFormStackDropdown()
+    })
+
+    // Stack chip removal
+    document.getElementById('add-form-stack-chips')?.addEventListener('click', (e) => {
+      const target = e.target as HTMLElement
+      if (target.dataset.removeStack) {
+        this.addFormSelectedStacks = this.addFormSelectedStacks.filter(
+          id => id !== Number(target.dataset.removeStack)
+        )
+        this.renderAddFormStackChips()
+      }
+    })
+
     form.addEventListener('submit', async (e) => {
       e.preventDefault()
 
@@ -133,6 +150,13 @@ export class App {
         })
         await this.queueMusicItemUpsert(item)
         await this.queuePrimaryMusicLinkUpsert(item)
+        // Assign selected stacks
+        if (this.addFormSelectedStacks.length > 0) {
+          await this.stackRepository.setItemStacks(item.id, this.addFormSelectedStacks)
+          this.addFormSelectedStacks = []
+          this.renderAddFormStackChips()
+          await this.renderStackBar()
+        }
         form.reset()
         await this.renderMusicList()
       } catch (error) {
@@ -430,6 +454,92 @@ export class App {
         </div>
       </article>
     `
+  }
+
+  private renderAddFormStackChips(): void {
+    const container = document.getElementById('add-form-stack-chips')
+    if (!container) return
+    container.innerHTML = this.addFormSelectedStacks
+      .map(id => {
+        const stack = this.stacks.find(s => s.id === id)
+        if (!stack) return ''
+        return `<span class="stack-chip">
+          ${this.escapeHtml(stack.name)}
+          <button type="button" class="stack-chip__remove" data-remove-stack="${id}">&times;</button>
+        </span>`
+      })
+      .join('')
+  }
+
+  private async showAddFormStackDropdown(): Promise<void> {
+    document.querySelectorAll('.stack-dropdown').forEach(el => el.remove())
+
+    const stacks = await this.stackRepository.listStacks()
+    const selectedSet = new Set(this.addFormSelectedStacks)
+
+    const dropdown = document.createElement('div')
+    dropdown.className = 'stack-dropdown'
+    dropdown.innerHTML = `
+      ${stacks.map(s => `
+        <label class="stack-dropdown__item">
+          <input type="checkbox" class="stack-dropdown__checkbox"
+                 data-stack-id="${s.id}" ${selectedSet.has(s.id) ? 'checked' : ''}>
+          ${this.escapeHtml(s.name)}
+        </label>
+      `).join('')}
+      <div class="stack-dropdown__new">
+        <input type="text" class="stack-dropdown__new-input input"
+               placeholder="New stack...">
+      </div>
+    `
+
+    const picker = document.getElementById('add-form-stacks')!
+    picker.appendChild(dropdown)
+
+    dropdown.addEventListener('change', async (e) => {
+      const target = e.target as HTMLInputElement
+      if (!target.classList.contains('stack-dropdown__checkbox')) return
+      const stackId = Number(target.dataset.stackId)
+      if (target.checked) {
+        if (!this.addFormSelectedStacks.includes(stackId)) {
+          this.addFormSelectedStacks.push(stackId)
+        }
+      } else {
+        this.addFormSelectedStacks = this.addFormSelectedStacks.filter(id => id !== stackId)
+      }
+      this.renderAddFormStackChips()
+    })
+
+    const newInput = dropdown.querySelector('.stack-dropdown__new-input') as HTMLInputElement
+    newInput.addEventListener('keydown', async (e) => {
+      if (e.key !== 'Enter') return
+      e.preventDefault()
+      const name = newInput.value.trim()
+      if (!name) return
+      const stack = await this.stackRepository.createStack(name)
+      this.addFormSelectedStacks.push(stack.id)
+      await this.renderStackBar()
+      this.renderAddFormStackChips()
+      await this.showAddFormStackDropdown()
+    })
+
+    const closeOnEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        dropdown.remove()
+        document.removeEventListener('keydown', closeOnEscape)
+      }
+    }
+    document.addEventListener('keydown', closeOnEscape)
+
+    setTimeout(() => {
+      const clickOutside = (e: MouseEvent) => {
+        if (!dropdown.contains(e.target as Node) && !(e.target as HTMLElement).closest('#add-form-stack-btn')) {
+          dropdown.remove()
+          document.removeEventListener('click', clickOutside)
+        }
+      }
+      document.addEventListener('click', clickOutside)
+    }, 0)
   }
 
   private async renderStackDropdown(cardEl: HTMLElement, itemId: number): Promise<void> {
