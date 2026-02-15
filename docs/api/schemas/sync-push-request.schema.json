@@ -1,0 +1,71 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://on-the-beach.app/schemas/sync-push-request.schema.json",
+  "title": "Sync Push Request",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["deviceId", "ops"],
+  "properties": {
+    "deviceId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "description": "Stable per-install device identifier"
+    },
+    "ops": {
+      "type": "array",
+      "maxItems": 500,
+      "items": {
+        "$ref": "#/$defs/op"
+      }
+    }
+  },
+  "$defs": {
+    "entity": {
+      "type": "string",
+      "enum": ["music_item", "music_link", "artist"]
+    },
+    "action": {
+      "type": "string",
+      "enum": ["upsert", "delete"]
+    },
+    "op": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["opId", "entity", "action", "payload", "clientUpdatedAt"],
+      "properties": {
+        "opId": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9._:-]{8,128}$",
+          "description": "Idempotency key unique per client operation"
+        },
+        "entity": {
+          "$ref": "#/$defs/entity"
+        },
+        "action": {
+          "$ref": "#/$defs/action"
+        },
+        "payload": {
+          "type": "object",
+          "additionalProperties": true,
+          "required": ["id"],
+          "properties": {
+            "id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            },
+            "deletedAt": {
+              "type": ["string", "null"],
+              "format": "date-time"
+            }
+          }
+        },
+        "clientUpdatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    }
+  }
+}

@@ -1,7 +1,81 @@
 import { App } from './app'
+import { AuthService, type AuthSession } from './services/auth'
+
+interface SyncBootstrapConfig {
+  baseUrl: string
+  deviceId: string
+  enabled?: boolean
+  intervalMs?: number
+}
+
+declare global {
+  interface Window {
+    __ON_THE_BEACH_SYNC_CONFIG__?: Partial<SyncBootstrapConfig>
+  }
+}
+
+const SESSION_STORAGE_KEY = 'otb.auth.session'
+
+function parseStoredSession(): AuthSession | null {
+  const raw = localStorage.getItem(SESSION_STORAGE_KEY)
+  if (!raw) return null
+
+  try {
+    const parsed = JSON.parse(raw) as Partial<AuthSession>
+    if (
+      typeof parsed.userId !== 'string' ||
+      typeof parsed.accessToken !== 'string' ||
+      typeof parsed.expiresAt !== 'number'
+    ) {
+      return null
+    }
+    return {
+      userId: parsed.userId,
+      accessToken: parsed.accessToken,
+      expiresAt: parsed.expiresAt,
+    }
+  } catch {
+    return null
+  }
+}
+
+function parseSyncConfig(): SyncBootstrapConfig | null {
+  const config = window.__ON_THE_BEACH_SYNC_CONFIG__
+  if (!config || config.enabled === false) return null
+
+  if (typeof config.baseUrl !== 'string') return null
+  if (typeof config.deviceId !== 'string' || config.deviceId.trim() === '') return null
+
+  return {
+    baseUrl: config.baseUrl,
+    deviceId: config.deviceId,
+    enabled: true,
+    intervalMs: typeof config.intervalMs === 'number' ? config.intervalMs : undefined,
+  }
+}
 
 async function bootstrap() {
-  const app = new App()
+  const syncConfig = parseSyncConfig()
+  const app = (() => {
+    if (!syncConfig) return new App()
+
+    const authService = new AuthService({ baseUrl: syncConfig.baseUrl })
+    const session = parseStoredSession()
+    if (session) {
+      authService.setSession(session)
+    }
+
+    return new App({
+      sync: {
+        authService,
+        config: {
+          baseUrl: syncConfig.baseUrl,
+          deviceId: syncConfig.deviceId,
+        },
+        intervalMs: syncConfig.intervalMs,
+      },
+    })
+  })()
 
   try {
     await app.initialize()

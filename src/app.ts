@@ -2,6 +2,9 @@ import { SqlJsDriver } from './database/driver'
 import { IndexedDBPersistence } from './database/persistence'
 import { MusicRepository } from './repository/music-repository'
 import { AutoSaveService } from './services/auto-save'
+import { SyncService } from './services/sync'
+import { AuthService } from './services/auth'
+import type { SyncServiceConfig } from './services/sync'
 import { SCHEMA } from './database/schema'
 import type { MusicItemFull, ListenStatus, ItemType } from './types'
 
@@ -13,6 +16,14 @@ const STATUS_LABELS: Record<ListenStatus, string> = {
   'done': 'Done',
 }
 
+interface AppOptions {
+  sync?: {
+    authService: AuthService
+    config: SyncServiceConfig
+    intervalMs?: number
+  }
+}
+
 export class App {
   private driver: SqlJsDriver
   private persistence: IndexedDBPersistence
@@ -21,12 +32,23 @@ export class App {
   private currentFilter: ListenStatus | 'all' = 'all'
   private isReady = false
   private addFormInitialized = false
+  private syncService: SyncService | null
+  private syncIntervalMs: number
+  private syncTimer: ReturnType<typeof setInterval> | null = null
+  private syncInFlight = false
 
-  constructor() {
+  constructor(options: AppOptions = {}) {
     this.driver = new SqlJsDriver('/sql-wasm.wasm')
     this.persistence = new IndexedDBPersistence()
     this.autoSave = new AutoSaveService(this.driver, this.persistence)
     this.repository = new MusicRepository(this.driver)
+    if (options.sync) {
+      this.syncService = new SyncService(this.driver, options.sync.authService, options.sync.config)
+      this.syncIntervalMs = options.sync.intervalMs ?? 60_000
+    } else {
+      this.syncService = null
+      this.syncIntervalMs = 60_000
+    }
   }
 
   async initialize(): Promise<void> {
@@ -59,6 +81,8 @@ export class App {
 
     // Initialize UI
     this.initializeUI()
+    await this.runSyncCycle()
+    this.startSyncLoop()
   }
 
   async forceSave(): Promise<void> {
@@ -94,19 +118,51 @@ export class App {
       if (!url.trim()) return
 
       try {
-        await this.repository.createMusicItem({
+        const item = await this.repository.createMusicItem({
           url,
           title: title || undefined,
           artistName: artist,
           itemType,
         })
+        await this.queueMusicItemUpsert(item)
+        await this.queuePrimaryMusicLinkUpsert(item)
         form.reset()
-        this.renderMusicList()
+        await this.renderMusicList()
       } catch (error) {
         console.error('Failed to add item:', error)
         alert('Failed to add item. Please check the URL and try again.')
       }
     })
+  }
+
+  private startSyncLoop(): void {
+    if (!this.syncService) return
+
+    window.addEventListener('online', () => {
+      void this.runSyncCycle()
+    })
+
+    if (this.syncIntervalMs > 0) {
+      this.syncTimer = setInterval(() => {
+        void this.runSyncCycle()
+      }, this.syncIntervalMs)
+    }
+  }
+
+  private async runSyncCycle(): Promise<void> {
+    if (!this.syncService || this.syncInFlight) return
+
+    this.syncInFlight = true
+    try {
+      const result = await this.syncService.runOnce()
+      if (result.status === 'ok' && result.pulled > 0) {
+        await this.renderMusicList()
+      }
+    } catch (error) {
+      console.error('[Sync] Cycle failed:', error)
+    } finally {
+      this.syncInFlight = false
+    }
   }
 
   private setupFilterBar(): void {
@@ -141,8 +197,11 @@ export class App {
         const card = target.closest('[data-item-id]') as HTMLElement
         const id = Number(card?.dataset.itemId)
         if (id && confirm('Delete this item?')) {
-          await this.repository.deleteMusicItem(id)
-          this.renderMusicList()
+          const deleted = await this.repository.deleteMusicItem(id)
+          if (deleted) {
+            await this.queueMusicItemDelete(id)
+          }
+          await this.renderMusicList()
         }
       }
     })
@@ -156,8 +215,11 @@ export class App {
         const id = Number(card?.dataset.itemId)
         const status = target.value as ListenStatus
         if (id) {
-          await this.repository.updateListenStatus(id, status)
-          this.renderMusicList()
+          const updated = await this.repository.updateListenStatus(id, status)
+          if (updated) {
+            await this.queueMusicItemUpsert(updated)
+          }
+          await this.renderMusicList()
         }
       }
     })
@@ -185,6 +247,78 @@ export class App {
     }
 
     container.innerHTML = result.items.map((item) => this.renderMusicCard(item)).join('')
+  }
+
+  private async queueMusicItemUpsert(item: MusicItemFull): Promise<void> {
+    if (!this.syncService) return
+
+    try {
+      await this.syncService.queueOperation({
+        entity: 'music_item',
+        action: 'upsert',
+        payload: {
+          id: String(item.id),
+          title: item.title,
+          normalized_title: item.normalized_title,
+          item_type: item.item_type,
+          artist_id: item.artist_id,
+          listen_status: item.listen_status,
+          purchase_intent: item.purchase_intent,
+          price_cents: item.price_cents,
+          currency: item.currency,
+          notes: item.notes,
+          rating: item.rating,
+          created_at: item.created_at,
+          updated_at: item.updated_at,
+          listened_at: item.listened_at,
+          is_physical: item.is_physical,
+          physical_format: item.physical_format,
+        },
+      })
+      void this.runSyncCycle()
+    } catch (error) {
+      console.error('[Sync] Failed to queue music item upsert:', error)
+    }
+  }
+
+  private async queueMusicItemDelete(id: number): Promise<void> {
+    if (!this.syncService) return
+
+    try {
+      await this.syncService.queueOperation({
+        entity: 'music_item',
+        action: 'delete',
+        payload: {
+          id: String(id),
+          deletedAt: new Date().toISOString(),
+        },
+      })
+      void this.runSyncCycle()
+    } catch (error) {
+      console.error('[Sync] Failed to queue music item delete:', error)
+    }
+  }
+
+  private async queuePrimaryMusicLinkUpsert(item: MusicItemFull): Promise<void> {
+    if (!this.syncService || !item.primary_url) return
+
+    try {
+      await this.syncService.queueOperation({
+        entity: 'music_link',
+        action: 'upsert',
+        payload: {
+          id: `primary:${item.id}`,
+          music_item_id: String(item.id),
+          url: item.primary_url,
+          is_primary: 1,
+          source_name: item.primary_source,
+          created_at: item.created_at,
+        },
+      })
+      void this.runSyncCycle()
+    } catch (error) {
+      console.error('[Sync] Failed to queue primary music link upsert:', error)
+    }
   }
 
   private renderMusicCard(item: MusicItemFull): string {

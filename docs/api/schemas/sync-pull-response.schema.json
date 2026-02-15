@@ -1,0 +1,63 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://on-the-beach.app/schemas/sync-pull-response.schema.json",
+  "title": "Sync Pull Response",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["changes", "nextVersion", "hasMore"],
+  "properties": {
+    "changes": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/change"
+      }
+    },
+    "nextVersion": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "hasMore": {
+      "type": "boolean"
+    }
+  },
+  "$defs": {
+    "entity": {
+      "type": "string",
+      "enum": ["music_item", "music_link", "artist"]
+    },
+    "action": {
+      "type": "string",
+      "enum": ["upsert", "delete"]
+    },
+    "change": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["version", "entity", "entityId", "action", "payload", "updatedAt"],
+      "properties": {
+        "version": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "entity": {
+          "$ref": "#/$defs/entity"
+        },
+        "entityId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "action": {
+          "$ref": "#/$defs/action"
+        },
+        "payload": {
+          "type": "object",
+          "additionalProperties": true
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    }
+  }
+}

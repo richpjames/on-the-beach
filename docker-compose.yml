@@ -1,0 +1,32 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: on-the-beach-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: on_the_beach
+      POSTGRES_USER: on_the_beach
+      POSTGRES_PASSWORD: on_the_beach_dev
+    ports:
+      - '5432:5432'
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U on_the_beach -d on_the_beach']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./ops/postgres/init:/docker-entrypoint-initdb.d:ro
+
+  adminer:
+    image: adminer:4
+    container_name: on-the-beach-adminer
+    restart: unless-stopped
+    ports:
+      - '8080:8080'
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  postgres_data:

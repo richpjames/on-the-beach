@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://on-the-beach.app/schemas/sync-pull-query.schema.json",
+  "title": "Sync Pull Query",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["since"],
+  "properties": {
+    "since": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Last applied server version on the client"
+    },
+    "limit": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 500,
+      "default": 200
+    }
+  }
+}

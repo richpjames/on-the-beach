@@ -1,0 +1,64 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://on-the-beach.app/schemas/sync-push-response.schema.json",
+  "title": "Sync Push Response",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["appliedOpIds", "conflicts", "serverVersion"],
+  "properties": {
+    "appliedOpIds": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 128
+      },
+      "uniqueItems": true
+    },
+    "conflicts": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/conflict"
+      }
+    },
+    "serverVersion": {
+      "type": "integer",
+      "minimum": 0
+    }
+  },
+  "$defs": {
+    "conflict": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["opId", "entity", "entityId", "reason", "serverVersion"],
+      "properties": {
+        "opId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "entity": {
+          "type": "string",
+          "enum": ["music_item", "music_link", "artist"]
+        },
+        "entityId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "reason": {
+          "type": "string",
+          "enum": ["version_conflict", "validation_failed", "not_found", "forbidden"]
+        },
+        "serverVersion": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "serverRecord": {
+          "type": "object",
+          "additionalProperties": true
+        }
+      }
+    }
+  }
+}
