@@ -201,7 +201,11 @@ export class App {
           ${item.artist_name ? `<div class="music-card__artist">${this.escapeHtml(item.artist_name)}</div>` : ''}
           <div class="music-card__meta">
             <select class="status-select">${statusOptions}</select>
-            ${item.primary_source ? `<span class="badge badge--source">${item.primary_source}</span>` : ''}
+            ${item.primary_source ? (
+              item.primary_url
+                ? `<a href="${this.escapeHtml(item.primary_url)}" target="_blank" rel="noopener noreferrer" class="badge badge--source">${this.escapeHtml(item.primary_source)}</a>`
+                : `<span class="badge badge--source">${this.escapeHtml(item.primary_source)}</span>`
+            ) : ''}
           </div>
         </div>
         <div class="music-card__actions">
