@@ -173,6 +173,13 @@ export class MusicRepository implements IMusicRepository {
       params.push(searchTerm, searchTerm)
     }
 
+    if (filters?.stackId) {
+      conditions.push(
+        `id IN (SELECT music_item_id FROM music_item_stacks WHERE stack_id = ?)`
+      )
+      params.push(filters.stackId)
+    }
+
     if (conditions.length > 0) {
       sql += ' WHERE ' + conditions.join(' AND ')
     }
