@@ -6,6 +6,11 @@ interface SyncBootstrapConfig {
   deviceId: string
   enabled?: boolean
   intervalMs?: number
+  pushPath?: string
+  pullPath?: string
+  pushBatchSize?: number
+  pullLimit?: number
+  maxPullPages?: number
 }
 
 declare global {
@@ -51,6 +56,11 @@ function parseSyncConfig(): SyncBootstrapConfig | null {
     deviceId: config.deviceId,
     enabled: true,
     intervalMs: typeof config.intervalMs === 'number' ? config.intervalMs : undefined,
+    pushPath: typeof config.pushPath === 'string' ? config.pushPath : undefined,
+    pullPath: typeof config.pullPath === 'string' ? config.pullPath : undefined,
+    pushBatchSize: typeof config.pushBatchSize === 'number' ? config.pushBatchSize : undefined,
+    pullLimit: typeof config.pullLimit === 'number' ? config.pullLimit : undefined,
+    maxPullPages: typeof config.maxPullPages === 'number' ? config.maxPullPages : undefined,
   }
 }
 
@@ -71,6 +81,11 @@ async function bootstrap() {
         config: {
           baseUrl: syncConfig.baseUrl,
           deviceId: syncConfig.deviceId,
+          pushPath: syncConfig.pushPath,
+          pullPath: syncConfig.pullPath,
+          pushBatchSize: syncConfig.pushBatchSize,
+          pullLimit: syncConfig.pullLimit,
+          maxPullPages: syncConfig.maxPullPages,
         },
         intervalMs: syncConfig.intervalMs,
       },
