@@ -204,7 +204,7 @@ export class SyncService {
     }
 
     if (data.conflicts.length > 0) {
-      await this.markConflicts(data.conflicts)
+      await this.handleConflicts(data.conflicts)
     }
 
     return {
@@ -425,6 +425,7 @@ export class SyncService {
   }
 
   private async deleteAppliedOps(opIds: string[]): Promise<void> {
+    if (opIds.length === 0) return
     const placeholders = opIds.map(() => '?').join(', ')
     await this.driver.run(
       `DELETE FROM sync_outbox WHERE op_id IN (${placeholders})`,
@@ -432,8 +433,34 @@ export class SyncService {
     )
   }
 
-  private async markConflicts(conflicts: SyncPushResponse['conflicts']): Promise<void> {
+  private async handleConflicts(conflicts: SyncPushResponse['conflicts']): Promise<void> {
+    const reconciledOpIds: string[] = []
+
     for (const conflict of conflicts) {
+      if (conflict.serverRecord) {
+        try {
+          const action = this.inferConflictAction(conflict.serverRecord)
+          const resolvedEntityId = this.resolveConflictEntityId(conflict)
+          const change: SyncPullResponse['changes'][number] = {
+            version: conflict.serverVersion,
+            entity: conflict.entity,
+            entityId: resolvedEntityId,
+            action,
+            payload: {
+              ...conflict.serverRecord,
+              id: String(conflict.serverRecord.id ?? resolvedEntityId),
+            },
+            updatedAt: new Date().toISOString(),
+          }
+
+          await this.applyIncomingChange(change)
+          reconciledOpIds.push(conflict.opId)
+          continue
+        } catch (error) {
+          console.warn('[Sync] Failed to reconcile conflict with serverRecord:', error)
+        }
+      }
+
       await this.driver.run(
         `UPDATE sync_outbox
          SET attempts = attempts + 1,
@@ -441,6 +468,10 @@ export class SyncService {
          WHERE op_id = ?`,
         [conflict.reason, conflict.opId]
       )
+    }
+
+    if (reconciledOpIds.length > 0) {
+      await this.deleteAppliedOps(reconciledOpIds)
     }
   }
 
@@ -499,5 +530,23 @@ export class SyncService {
     if (value === null || value === undefined) return null
     if (typeof value !== 'string') return null
     return value
+  }
+
+  private inferConflictAction(serverRecord: Record<string, unknown>): 'upsert' | 'delete' {
+    const deletedAt = serverRecord.deletedAt ?? serverRecord.deleted_at
+    if (typeof deletedAt === 'string' && deletedAt.length > 0) {
+      return 'delete'
+    }
+
+    return 'upsert'
+  }
+
+  private resolveConflictEntityId(conflict: SyncPushResponse['conflicts'][number]): string {
+    const serverRecordId = conflict.serverRecord?.id
+    if (serverRecordId !== undefined && serverRecordId !== null && String(serverRecordId).trim() !== '') {
+      return String(serverRecordId)
+    }
+
+    return conflict.entityId
   }
 }

@@ -8,7 +8,11 @@
     "build": "tsc && vite build",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
-    "test:e2e": "playwright test"
+    "test": "vitest run",
+    "test:unit": "vitest run",
+    "test:unit:watch": "vitest",
+    "test:e2e": "playwright test playwright/add-link.spec.ts playwright/bandcamp-link.spec.ts playwright/stacks.spec.ts playwright/sync-startup.spec.ts",
+    "test:e2e:full": "npx playwright test playwright"
   },
   "dependencies": {
     "sql.js": "^1.13.0"
@@ -17,6 +21,7 @@
     "@playwright/test": "^1.58.2",
     "@types/sql.js": "^1.4.9",
     "typescript": "^5.9.3",
-    "vite": "^6.4.1"
+    "vite": "^6.4.1",
+    "vitest": "^4.0.18"
   }
 }

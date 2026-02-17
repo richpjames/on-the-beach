@@ -4,6 +4,7 @@ export default defineConfig({
   testDir: './playwright',
   timeout: 30_000,
   reporter: 'list',
+  workers: 2,
   use: {
     baseURL: 'http://127.0.0.1:4175',
     headless: true,

@@ -30,6 +30,9 @@ npm run dev       # Start the Vite dev server
 npm run build     # Type-check and build for production
 npm run preview   # Preview the production build
 npm run typecheck # Type-check without building
+npm run test:unit # Fast unit tests (Vitest)
+npm run test:e2e  # Smoke end-to-end tests (Playwright)
+npm run test:e2e:full # Full end-to-end suite (Playwright)
 ```
 
 ## Data Storage

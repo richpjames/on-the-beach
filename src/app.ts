@@ -187,7 +187,7 @@ export class App {
     this.syncInFlight = true
     try {
       const result = await this.syncService.runOnce()
-      if (result.status === 'ok' && result.pulled > 0) {
+      if (result.status === 'ok' && (result.pulled > 0 || result.conflicts > 0)) {
         await this.renderMusicList()
       }
     } catch (error) {
