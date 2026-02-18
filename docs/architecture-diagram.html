@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>On The Beach - Architecture Diagram</title>
+  <style>
+    :root {
+      --bg-1: #f7efe3;
+      --bg-2: #e5f1f9;
+      --ink: #0f2430;
+      --muted: #365260;
+      --line: #7aa6bd;
+      --ui: #ffd78a;
+      --app: #f9b5a7;
+      --repo: #9ad1c2;
+      --data: #8bb8ff;
+      --persist: #b6a2e6;
+      --be: #8fd0a8;
+      --card-shadow: 0 10px 30px rgba(15, 36, 48, 0.12);
+      --radius: 14px;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: "Avenir Next", "Gill Sans", "Trebuchet MS", sans-serif;
+      color: var(--ink);
+      background:
+        radial-gradient(1000px 500px at 10% -10%, rgba(255, 255, 255, 0.85) 0%, rgba(255, 255, 255, 0) 65%),
+        radial-gradient(700px 500px at 90% 0%, rgba(140, 186, 255, 0.25) 0%, rgba(140, 186, 255, 0) 70%),
+        linear-gradient(160deg, var(--bg-1) 0%, var(--bg-2) 100%);
+      padding: 28px;
+    }
+
+    .page {
+      max-width: 1200px;
+      margin: 0 auto;
+      background: rgba(255, 255, 255, 0.66);
+      backdrop-filter: blur(6px);
+      border: 1px solid rgba(255, 255, 255, 0.8);
+      border-radius: 24px;
+      box-shadow: 0 16px 44px rgba(15, 36, 48, 0.12);
+      padding: 24px;
+    }
+
+    h1 {
+      margin: 0;
+      letter-spacing: 0.02em;
+      font-size: clamp(1.4rem, 3vw, 2.2rem);
+    }
+
+    .subtitle {
+      margin: 6px 0 20px;
+      color: var(--muted);
+      font-size: 0.98rem;
+    }
+
+    .swimlanes {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 22px;
+      align-items: start;
+    }
+
+    .lane {
+      border: 1px solid rgba(15, 36, 48, 0.15);
+      border-radius: 18px;
+      background: rgba(255, 255, 255, 0.8);
+      padding: 16px;
+    }
+
+    .lane h2 {
+      margin: 0 0 14px;
+      font-size: 1rem;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+
+    .node {
+      border-radius: var(--radius);
+      padding: 12px 14px;
+      box-shadow: var(--card-shadow);
+      border: 1px solid rgba(15, 36, 48, 0.12);
+      margin: 0;
+    }
+
+    .node strong {
+      display: block;
+      font-size: 0.96rem;
+      margin-bottom: 3px;
+    }
+
+    .node p {
+      margin: 0;
+      font-size: 0.83rem;
+      color: #203d4b;
+      line-height: 1.3;
+    }
+
+    .ui { background: linear-gradient(140deg, #ffeec4, var(--ui)); }
+    .app { background: linear-gradient(140deg, #ffd6cd, var(--app)); }
+    .repo { background: linear-gradient(140deg, #cdf1e8, var(--repo)); }
+    .data { background: linear-gradient(140deg, #d5e6ff, var(--data)); }
+    .persist { background: linear-gradient(140deg, #ddd3f3, var(--persist)); }
+    .be { background: linear-gradient(140deg, #d3f1df, var(--be)); }
+
+    .flow {
+      display: grid;
+      gap: 12px;
+    }
+
+    .row {
+      display: grid;
+      grid-template-columns: 1fr auto 1fr;
+      gap: 12px;
+      align-items: center;
+    }
+
+    .arrow {
+      text-align: center;
+      color: var(--muted);
+      font-size: 0.82rem;
+      line-height: 1.2;
+      font-weight: 600;
+    }
+
+    .arrow span {
+      display: block;
+      font-size: 1.15rem;
+      color: var(--line);
+    }
+
+    .stack {
+      display: grid;
+      gap: 10px;
+    }
+
+    .stack .arrow {
+      font-size: 0.8rem;
+    }
+
+    .legend {
+      margin-top: 16px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      color: var(--muted);
+      font-size: 0.78rem;
+    }
+
+    .pill {
+      border-radius: 999px;
+      padding: 6px 10px;
+      border: 1px solid rgba(15, 36, 48, 0.15);
+      background: rgba(255, 255, 255, 0.8);
+    }
+
+    code {
+      font-family: "SF Mono", Menlo, Consolas, monospace;
+      font-size: 0.78rem;
+      background: rgba(255, 255, 255, 0.66);
+      padding: 0.1rem 0.35rem;
+      border-radius: 6px;
+      border: 1px solid rgba(15, 36, 48, 0.16);
+    }
+
+    @media (max-width: 980px) {
+      .swimlanes {
+        grid-template-columns: 1fr;
+      }
+
+      .row {
+        grid-template-columns: 1fr;
+      }
+
+      .row .arrow {
+        order: 2;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <h1>On The Beach: App Architecture</h1>
+    <p class="subtitle">
+      Current implementation is local-first in browser; backend-only data flow is the target direction.
+    </p>
+
+    <section class="swimlanes">
+      <article class="lane">
+        <h2>Current: Client Runtime and Local Data Path</h2>
+        <div class="stack">
+          <div class="node ui">
+            <strong>UI Shell</strong>
+            <p><code>index.html</code> + <code>src/styles/main.css</code> + user interactions (forms, filters, stacks).</p>
+          </div>
+          <div class="arrow">DOM events and state updates<span>↓</span></div>
+
+          <div class="node app">
+            <strong>Bootstrap + Orchestrator</strong>
+            <p><code>src/main.ts</code> creates <code>App</code>; <code>src/app.ts</code> wires UI, repositories, and autosave.</p>
+          </div>
+
+          <div class="arrow">CRUD and queries<span>↓</span></div>
+          <div class="node repo">
+            <strong>Domain Repositories</strong>
+            <p><code>MusicRepository</code> and <code>StackRepository</code> encapsulate SQL operations and filtering.</p>
+          </div>
+
+          <div class="arrow">SQL execution and change notifications<span>↓</span></div>
+          <div class="node data">
+            <strong>Database Engine</strong>
+            <p><code>SqlJsDriver</code> runs SQLite in-memory via <code>sql.js</code> WebAssembly (<code>/public/sql-wasm.wasm</code>).</p>
+          </div>
+
+          <div class="arrow">onChange() debounced export<span>↓</span></div>
+          <div class="node persist">
+            <strong>Persistence Layer</strong>
+            <p><code>AutoSaveService</code> exports DB snapshots and stores them through <code>IndexedDBPersistence</code>.</p>
+          </div>
+
+          <div class="arrow">Load on startup, save on mutation/unload<span>↓</span></div>
+          <div class="node persist">
+            <strong>Browser Storage</strong>
+            <p><code>IndexedDB</code> stores SQLite bytes for persistence between sessions.</p>
+          </div>
+        </div>
+      </article>
+
+      <article class="lane">
+        <h2>Target: Backend-Only Data Path</h2>
+        <div class="stack">
+          <div class="node ui">
+            <strong>UI Shell</strong>
+            <p>User actions from forms, filters, status updates, and stack management.</p>
+          </div>
+          <div class="arrow">request / response<span>↓</span></div>
+
+          <div class="node app">
+            <strong>Frontend Application</strong>
+            <p><code>App</code> orchestrates state and calls API clients instead of writing directly to local DB.</p>
+          </div>
+
+          <div class="arrow">HTTP API calls<span>↓</span></div>
+          <div class="node be">
+            <strong>Backend API</strong>
+            <p>Owns write/read operations for music items, links, artists, and stacks.</p>
+          </div>
+
+          <div class="arrow">server-side persistence<span>↓</span></div>
+          <div class="node be">
+            <strong>Backend Database</strong>
+            <p>Single source of truth managed by the backend (engine can be chosen independently).</p>
+          </div>
+
+          <div class="arrow">initial load + refresh<span>↑</span></div>
+          <div class="node ui">
+            <strong>Rendered Library</strong>
+            <p>UI reflects backend state after each successful request.</p>
+          </div>
+        </div>
+      </article>
+    </section>
+
+    <section class="legend">
+      <span class="pill">Entry point: <code>src/main.ts</code></span>
+      <span class="pill">Core coordinator: <code>src/app.ts</code></span>
+      <span class="pill">Current model: SQLite snapshot persisted to IndexedDB</span>
+      <span class="pill">Removed: local outbox/inbox sync layer</span>
+      <span class="pill">Target model: frontend talks directly to backend API</span>
+    </section>
+  </main>
+</body>
+</html>
