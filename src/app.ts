@@ -1,9 +1,4 @@
-import { SqlJsDriver } from './database/driver'
-import { IndexedDBPersistence } from './database/persistence'
-import { MusicRepository } from './repository/music-repository'
-import { StackRepository } from './repository/stack-repository'
-import { AutoSaveService } from './services/auto-save'
-import { SCHEMA } from './database/schema'
+import { ApiClient } from './services/api-client'
 import type { MusicItemFull, ListenStatus, ItemType, Stack, StackWithCount, MusicItemFilters } from './types'
 
 const STATUS_LABELS: Record<ListenStatus, string> = {
@@ -15,60 +10,22 @@ const STATUS_LABELS: Record<ListenStatus, string> = {
 }
 
 export class App {
-  private driver: SqlJsDriver
-  private persistence: IndexedDBPersistence
-  private autoSave: AutoSaveService
-  private repository: MusicRepository
+  private api: ApiClient
   private currentFilter: ListenStatus | 'all' = 'all'
   private currentStack: number | null = null
-  private stackRepository!: StackRepository
   private stacks: StackWithCount[] = []
   private isReady = false
   private addFormInitialized = false
   private addFormSelectedStacks: number[] = []
 
   constructor() {
-    this.driver = new SqlJsDriver('/sql-wasm.wasm')
-    this.persistence = new IndexedDBPersistence()
-    this.autoSave = new AutoSaveService(this.driver, this.persistence)
-    this.repository = new MusicRepository(this.driver)
-    this.stackRepository = new StackRepository(this.driver)
+    this.api = new ApiClient()
   }
 
   async initialize(): Promise<void> {
-    // Bind the submit handler immediately so the form never falls back to native GET navigation.
     this.setupAddForm()
-
-    // Initialize persistence
-    await this.persistence.initialize()
-
-    // Initialize SQL.js driver
-    await this.driver.initialize()
-
-    // Try to load existing database
-    const existingData = await this.persistence.load()
-    if (existingData) {
-      await this.driver.import(existingData)
-      console.log('[App] Loaded existing database from IndexedDB')
-    } else {
-      // Fresh database - run schema
-      await this.driver.exec(SCHEMA)
-      console.log('[App] Created new database')
-    }
-
-    // Initialize repository
-    await this.repository.initialize()
-
-    // Start auto-save
-    this.autoSave.start()
     this.isReady = true
-
-    // Initialize UI
     this.initializeUI()
-  }
-
-  async forceSave(): Promise<void> {
-    await this.autoSave.forceSave()
   }
 
   private initializeUI(): void {
@@ -119,7 +76,7 @@ export class App {
       if (!url.trim()) return
 
       try {
-        const item = await this.repository.createMusicItem({
+        const item = await this.api.createMusicItem({
           url,
           title: title || undefined,
           artistName: artist,
@@ -127,7 +84,7 @@ export class App {
         })
         // Assign selected stacks
         if (this.addFormSelectedStacks.length > 0) {
-          await this.stackRepository.setItemStacks(item.id, this.addFormSelectedStacks)
+          await this.api.setItemStacks(item.id, this.addFormSelectedStacks)
           this.addFormSelectedStacks = []
           this.renderAddFormStackChips()
           await this.renderStackBar()
@@ -162,7 +119,7 @@ export class App {
   }
 
   private async renderStackBar(): Promise<void> {
-    this.stacks = await this.stackRepository.listStacks()
+    this.stacks = await this.api.listStacks()
     const bar = document.getElementById('stack-bar')!
     const allBtn = bar.querySelector('[data-stack="all"]')!
     const manageBtn = document.getElementById('manage-stacks-btn')!
@@ -225,7 +182,7 @@ export class App {
         const card = target.closest('[data-item-id]') as HTMLElement
         const id = Number(card?.dataset.itemId)
         if (id && confirm('Delete this item?')) {
-          await this.repository.deleteMusicItem(id)
+          await this.api.deleteMusicItem(id)
           await this.renderMusicList()
         }
       }
@@ -240,7 +197,7 @@ export class App {
         const id = Number(card?.dataset.itemId)
         const status = target.value as ListenStatus
         if (id) {
-          await this.repository.updateListenStatus(id, status)
+          await this.api.updateListenStatus(id, status)
           await this.renderMusicList()
         }
       }
@@ -258,7 +215,7 @@ export class App {
       filters.stackId = this.currentStack
     }
     const hasFilters = Object.keys(filters).length > 0
-    const result = await this.repository.listMusicItems(hasFilters ? filters : undefined)
+    const result = await this.api.listMusicItems(hasFilters ? filters : undefined)
 
     if (result.items.length === 0) {
       const message = this.currentFilter === 'all'
@@ -323,7 +280,7 @@ export class App {
   }
 
   private async renderStackManagePanel(): Promise<void> {
-    const stacks = await this.stackRepository.listStacks()
+    const stacks = await this.api.listStacks()
     const list = document.getElementById('stack-manage-list')!
     list.innerHTML = stacks.map(s => `
       <div class="stack-manage__item" data-manage-stack-id="${s.id}">
@@ -351,7 +308,7 @@ export class App {
       const input = document.getElementById('stack-manage-input') as HTMLInputElement
       const name = input.value.trim()
       if (!name) return
-      await this.stackRepository.createStack(name)
+      await this.api.createStack(name)
       input.value = ''
       await this.renderStackBar()
       await this.renderStackManagePanel()
@@ -379,7 +336,7 @@ export class App {
         const renameInput = item.querySelector('.stack-manage__rename-input') as HTMLInputElement
         const newName = renameInput.value.trim()
         if (newName) {
-          await this.stackRepository.renameStack(stackId, newName)
+          await this.api.renameStack(stackId, newName)
           await this.renderStackBar()
           await this.renderStackManagePanel()
         }
@@ -388,7 +345,7 @@ export class App {
       if (target.classList.contains('stack-manage__delete-btn')) {
         const stack = this.stacks.find(s => s.id === stackId)
         if (confirm(`Delete "${stack?.name}"? Links won't be deleted, just untagged.`)) {
-          await this.stackRepository.deleteStack(stackId)
+          await this.api.deleteStack(stackId)
           if (this.currentStack === stackId) {
             this.currentStack = null
           }
@@ -418,7 +375,7 @@ export class App {
   private async showAddFormStackDropdown(): Promise<void> {
     document.querySelectorAll('.stack-dropdown').forEach(el => el.remove())
 
-    const stacks = await this.stackRepository.listStacks()
+    const stacks = await this.api.listStacks()
     const selectedSet = new Set(this.addFormSelectedStacks)
 
     const dropdown = document.createElement('div')
@@ -460,7 +417,7 @@ export class App {
       e.preventDefault()
       const name = newInput.value.trim()
       if (!name) return
-      const stack = await this.stackRepository.createStack(name)
+      const stack = await this.api.createStack(name)
       this.addFormSelectedStacks.push(stack.id)
       await this.renderStackBar()
       this.renderAddFormStackChips()
@@ -490,8 +447,8 @@ export class App {
     // Remove any existing dropdown
     document.querySelectorAll('.stack-dropdown').forEach(el => el.remove())
 
-    const stacks = await this.stackRepository.listStacks()
-    const itemStacks = await this.stackRepository.getStacksForItem(itemId)
+    const stacks = await this.api.listStacks()
+    const itemStacks = await this.api.getStacksForItem(itemId)
     const itemStackIds = new Set(itemStacks.map(s => s.id))
 
     const dropdown = document.createElement('div')
@@ -520,9 +477,9 @@ export class App {
       if (!target.classList.contains('stack-dropdown__checkbox')) return
       const stackId = Number(target.dataset.stackId)
       if (target.checked) {
-        await this.stackRepository.addItemToStack(itemId, stackId)
+        await this.api.addItemToStack(itemId, stackId)
       } else {
-        await this.stackRepository.removeItemFromStack(itemId, stackId)
+        await this.api.removeItemFromStack(itemId, stackId)
       }
       await this.renderStackBar()
     })
@@ -533,8 +490,8 @@ export class App {
       if (e.key !== 'Enter') return
       const name = newInput.value.trim()
       if (!name) return
-      const stack = await this.stackRepository.createStack(name)
-      await this.stackRepository.addItemToStack(itemId, stack.id)
+      const stack = await this.api.createStack(name)
+      await this.api.addItemToStack(itemId, stack.id)
       await this.renderStackBar()
       await this.renderStackDropdown(cardEl, itemId)
     })
