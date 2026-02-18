@@ -1,5 +1,9 @@
 import { expect, test } from '@playwright/test'
 
+test.beforeEach(async ({ request }) => {
+  await request.post('/api/__test__/reset')
+})
+
 test('adding a link shows the new item', async ({ page }) => {
   await page.goto('/')
   await expect(page.getByPlaceholder('Paste a music link...')).toBeVisible()
@@ -8,18 +12,11 @@ test('adding a link shows the new item', async ({ page }) => {
   })
 
   const bandcampUrl = 'https://seekersinternational.bandcamp.com/album/thewherebetweenyou-me-reissue'
-  const countBefore = await page.locator('.music-card').count()
 
-  for (let i = 0; i < 3; i++) {
-    await page.getByPlaceholder('Paste a music link...').fill(bandcampUrl)
-    await page.getByRole('button', { name: 'Add' }).click()
-    await page.waitForTimeout(800)
+  await page.getByPlaceholder('Paste a music link...').fill(bandcampUrl)
+  await page.getByRole('button', { name: 'Add' }).click()
 
-    const countNow = await page.locator('.music-card').count()
-    if (countNow > countBefore) break
-  }
-
-  await expect
-    .poll(async () => page.locator('.music-card').count(), { timeout: 10_000 })
-    .toBeGreaterThan(countBefore)
+  // Wait for the card to appear after the API round-trip
+  await expect(page.locator('.music-card').first()).toBeVisible({ timeout: 10_000 })
+  await expect(page.locator('.music-card')).toHaveCount(1)
 })

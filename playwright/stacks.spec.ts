@@ -1,7 +1,8 @@
 import { expect, test } from '@playwright/test'
 
 test.describe('Stacks', () => {
-  test.beforeEach(async ({ page }) => {
+  test.beforeEach(async ({ page, request }) => {
+    await request.post('/api/__test__/reset')
     await page.goto('/')
     await expect(page.getByPlaceholder('Paste a music link...')).toBeVisible()
   })

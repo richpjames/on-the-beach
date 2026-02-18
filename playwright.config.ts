@@ -4,14 +4,14 @@ export default defineConfig({
   testDir: './playwright',
   timeout: 30_000,
   reporter: 'list',
-  workers: 2,
+  workers: 1, // serialize — tests share a single Postgres database
   use: {
-    baseURL: 'http://127.0.0.1:4175',
+    baseURL: 'http://localhost:3000',
     headless: true,
   },
   webServer: {
-    command: 'npm run dev -- --host 127.0.0.1 --port 4175',
-    url: 'http://127.0.0.1:4175',
+    command: 'NODE_ENV=test tsx server/index.ts',
+    port: 3000,
     reuseExistingServer: !process.env.CI,
   },
 })
