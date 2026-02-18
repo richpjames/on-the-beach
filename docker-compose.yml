@@ -28,5 +28,23 @@ services:
       postgres:
         condition: service_healthy
 
+  app:
+    image: node:22-alpine
+    container_name: on-the-beach-app
+    restart: unless-stopped
+    working_dir: /app
+    ports:
+      - '3000:3000'
+    environment:
+      DATABASE_URL: postgres://on_the_beach:on_the_beach_dev@postgres:5432/on_the_beach
+      NODE_ENV: production
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - .:/app
+      - /app/node_modules
+    command: ['node', 'dist-server/index.js']
+
 volumes:
   postgres_data:
