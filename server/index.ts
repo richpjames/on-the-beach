@@ -11,6 +11,12 @@ const app = new Hono()
 app.route('/api/music-items', musicItemRoutes)
 app.route('/api/stacks', stackRoutes)
 
+// ---------- Test-only routes ----------
+if (process.env.NODE_ENV === 'test') {
+  const { testRoutes } = await import('./routes/test')
+  app.route('/api/__test__', testRoutes)
+}
+
 // ---------- Environment ----------
 const isDev = process.env.NODE_ENV !== 'production'
 const port = Number(process.env.PORT) || 3000

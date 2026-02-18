@@ -1,5 +1,9 @@
 import { expect, test } from '@playwright/test'
 
+test.beforeEach(async ({ request }) => {
+  await request.post('/api/__test__/reset')
+})
+
 test('adding the Seekers International Bandcamp URL creates a working Bandcamp link', async ({
   page,
 }) => {
