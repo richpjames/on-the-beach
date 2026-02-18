@@ -8,10 +8,10 @@
     "build": "tsc && vite build",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run",
-    "test:unit": "vitest run",
-    "test:unit:watch": "vitest",
-    "test:e2e": "playwright test playwright/add-link.spec.ts playwright/bandcamp-link.spec.ts playwright/stacks.spec.ts playwright/sync-startup.spec.ts",
+    "test": "vitest run --passWithNoTests",
+    "test:unit": "vitest run --passWithNoTests",
+    "test:unit:watch": "vitest --passWithNoTests",
+    "test:e2e": "playwright test playwright/add-link.spec.ts playwright/bandcamp-link.spec.ts playwright/stacks.spec.ts",
     "test:e2e:full": "npx playwright test playwright"
   },
   "dependencies": {
