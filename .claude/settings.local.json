@@ -7,7 +7,14 @@
       "Bash(npm run typecheck:*)",
       "Bash(git add:*)",
       "Bash(git commit:*)",
-      "Bash(npx playwright test)"
+      "Bash(npx playwright test)",
+      "Bash(npm run test:unit:*)",
+      "Bash(docker ps:*)",
+      "Bash(open -a Docker:*)",
+      "Bash(docker compose up:*)",
+      "WebSearch",
+      "Bash(npm run db:migrate:*)",
+      "Bash(npm run db:seed:*)"
     ]
   }
 }
