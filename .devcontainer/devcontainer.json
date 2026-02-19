@@ -1,0 +1,14 @@
+{
+  "name": "On The Beach",
+  "dockerComposeFile": "docker-compose.yml",
+  "service": "app",
+  "workspaceFolder": "/workspace",
+  "containerEnv": {
+    "DATABASE_URL": "postgres://on_the_beach:on_the_beach_dev@postgres:5432/on_the_beach"
+  },
+  "mounts": [
+    "source=${localEnv:HOME}/.claude,target=/root/.claude,type=bind,consistency=cached"
+  ],
+  "postCreateCommand": "npm install && npm run db:migrate || true",
+  "forwardPorts": [3000, 5432]
+}
