@@ -7,7 +7,21 @@
       "Bash(npm run typecheck:*)",
       "Bash(git add:*)",
       "Bash(git commit:*)",
-      "Bash(npx playwright test)"
+      "Bash(npx playwright test)",
+      "Bash(git check-ignore:*)",
+      "Bash(echo:*)",
+      "Bash(curl:*)",
+      "Bash(npm test:*)",
+      "WebSearch",
+      "WebFetch(domain:performance-partners.apple.com)",
+      "Bash(node -e:*)",
+      "Bash(git push:*)",
+      "Bash(npx tsc:*)",
+      "Bash(npm uninstall:*)",
+      "Bash(git -C /Users/rich/Developer/on-the-beach status)",
+      "Bash(git -C /Users/rich/Developer/on-the-beach diff --stat)",
+      "Bash(git -C /Users/rich/Developer/on-the-beach log --oneline -5)",
+      "Bash(git -C /Users/rich/Developer/on-the-beach diff --cached --stat)"
     ]
   }
 }
