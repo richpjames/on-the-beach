@@ -133,7 +133,7 @@ musicItemRoutes.get('/', async (c) => {
   if (search) {
     const term = `%${normalize(search)}%`
     conditions.push(
-      sql`(${musicItems.normalizedTitle} ILIKE ${term} OR ${artists.name} ILIKE ${term})`,
+      sql`(${musicItems.normalizedTitle} LIKE ${term} OR LOWER(${artists.name}) LIKE ${term})`,
     )
   }
 

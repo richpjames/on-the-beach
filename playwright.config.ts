@@ -4,7 +4,7 @@ export default defineConfig({
   testDir: './playwright',
   timeout: 30_000,
   reporter: 'list',
-  workers: 1, // serialize — tests share a single Postgres database
+  workers: 1, // serialize — tests share a single SQLite database
   use: {
     baseURL: 'http://localhost:3000',
     headless: true,

@@ -1,9 +1,9 @@
-import { drizzle } from 'drizzle-orm/postgres-js'
-import postgres from 'postgres'
+import Database from 'better-sqlite3'
+import { drizzle } from 'drizzle-orm/better-sqlite3'
 import * as schema from './schema'
 
-const connectionString = process.env.DATABASE_URL
-  ?? 'postgres://on_the_beach:on_the_beach_dev@localhost:5432/on_the_beach'
-
-const client = postgres(connectionString)
-export const db = drizzle(client, { schema })
+const dbPath = process.env.DATABASE_PATH ?? 'on_the_beach.db'
+const sqlite = new Database(dbPath)
+sqlite.pragma('journal_mode = WAL')
+sqlite.pragma('foreign_keys = ON')
+export const db = drizzle(sqlite, { schema })

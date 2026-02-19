@@ -3,12 +3,12 @@
   "dockerComposeFile": "docker-compose.yml",
   "service": "app",
   "workspaceFolder": "/workspace",
-  "containerEnv": {
-    "DATABASE_URL": "postgres://on_the_beach:on_the_beach_dev@postgres:5432/on_the_beach"
+  "features": {
+    "ghcr.io/anthropics/devcontainer-features/claude-code:1": {}
   },
   "mounts": [
     "source=${localEnv:HOME}/.claude,target=/root/.claude,type=bind,consistency=cached"
   ],
-  "postCreateCommand": "npm install && npm run db:migrate || true",
-  "forwardPorts": [3000, 5432]
+  "postCreateCommand": "npm install && npx playwright install --with-deps chromium && npm run db:migrate && npm run db:seed",
+  "forwardPorts": [3000]
 }
