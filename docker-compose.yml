@@ -29,7 +29,7 @@ services:
         condition: service_healthy
 
   app:
-    image: node:22-alpine
+    image: node:24-alpine
     container_name: on-the-beach-app
     restart: unless-stopped
     working_dir: /app
