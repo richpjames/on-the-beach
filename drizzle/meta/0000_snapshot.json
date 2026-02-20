@@ -46,9 +46,7 @@
       "indexes": {
         "artists_normalized_name_unique": {
           "name": "artists_normalized_name_unique",
-          "columns": [
-            "normalized_name"
-          ],
+          "columns": ["normalized_name"],
           "isUnique": true
         }
       },
@@ -85,16 +83,12 @@
       "indexes": {
         "idx_music_item_stacks_stack_id": {
           "name": "idx_music_item_stacks_stack_id",
-          "columns": [
-            "stack_id"
-          ],
+          "columns": ["stack_id"],
           "isUnique": false
         },
         "idx_music_item_stacks_music_item_id": {
           "name": "idx_music_item_stacks_music_item_id",
-          "columns": [
-            "music_item_id"
-          ],
+          "columns": ["music_item_id"],
           "isUnique": false
         }
       },
@@ -103,12 +97,8 @@
           "name": "music_item_stacks_music_item_id_music_items_id_fk",
           "tableFrom": "music_item_stacks",
           "tableTo": "music_items",
-          "columnsFrom": [
-            "music_item_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["music_item_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -116,22 +106,15 @@
           "name": "music_item_stacks_stack_id_stacks_id_fk",
           "tableFrom": "music_item_stacks",
           "tableTo": "stacks",
-          "columnsFrom": [
-            "stack_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["stack_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {
         "music_item_stacks_music_item_id_stack_id_pk": {
-          "columns": [
-            "music_item_id",
-            "stack_id"
-          ],
+          "columns": ["music_item_id", "stack_id"],
           "name": "music_item_stacks_music_item_id_stack_id_pk"
         }
       },
@@ -269,30 +252,22 @@
       "indexes": {
         "idx_music_items_listen_status": {
           "name": "idx_music_items_listen_status",
-          "columns": [
-            "listen_status"
-          ],
+          "columns": ["listen_status"],
           "isUnique": false
         },
         "idx_music_items_purchase_intent": {
           "name": "idx_music_items_purchase_intent",
-          "columns": [
-            "purchase_intent"
-          ],
+          "columns": ["purchase_intent"],
           "isUnique": false
         },
         "idx_music_items_artist_id": {
           "name": "idx_music_items_artist_id",
-          "columns": [
-            "artist_id"
-          ],
+          "columns": ["artist_id"],
           "isUnique": false
         },
         "idx_music_items_created_at": {
           "name": "idx_music_items_created_at",
-          "columns": [
-            "created_at"
-          ],
+          "columns": ["created_at"],
           "isUnique": false
         }
       },
@@ -301,12 +276,8 @@
           "name": "music_items_artist_id_artists_id_fk",
           "tableFrom": "music_items",
           "tableTo": "artists",
-          "columnsFrom": [
-            "artist_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["artist_id"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         }
@@ -365,24 +336,17 @@
       "indexes": {
         "idx_music_links_music_item_id": {
           "name": "idx_music_links_music_item_id",
-          "columns": [
-            "music_item_id"
-          ],
+          "columns": ["music_item_id"],
           "isUnique": false
         },
         "idx_music_links_url": {
           "name": "idx_music_links_url",
-          "columns": [
-            "url"
-          ],
+          "columns": ["url"],
           "isUnique": false
         },
         "music_links_item_url": {
           "name": "music_links_item_url",
-          "columns": [
-            "music_item_id",
-            "url"
-          ],
+          "columns": ["music_item_id", "url"],
           "isUnique": true
         }
       },
@@ -391,12 +355,8 @@
           "name": "music_links_music_item_id_music_items_id_fk",
           "tableFrom": "music_links",
           "tableTo": "music_items",
-          "columnsFrom": [
-            "music_item_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["music_item_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -404,12 +364,8 @@
           "name": "music_links_source_id_sources_id_fk",
           "tableFrom": "music_links",
           "tableTo": "sources",
-          "columnsFrom": [
-            "source_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["source_id"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         }
@@ -460,9 +416,7 @@
       "indexes": {
         "sources_name_unique": {
           "name": "sources_name_unique",
-          "columns": [
-            "name"
-          ],
+          "columns": ["name"],
           "isUnique": true
         }
       },
@@ -499,9 +453,7 @@
       "indexes": {
         "stacks_name_unique": {
           "name": "stacks_name_unique",
-          "columns": [
-            "name"
-          ],
+          "columns": ["name"],
           "isUnique": true
         }
       },

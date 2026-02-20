@@ -1,10 +1,10 @@
-import { defineConfig } from 'drizzle-kit'
+import { defineConfig } from "drizzle-kit";
 
 export default defineConfig({
-  schema: './server/db/schema.ts',
-  out: './drizzle',
-  dialect: 'sqlite',
+  schema: "./server/db/schema.ts",
+  out: "./drizzle",
+  dialect: "sqlite",
   dbCredentials: {
-    url: process.env.DATABASE_PATH ?? './on_the_beach.db',
+    url: process.env.DATABASE_PATH ?? "./on_the_beach.db",
   },
-})
+});

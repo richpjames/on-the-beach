@@ -20,7 +20,14 @@
       "Bash(npm run db:generate:*)",
       "Bash(npx playwright install:*)",
       "Bash(npx drizzle-kit generate:*)",
-      "Bash(npm uninstall:*)"
+      "Bash(npm uninstall:*)",
+      "Bash(ls:*)",
+      "Bash(npx husky:*)",
+      "Bash(gh run list:*)",
+      "Bash(gh run view:*)",
+      "Bash(npx oxlint:*)",
+      "Bash(npx oxfmt:*)",
+      "Bash(npx lint-staged:*)"
     ]
   }
 }
