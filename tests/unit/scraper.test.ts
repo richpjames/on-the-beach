@@ -1,4 +1,4 @@
-import { describe, test, expect, vi } from "vitest";
+import { describe, test, expect, spyOn, mock } from "bun:test";
 import {
   parseOgTags,
   decodeHtmlEntities,
@@ -191,21 +191,21 @@ describe("parseDefaultOg", () => {
 
 describe("scrapeUrl", () => {
   test("returns null on fetch failure", async () => {
-    vi.spyOn(globalThis, "fetch").mockRejectedValueOnce(new Error("Network error"));
+    spyOn(globalThis, "fetch").mockRejectedValueOnce(new Error("Network error"));
     const result = await scrapeUrl("https://example.com", "unknown");
     expect(result).toBeNull();
-    vi.restoreAllMocks();
+    mock.restore();
   });
 
   test("returns null for non-HTML content-type", async () => {
-    vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+    spyOn(globalThis, "fetch").mockResolvedValueOnce(
       new Response("binary data", {
         headers: { "content-type": "application/octet-stream" },
       }),
     );
     const result = await scrapeUrl("https://example.com/file.zip", "unknown");
     expect(result).toBeNull();
-    vi.restoreAllMocks();
+    mock.restore();
   });
 
   test("parses OG tags from HTML response", async () => {
@@ -215,7 +215,7 @@ describe("scrapeUrl", () => {
         <meta property="og:image" content="https://example.com/cover.jpg" />
       </head><body></body></html>
     `;
-    vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+    spyOn(globalThis, "fetch").mockResolvedValueOnce(
       new Response(html, {
         headers: { "content-type": "text/html; charset=utf-8" },
       }),
@@ -225,7 +225,7 @@ describe("scrapeUrl", () => {
     expect(result!.potentialTitle).toBe("Test Album");
     expect(result!.potentialArtist).toBe("Test Artist");
     expect(result!.imageUrl).toBe("https://example.com/cover.jpg");
-    vi.restoreAllMocks();
+    mock.restore();
   });
 
   test("uses default parser for unknown sources", async () => {
@@ -234,7 +234,7 @@ describe("scrapeUrl", () => {
         <meta property="og:title" content="Some Music" />
       </head></html>
     `;
-    vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+    spyOn(globalThis, "fetch").mockResolvedValueOnce(
       new Response(html, {
         headers: { "content-type": "text/html" },
       }),
@@ -242,15 +242,15 @@ describe("scrapeUrl", () => {
     const result = await scrapeUrl("https://example.com/music", "unknown");
     expect(result).not.toBeNull();
     expect(result!.potentialTitle).toBe("Some Music");
-    vi.restoreAllMocks();
+    mock.restore();
   });
 
   test("respects timeout", async () => {
-    vi.spyOn(globalThis, "fetch").mockImplementationOnce(
+    spyOn(globalThis, "fetch").mockImplementationOnce(
       () => new Promise((_, reject) => setTimeout(() => reject(new Error("aborted")), 100)),
     );
     const result = await scrapeUrl("https://example.com", "unknown", 50);
     expect(result).toBeNull();
-    vi.restoreAllMocks();
+    mock.restore();
   });
 });
