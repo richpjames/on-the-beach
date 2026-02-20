@@ -78,7 +78,38 @@ If you add it, append `otb-noindex` to the same router middleware label:
 traefik.http.routers.<your-router-name>.middlewares=gzip,otb-auth,otb-noindex
 ```
 
-## 5. GitHub Secrets for Deploy Hook
+## 5. Email Ingest (Optional)
+
+To enable the email-to-music-item webhook, set these environment variables in Coolify:
+
+- `INGEST_API_KEY`: A random secret token used to authenticate webhook requests. Generate one with `openssl rand -base64 32`.
+- `INGEST_ENABLED`: Set to `"false"` to disable the endpoint without removing the key. Defaults to enabled.
+
+The webhook endpoint is `POST /api/ingest/email`. Configure your email provider (e.g. SendGrid Inbound Parse, Cloudflare Email Routing) to forward emails to:
+
+```
+https://enlaplaya.example.com/api/ingest/email
+```
+
+with the header `Authorization: Bearer <your-INGEST_API_KEY>`.
+
+For SendGrid, append `?provider=sendgrid` to the URL.
+
+Test with curl:
+
+```bash
+curl -X POST https://enlaplaya.example.com/api/ingest/email \
+  -H "Authorization: Bearer <your-INGEST_API_KEY>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "from": "noreply@bandcamp.com",
+    "to": "music@enlaplaya.example.com",
+    "subject": "New release",
+    "html": "<a href=\"https://artist.bandcamp.com/album/test\">Listen</a>"
+  }'
+```
+
+## 6. GitHub Secrets for Deploy Hook
 
 Add repository secrets:
 
@@ -91,7 +122,7 @@ The workflow at `.github/workflows/playwright.yml` deploys only when:
 2. Playwright test job passes
 3. both secrets are configured
 
-## 6. Verification Checklist
+## 7. Verification Checklist
 
 1. Push a commit to `main`.
 2. Confirm `Playwright E2E / test` passes in GitHub Actions.
