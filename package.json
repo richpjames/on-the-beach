@@ -20,6 +20,8 @@
     "lint": "oxlint",
     "format": "oxfmt --write",
     "format:check": "oxfmt --check",
+    "devcontainer": "devcontainer up --workspace-folder .",
+    "devcontainer:ssh": "docker compose -f .devcontainer/docker-compose.yml exec app bash",
     "prepare": "husky"
   },
   "dependencies": {
