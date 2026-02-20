@@ -29,6 +29,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Setup database
+        run: npm run db:migrate && npm run db:seed
+
       - name: Run Vitest unit tests
         run: npm run test:unit
 

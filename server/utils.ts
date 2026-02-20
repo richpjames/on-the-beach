@@ -1,103 +1,110 @@
-import type { SourceName } from '../src/types'
+import type { SourceName } from "../src/types";
 
 interface ParsedUrl {
-  source: SourceName
-  normalizedUrl: string
-  potentialArtist?: string
-  potentialTitle?: string
+  source: SourceName;
+  normalizedUrl: string;
+  potentialArtist?: string;
+  potentialTitle?: string;
 }
 
 const URL_PATTERNS: Array<{
-  source: SourceName
-  pattern: RegExp
-  extractor?: (match: RegExpMatchArray) => { potentialArtist?: string; potentialTitle?: string }
+  source: SourceName;
+  pattern: RegExp;
+  extractor?: (match: RegExpMatchArray) => { potentialArtist?: string; potentialTitle?: string };
 }> = [
   {
-    source: 'bandcamp',
+    source: "bandcamp",
     pattern: /^https?:\/\/([^.]+)\.bandcamp\.com(?:\/(?:album|track)\/([^/?]+))?/,
     extractor: (match) => ({
-      potentialArtist: match[1]?.replace(/-/g, ' '),
-      potentialTitle: match[2]?.replace(/-/g, ' '),
+      potentialArtist: match[1]?.replace(/-/g, " "),
+      potentialTitle: match[2]?.replace(/-/g, " "),
     }),
   },
   {
-    source: 'spotify',
+    source: "spotify",
     pattern: /^https?:\/\/open\.spotify\.com\/(album|track|playlist)\/([a-zA-Z0-9]+)/,
   },
   {
-    source: 'soundcloud',
+    source: "soundcloud",
     pattern: /^https?:\/\/(?:www\.)?soundcloud\.com\/([^/]+)(?:\/([^/?]+))?/,
     extractor: (match) => ({
-      potentialArtist: match[1]?.replace(/-/g, ' '),
-      potentialTitle: match[2]?.replace(/-/g, ' '),
+      potentialArtist: match[1]?.replace(/-/g, " "),
+      potentialTitle: match[2]?.replace(/-/g, " "),
     }),
   },
   {
-    source: 'youtube',
+    source: "youtube",
     pattern: /^https?:\/\/(?:www\.)?(youtube\.com\/watch\?v=|youtu\.be\/)([a-zA-Z0-9_-]+)/,
   },
   {
-    source: 'apple_music',
-    pattern: /^https?:\/\/music\.apple\.com\/[a-z]{2}\/(album|playlist)\/([^/]+)/,
+    source: "apple_music",
+    pattern:
+      /^https?:\/\/music\.apple\.com\/[a-z]{2}\/(album|playlist|artist|music-video|station)\/([^/]+)/,
+    extractor: (match) => {
+      const slug = match[2]?.replace(/-/g, " ");
+      if (match[1] === "artist") return { potentialArtist: slug };
+      return { potentialTitle: slug };
+    },
   },
   {
-    source: 'discogs',
+    source: "discogs",
     pattern: /^https?:\/\/(?:www\.)?discogs\.com\/(release|master)\/(\d+)/,
   },
   {
-    source: 'tidal',
-    pattern: /^https?:\/\/(?:www\.|listen\.)?tidal\.com\/(?:browse\/)?(album|track|playlist)\/(\d+)/,
+    source: "tidal",
+    pattern:
+      /^https?:\/\/(?:www\.|listen\.)?tidal\.com\/(?:browse\/)?(album|track|playlist)\/(\d+)/,
   },
   {
-    source: 'mixcloud',
+    source: "mixcloud",
     pattern: /^https?:\/\/(?:www\.)?mixcloud\.com\/([^/]+)\/([^/?]+)/,
     extractor: (match) => ({
-      potentialArtist: match[1]?.replace(/-/g, ' '),
-      potentialTitle: match[2]?.replace(/-/g, ' '),
+      potentialArtist: match[1]?.replace(/-/g, " "),
+      potentialTitle: match[2]?.replace(/-/g, " "),
     }),
   },
   {
-    source: 'deezer',
+    source: "deezer",
     pattern: /^https?:\/\/(?:www\.)?deezer\.com\/[a-z]{2}\/(album|track|playlist)\/(\d+)/,
   },
-]
+];
 
 export function parseUrl(url: string): ParsedUrl {
-  const trimmedUrl = url.trim()
+  const trimmedUrl = url.trim();
 
   for (const { source, pattern, extractor } of URL_PATTERNS) {
-    const match = trimmedUrl.match(pattern)
+    const match = trimmedUrl.match(pattern);
     if (match) {
       return {
         source,
-        normalizedUrl: trimmedUrl.split('?')[0],
+        normalizedUrl: trimmedUrl.split("?")[0],
         ...(extractor?.(match) || {}),
-      }
+      };
     }
   }
 
   return {
-    source: 'unknown',
+    source: "unknown",
     normalizedUrl: trimmedUrl,
-  }
+  };
 }
 
 export function isValidUrl(url: string): boolean {
   try {
-    new URL(url)
-    return true
+    new URL(url);
+    return true;
   } catch {
-    return false
+    return false;
   }
 }
 
 export function normalize(text: string): string {
-  return text.toLowerCase().trim()
+  return text.toLowerCase().trim();
 }
 
 export function capitalize(text: string): string {
   return text
-    .split(' ')
+    .split(" ")
     .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-    .join(' ')
+    .join(" ");
 }

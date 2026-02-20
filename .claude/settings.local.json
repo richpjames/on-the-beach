@@ -14,7 +14,20 @@
       "Bash(docker compose up:*)",
       "WebSearch",
       "Bash(npm run db:migrate:*)",
-      "Bash(npm run db:seed:*)"
+      "Bash(npm run db:seed:*)",
+      "Bash(npm run test:e2e:full:*)",
+      "Bash(npm ci:*)",
+      "Bash(npm run db:generate:*)",
+      "Bash(npx playwright install:*)",
+      "Bash(npx drizzle-kit generate:*)",
+      "Bash(npm uninstall:*)",
+      "Bash(ls:*)",
+      "Bash(npx husky:*)",
+      "Bash(gh run list:*)",
+      "Bash(gh run view:*)",
+      "Bash(npx oxlint:*)",
+      "Bash(npx oxfmt:*)",
+      "Bash(npx lint-staged:*)"
     ]
   }
 }

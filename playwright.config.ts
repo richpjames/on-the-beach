@@ -1,17 +1,17 @@
-import { defineConfig } from '@playwright/test'
+import { defineConfig } from "@playwright/test";
 
 export default defineConfig({
-  testDir: './playwright',
+  testDir: "./playwright",
   timeout: 30_000,
-  reporter: 'list',
+  reporter: "list",
   workers: 1, // serialize — tests share a single SQLite database
   use: {
-    baseURL: 'http://localhost:3000',
+    baseURL: "http://localhost:3000",
     headless: true,
   },
   webServer: {
-    command: 'NODE_ENV=test tsx server/index.ts',
+    command: "NODE_ENV=test tsx server/index.ts",
     port: 3000,
     reuseExistingServer: !process.env.CI,
   },
-})
+});

@@ -6,9 +6,7 @@
   "features": {
     "ghcr.io/anthropics/devcontainer-features/claude-code:1": {}
   },
-  "mounts": [
-    "source=${localEnv:HOME}/.claude,target=/root/.claude,type=bind,consistency=cached"
-  ],
+  "mounts": ["source=${localEnv:HOME}/.claude,target=/root/.claude,type=bind,consistency=cached"],
   "postCreateCommand": "npm install && npx playwright install --with-deps chromium && npm run db:migrate && npm run db:seed",
   "forwardPorts": [3000]
 }

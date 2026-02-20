@@ -1,23 +1,18 @@
-import { Hono } from 'hono'
-import { eq, and, inArray, sql } from 'drizzle-orm'
-import { db } from '../db/index'
-import {
-  musicItems,
-  artists,
-  musicLinks,
-  sources,
-  musicItemStacks,
-} from '../db/schema'
-import { parseUrl, isValidUrl, normalize, capitalize } from '../utils'
+import { Hono } from "hono";
+import { eq, and, inArray, sql } from "drizzle-orm";
+import { db } from "../db/index";
+import { musicItems, artists, musicLinks, sources, musicItemStacks } from "../db/schema";
+import { parseUrl, isValidUrl, normalize, capitalize } from "../utils";
+import { scrapeUrl } from "../scraper";
 import type {
   CreateMusicItemInput,
   UpdateMusicItemInput,
   MusicItemFull,
   ListenStatus,
   PurchaseIntent,
-} from '../../src/types'
+} from "../../src/types";
 
-export const musicItemRoutes = new Hono()
+export const musicItemRoutes = new Hono();
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -44,6 +39,7 @@ function fullItemSelect() {
       created_at: musicItems.createdAt,
       updated_at: musicItems.updatedAt,
       listened_at: musicItems.listenedAt,
+      artwork_url: musicItems.artworkUrl,
       is_physical: musicItems.isPhysical,
       physical_format: musicItems.physicalFormat,
       artist_name: artists.name,
@@ -54,34 +50,31 @@ function fullItemSelect() {
     .leftJoin(artists, eq(musicItems.artistId, artists.id))
     .leftJoin(
       musicLinks,
-      and(
-        eq(musicLinks.musicItemId, musicItems.id),
-        eq(musicLinks.isPrimary, true),
-      ),
+      and(eq(musicLinks.musicItemId, musicItems.id), eq(musicLinks.isPrimary, true)),
     )
-    .leftJoin(sources, eq(musicLinks.sourceId, sources.id))
+    .leftJoin(sources, eq(musicLinks.sourceId, sources.id));
 }
 
 /** Look up an existing artist by normalized name, or create a new one. */
 async function getOrCreateArtist(name: string): Promise<number> {
-  const normalizedName = normalize(name)
+  const normalizedName = normalize(name);
 
   const existing = await db
     .select({ id: artists.id })
     .from(artists)
     .where(eq(artists.normalizedName, normalizedName))
-    .limit(1)
+    .limit(1);
 
   if (existing[0]) {
-    return existing[0].id
+    return existing[0].id;
   }
 
   const [created] = await db
     .insert(artists)
     .values({ name: capitalize(name), normalizedName })
-    .returning({ id: artists.id })
+    .returning({ id: artists.id });
 
-  return created.id
+  return created.id;
 }
 
 /** Resolve the DB id for a source name (e.g. "bandcamp"). */
@@ -90,96 +83,96 @@ async function getSourceId(sourceName: string): Promise<number | null> {
     .select({ id: sources.id })
     .from(sources)
     .where(eq(sources.name, sourceName))
-    .limit(1)
+    .limit(1);
 
-  return rows[0]?.id ?? null
+  return rows[0]?.id ?? null;
 }
 
 /** Fetch a single full item by its id (reused by create / update / get). */
 async function fetchFullItem(id: number): Promise<MusicItemFull | null> {
-  const rows = await fullItemSelect().where(eq(musicItems.id, id))
-  if (!rows[0]) return null
+  const rows = await fullItemSelect().where(eq(musicItems.id, id));
+  if (!rows[0]) return null;
   // Drizzle returns Date objects for timestamps; the MusicItemFull interface
   // uses string. Hono's c.json() will serialize Dates via JSON.stringify which
   // calls .toISOString(), so the cast is safe at the serialization boundary.
-  return rows[0] as unknown as MusicItemFull
+  return rows[0] as unknown as MusicItemFull;
 }
 
 // ---------------------------------------------------------------------------
 // GET / — list music items
 // ---------------------------------------------------------------------------
 
-musicItemRoutes.get('/', async (c) => {
-  const {
-    listenStatus,
-    purchaseIntent,
-    search,
-    stackId,
-  } = c.req.query()
+musicItemRoutes.get("/", async (c) => {
+  const { listenStatus, purchaseIntent, search, stackId } = c.req.query();
 
   // Start building conditions
-  const conditions = []
+  const conditions = [];
 
   if (listenStatus) {
-    const statuses = listenStatus.split(',') as ListenStatus[]
-    conditions.push(inArray(musicItems.listenStatus, statuses))
+    const statuses = listenStatus.split(",") as ListenStatus[];
+    conditions.push(inArray(musicItems.listenStatus, statuses));
   }
 
   if (purchaseIntent) {
-    const intents = purchaseIntent.split(',') as PurchaseIntent[]
-    conditions.push(inArray(musicItems.purchaseIntent, intents))
+    const intents = purchaseIntent.split(",") as PurchaseIntent[];
+    conditions.push(inArray(musicItems.purchaseIntent, intents));
   }
 
   if (search) {
-    const term = `%${normalize(search)}%`
+    const term = `%${normalize(search)}%`;
     conditions.push(
       sql`(${musicItems.normalizedTitle} LIKE ${term} OR LOWER(${artists.name}) LIKE ${term})`,
-    )
+    );
   }
 
   if (stackId) {
-    const sid = Number(stackId)
+    const sid = Number(stackId);
     conditions.push(
       sql`${musicItems.id} IN (SELECT ${musicItemStacks.musicItemId} FROM ${musicItemStacks} WHERE ${musicItemStacks.stackId} = ${sid})`,
-    )
+    );
   }
 
-  let query = fullItemSelect().$dynamic()
+  let query = fullItemSelect().$dynamic();
 
   if (conditions.length > 0) {
-    query = query.where(and(...conditions))
+    query = query.where(and(...conditions));
   }
 
-  query = query.orderBy(sql`${musicItems.createdAt} DESC`)
+  query = query.orderBy(sql`${musicItems.createdAt} DESC`);
 
-  const items = await query
+  const items = await query;
 
-  return c.json({ items, total: items.length })
-})
+  return c.json({ items, total: items.length });
+});
 
 // ---------------------------------------------------------------------------
 // POST / — create a music item
 // ---------------------------------------------------------------------------
 
-musicItemRoutes.post('/', async (c) => {
-  const input = (await c.req.json()) as CreateMusicItemInput
+musicItemRoutes.post("/", async (c) => {
+  const input = (await c.req.json()) as CreateMusicItemInput;
 
   if (!input.url || !isValidUrl(input.url)) {
-    return c.json({ error: 'Invalid or missing URL' }, 400)
+    return c.json({ error: "Invalid or missing URL" }, 400);
   }
 
-  const parsed = parseUrl(input.url)
-  const title = input.title || parsed.potentialTitle || 'Untitled'
-  const artistName = input.artistName || parsed.potentialArtist
+  const parsed = parseUrl(input.url);
+
+  // Attempt OG metadata scraping (non-blocking on failure)
+  const scraped = await scrapeUrl(parsed.normalizedUrl, parsed.source);
+
+  // Merge with priority: user input > OG scraped > regex extracted > defaults
+  const title = input.title || scraped?.potentialTitle || parsed.potentialTitle || "Untitled";
+  const artistName = input.artistName || scraped?.potentialArtist || parsed.potentialArtist;
 
   // Get or create artist
-  let artistId: number | null = null
+  let artistId: number | null = null;
   if (artistName) {
-    artistId = await getOrCreateArtist(artistName)
+    artistId = await getOrCreateArtist(artistName);
   }
 
   // Resolve source
-  const sourceId = await getSourceId(parsed.source)
+  const sourceId = await getSourceId(parsed.source);
 
   // Insert music item
   const [inserted] = await db
@@ -187,13 +180,14 @@ musicItemRoutes.post('/', async (c) => {
     .values({
       title: capitalize(title),
       normalizedTitle: normalize(title),
-      itemType: input.itemType ?? 'album',
+      itemType: input.itemType ?? "album",
       artistId,
-      listenStatus: input.listenStatus ?? 'to-listen',
-      purchaseIntent: input.purchaseIntent ?? 'no',
+      listenStatus: input.listenStatus ?? "to-listen",
+      purchaseIntent: input.purchaseIntent ?? "no",
       notes: input.notes ?? null,
+      artworkUrl: scraped?.imageUrl ?? null,
     })
-    .returning({ id: musicItems.id })
+    .returning({ id: musicItems.id });
 
   // Insert primary link
   await db.insert(musicLinks).values({
@@ -201,118 +195,115 @@ musicItemRoutes.post('/', async (c) => {
     sourceId,
     url: parsed.normalizedUrl,
     isPrimary: true,
-  })
+  });
 
-  const item = await fetchFullItem(inserted.id)
+  const item = await fetchFullItem(inserted.id);
   if (!item) {
-    return c.json({ error: 'Failed to create music item' }, 500)
+    return c.json({ error: "Failed to create music item" }, 500);
   }
 
-  return c.json(item, 201)
-})
+  return c.json(item, 201);
+});
 
 // ---------------------------------------------------------------------------
 // GET /:id — get a single music item
 // ---------------------------------------------------------------------------
 
-musicItemRoutes.get('/:id', async (c) => {
-  const id = Number(c.req.param('id'))
+musicItemRoutes.get("/:id", async (c) => {
+  const id = Number(c.req.param("id"));
   if (Number.isNaN(id)) {
-    return c.json({ error: 'Invalid ID' }, 400)
+    return c.json({ error: "Invalid ID" }, 400);
   }
 
-  const item = await fetchFullItem(id)
+  const item = await fetchFullItem(id);
   if (!item) {
-    return c.json({ error: 'Not found' }, 404)
+    return c.json({ error: "Not found" }, 404);
   }
 
-  return c.json(item)
-})
+  return c.json(item);
+});
 
 // ---------------------------------------------------------------------------
 // PATCH /:id — update a music item
 // ---------------------------------------------------------------------------
 
-musicItemRoutes.patch('/:id', async (c) => {
-  const id = Number(c.req.param('id'))
+musicItemRoutes.patch("/:id", async (c) => {
+  const id = Number(c.req.param("id"));
   if (Number.isNaN(id)) {
-    return c.json({ error: 'Invalid ID' }, 400)
+    return c.json({ error: "Invalid ID" }, 400);
   }
 
-  const input = (await c.req.json()) as UpdateMusicItemInput
+  const input = (await c.req.json()) as UpdateMusicItemInput;
 
   // Build the dynamic set object
-  const setFields: Record<string, unknown> = {}
+  const setFields: Record<string, unknown> = {};
 
   if (input.title !== undefined) {
-    setFields.title = input.title
-    setFields.normalizedTitle = normalize(input.title)
+    setFields.title = input.title;
+    setFields.normalizedTitle = normalize(input.title);
   }
   if (input.itemType !== undefined) {
-    setFields.itemType = input.itemType
+    setFields.itemType = input.itemType;
   }
   if (input.listenStatus !== undefined) {
-    setFields.listenStatus = input.listenStatus
-    if (input.listenStatus === 'listened' || input.listenStatus === 'done') {
-      setFields.listenedAt = new Date()
+    setFields.listenStatus = input.listenStatus;
+    if (input.listenStatus === "listened" || input.listenStatus === "done") {
+      setFields.listenedAt = new Date();
     }
   }
   if (input.purchaseIntent !== undefined) {
-    setFields.purchaseIntent = input.purchaseIntent
+    setFields.purchaseIntent = input.purchaseIntent;
   }
   if (input.notes !== undefined) {
-    setFields.notes = input.notes
+    setFields.notes = input.notes;
   }
   if (input.rating !== undefined) {
-    setFields.rating = input.rating
+    setFields.rating = input.rating;
   }
   if (input.priceCents !== undefined) {
-    setFields.priceCents = input.priceCents
+    setFields.priceCents = input.priceCents;
   }
   if (input.currency !== undefined) {
-    setFields.currency = input.currency
+    setFields.currency = input.currency;
   }
 
   // Handle artist name changes
   if (input.artistName !== undefined) {
     if (input.artistName) {
-      setFields.artistId = await getOrCreateArtist(input.artistName)
+      setFields.artistId = await getOrCreateArtist(input.artistName);
     } else {
-      setFields.artistId = null
+      setFields.artistId = null;
     }
   }
 
   if (Object.keys(setFields).length > 0) {
-    setFields.updatedAt = new Date()
+    setFields.updatedAt = new Date();
 
-    await db
-      .update(musicItems)
-      .set(setFields)
-      .where(eq(musicItems.id, id))
+    await db.update(musicItems).set(setFields).where(eq(musicItems.id, id));
   }
 
-  const item = await fetchFullItem(id)
+  const item = await fetchFullItem(id);
   if (!item) {
-    return c.json({ error: 'Not found' }, 404)
+    return c.json({ error: "Not found" }, 404);
   }
 
-  return c.json(item)
-})
+  return c.json(item);
+});
 
 // ---------------------------------------------------------------------------
 // DELETE /:id — delete a music item
 // ---------------------------------------------------------------------------
 
-musicItemRoutes.delete('/:id', async (c) => {
-  const id = Number(c.req.param('id'))
+musicItemRoutes.delete("/:id", async (c) => {
+  const id = Number(c.req.param("id"));
   if (Number.isNaN(id)) {
-    return c.json({ error: 'Invalid ID' }, 400)
+    return c.json({ error: "Invalid ID" }, 400);
   }
 
   const result = await db
     .delete(musicItems)
     .where(eq(musicItems.id, id))
-    .returning({ id: musicItems.id })
+    .returning({ id: musicItems.id });
 
-  return c.json({ success: result.length > 0 })
-})
+  return c.json({ success: result.length > 0 });
+});

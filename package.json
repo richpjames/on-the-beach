@@ -16,21 +16,36 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:studio": "drizzle-kit studio",
-    "db:seed": "tsx server/db/seed.ts"
+    "db:seed": "tsx server/db/seed.ts",
+    "lint": "oxlint",
+    "format": "oxfmt --write",
+    "format:check": "oxfmt --check",
+    "prepare": "husky"
   },
   "dependencies": {
     "@hono/node-server": "^1.19.9",
+    "better-sqlite3": "^12.6.2",
     "drizzle-orm": "^0.45.1",
-    "hono": "^4.11.10",
-    "postgres": "^3.4.8"
+    "hono": "^4.11.10"
   },
   "devDependencies": {
     "@playwright/test": "^1.58.2",
+    "@types/better-sqlite3": "^7.6.13",
     "@types/node": "^25.2.3",
     "drizzle-kit": "^0.31.9",
+    "husky": "^9.1.7",
+    "lint-staged": "^16.2.7",
+    "oxfmt": "^0.34.0",
+    "oxlint": "^1.49.0",
     "tsx": "^4.21.0",
     "typescript": "^5.9.3",
     "vite": "^6.4.1",
     "vitest": "^4.0.18"
+  },
+  "lint-staged": {
+    "*.{js,jsx,ts,tsx}": [
+      "oxlint",
+      "oxfmt --write --no-error-on-unmatched-pattern"
+    ]
   }
 }
