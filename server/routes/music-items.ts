@@ -9,6 +9,7 @@ import {
   musicItemStacks,
 } from '../db/schema'
 import { parseUrl, isValidUrl, normalize, capitalize } from '../utils'
+import { scrapeUrl } from '../scraper'
 import type {
   CreateMusicItemInput,
   UpdateMusicItemInput,
@@ -44,6 +45,7 @@ function fullItemSelect() {
       created_at: musicItems.createdAt,
       updated_at: musicItems.updatedAt,
       listened_at: musicItems.listenedAt,
+      artwork_url: musicItems.artworkUrl,
       is_physical: musicItems.isPhysical,
       physical_format: musicItems.physicalFormat,
       artist_name: artists.name,
@@ -169,8 +171,13 @@ musicItemRoutes.post('/', async (c) => {
   }
 
   const parsed = parseUrl(input.url)
-  const title = input.title || parsed.potentialTitle || 'Untitled'
-  const artistName = input.artistName || parsed.potentialArtist
+
+  // Attempt OG metadata scraping (non-blocking on failure)
+  const scraped = await scrapeUrl(parsed.normalizedUrl, parsed.source)
+
+  // Merge with priority: user input > OG scraped > regex extracted > defaults
+  const title = input.title || scraped?.potentialTitle || parsed.potentialTitle || 'Untitled'
+  const artistName = input.artistName || scraped?.potentialArtist || parsed.potentialArtist
 
   // Get or create artist
   let artistId: number | null = null
@@ -192,6 +199,7 @@ musicItemRoutes.post('/', async (c) => {
       listenStatus: input.listenStatus ?? 'to-listen',
       purchaseIntent: input.purchaseIntent ?? 'no',
       notes: input.notes ?? null,
+      artworkUrl: scraped?.imageUrl ?? null,
     })
     .returning({ id: musicItems.id })
 

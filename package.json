@@ -20,12 +20,13 @@
   },
   "dependencies": {
     "@hono/node-server": "^1.19.9",
+    "better-sqlite3": "^12.6.2",
     "drizzle-orm": "^0.45.1",
-    "hono": "^4.11.10",
-    "postgres": "^3.4.8"
+    "hono": "^4.11.10"
   },
   "devDependencies": {
     "@playwright/test": "^1.58.2",
+    "@types/better-sqlite3": "^7.6.13",
     "@types/node": "^25.2.3",
     "drizzle-kit": "^0.31.9",
     "tsx": "^4.21.0",

@@ -49,6 +49,7 @@ export interface MusicItem {
   created_at: string
   updated_at: string
   listened_at: string | null
+  artwork_url: string | null
   is_physical: number
   physical_format: PhysicalFormat | null
 }

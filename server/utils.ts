@@ -38,7 +38,12 @@ const URL_PATTERNS: Array<{
   },
   {
     source: 'apple_music',
-    pattern: /^https?:\/\/music\.apple\.com\/[a-z]{2}\/(album|playlist)\/([^/]+)/,
+    pattern: /^https?:\/\/music\.apple\.com\/[a-z]{2}\/(album|playlist|artist|music-video|station)\/([^/]+)/,
+    extractor: (match) => {
+      const slug = match[2]?.replace(/-/g, ' ')
+      if (match[1] === 'artist') return { potentialArtist: slug }
+      return { potentialTitle: slug }
+    },
   },
   {
     source: 'discogs',
