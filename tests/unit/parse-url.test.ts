@@ -1,4 +1,4 @@
-import { describe, test, expect } from "vitest";
+import { describe, test, expect } from "bun:test";
 import { parseUrl } from "../../src/repository/utils";
 
 describe("parseUrl - apple music", () => {

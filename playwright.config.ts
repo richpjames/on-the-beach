@@ -10,7 +10,7 @@ export default defineConfig({
     headless: true,
   },
   webServer: {
-    command: "NODE_ENV=test tsx server/index.ts",
+    command: "NODE_ENV=test bun server/index.ts",
     port: 3000,
     reuseExistingServer: !process.env.CI,
   },
