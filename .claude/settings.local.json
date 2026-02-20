@@ -27,7 +27,11 @@
       "Bash(gh run view:*)",
       "Bash(npx oxlint:*)",
       "Bash(npx oxfmt:*)",
-      "Bash(npx lint-staged:*)"
+      "Bash(npx lint-staged:*)",
+      "Bash(bun install:*)",
+      "Bash(node -e:*)",
+      "Bash(curl:*)",
+      "Bash(lsof:*)"
     ]
   }
 }
