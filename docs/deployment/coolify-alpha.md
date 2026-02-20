@@ -80,12 +80,53 @@ traefik.http.routers.<your-router-name>.middlewares=gzip,otb-auth,otb-noindex
 
 ## 5. Email Ingest (Optional)
 
-To enable the email-to-music-item webhook, set these environment variables in Coolify:
+The app can receive emails directly via an embedded SMTP server and/or an HTTP webhook. Both extract music URLs from the email body and create music items automatically.
 
-- `INGEST_API_KEY`: A random secret token used to authenticate webhook requests. Generate one with `openssl rand -base64 32`.
+### Option A: Embedded SMTP server (recommended for self-hosting)
+
+Set these environment variables in Coolify:
+
+- `SMTP_ENABLED`: Set to `"true"` to start the embedded SMTP server alongside the web app.
+- `SMTP_PORT`: Port to listen on (default `2525`). Use `25` if receiving mail directly.
+- `SMTP_ALLOWED_FROM`: Comma-separated sender addresses to accept (e.g. `noreply@bandcamp.com`). If unset, all senders are accepted.
+
+**DNS setup** — add an MX record pointing to your server:
+
+```
+MX  enlaplaya.example.com  ->  enlaplaya.example.com  (priority 10)
+```
+
+**Coolify port** — expose the SMTP port alongside the web port. In your Coolify app settings, add:
+
+```
+Ports: 3000:3000, 2525:2525
+```
+
+**Firewall** — ensure the SMTP port is open on your server:
+
+```bash
+ufw allow 2525/tcp
+```
+
+Test with swaks or a manual SMTP send:
+
+```bash
+swaks --to music@enlaplaya.example.com \
+      --from noreply@bandcamp.com \
+      --server enlaplaya.example.com:2525 \
+      --header "Subject: New release" \
+      --body '<a href="https://artist.bandcamp.com/album/test">Listen</a>' \
+      --h-Content-Type "text/html"
+```
+
+### Option B: HTTP webhook
+
+Set these environment variables in Coolify:
+
+- `INGEST_API_KEY`: A random secret token. Generate one with `openssl rand -base64 32`.
 - `INGEST_ENABLED`: Set to `"false"` to disable the endpoint without removing the key. Defaults to enabled.
 
-The webhook endpoint is `POST /api/ingest/email`. Configure your email provider (e.g. SendGrid Inbound Parse, Cloudflare Email Routing) to forward emails to:
+The endpoint is `POST /api/ingest/email`. Point your email provider's webhook to:
 
 ```
 https://enlaplaya.example.com/api/ingest/email
