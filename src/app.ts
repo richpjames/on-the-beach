@@ -75,12 +75,17 @@ export class App {
       }
 
       const formData = new FormData(form);
-      const url = formData.get("url") as string;
+      let url = (formData.get("url") as string).trim();
       const title = (formData.get("title") as string) || undefined;
       const artist = (formData.get("artist") as string) || undefined;
       const itemType = (formData.get("itemType") as ItemType) || "album";
 
-      if (!url.trim()) return;
+      if (!url) return;
+
+      // Auto-prepend https:// if no protocol is provided
+      if (!/^https?:\/\//i.test(url)) {
+        url = `https://${url}`;
+      }
 
       try {
         const item = await this.api.createMusicItem({
