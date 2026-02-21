@@ -48,8 +48,8 @@
   },
   "lint-staged": {
     "*.{js,jsx,ts,tsx}": [
-      "oxlint",
-      "oxfmt --write --no-error-on-unmatched-pattern"
+      "bun --bun x oxlint",
+      "bun --bun x oxfmt --write --no-error-on-unmatched-pattern"
     ]
   }
 }

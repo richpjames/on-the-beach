@@ -1,16 +1,15 @@
-import { describe, it, expect, vi, beforeEach, afterEach, afterAll } from "vitest";
+import { describe, it, expect, mock, beforeEach, afterEach } from "bun:test";
 import { createTransport } from "nodemailer";
 import type { SMTPServer } from "smtp-server";
 
+const mockCreate = mock();
+
 // Mock createMusicItemFromUrl before importing
-vi.mock("../../server/music-item-creator", () => ({
-  createMusicItemFromUrl: vi.fn(),
+mock.module("../../server/music-item-creator", () => ({
+  createMusicItemFromUrl: mockCreate,
 }));
 
-const { createMusicItemFromUrl } = await import("../../server/music-item-creator");
 const { startSmtpIngest } = await import("../../server/smtp-ingest");
-
-const mockCreate = vi.mocked(createMusicItemFromUrl);
 
 let server: SMTPServer;
 let smtpPort: number;

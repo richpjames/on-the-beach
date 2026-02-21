@@ -1,16 +1,15 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, mock, beforeEach, afterEach } from "bun:test";
 import { Hono } from "hono";
 
+const mockCreate = mock();
+
 // Mock createMusicItemFromUrl before importing the route
-vi.mock("../../server/music-item-creator", () => ({
-  createMusicItemFromUrl: vi.fn(),
+mock.module("../../server/music-item-creator", () => ({
+  createMusicItemFromUrl: mockCreate,
 }));
 
 // Import after mock is set up
 const { ingestRoutes } = await import("../../server/routes/ingest");
-const { createMusicItemFromUrl } = await import("../../server/music-item-creator");
-
-const mockCreate = vi.mocked(createMusicItemFromUrl);
 
 function makeApp() {
   const app = new Hono();
