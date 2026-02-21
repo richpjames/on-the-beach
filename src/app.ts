@@ -33,6 +33,8 @@ export class App {
     this.setupAddForm();
     this.isReady = true;
     this.initializeUI();
+    const versionEl = document.getElementById("app-version");
+    if (versionEl) versionEl.textContent = `v${__APP_VERSION__}`;
   }
 
   private initializeUI(): void {
