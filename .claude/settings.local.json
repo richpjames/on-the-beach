@@ -31,7 +31,10 @@
       "Bash(bun install:*)",
       "Bash(node -e:*)",
       "Bash(curl:*)",
-      "Bash(lsof:*)"
+      "Bash(lsof:*)",
+      "Bash(grep:*)",
+      "Bash(bun run test:unit:*)",
+      "mcp__plugin_playwright_playwright__browser_navigate"
     ]
   }
 }
