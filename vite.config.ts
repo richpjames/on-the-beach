@@ -1,11 +1,13 @@
 import { defineConfig } from "vite";
+import pkg from "./package.json";
 
 export default defineConfig({
-  root: ".",
-  publicDir: "public",
   build: {
     outDir: "dist",
     target: "esnext",
     sourcemap: true,
+  },
+  define: {
+    __APP_VERSION__: JSON.stringify(pkg.version),
   },
 });

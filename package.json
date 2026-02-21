@@ -11,7 +11,7 @@
     "test": "bun test tests/unit",
     "test:unit": "bun test tests/unit",
     "test:unit:watch": "bun test --watch tests/unit",
-    "test:e2e": "playwright test playwright/add-link.spec.ts playwright/bandcamp-link.spec.ts playwright/stacks.spec.ts",
+    "test:e2e": "playwright test playwright/add-link.spec.ts playwright/bandcamp-link.spec.ts playwright/stacks.spec.ts playwright/version.spec.ts",
     "test:e2e:full": "bunx playwright test playwright",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
@@ -20,6 +20,8 @@
     "lint": "oxlint",
     "format": "oxfmt --write",
     "format:check": "oxfmt --check",
+    "devcontainer": "devcontainer up --workspace-folder .",
+    "devcontainer:ssh": "docker compose -f .devcontainer/docker-compose.yml exec app bash",
     "prepare": "husky"
   },
   "dependencies": {
