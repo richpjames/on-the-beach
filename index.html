@@ -6,6 +6,9 @@
     <meta name="description" content="Track music you want to listen to" />
     <meta name="robots" content="noindex, nofollow" />
     <title>On The Beach</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=VT323&family=Share+Tech+Mono&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="/src/styles/main.css" />
   </head>
   <body>
@@ -13,6 +16,11 @@
       <header class="header">
         <h1>On The Beach</h1>
         <p class="header__subtitle">Music Tracking</p>
+        <div class="header__winbuttons">
+          <button class="header__winbtn" aria-label="Minimize" tabindex="-1">_</button>
+          <button class="header__winbtn" aria-label="Maximize" tabindex="-1">□</button>
+          <button class="header__winbtn header__winbtn--close" aria-label="Close" tabindex="-1">✕</button>
+        </div>
       </header>
 
       <main class="main">
@@ -66,8 +74,8 @@
               title="Manage stacks"
             >
               <svg
-                width="16"
-                height="16"
+                width="14"
+                height="14"
                 viewBox="0 0 24 24"
                 fill="none"
                 stroke="currentColor"
@@ -111,11 +119,10 @@
           </div>
         </section>
       </main>
+      <footer class="footer">
+        <span id="app-version"></span>
+      </footer>
     </div>
-
-    <footer class="footer">
-      <span id="app-version"></span>
-    </footer>
 
     <script type="module" src="/src/main.ts"></script>
   </body>
