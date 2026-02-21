@@ -1,15 +1,15 @@
 services:
   app:
-    image: node:24-alpine
+    build: .
     container_name: on-the-beach-app
     restart: unless-stopped
-    working_dir: /app
     ports:
       - "3000:3000"
     environment:
       DATABASE_PATH: /app/data/on_the_beach.db
       NODE_ENV: production
     volumes:
-      - .:/app
-      - /app/node_modules
-    command: ["node", "dist-server/index.js"]
+      - app-data:/app/data
+
+volumes:
+  app-data:

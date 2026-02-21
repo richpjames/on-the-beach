@@ -1,0 +1,9 @@
+node_modules
+dist
+.worktrees
+.git
+*.md
+docs
+playwright
+tests
+.github
