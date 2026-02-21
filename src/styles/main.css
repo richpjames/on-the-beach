@@ -505,3 +505,11 @@ a:hover {
   padding: 0.5rem 1rem;
   font-size: 0.875rem;
 }
+
+.footer {
+  text-align: center;
+  padding: 1.5rem 1rem;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  letter-spacing: 0.05em;
+}
