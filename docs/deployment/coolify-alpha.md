@@ -24,12 +24,24 @@ dig enlaplaya.example.com +short
 Create a new Coolify application from `richpjames/on-the-beach`:
 
 - `Branch`: `main`
-- `Build Pack`: `Nixpacks`
-- `Static Site`: enabled
+- `Build Pack`: `Dockerfile`
 - `Base Directory`: `/`
-- `Publish Directory`: `/dist`
+- `Port`: `3000`
 - `Domain`: `https://enlaplaya.example.com`
 - `Force HTTPS`: enabled
+
+> **Important**: Do NOT use Static Site mode. The app requires a running backend server
+> (Hono + SQLite) to handle `/api/*` routes. The Dockerfile builds the frontend and
+> starts the Bun server in a single container.
+
+Add an environment variable in Coolify:
+
+- `DATABASE_PATH`: `/app/data/on_the_beach.db`
+
+Add a persistent volume in Coolify:
+
+- Source: a named volume (e.g. `on-the-beach-data`)
+- Destination: `/app/data`
 
 Run one manual deploy to confirm baseline.
 
