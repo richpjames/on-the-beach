@@ -12,7 +12,24 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  test:
+  unit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile --ignore-scripts
+
+      - name: Run unit tests
+        run: bun run test:unit
+
+  e2e:
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
@@ -28,9 +45,6 @@ jobs:
 
       - name: Setup database
         run: bun run db:migrate && bun run db:seed
-
-      - name: Run unit tests
-        run: bun run test:unit
 
       - name: Install Playwright browser
         run: bunx playwright install --with-deps chromium
