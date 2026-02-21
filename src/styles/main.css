@@ -1,3 +1,5 @@
+@import url('https://fonts.googleapis.com/css2?family=VT323&family=Share+Tech+Mono&display=swap');
+
 * {
   box-sizing: border-box;
   margin: 0;
@@ -5,229 +7,527 @@
 }
 
 :root {
-  --bg: #0a0a0a;
-  --bg-card: #141414;
-  --bg-input: #1a1a1a;
-  --text: #e5e5e5;
-  --text-muted: #737373;
-  --accent: #3b82f6;
-  --accent-hover: #2563eb;
-  --border: #262626;
-  --success: #22c55e;
-  --warning: #eab308;
-  --danger: #ef4444;
-  --radius: 8px;
-  --radius-sm: 4px;
+  /* Windows 98 Silver Chrome */
+  --chrome:         #c0c0c0;
+  --chrome-light:   #dfdfdf;
+  --chrome-white:   #ffffff;
+  --chrome-dark:    #808080;
+  --chrome-darker:  #404040;
+  --chrome-black:   #000000;
+
+  /* Classic Windows Title Blue */
+  --title-bar: linear-gradient(90deg, #000080 0%, #1084d0 70%, #4db0e8 100%);
+
+  /* Winamp Playlist Core */
+  --playlist-bg:              #000000;
+  --playlist-bg-alt:          #06060e;
+  --playlist-text:            #adc8ff;
+  --playlist-text-hover:      #c8dfff;
+  --playlist-selected-bg:     #225fa8;
+  --playlist-selected-text:   #ffffff;
+
+  /* LED / LCD */
+  --led-green:  #00ff41;
+  --led-dim:    #004d14;
+  --led-amber:  #ffb300;
+
+  /* Accent */
+  --win-blue:   #225fa8;
+
+  /* Status colors (Winamp-palette) */
+  --status-listen:  #6699ff;
+  --status-playing: #ffcc44;
+  --status-done:    #44ff88;
+  --status-revisit: #cc44ff;
+  --status-grey:    #888888;
+
+  /* Danger */
+  --danger: #cc2200;
+
+  /* Zero radius — pixels only */
+  --radius: 0px;
+  --radius-sm: 0px;
 }
 
+/* ═══════════════════════════════════════════════════
+   BODY — Windows 98 Desktop
+═══════════════════════════════════════════════════ */
 body {
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-  background: var(--bg);
-  color: var(--text);
-  line-height: 1.5;
+  font-family: "Tahoma", "MS Sans Serif", "Arial", sans-serif;
+  background-color: #008080;
+  background-image:
+    repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 1px,
+      rgba(0, 0, 0, 0.04) 1px,
+      rgba(0, 0, 0, 0.04) 2px
+    ),
+    repeating-linear-gradient(
+      90deg,
+      transparent,
+      transparent 1px,
+      rgba(0, 0, 0, 0.02) 1px,
+      rgba(0, 0, 0, 0.02) 2px
+    );
+  color: #000000;
+  line-height: 1.3;
   min-height: 100vh;
+  font-size: 11px;
+  padding: 16px 16px 44px;
 }
 
+/* ═══════════════════════════════════════════════════
+   APP WINDOW — Floating window on desktop
+═══════════════════════════════════════════════════ */
 #app {
-  max-width: 800px;
+  max-width: 680px;
   margin: 0 auto;
-  padding: 2rem 1rem;
+  background: var(--chrome);
+  border-width: 2px;
+  border-style: solid;
+  border-color: var(--chrome-white) var(--chrome-darker) var(--chrome-darker) var(--chrome-white);
+  box-shadow: 3px 3px 0 #000000, 4px 4px 0 rgba(0,0,0,0.3);
 }
 
-/* Header */
+/* ═══════════════════════════════════════════════════
+   HEADER — Windows Title Bar
+═══════════════════════════════════════════════════ */
 .header {
-  text-align: center;
-  margin-bottom: 2rem;
+  background: var(--title-bar);
+  padding: 4px 6px 4px 8px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 0;
+  cursor: default;
+  user-select: none;
+  min-height: 26px;
 }
 
 .header h1 {
-  font-size: 2rem;
-  font-weight: 600;
-  letter-spacing: -0.02em;
+  font-size: 11px;
+  font-weight: bold;
+  color: #ffffff;
+  letter-spacing: 0;
+  text-shadow: 1px 1px 0 rgba(0, 0, 30, 0.8);
+  font-family: "Tahoma", "MS Sans Serif", sans-serif;
+  white-space: nowrap;
+}
+
+.header h1::before {
+  content: "♫ ";
+  font-size: 10px;
+  opacity: 0.9;
 }
 
 .header__subtitle {
-  color: var(--text-muted);
-  font-size: 0.875rem;
+  color: rgba(255,255,255,0.7);
+  font-size: 10px;
+  font-family: "Tahoma", sans-serif;
+  flex: 1;
+  padding-left: 6px;
 }
 
-/* Form */
+.header__winbuttons {
+  display: flex;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.header__winbtn {
+  width: 16px;
+  height: 14px;
+  font-size: 9px;
+  font-weight: bold;
+  background: var(--chrome);
+  border-width: 1px;
+  border-style: solid;
+  border-color: var(--chrome-white) var(--chrome-darker) var(--chrome-darker) var(--chrome-white);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: #000000;
+  line-height: 1;
+  padding: 0;
+  font-family: "Tahoma", monospace;
+}
+
+.header__winbtn:active {
+  border-color: var(--chrome-darker) var(--chrome-white) var(--chrome-white) var(--chrome-darker);
+}
+
+.header__winbtn--close {
+  background: var(--chrome);
+}
+
+/* ═══════════════════════════════════════════════════
+   MAIN CONTENT AREA
+═══════════════════════════════════════════════════ */
+.main {
+  background: var(--chrome);
+  padding: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+/* ═══════════════════════════════════════════════════
+   ADD SECTION — Winamp-style input panel
+═══════════════════════════════════════════════════ */
 .add-section {
-  margin-bottom: 2rem;
+  background: #d4d0c8;
+  border-width: 2px;
+  border-style: solid;
+  border-color: var(--chrome-dark) var(--chrome-white) var(--chrome-white) var(--chrome-dark);
+  padding: 6px;
+}
+
+.add-section::before {
+  content: "ADD TRACK";
+  display: block;
+  font-size: 9px;
+  font-weight: bold;
+  color: var(--chrome-dark);
+  letter-spacing: 0.12em;
+  margin-bottom: 5px;
+  font-family: "Tahoma", sans-serif;
 }
 
 .add-form__row {
   display: flex;
-  gap: 0.5rem;
+  gap: 3px;
 }
 
 .add-form__details {
-  margin-top: 0.75rem;
+  margin-top: 5px;
 }
 
 .add-form__details summary {
-  color: var(--text-muted);
+  color: var(--chrome-dark);
   cursor: pointer;
-  font-size: 0.875rem;
+  font-size: 10px;
+  font-family: "Tahoma", sans-serif;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.add-form__details summary::before {
+  content: "▶";
+  font-size: 8px;
+}
+
+.add-form__details[open] summary::before {
+  content: "▼";
 }
 
 .add-form__extra {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 0.5rem;
-  margin-top: 0.75rem;
+  gap: 3px;
+  margin-top: 5px;
 }
 
 .add-form__extra select {
   grid-column: span 2;
 }
 
-/* Inputs */
+/* ═══════════════════════════════════════════════════
+   INPUTS — Windows 98 sunken edit fields
+═══════════════════════════════════════════════════ */
 .input {
   flex: 1;
-  padding: 0.75rem 1rem;
-  background: var(--bg-input);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  color: var(--text);
-  font-size: 1rem;
+  padding: 2px 4px;
+  background: #ffffff;
+  border-width: 2px;
+  border-style: solid;
+  border-color: var(--chrome-dark) var(--chrome-white) var(--chrome-white) var(--chrome-dark);
+  border-radius: 0;
+  color: #000000;
+  font-size: 11px;
+  font-family: "Tahoma", "MS Sans Serif", sans-serif;
+  height: 22px;
 }
 
 .input:focus {
-  outline: none;
-  border-color: var(--accent);
+  outline: 1px dotted #000000;
+  outline-offset: -2px;
 }
 
 .input::placeholder {
-  color: var(--text-muted);
+  color: #999999;
+  font-style: italic;
 }
 
-/* Buttons */
-.btn {
-  padding: 0.75rem 1.5rem;
-  border: none;
-  border-radius: var(--radius);
-  font-size: 1rem;
-  font-weight: 500;
+select.input {
   cursor: pointer;
-  transition: background 0.15s;
+  appearance: auto;
+}
+
+/* ═══════════════════════════════════════════════════
+   BUTTONS — Raised 3D Windows buttons
+═══════════════════════════════════════════════════ */
+.btn {
+  padding: 2px 12px;
+  border-width: 2px;
+  border-style: solid;
+  border-color: var(--chrome-white) var(--chrome-darker) var(--chrome-darker) var(--chrome-white);
+  border-radius: 0;
+  font-size: 11px;
+  font-weight: normal;
+  font-family: "Tahoma", "MS Sans Serif", sans-serif;
+  cursor: pointer;
+  background: var(--chrome);
+  color: #000000;
+  transition: none;
+  min-width: 54px;
+  text-align: center;
+  height: 22px;
+  white-space: nowrap;
+}
+
+.btn:hover {
+  background: var(--chrome-light);
+}
+
+.btn:active {
+  border-color: var(--chrome-darker) var(--chrome-white) var(--chrome-white) var(--chrome-darker);
+  padding: 3px 11px 1px 13px;
 }
 
 .btn--primary {
-  background: var(--accent);
-  color: white;
+  background: var(--chrome);
+  color: #000000;
 }
 
 .btn--primary:hover {
-  background: var(--accent-hover);
+  background: var(--chrome-light);
 }
 
 .btn--ghost {
   background: transparent;
-  color: var(--text-muted);
-  padding: 0.5rem;
+  border-color: transparent;
+  color: var(--chrome-dark);
+  padding: 2px 6px;
+  min-width: auto;
+  border-width: 2px;
 }
 
 .btn--ghost:hover {
-  color: var(--text);
+  color: #000000;
+  background: var(--chrome-light);
+  border-color: var(--chrome-white) var(--chrome-darker) var(--chrome-darker) var(--chrome-white);
 }
 
 .btn--danger:hover {
   color: var(--danger);
 }
 
-/* Filter bar */
-.filter-section {
-  margin-bottom: 1.5rem;
-}
-
-.filter-bar {
-  display: flex;
-  gap: 0.5rem;
-  flex-wrap: wrap;
-}
-
-.filter-btn {
-  padding: 0.5rem 1rem;
-  background: var(--bg-input);
-  border: 1px solid var(--border);
-  border-radius: 9999px;
-  color: var(--text-muted);
-  font-size: 0.875rem;
-  cursor: pointer;
-  transition: all 0.15s;
-}
-
-.filter-btn:hover {
-  border-color: var(--text-muted);
-}
-
-.filter-btn.active {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: white;
-}
-
-/* Stack bar */
+/* ═══════════════════════════════════════════════════
+   STACK BAR — Classic Windows Tabs
+═══════════════════════════════════════════════════ */
 .stack-section {
-  margin-bottom: 1rem;
+  margin-bottom: 0;
 }
 
 .stack-bar {
   display: flex;
-  gap: 0.5rem;
+  gap: 2px;
   flex-wrap: wrap;
-  align-items: center;
+  align-items: flex-end;
+  background: var(--chrome);
+  padding: 4px 4px 0;
 }
 
 .stack-tab {
-  padding: 0.5rem 1rem;
-  background: var(--bg-input);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  color: var(--text-muted);
-  font-size: 0.875rem;
+  padding: 2px 14px 3px;
+  background: #b0b0b0;
+  border-width: 2px;
+  border-style: solid;
+  border-color: var(--chrome-white) var(--chrome-dark) transparent var(--chrome-white);
+  border-radius: 0;
+  color: var(--chrome-dark);
+  font-size: 11px;
+  font-family: "Tahoma", "MS Sans Serif", sans-serif;
   cursor: pointer;
-  transition: all 0.15s;
+  transition: none;
+  position: relative;
+  top: 2px;
 }
 
 .stack-tab:hover {
-  border-color: var(--text-muted);
+  background: var(--chrome);
+  color: #000000;
 }
 
 .stack-tab.active {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: white;
+  background: var(--chrome);
+  border-bottom-color: var(--chrome);
+  color: #000000;
+  font-weight: bold;
+  z-index: 1;
 }
 
 .stack-tab--manage {
-  padding: 0.5rem;
+  padding: 2px 8px;
   margin-left: auto;
 }
 
-/* Music list */
+/* ═══════════════════════════════════════════════════
+   FILTER BAR — Toolbar-style status buttons
+═══════════════════════════════════════════════════ */
+.filter-section {
+  margin-bottom: 0;
+}
+
+.filter-bar {
+  display: flex;
+  gap: 2px;
+  flex-wrap: wrap;
+  background: #d4d0c8;
+  border-width: 2px;
+  border-style: solid;
+  border-color: var(--chrome-dark) var(--chrome-white) var(--chrome-white) var(--chrome-dark);
+  padding: 3px;
+}
+
+.filter-bar::before {
+  content: "FILTER:";
+  font-size: 9px;
+  font-weight: bold;
+  color: var(--chrome-dark);
+  letter-spacing: 0.08em;
+  display: flex;
+  align-items: center;
+  padding: 0 6px 0 2px;
+  font-family: "Tahoma", sans-serif;
+}
+
+.filter-btn {
+  padding: 1px 10px;
+  background: var(--chrome);
+  border-width: 2px;
+  border-style: solid;
+  border-color: var(--chrome-white) var(--chrome-darker) var(--chrome-darker) var(--chrome-white);
+  border-radius: 0;
+  color: #000000;
+  font-size: 11px;
+  font-family: "Tahoma", "MS Sans Serif", sans-serif;
+  cursor: pointer;
+  transition: none;
+  height: 20px;
+}
+
+.filter-btn:hover {
+  background: var(--chrome-light);
+}
+
+.filter-btn.active {
+  background: #b0b0b0;
+  border-color: var(--chrome-darker) var(--chrome-white) var(--chrome-white) var(--chrome-darker);
+  color: #000000;
+  font-weight: bold;
+}
+
+/* ═══════════════════════════════════════════════════
+   MUSIC LIST — Winamp Playlist Window
+═══════════════════════════════════════════════════ */
+.list-section {
+  border-width: 2px;
+  border-style: solid;
+  border-color: var(--chrome-dark) var(--chrome-white) var(--chrome-white) var(--chrome-dark);
+}
+
+.list-section::before {
+  content: "▌ PLAYLIST ▐";
+  display: block;
+  background: linear-gradient(90deg, #000080 0%, #1084d0 100%);
+  color: #ffffff;
+  font-size: 9px;
+  font-weight: bold;
+  letter-spacing: 0.15em;
+  padding: 2px 6px;
+  font-family: "Tahoma", sans-serif;
+}
+
 .music-list {
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
+  background: var(--playlist-bg);
+  min-height: 120px;
+  max-height: 520px;
+  overflow-y: auto;
+  counter-reset: track-num;
+}
+
+/* Playlist scrollbar */
+.music-list::-webkit-scrollbar {
+  width: 16px;
+}
+.music-list::-webkit-scrollbar-track {
+  background: var(--chrome);
+  border-left: 1px solid var(--chrome-dark);
+}
+.music-list::-webkit-scrollbar-thumb {
+  background: var(--chrome);
+  border-width: 1px;
+  border-style: solid;
+  border-color: var(--chrome-white) var(--chrome-darker) var(--chrome-darker) var(--chrome-white);
+}
+.music-list::-webkit-scrollbar-button {
+  background: var(--chrome);
+  height: 16px;
+  border-width: 1px;
+  border-style: solid;
+  border-color: var(--chrome-white) var(--chrome-darker) var(--chrome-darker) var(--chrome-white);
 }
 
 .empty-state {
   text-align: center;
-  padding: 3rem 1rem;
-  color: var(--text-muted);
+  padding: 32px 8px;
+  color: var(--playlist-text);
+  font-size: 11px;
+  font-family: "Tahoma", sans-serif;
+  background: var(--playlist-bg);
 }
 
-/* Music card */
+/* ═══════════════════════════════════════════════════
+   MUSIC CARD — Playlist Row
+═══════════════════════════════════════════════════ */
 .music-card {
   display: flex;
   align-items: center;
-  gap: 1rem;
-  padding: 1rem;
-  background: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
+  gap: 6px;
+  padding: 2px 6px;
+  background: var(--playlist-bg);
+  border: none;
+  border-bottom: 1px solid #0a0a1a;
+  border-radius: 0;
+  min-height: 28px;
+  counter-increment: track-num;
+}
+
+.music-card::before {
+  content: counter(track-num) ".";
+  color: #4a6a9a;
+  font-size: 10px;
+  min-width: 22px;
+  flex-shrink: 0;
+  text-align: right;
+  font-family: "Tahoma", monospace;
+  align-self: flex-start;
+  padding-top: 3px;
+}
+
+.music-card:nth-child(even) {
+  background: var(--playlist-bg-alt);
+}
+
+.music-card:hover {
+  background: #0e1a30;
 }
 
 .music-card__content {
@@ -236,182 +536,253 @@ body {
 }
 
 .music-card__title {
-  font-weight: 500;
+  font-weight: normal;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--playlist-text);
+  font-size: 11px;
+  font-family: "Tahoma", sans-serif;
+  line-height: 1.4;
+}
+
+.music-card__artist {
+  color: #7a9fd4;
+  font-size: 10px;
+  font-style: italic;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
-.music-card__artist {
-  color: var(--text-muted);
-  font-size: 0.875rem;
-}
-
 .music-card__meta {
   display: flex;
-  gap: 0.5rem;
-  margin-top: 0.5rem;
+  gap: 4px;
+  margin-top: 2px;
+  align-items: center;
+  flex-wrap: wrap;
 }
 
 .music-card__actions {
   display: flex;
-  gap: 0.25rem;
+  gap: 2px;
+  flex-shrink: 0;
+  align-items: center;
 }
 
-/* Badges */
+/* ═══════════════════════════════════════════════════
+   BADGES — LED status indicators
+═══════════════════════════════════════════════════ */
 .badge {
   display: inline-block;
-  padding: 0.25rem 0.5rem;
-  border-radius: var(--radius-sm);
-  font-size: 0.75rem;
-  font-weight: 500;
-  text-transform: capitalize;
+  padding: 0px 4px;
+  border-radius: 0;
+  font-size: 9px;
+  font-weight: bold;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-family: "Tahoma", monospace;
+  border-width: 1px;
+  border-style: solid;
+  line-height: 14px;
 }
 
 .badge--to-listen {
-  background: rgba(59, 130, 246, 0.2);
-  color: #60a5fa;
+  background: #001033;
+  color: #6699ff;
+  border-color: #224499;
+  text-shadow: 0 0 4px #4477ff;
 }
 
 .badge--listening {
-  background: rgba(234, 179, 8, 0.2);
-  color: #facc15;
+  background: #332200;
+  color: #ffcc44;
+  border-color: #886600;
+  text-shadow: 0 0 4px #ffaa00;
 }
 
 .badge--listened {
-  background: rgba(34, 197, 94, 0.2);
-  color: #4ade80;
+  background: #002200;
+  color: #44ff88;
+  border-color: #006622;
+  text-shadow: 0 0 4px #00ff44;
 }
 
 .badge--to-revisit {
-  background: rgba(168, 85, 247, 0.2);
-  color: #c084fc;
+  background: #220033;
+  color: #cc44ff;
+  border-color: #660099;
+  text-shadow: 0 0 4px #aa00ff;
 }
 
 .badge--done {
-  background: rgba(115, 115, 115, 0.2);
-  color: #a3a3a3;
+  background: #111111;
+  color: #777777;
+  border-color: #444444;
 }
 
 .badge--source {
-  background: rgba(255, 255, 255, 0.1);
-  color: var(--text-muted);
+  background: #111111;
+  color: #555577;
+  border-color: #222244;
+  text-transform: none;
+  font-style: italic;
 }
 
-/* Status select dropdown */
+/* ═══════════════════════════════════════════════════
+   STATUS SELECT — Compact Windows dropdown
+═══════════════════════════════════════════════════ */
 .status-select {
-  padding: 0.25rem 0.5rem;
-  background: var(--bg-input);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  color: var(--text);
-  font-size: 0.75rem;
+  padding: 1px 2px;
+  background: #ffffff;
+  border-width: 2px;
+  border-style: solid;
+  border-color: var(--chrome-dark) var(--chrome-white) var(--chrome-white) var(--chrome-dark);
+  border-radius: 0;
+  color: #000000;
+  font-size: 10px;
+  font-family: "Tahoma", "MS Sans Serif", sans-serif;
   cursor: pointer;
+  height: 18px;
+  appearance: auto;
 }
 
 .status-select:focus {
-  outline: none;
-  border-color: var(--accent);
+  outline: 1px dotted #000000;
 }
 
-/* Links */
+/* ═══════════════════════════════════════════════════
+   LINKS
+═══════════════════════════════════════════════════ */
 a {
-  color: var(--accent);
-  text-decoration: none;
-}
-
-a:hover {
+  color: #6699ff;
   text-decoration: underline;
 }
 
-/* Error state */
+a:hover {
+  color: #aaccff;
+  text-decoration: underline;
+}
+
+/* ═══════════════════════════════════════════════════
+   ERROR STATE
+═══════════════════════════════════════════════════ */
 .error-screen {
   text-align: center;
-  padding: 3rem 1rem;
+  padding: 24px 8px;
+  background: var(--playlist-bg);
 }
 
 .error-screen h1 {
-  color: var(--danger);
-  margin-bottom: 1rem;
+  color: #ff4444;
+  margin-bottom: 8px;
+  font-size: 13px;
+  font-family: "Tahoma", sans-serif;
 }
 
 .error-screen pre {
-  background: var(--bg-card);
-  padding: 1rem;
-  border-radius: var(--radius);
+  background: #000000;
+  padding: 8px;
+  border-width: 1px;
+  border-style: solid;
+  border-color: var(--chrome-dark);
   overflow-x: auto;
-  font-size: 0.875rem;
-  margin-top: 1rem;
+  font-size: 10px;
+  margin-top: 8px;
+  color: var(--led-green);
+  font-family: "Courier New", monospace;
+  text-align: left;
 }
 
-/* Stack dropdown */
+/* ═══════════════════════════════════════════════════
+   STACK DROPDOWN — Windows context menu
+═══════════════════════════════════════════════════ */
 .stack-dropdown {
   position: absolute;
   top: 100%;
   right: 0;
-  z-index: 10;
-  min-width: 180px;
-  background: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 0.5rem;
+  z-index: 100;
+  min-width: 160px;
+  background: var(--chrome);
+  border-width: 2px;
+  border-style: solid;
+  border-color: var(--chrome-white) var(--chrome-darker) var(--chrome-darker) var(--chrome-white);
+  padding: 2px;
   display: flex;
   flex-direction: column;
-  gap: 0.25rem;
+  gap: 0;
+  box-shadow: 2px 2px 0 #000000;
+  border-radius: 0;
 }
 
 .stack-dropdown__item {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  padding: 0.35rem 0.5rem;
-  border-radius: var(--radius-sm);
-  font-size: 0.875rem;
+  gap: 6px;
+  padding: 3px 16px;
+  font-size: 11px;
+  font-family: "Tahoma", sans-serif;
   cursor: pointer;
-  color: var(--text);
+  color: #000000;
+  border-radius: 0;
 }
 
 .stack-dropdown__item:hover {
-  background: var(--bg-input);
+  background: var(--win-blue);
+  color: #ffffff;
 }
 
 .stack-dropdown__new {
-  border-top: 1px solid var(--border);
-  padding-top: 0.5rem;
-  margin-top: 0.25rem;
+  border-top-width: 2px;
+  border-top-style: solid;
+  border-color: var(--chrome-dark) transparent transparent transparent;
+  padding-top: 4px;
+  margin-top: 2px;
 }
 
 .stack-dropdown__new-input {
   width: 100%;
-  padding: 0.35rem 0.5rem;
-  font-size: 0.875rem;
+  padding: 2px 4px;
+  font-size: 11px;
+  font-family: "Tahoma", sans-serif;
+  border-width: 2px;
+  border-style: solid;
+  border-color: var(--chrome-dark) var(--chrome-white) var(--chrome-white) var(--chrome-dark);
+  background: #ffffff;
+  border-radius: 0;
 }
 
-/* Stack picker (add form) */
+/* ═══════════════════════════════════════════════════
+   STACK PICKER (add form)
+═══════════════════════════════════════════════════ */
 .stack-picker {
   grid-column: span 2;
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: 4px;
   flex-wrap: wrap;
   position: relative;
 }
 
 .stack-picker__chips {
   display: flex;
-  gap: 0.25rem;
+  gap: 2px;
   flex-wrap: wrap;
 }
 
 .stack-chip {
   display: inline-flex;
   align-items: center;
-  gap: 0.25rem;
-  padding: 0.25rem 0.5rem;
-  background: rgba(59, 130, 246, 0.2);
-  color: #60a5fa;
-  border-radius: var(--radius-sm);
-  font-size: 0.75rem;
+  gap: 2px;
+  padding: 1px 5px;
+  background: #001033;
+  color: #6699ff;
+  border-radius: 0;
+  font-size: 10px;
+  border-width: 1px;
+  border-style: solid;
+  border-color: #224499;
+  font-family: "Tahoma", sans-serif;
 }
 
 .stack-chip__remove {
@@ -420,7 +791,7 @@ a:hover {
   color: inherit;
   cursor: pointer;
   padding: 0;
-  font-size: 1rem;
+  font-size: 10px;
   line-height: 1;
   opacity: 0.7;
 }
@@ -430,86 +801,180 @@ a:hover {
 }
 
 .stack-picker__add {
-  font-size: 0.875rem;
-  padding: 0.25rem 0.5rem;
+  font-size: 10px;
+  padding: 1px 6px;
+  height: 18px;
+  min-width: auto;
 }
 
-/* Stack management panel */
+/* ═══════════════════════════════════════════════════
+   STACK MANAGE PANEL
+═══════════════════════════════════════════════════ */
 .stack-manage {
-  margin-top: 0.75rem;
-  padding: 1rem;
-  background: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
+  margin-top: 2px;
+  padding: 6px;
+  background: var(--chrome);
+  border-width: 2px;
+  border-style: solid;
+  border-color: var(--chrome-dark) var(--chrome-white) var(--chrome-white) var(--chrome-dark);
 }
 
 .stack-manage__item {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  padding: 0.5rem 0;
-  border-bottom: 1px solid var(--border);
+  gap: 4px;
+  padding: 3px 2px;
+  border-bottom-width: 1px;
+  border-bottom-style: solid;
+  border-color: var(--chrome-dark);
 }
 
 .stack-manage__name {
   flex: 1;
-  font-size: 0.875rem;
+  font-size: 11px;
+  font-family: "Tahoma", sans-serif;
+  color: #000000;
 }
 
 .stack-manage__count {
-  color: var(--text-muted);
-  font-size: 0.75rem;
+  color: var(--chrome-dark);
+  font-size: 10px;
+  font-family: "Tahoma", sans-serif;
 }
 
 .stack-manage__rename-btn,
 .stack-manage__delete-btn,
 .stack-manage__rename-confirm {
-  background: none;
-  border: none;
-  color: var(--text-muted);
+  background: var(--chrome);
+  border-width: 2px;
+  border-style: solid;
+  border-color: var(--chrome-white) var(--chrome-darker) var(--chrome-darker) var(--chrome-white);
+  color: #000000;
   cursor: pointer;
-  font-size: 0.75rem;
-  padding: 0.25rem 0.5rem;
+  font-size: 10px;
+  font-family: "Tahoma", sans-serif;
+  padding: 1px 8px;
+  height: 20px;
 }
 
 .stack-manage__rename-btn:hover,
 .stack-manage__rename-confirm:hover {
-  color: var(--text);
+  background: var(--chrome-light);
 }
 
 .stack-manage__delete-btn:hover {
   color: var(--danger);
+  background: var(--chrome-light);
+}
+
+.stack-manage__rename-btn:active,
+.stack-manage__delete-btn:active,
+.stack-manage__rename-confirm:active {
+  border-color: var(--chrome-darker) var(--chrome-white) var(--chrome-white) var(--chrome-darker);
 }
 
 .stack-manage__rename-input {
   flex: 1;
-  padding: 0.25rem 0.5rem;
-  font-size: 0.875rem;
+  padding: 1px 4px;
+  font-size: 11px;
+  font-family: "Tahoma", sans-serif;
+  border-width: 2px;
+  border-style: solid;
+  border-color: var(--chrome-dark) var(--chrome-white) var(--chrome-white) var(--chrome-dark);
+  background: #ffffff;
+  border-radius: 0;
+  height: 20px;
 }
 
 .stack-manage__create {
   display: flex;
-  gap: 0.5rem;
-  margin-top: 0.75rem;
-  padding-top: 0.75rem;
-  border-top: 1px solid var(--border);
+  gap: 4px;
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top-width: 2px;
+  border-top-style: solid;
+  border-color: var(--chrome-dark) transparent transparent;
 }
 
 .stack-manage__create .input {
   flex: 1;
-  padding: 0.5rem;
-  font-size: 0.875rem;
+  padding: 2px 4px;
+  font-size: 11px;
 }
 
 .stack-manage__create .btn {
-  padding: 0.5rem 1rem;
-  font-size: 0.875rem;
+  padding: 2px 10px;
+  font-size: 11px;
 }
 
+/* ═══════════════════════════════════════════════════
+   FOOTER — Status bar (inside window)
+═══════════════════════════════════════════════════ */
 .footer {
-  text-align: center;
-  padding: 1.5rem 1rem;
-  font-size: 0.75rem;
-  color: var(--text-muted);
+  background: var(--chrome);
+  border-top: 2px solid var(--chrome-dark);
+  padding: 3px 6px;
+  font-size: 10px;
+  color: var(--chrome-dark);
+  font-family: "Tahoma", "MS Sans Serif", sans-serif;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.footer::before {
+  content: "";
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  background: var(--led-green);
+  box-shadow: 0 0 5px var(--led-green), 0 0 2px var(--led-green);
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+#app-version {
+  font-family: "VT323", "Courier New", monospace;
+  font-size: 14px;
+  color: var(--chrome-darker);
   letter-spacing: 0.05em;
+}
+
+/* ═══════════════════════════════════════════════════
+   BODY TASKBAR (decorative Windows 98)
+═══════════════════════════════════════════════════ */
+body::before {
+  content: "🪟 Start";
+  display: block;
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  width: 80px;
+  height: 28px;
+  background: var(--chrome);
+  border-top: 2px solid var(--chrome-white);
+  border-right: 2px solid var(--chrome-darker);
+  font-size: 11px;
+  font-family: "Tahoma", "MS Sans Serif", sans-serif;
+  color: #000000;
+  padding: 4px 8px;
+  font-weight: bold;
+  z-index: 9999;
+}
+
+body::after {
+  content: "♫ On The Beach — Music Tracking";
+  display: block;
+  position: fixed;
+  bottom: 0;
+  left: 80px;
+  right: 0;
+  height: 28px;
+  background: var(--chrome);
+  border-top: 2px solid var(--chrome-white);
+  font-size: 11px;
+  font-family: "Tahoma", "MS Sans Serif", sans-serif;
+  color: #000000;
+  padding: 4px 12px;
+  z-index: 9999;
 }
