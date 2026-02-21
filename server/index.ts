@@ -2,12 +2,14 @@ import { Hono } from "hono";
 import { serveStatic } from "hono/bun";
 import { musicItemRoutes } from "./routes/music-items";
 import { stackRoutes } from "./routes/stacks";
+import { ingestRoutes } from "./routes/ingest";
 
 const app = new Hono();
 
 // ---------- API routes ----------
 app.route("/api/music-items", musicItemRoutes);
 app.route("/api/stacks", stackRoutes);
+app.route("/api/ingest", ingestRoutes);
 
 // ---------- Test-only routes ----------
 if (process.env.NODE_ENV === "test") {
@@ -57,4 +59,10 @@ if (isDev) {
     fetch: app.fetch,
   });
   console.log(`Server running on http://localhost:${port}`);
+}
+
+// ---------- SMTP ingest (opt-in via SMTP_ENABLED=true) ----------
+if (process.env.SMTP_ENABLED === "true") {
+  const { startSmtpIngest } = await import("./smtp-ingest");
+  startSmtpIngest();
 }
