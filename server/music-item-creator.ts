@@ -79,6 +79,22 @@ export async function getSourceId(sourceName: string): Promise<number | null> {
   return rows[0]?.id ?? null;
 }
 
+/**
+ * Merge a flat list of stack-membership rows into an array of items,
+ * adding a `stacks` field to each. Items with no memberships get `stacks: []`.
+ */
+export function hydrateItemStacks<T extends { id: number }>(
+  items: T[],
+  stackRows: Array<{ musicItemId: number; id: number; name: string }>,
+): Array<T & { stacks: Array<{ id: number; name: string }> }> {
+  const byItem = new Map<number, Array<{ id: number; name: string }>>();
+  for (const row of stackRows) {
+    if (!byItem.has(row.musicItemId)) byItem.set(row.musicItemId, []);
+    byItem.get(row.musicItemId)!.push({ id: row.id, name: row.name });
+  }
+  return items.map((item) => ({ ...item, stacks: byItem.get(item.id) ?? [] }));
+}
+
 /** Fetch a single full item by its id. */
 export async function fetchFullItem(id: number): Promise<MusicItemFull | null> {
   const rows = await fullItemSelect().where(eq(musicItems.id, id));
