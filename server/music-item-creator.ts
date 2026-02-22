@@ -33,6 +33,11 @@ export function fullItemSelect() {
       artwork_url: musicItems.artworkUrl,
       is_physical: musicItems.isPhysical,
       physical_format: musicItems.physicalFormat,
+      label: musicItems.label,
+      year: musicItems.year,
+      country: musicItems.country,
+      genre: musicItems.genre,
+      catalogue_number: musicItems.catalogueNumber,
       artist_name: artists.name,
       primary_url: musicLinks.url,
       primary_source: sources.name,
@@ -171,6 +176,11 @@ export async function createMusicItemFromUrl(
       purchaseIntent: overrides?.purchaseIntent ?? "no",
       notes: overrides?.notes ?? null,
       artworkUrl: scraped?.imageUrl ?? null,
+      label: overrides?.label ?? null,
+      year: overrides?.year ?? null,
+      country: overrides?.country ?? null,
+      genre: overrides?.genre ?? null,
+      catalogueNumber: overrides?.catalogueNumber ?? null,
     })
     .returning({ id: musicItems.id });
 
@@ -181,6 +191,48 @@ export async function createMusicItemFromUrl(
     url: parsed.normalizedUrl,
     isPrimary: true,
   });
+
+  const item = await fetchFullItem(inserted.id);
+  if (!item) {
+    throw new Error("Failed to fetch created item");
+  }
+
+  return { item, created: true };
+}
+
+/**
+ * Create a music item without a URL — no scraping, no link inserted.
+ * Used for physical records or items known only from memory.
+ */
+export async function createMusicItemDirect(
+  overrides: Partial<CreateMusicItemInput>,
+): Promise<CreateResult> {
+  const title = overrides.title || "Untitled";
+  const artistName = overrides.artistName;
+
+  let artistId: number | null = null;
+  if (artistName) {
+    artistId = await getOrCreateArtist(artistName);
+  }
+
+  const [inserted] = await db
+    .insert(musicItems)
+    .values({
+      title: capitalize(title),
+      normalizedTitle: normalize(title),
+      itemType: overrides.itemType ?? "album",
+      artistId,
+      listenStatus: overrides.listenStatus ?? "to-listen",
+      purchaseIntent: overrides.purchaseIntent ?? "no",
+      notes: overrides.notes ?? null,
+      artworkUrl: null,
+      label: overrides.label ?? null,
+      year: overrides.year ?? null,
+      country: overrides.country ?? null,
+      genre: overrides.genre ?? null,
+      catalogueNumber: overrides.catalogueNumber ?? null,
+    })
+    .returning({ id: musicItems.id });
 
   const item = await fetchFullItem(inserted.id);
   if (!item) {

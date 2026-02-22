@@ -80,20 +80,31 @@ export class App {
       const title = (formData.get("title") as string) || undefined;
       const artist = (formData.get("artist") as string) || undefined;
       const itemType = (formData.get("itemType") as ItemType) || "album";
+      const label = (formData.get("label") as string) || undefined;
+      const yearRaw = (formData.get("year") as string).trim();
+      const year = yearRaw ? Number(yearRaw) : undefined;
+      const country = (formData.get("country") as string) || undefined;
+      const genre = (formData.get("genre") as string) || undefined;
+      const catalogueNumber = (formData.get("catalogueNumber") as string) || undefined;
+      const notes = (formData.get("notes") as string) || undefined;
 
-      if (!url) return;
-
-      // Auto-prepend https:// if no protocol is provided
-      if (!/^https?:\/\//i.test(url)) {
+      // Auto-prepend https:// if a URL is provided but has no protocol
+      if (url && !/^https?:\/\//i.test(url)) {
         url = `https://${url}`;
       }
 
       try {
         const item = await this.api.createMusicItem({
-          url,
-          title: title || undefined,
+          url: url || undefined,
+          title,
           artistName: artist,
           itemType,
+          label,
+          year,
+          country,
+          genre,
+          catalogueNumber,
+          notes,
         });
         // Assign selected stacks
         if (this.addFormSelectedStacks.length > 0) {

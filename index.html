@@ -36,8 +36,7 @@
                 type="text"
                 id="url-input"
                 name="url"
-                placeholder="Paste a music link..."
-                required
+                placeholder="Paste a music link (optional)..."
                 class="input"
               />
               <button type="submit" class="btn btn--primary">Add</button>
@@ -55,6 +54,12 @@
                   <option value="track">Track</option>
                   <option value="mix">Mix</option>
                 </select>
+                <input type="text" name="label" placeholder="Label (optional)" class="input" />
+                <input type="number" name="year" placeholder="Year (optional)" min="1900" max="2099" class="input" />
+                <input type="text" name="country" placeholder="Country (optional)" class="input" />
+                <input type="text" name="genre" placeholder="Genre (optional)" class="input" />
+                <input type="text" name="catalogueNumber" placeholder="Catalogue number (optional)" class="input" />
+                <textarea name="notes" placeholder="Notes (optional)" class="input"></textarea>
                 <div class="stack-picker" id="add-form-stacks">
                   <div class="stack-picker__chips" id="add-form-stack-chips"></div>
                   <button

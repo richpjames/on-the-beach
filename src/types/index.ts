@@ -52,6 +52,11 @@ export interface MusicItem {
   artwork_url: string | null;
   is_physical: number;
   physical_format: PhysicalFormat | null;
+  label: string | null;
+  year: number | null;
+  country: string | null;
+  genre: string | null;
+  catalogue_number: string | null;
 }
 
 export interface MusicLink {
@@ -74,12 +79,17 @@ export interface MusicItemFull extends MusicItem {
 // Input types for create/update
 export interface CreateMusicItemInput {
   title?: string;
-  url: string;
+  url?: string;
   artistName?: string;
   itemType?: ItemType;
   listenStatus?: ListenStatus;
   purchaseIntent?: PurchaseIntent;
   notes?: string;
+  label?: string;
+  year?: number;
+  country?: string;
+  genre?: string;
+  catalogueNumber?: string;
 }
 
 export interface UpdateMusicItemInput {
@@ -92,6 +102,11 @@ export interface UpdateMusicItemInput {
   currency?: string;
   notes?: string | null;
   rating?: number | null;
+  label?: string | null;
+  year?: number | null;
+  country?: string | null;
+  genre?: string | null;
+  catalogueNumber?: string | null;
 }
 
 // Query/filter types
