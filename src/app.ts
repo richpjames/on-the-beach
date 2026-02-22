@@ -192,12 +192,13 @@ export class App {
       }
 
       // Delete button
-      if (target.dataset.action === "delete") {
-        const card = target.closest("[data-item-id]") as HTMLElement;
+      const deleteBtn = target.closest('[data-action="delete"]');
+      if (deleteBtn) {
+        const card = deleteBtn.closest("[data-item-id]") as HTMLElement;
         const id = Number(card?.dataset.itemId);
         if (id && confirm("Delete this item?")) {
+          card.remove();
           await this.api.deleteMusicItem(id);
-          await this.renderMusicList();
         }
       }
     });
@@ -290,7 +291,7 @@ export class App {
               <line x1="5" y1="12" x2="19" y2="12"></line>
             </svg>
           </button>
-          <button class="btn btn--ghost btn--danger" data-action="delete" title="Delete">
+          <button type="button" class="btn btn--ghost btn--danger" data-action="delete" title="Delete">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <polyline points="3 6 5 6 21 6"></polyline>
               <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
