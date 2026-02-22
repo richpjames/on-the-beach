@@ -8,6 +8,7 @@ import {
   fetchFullItem,
   getOrCreateArtist,
   createMusicItemFromUrl,
+  hydrateItemStacks,
 } from "../music-item-creator";
 import type {
   CreateMusicItemInput,
@@ -63,9 +64,9 @@ musicItemRoutes.get("/", async (c) => {
   const items = await query;
 
   // Hydrate stacks for all returned items in a single extra query
-  const stacksByItem = new Map<number, Array<{ id: number; name: string }>>();
+  let stackRows: Array<{ musicItemId: number; id: number; name: string }> = [];
   if (items.length > 0) {
-    const stackRows = await db
+    stackRows = await db
       .select({
         musicItemId: musicItemStacks.musicItemId,
         id: stacks.id,
@@ -79,14 +80,9 @@ musicItemRoutes.get("/", async (c) => {
           items.map((i) => i.id),
         ),
       );
-
-    for (const row of stackRows) {
-      if (!stacksByItem.has(row.musicItemId)) stacksByItem.set(row.musicItemId, []);
-      stacksByItem.get(row.musicItemId)!.push({ id: row.id, name: row.name });
-    }
   }
 
-  const enriched = items.map((item) => ({ ...item, stacks: stacksByItem.get(item.id) ?? [] }));
+  const enriched = hydrateItemStacks(items, stackRows);
 
   return c.json({ items: enriched, total: enriched.length });
 });
