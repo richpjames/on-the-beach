@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { hydrateItemStacks } from "../../server/music-item-creator";
+import { hydrateItemStacks } from "../../server/hydrate-item-stacks";
 
 const item = (id: number) => ({ id, title: `Item ${id}` });
 
