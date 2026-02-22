@@ -122,6 +122,11 @@ export interface PaginatedResult<T> {
   total: number;
 }
 
+export interface ScanResult {
+  artist: string | null;
+  title: string | null;
+}
+
 // Stacks
 export interface Stack {
   id: number;

@@ -23,6 +23,7 @@ export class App {
   private isReady = false;
   private addFormInitialized = false;
   private addFormSelectedStacks: number[] = [];
+  private scanInProgress = false;
 
   constructor() {
     this.api = new ApiClient();
@@ -49,7 +50,27 @@ export class App {
     if (this.addFormInitialized) return;
 
     const form = document.getElementById("add-form") as HTMLFormElement;
+    const detailsEl = form.querySelector(".add-form__details") as HTMLDetailsElement | null;
+    const titleInput = form.querySelector('input[name="title"]') as HTMLInputElement | null;
+    const artistInput = form.querySelector('input[name="artist"]') as HTMLInputElement | null;
+    const scanButton = document.getElementById("add-form-scan-btn") as HTMLButtonElement | null;
+    const scanInput = document.getElementById("scan-file-input") as HTMLInputElement | null;
     this.addFormInitialized = true;
+
+    if (scanButton && scanInput) {
+      scanButton.addEventListener("click", () => {
+        if (this.scanInProgress) return;
+        scanInput.click();
+      });
+
+      scanInput.addEventListener("change", async () => {
+        const file = scanInput.files?.[0];
+        if (!file) return;
+
+        await this.handleCoverScan(file, scanButton, detailsEl, artistInput, titleInput);
+        scanInput.value = "";
+      });
+    }
 
     // Stack picker button
     document.getElementById("add-form-stack-btn")?.addEventListener("click", () => {
@@ -120,6 +141,111 @@ export class App {
         alert("Failed to add item. Please check the URL and try again.");
       }
     });
+  }
+
+  private setScanButtonState(button: HTMLButtonElement, isLoading: boolean): void {
+    this.scanInProgress = isLoading;
+    button.disabled = isLoading;
+    button.classList.toggle("is-loading", isLoading);
+    button.textContent = isLoading ? "Scanning..." : "Scan";
+  }
+
+  private async handleCoverScan(
+    file: File,
+    scanButton: HTMLButtonElement,
+    detailsEl: HTMLDetailsElement | null,
+    artistInput: HTMLInputElement | null,
+    titleInput: HTMLInputElement | null,
+  ): Promise<void> {
+    this.setScanButtonState(scanButton, true);
+
+    try {
+      const imageBase64 = await this.encodeScanImage(file);
+      const result = await this.api.scanCover(imageBase64);
+
+      if (detailsEl) {
+        detailsEl.open = true;
+      }
+      if (artistInput && result.artist) {
+        artistInput.value = result.artist;
+      }
+      if (titleInput && result.title) {
+        titleInput.value = result.title;
+      }
+    } catch (error) {
+      if (error instanceof Error && error.message.includes("503")) {
+        alert("Scan unavailable. Enter details manually.");
+      } else {
+        alert("Couldn't read the cover. Enter details manually.");
+      }
+    } finally {
+      this.setScanButtonState(scanButton, false);
+    }
+  }
+
+  private async encodeScanImage(file: File): Promise<string> {
+    const imageDataUrl = await this.readFileAsDataUrl(file);
+    const image = await this.loadImage(imageDataUrl);
+    const { width, height } = this.constrainDimensions(image.width, image.height, 1024);
+
+    const canvas = document.createElement("canvas");
+    canvas.width = width;
+    canvas.height = height;
+
+    const context = canvas.getContext("2d");
+    if (!context) {
+      throw new Error("Canvas context unavailable");
+    }
+
+    context.drawImage(image, 0, 0, width, height);
+    const encoded = canvas.toDataURL("image/jpeg", 0.85);
+    const parts = encoded.split(",", 2);
+    if (parts.length !== 2 || !parts[1]) {
+      throw new Error("Failed to encode scan image");
+    }
+
+    return parts[1];
+  }
+
+  private readFileAsDataUrl(file: Blob): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        if (typeof reader.result !== "string") {
+          reject(new Error("Failed to read image file"));
+          return;
+        }
+        resolve(reader.result);
+      };
+      reader.onerror = () => reject(reader.error ?? new Error("Failed to read image file"));
+      reader.readAsDataURL(file);
+    });
+  }
+
+  private loadImage(dataUrl: string): Promise<HTMLImageElement> {
+    return new Promise((resolve, reject) => {
+      const image = new Image();
+      image.onload = () => resolve(image);
+      image.onerror = () => reject(new Error("Failed to load image"));
+      image.src = dataUrl;
+    });
+  }
+
+  private constrainDimensions(
+    width: number,
+    height: number,
+    maxEdge: number,
+  ): { width: number; height: number } {
+    const largestEdge = Math.max(width, height);
+    if (largestEdge <= maxEdge) {
+      return { width, height };
+    }
+
+    const scale = maxEdge / largestEdge;
+    return {
+      width: Math.max(1, Math.round(width * scale)),
+      height: Math.max(1, Math.round(height * scale)),
+    };
   }
 
   private setupFilterBar(): void {

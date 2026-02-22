@@ -3,6 +3,7 @@ import { serveStatic } from "hono/bun";
 import { musicItemRoutes } from "./routes/music-items";
 import { stackRoutes } from "./routes/stacks";
 import { ingestRoutes } from "./routes/ingest";
+import { releaseRoutes } from "./routes/release";
 
 const app = new Hono();
 
@@ -10,6 +11,7 @@ const app = new Hono();
 app.route("/api/music-items", musicItemRoutes);
 app.route("/api/stacks", stackRoutes);
 app.route("/api/ingest", ingestRoutes);
+app.route("/api/release", releaseRoutes);
 
 // ---------- Test-only routes ----------
 if (process.env.NODE_ENV === "test") {
