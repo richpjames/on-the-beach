@@ -46,6 +46,11 @@ export const musicItems = sqliteTable(
     artworkUrl: text("artwork_url"),
     isPhysical: integer("is_physical", { mode: "boolean" }).notNull().default(false),
     physicalFormat: text("physical_format"),
+    label: text("label"),
+    year: integer("year"),
+    country: text("country"),
+    genre: text("genre"),
+    catalogueNumber: text("catalogue_number"),
   },
   (table) => [
     index("idx_music_items_listen_status").on(table.listenStatus),

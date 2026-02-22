@@ -8,6 +8,7 @@ import {
   fetchFullItem,
   getOrCreateArtist,
   createMusicItemFromUrl,
+  createMusicItemDirect,
   hydrateItemStacks,
 } from "../music-item-creator";
 import type {
@@ -94,12 +95,15 @@ musicItemRoutes.get("/", async (c) => {
 musicItemRoutes.post("/", async (c) => {
   const input = (await c.req.json()) as CreateMusicItemInput;
 
-  if (!input.url || !isValidUrl(input.url)) {
-    return c.json({ error: "Invalid or missing URL" }, 400);
-  }
-
   try {
-    const result = await createMusicItemFromUrl(input.url, input);
+    let result;
+    if (input.url && isValidUrl(input.url)) {
+      result = await createMusicItemFromUrl(input.url, input);
+    } else if (input.url) {
+      return c.json({ error: "Invalid URL" }, 400);
+    } else {
+      result = await createMusicItemDirect(input);
+    }
     return c.json(result.item, 201);
   } catch {
     return c.json({ error: "Failed to create music item" }, 500);
@@ -166,6 +170,21 @@ musicItemRoutes.patch("/:id", async (c) => {
   }
   if (input.currency !== undefined) {
     setFields.currency = input.currency;
+  }
+  if (input.label !== undefined) {
+    setFields.label = input.label;
+  }
+  if (input.year !== undefined) {
+    setFields.year = input.year;
+  }
+  if (input.country !== undefined) {
+    setFields.country = input.country;
+  }
+  if (input.genre !== undefined) {
+    setFields.genre = input.genre;
+  }
+  if (input.catalogueNumber !== undefined) {
+    setFields.catalogueNumber = input.catalogueNumber;
   }
 
   // Handle artist name changes
