@@ -34,7 +34,9 @@
       "Bash(lsof:*)",
       "Bash(grep:*)",
       "Bash(bun run test:unit:*)",
-      "mcp__plugin_playwright_playwright__browser_navigate"
+      "mcp__plugin_playwright_playwright__browser_navigate",
+      "Bash(head:*)",
+      "WebFetch(domain:docs.mistral.ai)"
     ]
   }
 }

@@ -11,7 +11,7 @@
     "test": "bun test tests/unit",
     "test:unit": "bun test tests/unit",
     "test:unit:watch": "bun test --watch tests/unit",
-    "test:e2e": "playwright test playwright/add-link.spec.ts playwright/bandcamp-link.spec.ts playwright/stacks.spec.ts playwright/version.spec.ts",
+    "test:e2e": "playwright test playwright/add-link.spec.ts playwright/bandcamp-link.spec.ts playwright/stacks.spec.ts playwright/scan-cover.spec.ts playwright/version.spec.ts",
     "test:e2e:full": "bunx playwright test playwright",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
@@ -25,6 +25,7 @@
     "prepare": "husky"
   },
   "dependencies": {
+    "@mistralai/mistralai": "^1.14.0",
     "drizzle-orm": "^0.45.1",
     "hono": "^4.11.10",
     "mailparser": "^3.9.3",

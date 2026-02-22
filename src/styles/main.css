@@ -203,6 +203,19 @@ body {
   gap: 3px;
 }
 
+.add-form__scan-input {
+  display: none;
+}
+
+.add-form__scan-btn {
+  min-width: 56px;
+}
+
+.add-form__scan-btn.is-loading {
+  color: var(--chrome-darker);
+  cursor: wait;
+}
+
 .add-form__details {
   margin-top: 5px;
 }

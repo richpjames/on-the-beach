@@ -7,6 +7,7 @@ import type {
   ListenStatus,
   Stack,
   StackWithCount,
+  ScanResult,
 } from "../types";
 
 export class ApiClient {
@@ -152,5 +153,17 @@ export class ApiClient {
       body: JSON.stringify({ stackIds }),
     });
     if (!res.ok) throw new Error(`setItemStacks failed: ${res.status}`);
+  }
+
+  // ── Release Scan ────────────────────────────────────────────
+
+  async scanCover(imageBase64: string): Promise<ScanResult> {
+    const res = await fetch(`${this.baseUrl}/api/release/scan`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ imageBase64 }),
+    });
+    if (!res.ok) throw new Error(`scanCover failed: ${res.status}`);
+    return res.json();
   }
 }
