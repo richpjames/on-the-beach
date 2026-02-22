@@ -23,27 +23,31 @@ const port = Number(process.env.PORT) || 3000;
 
 if (isDev) {
   // ---- Development: Vite dev server as middleware ----
-  const { createServer: createViteServer } = await import("vite");
-  const vite = await createViteServer({
-    server: {
-      middlewareMode: true,
-    },
-    appType: "spa",
-  });
-
-  // Proxy non-API requests to Vite's middleware via a Node compat server
   const { createServer: createHttpServer } = await import("node:http");
   const { getRequestListener } = await import("@hono/node-server");
+  const { createServer: createViteServer } = await import("vite");
 
   const honoListener = getRequestListener(app.fetch);
 
+  // Create the HTTP server first so it can be passed to Vite for HMR WebSocket attachment,
+  // avoiding the "Port undefined" error that occurs when Vite tries to derive the port itself.
+  let viteHandle: ((req: unknown, res: unknown) => void) | null = null;
   const server = createHttpServer((req, res) => {
     if (req.url?.startsWith("/api/")) {
       honoListener(req, res);
       return;
     }
-    vite.middlewares.handle(req, res);
+    viteHandle!(req, res);
   });
+
+  const vite = await createViteServer({
+    server: {
+      middlewareMode: true,
+      hmr: { server },
+    },
+    appType: "spa",
+  });
+  viteHandle = vite.middlewares.handle.bind(vite.middlewares);
 
   server.listen(port, () => {
     console.log(`Dev server running on http://localhost:${port}`);

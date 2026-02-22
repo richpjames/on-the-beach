@@ -13,6 +13,7 @@
 ### Task 1: Vite config with version injection
 
 **Files:**
+
 - Create: `vite.config.ts`
 - Create: `src/vite-env.d.ts`
 
@@ -59,6 +60,7 @@ git commit -m "feat: inject app version via Vite define"
 ### Task 2: Add footer element and styles
 
 **Files:**
+
 - Modify: `index.html`
 - Modify: `src/styles/main.css`
 
@@ -67,12 +69,13 @@ git commit -m "feat: inject app version via Vite define"
 In `index.html`, after the closing `</main>` tag (line ~114), add:
 
 ```html
-    <footer class="footer">
-      <span id="app-version"></span>
-    </footer>
+<footer class="footer">
+  <span id="app-version"></span>
+</footer>
 ```
 
 The full closing structure should look like:
+
 ```html
       </main>
     </div>
@@ -82,7 +85,7 @@ The full closing structure should look like:
     </footer>
 ```
 
-Note: place the footer *outside* `<div id="app">` so it stays fixed regardless of app state.
+Note: place the footer _outside_ `<div id="app">` so it stays fixed regardless of app state.
 
 **Step 2: Add `.footer` CSS to `src/styles/main.css`**
 
@@ -112,6 +115,7 @@ git commit -m "feat: add footer element for version display"
 ### Task 3: Wire version into footer (TDD)
 
 **Files:**
+
 - Create: `playwright/version.spec.ts`
 - Modify: `src/app.ts`
 - Modify: `package.json` (add spec to test:e2e command)
@@ -191,6 +195,7 @@ git commit -m "feat: display version in footer"
 ### Task 4: Auto-bump version in GitHub Actions deploy workflow
 
 **Files:**
+
 - Modify: `.github/workflows/deploy.yml`
 
 **Step 1: Update `deploy.yml`**
@@ -272,6 +277,7 @@ jobs:
 ```
 
 Key changes:
+
 - `permissions: contents: write` — allows the job to push to the repo.
 - Checkout with `ref: main` — ensures we're on the right branch (workflow_run can check out detached HEAD).
 - Bun setup — needed to run npm (Bun includes npm).
@@ -289,6 +295,7 @@ git commit -m "feat: auto-bump patch version on deploy"
 **Step 3: Verify (manual)**
 
 Push the branch to main (via PR or direct push). Watch the GitHub Actions run:
+
 1. Test workflow runs and passes.
 2. Deploy workflow triggers, bumps `package.json`, pushes commit, fires Coolify webhook.
 3. Check `https://onthebeach.ricojam.es/` — footer should show the new version.

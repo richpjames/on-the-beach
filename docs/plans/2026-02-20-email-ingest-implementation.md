@@ -32,7 +32,7 @@ import type { MusicItemFull, CreateMusicItemInput } from "../src/types";
 
 export interface CreateResult {
   item: MusicItemFull;
-  created: boolean;  // false if URL was a duplicate
+  created: boolean; // false if URL was a duplicate
 }
 
 export async function createMusicItemFromUrl(
@@ -85,16 +85,12 @@ import { extractMusicUrls } from "../../server/email-parser";
 describe("extractMusicUrls", () => {
   it("extracts bandcamp URLs from HTML anchor tags", () => {
     const html = `<a href="https://artist.bandcamp.com/album/cool-album">Listen</a>`;
-    expect(extractMusicUrls({ html })).toEqual([
-      "https://artist.bandcamp.com/album/cool-album",
-    ]);
+    expect(extractMusicUrls({ html })).toEqual(["https://artist.bandcamp.com/album/cool-album"]);
   });
 
   it("extracts URLs from plain text", () => {
     const text = "Check out https://open.spotify.com/album/abc123 it's great";
-    expect(extractMusicUrls({ text })).toEqual([
-      "https://open.spotify.com/album/abc123",
-    ]);
+    expect(extractMusicUrls({ text })).toEqual(["https://open.spotify.com/album/abc123"]);
   });
 
   it("ignores non-music URLs", () => {
@@ -103,9 +99,7 @@ describe("extractMusicUrls", () => {
       <a href="https://artist.bandcamp.com/album/yes">Music</a>
       <a href="https://unsubscribe.example.com">Unsubscribe</a>
     `;
-    expect(extractMusicUrls({ html })).toEqual([
-      "https://artist.bandcamp.com/album/yes",
-    ]);
+    expect(extractMusicUrls({ html })).toEqual(["https://artist.bandcamp.com/album/yes"]);
   });
 
   it("deduplicates URLs", () => {
@@ -113,9 +107,7 @@ describe("extractMusicUrls", () => {
       <a href="https://artist.bandcamp.com/album/dupe">Link 1</a>
       <a href="https://artist.bandcamp.com/album/dupe">Link 2</a>
     `;
-    expect(extractMusicUrls({ html })).toEqual([
-      "https://artist.bandcamp.com/album/dupe",
-    ]);
+    expect(extractMusicUrls({ html })).toEqual(["https://artist.bandcamp.com/album/dupe"]);
   });
 
   it("prefers HTML over text when both are present", () => {
@@ -132,9 +124,7 @@ describe("extractMusicUrls", () => {
 
   it("strips query parameters from extracted URLs", () => {
     const html = `<a href="https://artist.bandcamp.com/album/test?utm_source=email">Link</a>`;
-    expect(extractMusicUrls({ html })).toEqual([
-      "https://artist.bandcamp.com/album/test",
-    ]);
+    expect(extractMusicUrls({ html })).toEqual(["https://artist.bandcamp.com/album/test"]);
   });
 });
 ```
@@ -336,6 +326,7 @@ git commit -m "feat: add email ingest webhook endpoint"
 **Step 1: Write tests for auth, parsing, and item creation**
 
 Key test cases:
+
 - Returns 401 when no Authorization header
 - Returns 401 when wrong API key
 - Returns 503 when INGEST_API_KEY not set

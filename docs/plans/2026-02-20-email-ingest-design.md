@@ -74,10 +74,12 @@ Extract all URLs from the email, then filter to only music platform URLs that th
 ### Step 1: Extract URLs
 
 From the HTML body (preferred, richer content):
+
 - Parse all `<a href="...">` tags
 - Also extract bare URLs from text nodes (fallback)
 
 From the plain text body (fallback if no HTML):
+
 - Regex match URLs
 
 ### Step 2: Filter to Music URLs
@@ -93,12 +95,14 @@ For each music URL, check if it already exists in the `music_links` table. Skip 
 ### Step 4: Create Music Items
 
 For each new URL, reuse the same creation logic as `POST /api/music-items`:
+
 - Parse URL → extract source, potential artist/title
 - Scrape OG metadata
 - Get or create artist
 - Insert music item + primary link
 
 Items are created with:
+
 - `listen_status`: `"to-listen"`
 - `purchase_intent`: `"no"`
 - `notes`: `"Via email from <sender>"`
@@ -120,29 +124,29 @@ This is simple and sufficient for a single-user app. The key is configured once 
 
 ### New Files
 
-| File | Purpose |
-|------|---------|
-| `server/routes/ingest.ts` | Webhook endpoint + provider adapters |
-| `server/email-parser.ts` | URL extraction from email HTML/text |
-| `server/music-item-creator.ts` | Extracted shared creation logic (from music-items.ts POST handler) |
-| `tests/unit/email-parser.test.ts` | Unit tests for email URL extraction |
-| `tests/unit/ingest.test.ts` | Unit tests for provider adapters |
+| File                              | Purpose                                                            |
+| --------------------------------- | ------------------------------------------------------------------ |
+| `server/routes/ingest.ts`         | Webhook endpoint + provider adapters                               |
+| `server/email-parser.ts`          | URL extraction from email HTML/text                                |
+| `server/music-item-creator.ts`    | Extracted shared creation logic (from music-items.ts POST handler) |
+| `tests/unit/email-parser.test.ts` | Unit tests for email URL extraction                                |
+| `tests/unit/ingest.test.ts`       | Unit tests for provider adapters                                   |
 
 ### Modified Files
 
-| File | Change |
-|------|--------|
-| `server/index.ts` | Mount `/api/ingest` routes |
+| File                           | Change                                                  |
+| ------------------------------ | ------------------------------------------------------- |
+| `server/index.ts`              | Mount `/api/ingest` routes                              |
 | `server/routes/music-items.ts` | Refactor POST handler to use shared `createMusicItem()` |
 
 ## Configuration
 
 Two new environment variables:
 
-| Variable | Required | Description |
-|----------|----------|-------------|
-| `INGEST_API_KEY` | Yes (for ingest) | Shared secret for webhook auth |
-| `INGEST_ENABLED` | No | Set to `"false"` to disable the endpoint entirely. Defaults to `"true"`. |
+| Variable         | Required         | Description                                                              |
+| ---------------- | ---------------- | ------------------------------------------------------------------------ |
+| `INGEST_API_KEY` | Yes (for ingest) | Shared secret for webhook auth                                           |
+| `INGEST_ENABLED` | No               | Set to `"false"` to disable the endpoint entirely. Defaults to `"true"`. |
 
 ## Future Considerations (Not In Scope)
 

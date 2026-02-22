@@ -239,10 +239,10 @@ A skill is a set of local instructions in a `SKILL.md` file.
 - Trigger rules: If the user names a skill or the task clearly matches its description, use it.
 - Missing/blocked: If a skill path cannot be read, state that briefly and continue with best fallback.
 - Progressive disclosure:
-  1) Open the skill's `SKILL.md`.
-  2) Resolve referenced relative paths from the skill directory first.
-  3) Load only required referenced files.
-  4) Prefer provided scripts/assets/templates over rewriting from scratch.
+  1. Open the skill's `SKILL.md`.
+  2. Resolve referenced relative paths from the skill directory first.
+  3. Load only required referenced files.
+  4. Prefer provided scripts/assets/templates over rewriting from scratch.
 - Coordination:
   - If multiple skills apply, pick the minimal set and state execution order.
   - Announce which skill is used and why.
