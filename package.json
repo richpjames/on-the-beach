@@ -21,7 +21,7 @@
     "format": "oxfmt --write",
     "format:check": "oxfmt --check",
     "devcontainer": "devcontainer up --workspace-folder .",
-    "devcontainer:ssh": "docker compose -f .devcontainer/docker-compose.yml exec app bash",
+    "devcontainer:ssh": "container_id=$(bun run devcontainer | sed -n 's/.*\"containerId\":\"\\([^\"]*\\)\".*/\\1/p' | tail -n1) && [ -n \"$container_id\" ] && docker exec -it \"$container_id\" bash",
     "prepare": "husky"
   },
   "dependencies": {
