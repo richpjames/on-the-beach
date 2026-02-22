@@ -36,6 +36,32 @@ test.describe("Stacks", () => {
     await expect(page.locator(".music-card").first()).toBeVisible();
   });
 
+  test("shows stack chips on card after assignment", async ({ page }) => {
+    // Add a link
+    await page
+      .getByPlaceholder("Paste a music link...")
+      .fill("https://seekersinternational.bandcamp.com/album/chip-test");
+    await page.getByRole("button", { name: "Add" }).click();
+    await expect(page.locator(".music-card").first()).toBeVisible({ timeout: 10_000 });
+
+    // Assign to a new stack via the card dropdown
+    await page.locator(".music-card").first().locator('[data-action="stack"]').click();
+    await expect(page.locator(".stack-dropdown")).toBeVisible();
+    await page.locator(".stack-dropdown__new-input").fill("Late Night");
+    await page.locator(".stack-dropdown__new-input").press("Enter");
+    // Wait for the stack tab to appear before closing — ensures the API calls have completed
+    await expect(page.locator(".stack-tab", { hasText: "Late Night" })).toBeVisible();
+
+    // Close dropdown — chips should appear on the card
+    await page.keyboard.press("Escape");
+    await expect(
+      page.locator(".music-card").first().locator(".music-card__stack-chip"),
+    ).toBeVisible();
+    await expect(
+      page.locator(".music-card").first().locator(".music-card__stack-chip"),
+    ).toContainText("Late Night");
+  });
+
   test("can rename and delete a stack from the management panel", async ({ page }) => {
     // Add a link and create a stack first
     await page

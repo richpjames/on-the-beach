@@ -83,7 +83,7 @@ export async function getSourceId(sourceName: string): Promise<number | null> {
 export async function fetchFullItem(id: number): Promise<MusicItemFull | null> {
   const rows = await fullItemSelect().where(eq(musicItems.id, id));
   if (!rows[0]) return null;
-  return rows[0] as unknown as MusicItemFull;
+  return { ...(rows[0] as unknown as MusicItemFull), stacks: [] };
 }
 
 // ---------------------------------------------------------------------------
