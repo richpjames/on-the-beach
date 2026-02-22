@@ -560,6 +560,24 @@ select.input {
   text-overflow: ellipsis;
 }
 
+.music-card__stacks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+  margin-top: 3px;
+}
+
+.music-card__stack-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 5px;
+  background: #001033;
+  color: #6699ff;
+  border: 1px solid #224499;
+  font-size: 10px;
+  font-family: "Tahoma", sans-serif;
+}
+
 .music-card__meta {
   display: flex;
   gap: 4px;

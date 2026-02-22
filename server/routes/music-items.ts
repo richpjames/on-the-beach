@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { eq, and, inArray, sql } from "drizzle-orm";
 import { db } from "../db/index";
-import { musicItems, artists, musicLinks, musicItemStacks } from "../db/schema";
+import { musicItems, artists, musicItemStacks, stacks } from "../db/schema";
 import { isValidUrl, normalize } from "../utils";
 import {
   fullItemSelect,
@@ -62,7 +62,33 @@ musicItemRoutes.get("/", async (c) => {
 
   const items = await query;
 
-  return c.json({ items, total: items.length });
+  // Hydrate stacks for all returned items in a single extra query
+  const stacksByItem = new Map<number, Array<{ id: number; name: string }>>();
+  if (items.length > 0) {
+    const stackRows = await db
+      .select({
+        musicItemId: musicItemStacks.musicItemId,
+        id: stacks.id,
+        name: stacks.name,
+      })
+      .from(musicItemStacks)
+      .innerJoin(stacks, eq(stacks.id, musicItemStacks.stackId))
+      .where(
+        inArray(
+          musicItemStacks.musicItemId,
+          items.map((i) => i.id),
+        ),
+      );
+
+    for (const row of stackRows) {
+      if (!stacksByItem.has(row.musicItemId)) stacksByItem.set(row.musicItemId, []);
+      stacksByItem.get(row.musicItemId)!.push({ id: row.id, name: row.name });
+    }
+  }
+
+  const enriched = items.map((item) => ({ ...item, stacks: stacksByItem.get(item.id) ?? [] }));
+
+  return c.json({ items: enriched, total: enriched.length });
 });
 
 // ---------------------------------------------------------------------------

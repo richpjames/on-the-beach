@@ -68,6 +68,7 @@ export interface MusicItemFull extends MusicItem {
   artist_name: string | null;
   primary_url: string | null;
   primary_source: SourceName | null;
+  stacks: Array<{ id: number; name: string }>;
 }
 
 // Input types for create/update

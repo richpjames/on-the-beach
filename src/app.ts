@@ -3,7 +3,6 @@ import type {
   MusicItemFull,
   ListenStatus,
   ItemType,
-  Stack,
   StackWithCount,
   MusicItemFilters,
 } from "./types";
@@ -260,6 +259,11 @@ export class App {
         <div class="music-card__content">
           <div class="music-card__title">${this.escapeHtml(item.title)}</div>
           ${item.artist_name ? `<div class="music-card__artist">${this.escapeHtml(item.artist_name)}</div>` : ""}
+          ${
+            item.stacks.length > 0
+              ? `<div class="music-card__stacks">${item.stacks.map((s) => `<span class="music-card__stack-chip">${this.escapeHtml(s.name)}</span>`).join("")}</div>`
+              : ""
+          }
           <div class="music-card__meta">
             <select class="status-select">${statusOptions}</select>
             ${
@@ -539,6 +543,7 @@ export class App {
       if (e.key === "Escape") {
         dropdown.remove();
         document.removeEventListener("keydown", closeOnEscape);
+        this.renderMusicList();
       }
     };
     document.addEventListener("keydown", closeOnEscape);
@@ -549,6 +554,7 @@ export class App {
         if (!dropdown.contains(e.target as Node)) {
           dropdown.remove();
           document.removeEventListener("click", clickOutside);
+          this.renderMusicList();
         }
       };
       document.addEventListener("click", clickOutside);
