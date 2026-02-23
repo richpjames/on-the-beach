@@ -41,7 +41,8 @@ export function createReleaseRoutes(scanReleaseCover: ExtractAlbumInfoFn = extra
     let body: unknown;
     try {
       body = await c.req.json();
-    } catch {
+    } catch (err) {
+      console.error("[api] POST /api/release/scan invalid JSON:", err);
       return c.json({ error: "Invalid JSON payload" }, 400);
     }
 

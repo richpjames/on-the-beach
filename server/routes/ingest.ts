@@ -76,7 +76,8 @@ ingestRoutes.post("/email", async (c) => {
       } else {
         skipped.push({ url, reason: "duplicate" });
       }
-    } catch {
+    } catch (err) {
+      console.error(`[api] POST /api/ingest/email failed to create item for ${url}:`, err);
       skipped.push({ url, reason: "creation_failed" });
     }
   }

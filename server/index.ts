@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import { logger } from "hono/logger";
 import { serveStatic } from "hono/bun";
 import { musicItemRoutes } from "./routes/music-items";
 import { stackRoutes } from "./routes/stacks";
@@ -6,6 +7,14 @@ import { ingestRoutes } from "./routes/ingest";
 import { releaseRoutes } from "./routes/release";
 
 const app = new Hono();
+
+// ---------- Request logging ----------
+app.use("*", logger());
+
+app.onError((err, c) => {
+  console.error(`[api] ${c.req.method} ${c.req.path} error:`, err);
+  return c.json({ error: "Internal server error" }, 500);
+});
 
 // ---------- API routes ----------
 app.route("/api/music-items", musicItemRoutes);
