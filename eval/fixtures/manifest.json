@@ -1,3 +1,154 @@
 {
-  "cases": []
+  "cases": [
+    {
+      "id": "the-earons-land-of-hunger",
+      "image": "images/IMG_0613.jpeg",
+      "artist": "The Earons",
+      "title": "Land Of Hunger"
+    },
+    {
+      "id": "louis-chedid-ainsi-soit-il",
+      "image": "images/IMG_0614.jpeg",
+      "artist": "Louis Chedid",
+      "title": "Ainsi Soit-Il"
+    },
+    {
+      "id": "ed-lincoln-ontem-hoje-sempre",
+      "image": "images/IMG_0839.jpeg",
+      "artist": "Ed Lincoln",
+      "title": "Ontem Hoje Sempre"
+    },
+    {
+      "id": "caetano-veloso-caetano-veloso",
+      "image": "images/IMG_1014.jpeg",
+      "artist": "Caetano Veloso",
+      "title": "Caetano Veloso"
+    },
+    {
+      "id": "pipos-4-o-encontro-da-massa",
+      "image": "images/IMG_1358.jpeg",
+      "artist": "Pipo's 4",
+      "title": "O Encontro da Massa"
+    },
+    {
+      "id": "quarteto-em-cy-tamba-trio-som-definitivo",
+      "image": "images/IMG_1456.jpeg",
+      "artist": "Quarteto Em Cy & Tamba Trio",
+      "title": "Som Definitivo"
+    },
+    {
+      "id": "esperanza-spalding-emilys-devolution",
+      "image": "images/IMG_2404.jpeg",
+      "artist": "Esperanza Spalding",
+      "title": "Emily's D+Evolution"
+    },
+    {
+      "id": "machito-tanga",
+      "image": "images/IMG_2405.jpeg",
+      "artist": "Machito & His Afro-Cubans",
+      "title": "Tanga"
+    },
+    {
+      "id": "orquesta-el-macabeo-salsa-bestial",
+      "image": "images/IMG_2406.jpeg",
+      "artist": "Orquesta El Macabeo",
+      "title": "Salsa Bestial"
+    },
+    {
+      "id": "t-rex-t-rex",
+      "image": "images/IMG_2407.jpeg",
+      "artist": "T. Rex",
+      "title": "T. Rex"
+    },
+    {
+      "id": "various-rico-rico",
+      "image": "images/IMG_3157.jpeg",
+      "artist": "Various",
+      "title": "Rico Rico - 50 Exitos Tropicales"
+    },
+    {
+      "id": "various-seattle-the-dark-side",
+      "image": "images/IMG_3257.jpeg",
+      "artist": "Various",
+      "title": "Seattle... The Dark Side"
+    },
+    {
+      "id": "determine-never-know",
+      "image": "images/IMG_4029.jpeg",
+      "artist": "Determine",
+      "title": "Never Know"
+    },
+    {
+      "id": "discotex-records-6am-wanna-be-down",
+      "image": "images/IMG_4284.jpeg",
+      "artist": "Discotex Records",
+      "title": "6AM / Wanna Be Down"
+    },
+    {
+      "id": "legends-of-the-dark-ground-cabra",
+      "image": "images/IMG_6246.jpeg",
+      "artist": "Legends of the Dark Ground",
+      "title": "Cabra (Seiji Re-Rinse)"
+    },
+    {
+      "id": "wedding-hands-in-the-till",
+      "image": "images/IMG_6256.jpeg",
+      "artist": "Wedding",
+      "title": "Hands In The Till / A Little Love"
+    },
+    {
+      "id": "olu-living-free",
+      "image": "images/IMG_6419.jpeg",
+      "artist": "Olu",
+      "title": "Living Free"
+    },
+    {
+      "id": "big-bub-i-dont-mind",
+      "image": "images/IMG_6422.jpeg",
+      "artist": "Big Bub",
+      "title": "I Don't Mind"
+    },
+    {
+      "id": "patrick-cowley-menergy",
+      "image": "images/IMG_6428.jpeg",
+      "artist": "Patrick Cowley",
+      "title": "Menergy"
+    },
+    {
+      "id": "sleepy-brown-i-cant-wait",
+      "image": "images/IMG_6429.jpeg",
+      "artist": "Sleepy Brown feat. Outkast",
+      "title": "I Can't Wait"
+    },
+    {
+      "id": "mc-mell-o-first-chronicles",
+      "image": "images/IMG_6861.jpeg",
+      "artist": "MC Mell 'O'",
+      "title": "The First Chronicles of D.E.T.T."
+    },
+    {
+      "id": "natural-black-early-on-before",
+      "image": "images/IMG_7904.jpeg",
+      "artist": "Natural Black",
+      "title": "Early On Before"
+    },
+    {
+      "id": "young-peoples-records-all-aboard",
+      "image": "images/IMG_8298.jpeg",
+      "artist": "Young People's Records",
+      "title": "All Aboard!"
+    },
+    {
+      "id": "mario-telles-mario-telles",
+      "image": "images/IMG_8508.jpeg",
+      "artist": "Mario Telles",
+      "title": "Mario Telles"
+    },
+    {
+      "id": "lecuona-plays-for-two",
+      "image": "images/IMG_9952.jpeg",
+      "artist": "Lecuona",
+      "title": "Plays For Two"
+    }
+  ]
 }
