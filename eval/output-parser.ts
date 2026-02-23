@@ -6,6 +6,11 @@ interface ParsedOutput {
   actual: { artist: string | null; title: string | null } | null;
 }
 
+interface ParsedOcrTextOutput {
+  customId: string | null;
+  text: string | null;
+}
+
 function asRecord(value: unknown): Record<string, unknown> | null {
   return value !== null && typeof value === "object" ? (value as Record<string, unknown>) : null;
 }
@@ -66,6 +71,38 @@ function parseFromOcrResponseBody(
   return null;
 }
 
+function extractOcrTextFromResponseBody(body: unknown): string | null {
+  const bodyObj = asRecord(body);
+  if (!bodyObj) return null;
+
+  const pages = bodyObj.pages;
+  if (Array.isArray(pages)) {
+    const pageText = pages
+      .map((page) => {
+        const pageObj = asRecord(page);
+        if (!pageObj) return "";
+
+        if (typeof pageObj.markdown === "string") return pageObj.markdown.trim();
+        if (typeof pageObj.text === "string") return pageObj.text.trim();
+        return "";
+      })
+      .filter(Boolean)
+      .join("\n\n")
+      .trim();
+
+    if (pageText.length > 0) return pageText;
+  }
+
+  if (typeof bodyObj.text === "string" && bodyObj.text.trim().length > 0) {
+    return bodyObj.text.trim();
+  }
+
+  const annotation =
+    (typeof bodyObj.document_annotation === "string" ? bodyObj.document_annotation : null) ??
+    (typeof bodyObj.documentAnnotation === "string" ? bodyObj.documentAnnotation : null);
+  return annotation?.trim() || null;
+}
+
 export function parseBatchOutput(output: unknown, kind: EvalModelKind): ParsedOutput {
   const outputObj = asRecord(output);
   const customId =
@@ -78,4 +115,16 @@ export function parseBatchOutput(output: unknown, kind: EvalModelKind): ParsedOu
   const actual = kind === "ocr" ? parseFromOcrResponseBody(body) : parseFromChatResponseBody(body);
 
   return { customId, actual };
+}
+
+export function parseOcrTextBatchOutput(output: unknown): ParsedOcrTextOutput {
+  const outputObj = asRecord(output);
+  const customId =
+    (typeof outputObj?.custom_id === "string" ? outputObj.custom_id : null) ??
+    (typeof outputObj?.customId === "string" ? outputObj.customId : null);
+
+  const response = asRecord(outputObj?.response);
+  const text = extractOcrTextFromResponseBody(response?.body);
+
+  return { customId, text };
 }
