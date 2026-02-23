@@ -36,7 +36,10 @@
       "Bash(bun run test:unit:*)",
       "mcp__plugin_playwright_playwright__browser_navigate",
       "Bash(head:*)",
-      "WebFetch(domain:docs.mistral.ai)"
+      "WebFetch(domain:docs.mistral.ai)",
+      "Bash(bun test:*)",
+      "Bash(git:*)",
+      "Bash(bun run:*)"
     ]
   }
 }
