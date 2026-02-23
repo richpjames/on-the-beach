@@ -1,0 +1,547 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>OCR Eval — 2026-02-23</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=DM+Sans:ital,wght@0,400;0,500;0,700;1,400&family=Playfair+Display:wght@700;900&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0e0e0e;
+    --surface: #171717;
+    --surface2: #1e1e1e;
+    --border: #2a2a2a;
+    --text: #e8e4de;
+    --text-dim: #8a847a;
+    --amber: #e8a44a;
+    --amber-dim: rgba(232,164,74,0.15);
+    --green: #5cb87a;
+    --green-dim: rgba(92,184,122,0.12);
+    --red: #d15a5a;
+    --red-dim: rgba(209,90,90,0.12);
+    --yellow: #c9a84c;
+    --yellow-dim: rgba(201,168,76,0.12);
+    --model1: #e8a44a;
+    --model2: #5aafcf;
+    --model3: #c77dba;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    line-height: 1.5;
+    min-height: 100vh;
+  }
+
+  .noise {
+    position: fixed; inset: 0; z-index: 0; pointer-events: none; opacity: 0.03;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    background-size: 256px 256px;
+  }
+
+  .container {
+    position: relative; z-index: 1;
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 48px 32px 80px;
+  }
+
+  header {
+    margin-bottom: 48px;
+  }
+
+  header .label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--amber);
+    margin-bottom: 8px;
+  }
+
+  header h1 {
+    font-family: 'Playfair Display', serif;
+    font-weight: 900;
+    font-size: 36px;
+    letter-spacing: -0.02em;
+    color: var(--text);
+    margin-bottom: 6px;
+  }
+
+  header .meta {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    color: var(--text-dim);
+  }
+
+  /* ─── Summary Cards ─── */
+  .summary-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+    margin-bottom: 48px;
+  }
+
+  .model-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 24px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .model-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 3px;
+  }
+
+  .model-card:nth-child(1)::before { background: var(--model1); }
+  .model-card:nth-child(2)::before { background: var(--model2); }
+  .model-card:nth-child(3)::before { background: var(--model3); }
+
+  .model-card .model-name {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 14px;
+    font-weight: 600;
+    margin-bottom: 16px;
+    color: var(--text);
+  }
+
+  .model-card:nth-child(1) .model-name { color: var(--model1); }
+  .model-card:nth-child(2) .model-name { color: var(--model2); }
+  .model-card:nth-child(3) .model-name { color: var(--model3); }
+
+  .overall-score {
+    font-family: 'Playfair Display', serif;
+    font-size: 48px;
+    font-weight: 900;
+    letter-spacing: -0.03em;
+    margin-bottom: 16px;
+  }
+
+  .overall-label {
+    font-size: 12px;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    margin-bottom: 4px;
+  }
+
+  .stat-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 6px 0;
+    border-top: 1px solid var(--border);
+    font-size: 13px;
+  }
+
+  .stat-row .stat-label {
+    color: var(--text-dim);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+  }
+
+  .stat-row .stat-value {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    font-weight: 600;
+  }
+
+  .bar-track {
+    width: 80px;
+    height: 4px;
+    background: var(--surface2);
+    border-radius: 2px;
+    margin: 0 12px;
+    flex-shrink: 0;
+    overflow: hidden;
+  }
+
+  .bar-fill {
+    height: 100%;
+    border-radius: 2px;
+    transition: width 0.8s ease;
+  }
+
+  .model-card:nth-child(1) .bar-fill { background: var(--model1); }
+  .model-card:nth-child(2) .bar-fill { background: var(--model2); }
+  .model-card:nth-child(3) .bar-fill { background: var(--model3); }
+
+  /* ─── Section Headers ─── */
+  .section-title {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    margin-bottom: 16px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  /* ─── Detail Table ─── */
+  .table-wrap {
+    overflow-x: auto;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: var(--surface);
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+  }
+
+  thead th {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    padding: 14px 12px;
+    text-align: left;
+    background: var(--surface2);
+    border-bottom: 1px solid var(--border);
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    white-space: nowrap;
+  }
+
+  thead th.group-header {
+    text-align: center;
+    border-left: 1px solid var(--border);
+    padding: 8px 12px;
+  }
+
+  thead th:first-child { border-radius: 11px 0 0 0; }
+  thead th:last-child { border-radius: 0 11px 0 0; }
+
+  tbody td {
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--border);
+    vertical-align: top;
+  }
+
+  tbody tr:last-child td { border-bottom: none; }
+
+  tbody tr:hover {
+    background: rgba(232,164,74,0.03);
+  }
+
+  .col-id {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--text-dim);
+    max-width: 160px;
+    word-break: break-all;
+  }
+
+  .col-expected {
+    color: var(--text);
+    font-weight: 500;
+  }
+
+  .col-expected .artist { color: var(--text); }
+  .col-expected .title { color: var(--text-dim); font-style: italic; }
+
+  .model-col {
+    border-left: 1px solid var(--border);
+    min-width: 200px;
+  }
+
+  .model-result {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .model-result .artist,
+  .model-result .title {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+  }
+
+  .model-result .field-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-dim);
+    flex-shrink: 0;
+    width: 10px;
+  }
+
+  .model-result .field-value {
+    font-size: 12px;
+    line-height: 1.4;
+  }
+
+  .model-result .field-value.null-val {
+    color: var(--red);
+    opacity: 0.5;
+    font-style: italic;
+  }
+
+  /* Score pills */
+  .score-pills {
+    display: flex;
+    gap: 4px;
+    margin-top: 4px;
+  }
+
+  .pill {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    font-weight: 600;
+    padding: 2px 6px;
+    border-radius: 4px;
+    line-height: 1.4;
+  }
+
+  .pill.exact { letter-spacing: 0; }
+
+  .pill.s-perfect { background: var(--green-dim); color: var(--green); }
+  .pill.s-good    { background: var(--yellow-dim); color: var(--yellow); }
+  .pill.s-poor    { background: var(--red-dim); color: var(--red); }
+  .pill.s-zero    { background: rgba(255,255,255,0.04); color: var(--text-dim); opacity: 0.5; }
+
+  /* Winner badge */
+  .winner-badge {
+    display: inline-block;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 4px;
+    background: var(--green-dim);
+    color: var(--green);
+    margin-left: 8px;
+    vertical-align: middle;
+  }
+
+  /* Legend */
+  .legend {
+    display: flex;
+    gap: 20px;
+    margin-top: 16px;
+    margin-bottom: 24px;
+    flex-wrap: wrap;
+  }
+
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--text-dim);
+  }
+
+  .legend-swatch {
+    width: 12px; height: 12px;
+    border-radius: 3px;
+  }
+
+  .legend-swatch.perfect { background: var(--green-dim); border: 1px solid var(--green); }
+  .legend-swatch.good    { background: var(--yellow-dim); border: 1px solid var(--yellow); }
+  .legend-swatch.poor    { background: var(--red-dim); border: 1px solid var(--red); }
+  .legend-swatch.zero    { background: rgba(255,255,255,0.04); border: 1px solid var(--text-dim); opacity: 0.5; }
+
+  /* Responsive */
+  @media (max-width: 900px) {
+    .summary-grid { grid-template-columns: 1fr; }
+    .container { padding: 24px 16px 48px; }
+    header h1 { font-size: 28px; }
+  }
+
+  /* Animations */
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(12px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .model-card {
+    animation: fadeUp 0.5s ease both;
+  }
+  .model-card:nth-child(1) { animation-delay: 0.05s; }
+  .model-card:nth-child(2) { animation-delay: 0.12s; }
+  .model-card:nth-child(3) { animation-delay: 0.19s; }
+
+  .table-wrap {
+    animation: fadeUp 0.5s ease 0.25s both;
+  }
+</style>
+</head>
+<body>
+<div class="noise"></div>
+<div class="container">
+
+<header>
+  <div class="label">Vinyl OCR Model Evaluation</div>
+  <h1>Mistral Model Comparison</h1>
+  <div class="meta">2026-02-23T20:12:24Z &middot; 25 test cases &middot; artist + title extraction</div>
+</header>
+
+<div class="section-title">Overall Scores</div>
+<div class="summary-grid" id="summary"></div>
+
+<div class="section-title">Per-Case Results</div>
+<div class="legend">
+  <div class="legend-item"><div class="legend-swatch perfect"></div> Exact / ≥0.8 fuzzy</div>
+  <div class="legend-item"><div class="legend-swatch good"></div> ≥0.5 fuzzy</div>
+  <div class="legend-item"><div class="legend-swatch poor"></div> >0 fuzzy</div>
+  <div class="legend-item"><div class="legend-swatch zero"></div> 0 / null</div>
+</div>
+<div class="table-wrap">
+  <table id="detail-table"></table>
+</div>
+
+</div>
+
+<script>
+const DATA = {"timestamp":"2026-02-23T20:12:24.515Z","models":["mistral-ocr-latest","mistral-small-2506","mistral-medium-2508"],"caseCount":25,"results":{"mistral-ocr-latest":{"summary":{"artistExact":0.32,"titleExact":0.48,"artistFuzzy":0.5970788334472545,"titleFuzzy":0.6555389945451864,"overall":0.5131544569981102},"details":[{"id":"the-earons-land-of-hunger","expected":{"artist":"The Earons","title":"Land Of Hunger"},"actual":{"artist":"The Eurons","title":"Land Of Hunger"},"scores":{"artistExact":0,"titleExact":1,"artistFuzzy":0.9,"titleFuzzy":1}},{"id":"louis-chedid-ainsi-soit-il","expected":{"artist":"Louis Chedid","title":"Ainsi Soit-Il"},"actual":{"artist":"Louis Chedid","title":"Ainsi soit-il"},"scores":{"artistExact":1,"titleExact":1,"artistFuzzy":1,"titleFuzzy":1}},{"id":"ed-lincoln-ontem-hoje-sempre","expected":{"artist":"Ed Lincoln","title":"Ontem Hoje Sempre"},"actual":{"artist":"Hoje Sempre","title":"Hoje Sempre"},"scores":{"artistExact":0,"titleExact":0,"artistFuzzy":0,"titleFuzzy":0.6470588235294117}},{"id":"caetano-veloso-caetano-veloso","expected":{"artist":"Caetano Veloso","title":"Caetano Veloso"},"actual":{"artist":"Caciño Veloso","title":"MPB/Pop"},"scores":{"artistExact":0,"titleExact":0,"artistFuzzy":0.7142857142857143,"titleFuzzy":0.0714285714285714}},{"id":"pipos-4-o-encontro-da-massa","expected":{"artist":"Pipo's 4","title":"O Encontro da Massa"},"actual":{"artist":"CIEPOS 4","title":"Operativa"},"scores":{"artistExact":0,"titleExact":0,"artistFuzzy":0.625,"titleFuzzy":0.26315789473684215}},{"id":"quarteto-em-cy-tamba-trio-som-definitivo","expected":{"artist":"Quarteto Em Cy & Tamba Trio","title":"Som Definitivo"},"actual":{"artist":"Amba Trio","title":"Som Definitivo"},"scores":{"artistExact":0,"titleExact":1,"artistFuzzy":0.33333333333333337,"titleFuzzy":1}},{"id":"esperanza-spalding-emilys-devolution","expected":{"artist":"Esperanza Spalding","title":"Emily's D+Evolution"},"actual":{"artist":"Emily's D+Evolution","title":"Emily's D+Evolution"},"scores":{"artistExact":0,"titleExact":1,"artistFuzzy":0.1578947368421053,"titleFuzzy":1}},{"id":"machito-tanga","expected":{"artist":"Machito & His Afro-Cubans","title":"Tanga"},"actual":{"artist":"Machito y sus Afro-Cubanos","title":"Tanga"},"scores":{"artistExact":0,"titleExact":1,"artistFuzzy":0.8461538461538461,"titleFuzzy":1}},{"id":"orquesta-el-macabeo-salsa-bestial","expected":{"artist":"Orquesta El Macabeo","title":"Salsa Bestial"},"actual":{"artist":"SALSA 2","title":"4+22/"},"scores":{"artistExact":0,"titleExact":0,"artistFuzzy":0.21052631578947367,"titleFuzzy":0}},{"id":"t-rex-t-rex","expected":{"artist":"T. Rex","title":"T. Rex"},"actual":{"artist":"T. Rex","title":null},"scores":{"artistExact":1,"titleExact":0,"artistFuzzy":1,"titleFuzzy":0}},{"id":"various-rico-rico","expected":{"artist":"Various","title":"Rico Rico - 50 Exitos Tropicales"},"actual":{"artist":"RICO LEO","title":"50 ÉNIOS TROPICQUES"},"scores":{"artistExact":0,"titleExact":0,"artistFuzzy":0.125,"titleFuzzy":0.46875}},{"id":"various-seattle-the-dark-side","expected":{"artist":"Various","title":"Seattle... The Dark Side"},"actual":{"artist":"Sir Mix-a-Lot","title":"Seattle... The Dark Side"},"scores":{"artistExact":0,"titleExact":1,"artistFuzzy":0.15384615384615385,"titleFuzzy":1}},{"id":"determine-never-know","expected":{"artist":"Determine","title":"Never Know"},"actual":{"artist":"Dee Jays","title":"Never Know"},"scores":{"artistExact":0,"titleExact":1,"artistFuzzy":0.33333333333333337,"titleFuzzy":1}},{"id":"discotex-records-6am-wanna-be-down","expected":{"artist":"Discotex Records","title":"6AM / Wanna Be Down"},"actual":{"artist":"Skallamooch","title":"WANNA BE DOWN"},"scores":{"artistExact":0,"titleExact":0,"artistFuzzy":0.125,"titleFuzzy":0.6842105263157895}},{"id":"legends-of-the-dark-ground-cabra","expected":{"artist":"Legends of the Dark Ground","title":"Cabra (Seiji Re-Rinse)"},"actual":{"artist":null,"title":null},"scores":{"artistExact":0,"titleExact":0,"artistFuzzy":0,"titleFuzzy":0}},{"id":"wedding-hands-in-the-till","expected":{"artist":"Wedding","title":"Hands In The Till / A Little Love"},"actual":{"artist":"WEDDING","title":"HANDS IN THE TILL / A LITTLE LOVE"},"scores":{"artistExact":1,"titleExact":1,"artistFuzzy":1,"titleFuzzy":1}},{"id":"olu-living-free","expected":{"artist":"Olu","title":"Living Free"},"actual":{"artist":"OLU","title":"LIVING FREE"},"scores":{"artistExact":1,"titleExact":1,"artistFuzzy":1,"titleFuzzy":1}},{"id":"big-bub-i-dont-mind","expected":{"artist":"Big Bub","title":"I Don't Mind"},"actual":{"artist":"BIG BUS","title":"IDON'T MIND"},"scores":{"artistExact":0,"titleExact":0,"artistFuzzy":0.8571428571428572,"titleFuzzy":0.9166666666666666}},{"id":"patrick-cowley-menergy","expected":{"artist":"Patrick Cowley","title":"Menergy"},"actual":{"artist":"Patrick Cowley","title":"MENERGY"},"scores":{"artistExact":1,"titleExact":1,"artistFuzzy":1,"titleFuzzy":1}},{"id":"sleepy-brown-i-cant-wait","expected":{"artist":"Sleepy Brown feat. Outkast","title":"I Can't Wait"},"actual":{"artist":"Sleepy Brown featuring Outkast","title":"I Can't Wait"},"scores":{"artistExact":0,"titleExact":1,"artistFuzzy":0.8333333333333334,"titleFuzzy":1}},{"id":"mc-mell-o-first-chronicles","expected":{"artist":"MC Mell 'O'","title":"The First Chronicles of D.E.T.T."},"actual":{"artist":"MC MELL 'O'","title":"THE FIRST CHRONICLES OF D. E. T. T."},"scores":{"artistExact":1,"titleExact":0,"artistFuzzy":1,"titleFuzzy":0.9142857142857143}},{"id":"natural-black-early-on-before","expected":{"artist":"Natural Black","title":"Early On Before"},"actual":{"artist":"NATURAL BLACK","title":"MARCOSEA"},"scores":{"artistExact":1,"titleExact":0,"artistFuzzy":1,"titleFuzzy":0.2666666666666667}},{"id":"young-peoples-records-all-aboard","expected":{"artist":"Young People's Records","title":"All Aboard!"},"actual":{"artist":"Haydn","title":"Concerts for Days and Orchestras"},"scores":{"artistExact":0,"titleExact":0,"artistFuzzy":0.045454545454545414,"titleFuzzy":0.15625}},{"id":"mario-telles-mario-telles","expected":{"artist":"Mario Telles","title":"Mario Telles"},"actual":{"artist":"Mario Téras","title":null},"scores":{"artistExact":0,"titleExact":0,"artistFuzzy":0.6666666666666667,"titleFuzzy":0}},{"id":"lecuona-plays-for-two","expected":{"artist":"Lecuona","title":"Plays For Two"},"actual":{"artist":"Lecuona","title":"Plays for Two"},"scores":{"artistExact":1,"titleExact":1,"artistFuzzy":1,"titleFuzzy":1}}]},"mistral-small-2506":{"summary":{"artistExact":0.52,"titleExact":0.64,"artistFuzzy":0.6373033781033781,"titleFuzzy":0.7978169705140894,"overall":0.648780087154367},"details":[{"id":"the-earons-land-of-hunger","expected":{"artist":"The Earons","title":"Land Of Hunger"},"actual":{"artist":"The Earons","title":"Land Of Hunger"},"scores":{"artistExact":1,"titleExact":1,"artistFuzzy":1,"titleFuzzy":1}},{"id":"louis-chedid-ainsi-soit-il","expected":{"artist":"Louis Chedid","title":"Ainsi Soit-Il"},"actual":{"artist":"Louis Chedid","title":"Ainsi soit-il"},"scores":{"artistExact":1,"titleExact":1,"artistFuzzy":1,"titleFuzzy":1}},{"id":"ed-lincoln-ontem-hoje-sempre","expected":{"artist":"Ed Lincoln","title":"Ontem Hoje Sempre"},"actual":{"artist":"Ed Lincoln","title":"Ontem Hoje Sempre"},"scores":{"artistExact":1,"titleExact":1,"artistFuzzy":1,"titleFuzzy":1}},{"id":"caetano-veloso-caetano-veloso","expected":{"artist":"Caetano Veloso","title":"Caetano Veloso"},"actual":{"artist":"Caetano Veloso","title":"Caetano Veloso"},"scores":{"artistExact":1,"titleExact":1,"artistFuzzy":1,"titleFuzzy":1}},{"id":"pipos-4-o-encontro-da-massa","expected":{"artist":"Pipo's 4","title":"O Encontro da Massa"},"actual":{"artist":"Pipo & A Massa","title":"O Encontro da Massa"},"scores":{"artistExact":0,"titleExact":1,"artistFuzzy":0.3571428571428571,"titleFuzzy":1}},{"id":"quarteto-em-cy-tamba-trio-som-definitivo","expected":{"artist":"Quarteto Em Cy & Tamba Trio","title":"Som Definitivo"},"actual":{"artist":"Quarteto em Cy e Tamba Trio","title":"Som Definitivo"},"scores":{"artistExact":0,"titleExact":1,"artistFuzzy":0.962962962962963,"titleFuzzy":1}},{"id":"esperanza-spalding-emilys-devolution","expected":{"artist":"Esperanza Spalding","title":"Emily's D+Evolution"},"actual":{"artist":"Emley + D","title":"Evolution"},"scores":{"artistExact":0,"titleExact":0,"artistFuzzy":0.2222222222222222,"titleFuzzy":0.4736842105263158}},{"id":"machito-tanga","expected":{"artist":"Machito & His Afro-Cubans","title":"Tanga"},"actual":{"artist":"Machito","title":"Tanga"},"scores":{"artistExact":0,"titleExact":1,"artistFuzzy":0.28,"titleFuzzy":1}},{"id":"orquesta-el-macabeo-salsa-bestial","expected":{"artist":"Orquesta El Macabeo","title":"Salsa Bestial"},"actual":{"artist":"Orquesta El Macabeo","title":"Salsa Bestial"},"scores":{"artistExact":1,"titleExact":1,"artistFuzzy":1,"titleFuzzy":1}},{"id":"t-rex-t-rex","expected":{"artist":"T. Rex","title":"T. Rex"},"actual":{"artist":"T. Rex","title":null},"scores":{"artistExact":1,"titleExact":0,"artistFuzzy":1,"titleFuzzy":0}},{"id":"various-rico-rico","expected":{"artist":"Various","title":"Rico Rico - 50 Exitos Tropicales"},"actual":{"artist":null,"title":"El Rico Rico: 50 Exitos Tropicales"},"scores":{"artistExact":0,"titleExact":0,"artistFuzzy":0,"titleFuzzy":0.8529411764705882}},{"id":"various-seattle-the-dark-side","expected":{"artist":"Various","title":"Seattle... The Dark Side"},"actual":{"artist":"Rhyme Cartel Records","title":"Seattle... The Dark Side"},"scores":{"artistExact":0,"titleExact":1,"artistFuzzy":0.19999999999999996,"titleFuzzy":1}},{"id":"determine-never-know","expected":{"artist":"Determine","title":"Never Know"},"actual":{"artist":null,"title":"Never Know"},"scores":{"artistExact":0,"titleExact":1,"artistFuzzy":0,"titleFuzzy":1}},{"id":"discotex-records-6am-wanna-be-down","expected":{"artist":"Discotex Records","title":"6AM / Wanna Be Down"},"actual":{"artist":null,"title":"WANNA BE DOWN Feat: Skallamooch"},"scores":{"artistExact":0,"titleExact":0,"artistFuzzy":0,"titleFuzzy":0.22580645161290325}},{"id":"legends-of-the-dark-ground-cabra","expected":{"artist":"Legends of the Dark Ground","title":"Cabra (Seiji Re-Rinse)"},"actual":{"artist":"Capira","title":"Self Re-Rinse!"},"scores":{"artistExact":0,"titleExact":0,"artistFuzzy":0.07692307692307687,"titleFuzzy":0.5}},{"id":"wedding-hands-in-the-till","expected":{"artist":"Wedding","title":"Hands In The Till / A Little Love"},"actual":{"artist":null,"title":"Wedding"},"scores":{"artistExact":0,"titleExact":0,"artistFuzzy":0,"titleFuzzy":0.09090909090909094}},{"id":"olu-living-free","expected":{"artist":"Olu","title":"Living Free"},"actual":{"artist":"OLU","title":"LIVING FREE"},"scores":{"artistExact":1,"titleExact":1,"artistFuzzy":1,"titleFuzzy":1}},{"id":"big-bub-i-dont-mind","expected":{"artist":"Big Bub","title":"I Don't Mind"},"actual":{"artist":"Big Bub","title":"Don't Mind"},"scores":{"artistExact":1,"titleExact":0,"artistFuzzy":1,"titleFuzzy":0.8333333333333334}},{"id":"patrick-cowley-menergy","expected":{"artist":"Patrick Cowley","title":"Menergy"},"actual":{"artist":"Patrick Cowley","title":"Menergy"},"scores":{"artistExact":1,"titleExact":1,"artistFuzzy":1,"titleFuzzy":1}},{"id":"sleepy-brown-i-cant-wait","expected":{"artist":"Sleepy Brown feat. Outkast","title":"I Can't Wait"},"actual":{"artist":"Sleepy Brown featuring Outkast","title":"I Can't Wait"},"scores":{"artistExact":0,"titleExact":1,"artistFuzzy":0.8333333333333334,"titleFuzzy":1}},{"id":"mc-mell-o-first-chronicles","expected":{"artist":"MC Mell 'O'","title":"The First Chronicles of D.E.T.T."},"actual":{"artist":"MC MELL 'O'","title":"THE FIRST CHRONICLES OF D.E.E.T."},"scores":{"artistExact":1,"titleExact":0,"artistFuzzy":1,"titleFuzzy":0.96875}},{"id":"natural-black-early-on-before","expected":{"artist":"Natural Black","title":"Early On Before"},"actual":{"artist":"Natural Black","title":"Early On Before"},"scores":{"artistExact":1,"titleExact":1,"artistFuzzy":1,"titleFuzzy":1}},{"id":"young-peoples-records-all-aboard","expected":{"artist":"Young People's Records","title":"All Aboard!"},"actual":{"artist":null,"title":"All aboard!"},"scores":{"artistExact":0,"titleExact":1,"artistFuzzy":0,"titleFuzzy":1}},{"id":"mario-telles-mario-telles","expected":{"artist":"Mario Telles","title":"Mario Telles"},"actual":{"artist":"Mario Telles","title":null},"scores":{"artistExact":1,"titleExact":0,"artistFuzzy":1,"titleFuzzy":0}},{"id":"lecuona-plays-for-two","expected":{"artist":"Lecuona","title":"Plays For Two"},"actual":{"artist":"Lecuona","title":"Plays for Two"},"scores":{"artistExact":1,"titleExact":1,"artistFuzzy":1,"titleFuzzy":1}}]},"mistral-medium-2508":{"summary":{"artistExact":0.44,"titleExact":0.4,"artistFuzzy":0.5985850924903557,"titleFuzzy":0.5988304929555911,"overall":0.5093538963614868},"details":[{"id":"the-earons-land-of-hunger","expected":{"artist":"The Earons","title":"Land Of Hunger"},"actual":{"artist":"The Earons","title":"Land of Hunger"},"scores":{"artistExact":1,"titleExact":1,"artistFuzzy":1,"titleFuzzy":1}},{"id":"louis-chedid-ainsi-soit-il","expected":{"artist":"Louis Chedid","title":"Ainsi Soit-Il"},"actual":{"artist":"Louis Chedid","title":"Ainsi soit-il"},"scores":{"artistExact":1,"titleExact":1,"artistFuzzy":1,"titleFuzzy":1}},{"id":"ed-lincoln-ontem-hoje-sempre","expected":{"artist":"Ed Lincoln","title":"Ontem Hoje Sempre"},"actual":{"artist":"Ed Lincoln","title":"Ontem Hoje Sempre"},"scores":{"artistExact":1,"titleExact":1,"artistFuzzy":1,"titleFuzzy":1}},{"id":"caetano-veloso-caetano-veloso","expected":{"artist":"Caetano Veloso","title":"Caetano Veloso"},"actual":{"artist":"Caetano Veloso","title":null},"scores":{"artistExact":1,"titleExact":0,"artistFuzzy":1,"titleFuzzy":0}},{"id":"pipos-4-o-encontro-da-massa","expected":{"artist":"Pipo's 4","title":"O Encontro da Massa"},"actual":{"artist":"Pipo's 4","title":"O Encontro da Massa"},"scores":{"artistExact":1,"titleExact":1,"artistFuzzy":1,"titleFuzzy":1}},{"id":"quarteto-em-cy-tamba-trio-som-definitivo","expected":{"artist":"Quarteto Em Cy & Tamba Trio","title":"Som Definitivo"},"actual":{"artist":"Tamba Trio","title":"Quarteto em Cy"},"scores":{"artistExact":0,"titleExact":0,"artistFuzzy":0.37037037037037035,"titleFuzzy":0.0714285714285714}},{"id":"esperanza-spalding-emilys-devolution","expected":{"artist":"Esperanza Spalding","title":"Emily's D+Evolution"},"actual":{"artist":"Emily","title":"D+Evolution"},"scores":{"artistExact":0,"titleExact":0,"artistFuzzy":0.11111111111111116,"titleFuzzy":0.5789473684210527}},{"id":"machito-tanga","expected":{"artist":"Machito & His Afro-Cubans","title":"Tanga"},"actual":{"artist":"Machito","title":"Sul Afro Cubano Tanga"},"scores":{"artistExact":0,"titleExact":0,"artistFuzzy":0.28,"titleFuzzy":0.23809523809523814}},{"id":"orquesta-el-macabeo-salsa-bestial","expected":{"artist":"Orquesta El Macabeo","title":"Salsa Bestial"},"actual":{"artist":"Various Artists","title":null},"scores":{"artistExact":0,"titleExact":0,"artistFuzzy":0.10526315789473684,"titleFuzzy":0}},{"id":"t-rex-t-rex","expected":{"artist":"T. Rex","title":"T. Rex"},"actual":{"artist":"T-Rex","title":null},"scores":{"artistExact":0,"titleExact":0,"artistFuzzy":0.6666666666666667,"titleFuzzy":0}},{"id":"various-rico-rico","expected":{"artist":"Various","title":"Rico Rico - 50 Exitos Tropicales"},"actual":{"artist":"Rico Rico","title":"50 Exitos Tropicales"},"scores":{"artistExact":0,"titleExact":0,"artistFuzzy":0.11111111111111116,"titleFuzzy":0.625}},{"id":"various-seattle-the-dark-side","expected":{"artist":"Various","title":"Seattle... The Dark Side"},"actual":{"artist":"Various Artists","title":"Seattle...The Dark Side"},"scores":{"artistExact":0,"titleExact":0,"artistFuzzy":0.4666666666666667,"titleFuzzy":0.9583333333333334}},{"id":"determine-never-know","expected":{"artist":"Determine","title":"Never Know"},"actual":{"artist":null,"title":null},"scores":{"artistExact":0,"titleExact":0,"artistFuzzy":0,"titleFuzzy":0}},{"id":"discotex-records-6am-wanna-be-down","expected":{"artist":"Discotex Records","title":"6AM / Wanna Be Down"},"actual":{"artist":"Skallamooch","title":"Wanna Be Down"},"scores":{"artistExact":0,"titleExact":0,"artistFuzzy":0.125,"titleFuzzy":0.6842105263157895}},{"id":"legends-of-the-dark-ground-cabra","expected":{"artist":"Legends of the Dark Ground","title":"Cabra (Seiji Re-Rinse)"},"actual":{"artist":"Capira","title":"Selji Re-Rinse"},"scores":{"artistExact":0,"titleExact":0,"artistFuzzy":0.07692307692307687,"titleFuzzy":0.5909090909090908}},{"id":"wedding-hands-in-the-till","expected":{"artist":"Wedding","title":"Hands In The Till / A Little Love"},"actual":{"artist":null,"title":"Wedding"},"scores":{"artistExact":0,"titleExact":0,"artistFuzzy":0,"titleFuzzy":0.09090909090909094}},{"id":"olu-living-free","expected":{"artist":"Olu","title":"Living Free"},"actual":{"artist":"OLU","title":"Living Free"},"scores":{"artistExact":1,"titleExact":1,"artistFuzzy":1,"titleFuzzy":1}},{"id":"big-bub-i-dont-mind","expected":{"artist":"Big Bub","title":"I Don't Mind"},"actual":{"artist":"Big Bub","title":"I Don't Mind"},"scores":{"artistExact":1,"titleExact":1,"artistFuzzy":1,"titleFuzzy":1}},{"id":"patrick-cowley-menergy","expected":{"artist":"Patrick Cowley","title":"Menergy"},"actual":{"artist":"Patrick Cowley","title":"Menergy"},"scores":{"artistExact":1,"titleExact":1,"artistFuzzy":1,"titleFuzzy":1}},{"id":"sleepy-brown-i-cant-wait","expected":{"artist":"Sleepy Brown feat. Outkast","title":"I Can't Wait"},"actual":{"artist":"Sleepy Brown featuring Outkast","title":"I Can't Wait"},"scores":{"artistExact":0,"titleExact":1,"artistFuzzy":0.8333333333333334,"titleFuzzy":1}},{"id":"mc-mell-o-first-chronicles","expected":{"artist":"MC Mell 'O'","title":"The First Chronicles of D.E.T.T."},"actual":{"artist":"MC Mell'O","title":"The First Chronicles of D.E.F.T."},"scores":{"artistExact":0,"titleExact":0,"artistFuzzy":0.8181818181818181,"titleFuzzy":0.96875}},{"id":"natural-black-early-on-before","expected":{"artist":"Natural Black","title":"Early On Before"},"actual":{"artist":"Natural Black","title":"Early On Before"},"scores":{"artistExact":1,"titleExact":1,"artistFuzzy":1,"titleFuzzy":1}},{"id":"young-peoples-records-all-aboard","expected":{"artist":"Young People's Records","title":"All Aboard!"},"actual":{"artist":null,"title":"All Aboard! Train to the Zoo, Train to the Farm, Train to the Ranch"},"scores":{"artistExact":0,"titleExact":0,"artistFuzzy":0,"titleFuzzy":0.16417910447761197}},{"id":"mario-telles-mario-telles","expected":{"artist":"Mario Telles","title":"Mario Telles"},"actual":{"artist":"Mario Telles","title":null},"scores":{"artistExact":1,"titleExact":0,"artistFuzzy":1,"titleFuzzy":0}},{"id":"lecuona-plays-for-two","expected":{"artist":"Lecuona","title":"Plays For Two"},"actual":{"artist":"Lecuona","title":"Plays For Two"},"scores":{"artistExact":1,"titleExact":1,"artistFuzzy":1,"titleFuzzy":1}}]}}};
+
+const models = DATA.models;
+const modelColors = { [models[0]]: 'var(--model1)', [models[1]]: 'var(--model2)', [models[2]]: 'var(--model3)' };
+const shortName = m => m.replace('mistral-', '');
+
+function pct(v) { return (v * 100).toFixed(1) + '%'; }
+
+function scoreClass(v) {
+  if (v === 1) return 's-perfect';
+  if (v >= 0.8) return 's-perfect';
+  if (v >= 0.5) return 's-good';
+  if (v > 0) return 's-poor';
+  return 's-zero';
+}
+
+// ─── Summary Cards ───
+const summaryEl = document.getElementById('summary');
+const bestOverall = Math.max(...models.map(m => DATA.results[m].summary.overall));
+
+models.forEach(m => {
+  const s = DATA.results[m].summary;
+  const isBest = s.overall === bestOverall;
+  const card = document.createElement('div');
+  card.className = 'model-card';
+  card.innerHTML = `
+    <div class="model-name">${shortName(m)}${isBest ? '<span class="winner-badge">best</span>' : ''}</div>
+    <div class="overall-label">Overall</div>
+    <div class="overall-score">${pct(s.overall)}</div>
+    <div class="stat-row">
+      <span class="stat-label">Artist exact</span>
+      <div class="bar-track"><div class="bar-fill" style="width:${s.artistExact*100}%"></div></div>
+      <span class="stat-value">${pct(s.artistExact)}</span>
+    </div>
+    <div class="stat-row">
+      <span class="stat-label">Title exact</span>
+      <div class="bar-track"><div class="bar-fill" style="width:${s.titleExact*100}%"></div></div>
+      <span class="stat-value">${pct(s.titleExact)}</span>
+    </div>
+    <div class="stat-row">
+      <span class="stat-label">Artist fuzzy</span>
+      <div class="bar-track"><div class="bar-fill" style="width:${s.artistFuzzy*100}%"></div></div>
+      <span class="stat-value">${pct(s.artistFuzzy)}</span>
+    </div>
+    <div class="stat-row">
+      <span class="stat-label">Title fuzzy</span>
+      <div class="bar-track"><div class="bar-fill" style="width:${s.titleFuzzy*100}%"></div></div>
+      <span class="stat-value">${pct(s.titleFuzzy)}</span>
+    </div>
+  `;
+  summaryEl.appendChild(card);
+});
+
+// ─── Detail Table ───
+const table = document.getElementById('detail-table');
+
+// Header
+const modelHeaders = models.map(m =>
+  `<th class="group-header" colspan="1" style="color:${modelColors[m]}">${shortName(m)}</th>`
+).join('');
+
+table.innerHTML = `
+<thead>
+  <tr>
+    <th style="width:140px">#</th>
+    <th style="width:200px">Expected</th>
+    ${modelHeaders}
+  </tr>
+</thead>
+<tbody></tbody>`;
+
+const tbody = table.querySelector('tbody');
+const cases = DATA.results[models[0]].details;
+
+cases.forEach((c, i) => {
+  const row = document.createElement('tr');
+
+  // Expected cell
+  const expArtist = c.expected.artist;
+  const expTitle = c.expected.title;
+
+  let modelCells = '';
+  models.forEach(m => {
+    const d = DATA.results[m].details[i];
+    const a = d.actual.artist;
+    const t = d.actual.title;
+    const s = d.scores;
+
+    const artistVal = a === null
+      ? '<span class="field-value null-val">null</span>'
+      : `<span class="field-value">${esc(a)}</span>`;
+    const titleVal = t === null
+      ? '<span class="field-value null-val">null</span>'
+      : `<span class="field-value">${esc(t)}</span>`;
+
+    modelCells += `
+      <td class="model-col">
+        <div class="model-result">
+          <div class="artist">
+            <span class="field-label">A</span>
+            ${artistVal}
+          </div>
+          <div class="title">
+            <span class="field-label">T</span>
+            ${titleVal}
+          </div>
+          <div class="score-pills">
+            <span class="pill exact ${scoreClass(s.artistExact)}" title="Artist exact">A:${s.artistExact ? '✓' : '✗'}</span>
+            <span class="pill exact ${scoreClass(s.titleExact)}" title="Title exact">T:${s.titleExact ? '✓' : '✗'}</span>
+            <span class="pill ${scoreClass(s.artistFuzzy)}" title="Artist fuzzy: ${pct(s.artistFuzzy)}">${pct(s.artistFuzzy)}</span>
+            <span class="pill ${scoreClass(s.titleFuzzy)}" title="Title fuzzy: ${pct(s.titleFuzzy)}">${pct(s.titleFuzzy)}</span>
+          </div>
+        </div>
+      </td>`;
+  });
+
+  row.innerHTML = `
+    <td class="col-id">${i + 1}. ${c.id}</td>
+    <td class="col-expected">
+      <div class="artist">${esc(expArtist)}</div>
+      <div class="title">${esc(expTitle)}</div>
+    </td>
+    ${modelCells}`;
+
+  tbody.appendChild(row);
+});
+
+function esc(s) {
+  if (s == null) return '';
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+</script>
+</body>
+</html>

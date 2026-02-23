@@ -16,6 +16,7 @@ export interface ModelResult {
   id: string;
   expected: { artist: string; title: string };
   actual: { artist: string | null; title: string | null };
+  ocrText?: string | null;
   scores: {
     artistExact: number;
     titleExact: number;

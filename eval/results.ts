@@ -1,8 +1,9 @@
 import { Mistral } from "@mistralai/mistralai";
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from "node:fs";
 import { resolve, dirname } from "node:path";
-import { getVisionModelConfigById } from "./models";
-import { parseBatchOutput } from "./output-parser";
+import { parseScanJson } from "../server/scan-parser";
+import { OCR_TEXT_PARSER_MODELS, getVisionModelConfigById } from "./models";
+import { parseBatchOutput, parseOcrTextBatchOutput } from "./output-parser";
 import { scoreResult } from "./scoring";
 import type {
   EvalManifest,
@@ -17,6 +18,31 @@ const EVAL_DIR = dirname(import.meta.path);
 const FIXTURES_DIR = resolve(EVAL_DIR, "fixtures");
 const RESULTS_DIR = resolve(EVAL_DIR, "results");
 const PENDING_PATH = resolve(RESULTS_DIR, "pending-jobs.json");
+const OCR_TO_RELEASE_PROMPT =
+  "You are given OCR text extracted from a photo of a CD or vinyl cover. " +
+  "Infer the release artist and title from this OCR text only. " +
+  'Respond with JSON only using keys artist and title. If unknown, use null values. Example: {"artist":"Radiohead","title":"OK Computer"}';
+
+function asRecord(value: unknown): Record<string, unknown> | null {
+  return value !== null && typeof value === "object" ? (value as Record<string, unknown>) : null;
+}
+
+function extractContentText(content: unknown): string | null {
+  if (typeof content === "string") return content;
+  if (!Array.isArray(content)) return null;
+
+  const text = content
+    .map((chunk): string => {
+      const chunkObj = asRecord(chunk);
+      if (!chunkObj) return "";
+      return chunkObj.type === "text" && typeof chunkObj.text === "string" ? chunkObj.text : "";
+    })
+    .filter(Boolean)
+    .join("\n")
+    .trim();
+
+  return text.length > 0 ? text : null;
+}
 
 function loadManifest(): EvalManifest {
   return JSON.parse(readFileSync(resolve(FIXTURES_DIR, "manifest.json"), "utf-8"));
@@ -81,6 +107,40 @@ function getKindForPendingJob(pendingJob: PendingJobs["jobs"][number]): EvalMode
   return config?.kind ?? "chat";
 }
 
+async function parseReleaseFromOcrText(
+  client: Mistral,
+  model: string,
+  ocrText: string,
+): Promise<{ artist: string | null; title: string | null }> {
+  try {
+    const response = await client.chat.complete({
+      model,
+      temperature: 0,
+      responseFormat: { type: "json_object" },
+      messages: [
+        {
+          role: "user",
+          content: [
+            {
+              type: "text",
+              text: `${OCR_TO_RELEASE_PROMPT}\n\n` + "OCR text (raw):\n" + ocrText.slice(0, 12_000),
+            },
+          ],
+        },
+      ],
+    });
+
+    const content = response.choices[0]?.message?.content;
+    const text = extractContentText(content);
+    const parsed = text ? parseScanJson(text) : null;
+    return parsed ?? { artist: null, title: null };
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error(`Error parsing OCR text with ${model}: ${msg}`);
+    return { artist: null, title: null };
+  }
+}
+
 async function main() {
   const apiKey = process.env.MISTRAL_API_KEY;
   if (!apiKey) {
@@ -103,6 +163,7 @@ async function main() {
     caseCount: manifest.cases.length,
     results: {},
   };
+  const ocrTextByModel = new Map<string, Map<string, string>>();
 
   for (const pendingJob of pending.jobs) {
     const { model, jobId } = pendingJob;
@@ -117,10 +178,22 @@ async function main() {
       }
 
       const outputByCaseId = new Map<string, { artist: string | null; title: string | null }>();
+      const ocrTextByCaseId = new Map<string, string>();
       for (const output of job.outputs ?? []) {
         const parsed = parseBatchOutput(output, kind);
         if (!parsed.customId) continue;
         outputByCaseId.set(parsed.customId, parsed.actual ?? { artist: null, title: null });
+
+        if (kind === "ocr") {
+          const parsedOcrText = parseOcrTextBatchOutput(output);
+          if (parsedOcrText.customId && parsedOcrText.text) {
+            ocrTextByCaseId.set(parsedOcrText.customId, parsedOcrText.text);
+          }
+        }
+      }
+
+      if (kind === "ocr" && ocrTextByCaseId.size > 0) {
+        ocrTextByModel.set(model, ocrTextByCaseId);
       }
 
       const details: ModelResult[] = manifest.cases.map((testCase) => {
@@ -138,6 +211,32 @@ async function main() {
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       console.error(`Error fetching results for ${model}: ${msg}`);
+    }
+  }
+
+  for (const [ocrModel, ocrTextByCaseId] of ocrTextByModel.entries()) {
+    for (const parserModel of OCR_TEXT_PARSER_MODELS) {
+      const label = `ocr:${ocrModel} -> parse:${parserModel}`;
+      const details: ModelResult[] = [];
+
+      for (const testCase of manifest.cases) {
+        const ocrText = ocrTextByCaseId.get(testCase.id) ?? null;
+        const actual = ocrText
+          ? await parseReleaseFromOcrText(client, parserModel, ocrText)
+          : { artist: null, title: null };
+        const scores = scoreResult(actual, { artist: testCase.artist, title: testCase.title });
+
+        details.push({
+          id: testCase.id,
+          expected: { artist: testCase.artist, title: testCase.title },
+          actual,
+          ocrText,
+          scores,
+        });
+      }
+
+      report.results[label] = { summary: summarize(details), details };
+      report.models.push(label);
     }
   }
 

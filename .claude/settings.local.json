@@ -39,7 +39,10 @@
       "WebFetch(domain:docs.mistral.ai)",
       "Bash(bun test:*)",
       "Bash(git:*)",
-      "Bash(bun run:*)"
+      "Bash(bun run:*)",
+      "Bash(grep bun-types:*)",
+      "Bash(bun add:*)",
+      "Bash(source:*)"
     ]
   }
 }

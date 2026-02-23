@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { parseBatchOutput } from "../../eval/output-parser";
+import { parseBatchOutput, parseOcrTextBatchOutput } from "../../eval/output-parser";
 
 describe("parseBatchOutput", () => {
   test("parses chat output with string message content", () => {
@@ -80,5 +80,35 @@ describe("parseBatchOutput", () => {
 
     expect(parsed.customId).toBe("lecuona-plays-for-two");
     expect(parsed.actual).toEqual({ artist: "Lecuona", title: "Plays For Two" });
+  });
+});
+
+describe("parseOcrTextBatchOutput", () => {
+  test("extracts OCR text from page markdown", () => {
+    const parsed = parseOcrTextBatchOutput({
+      custom_id: "machito-tanga",
+      response: {
+        body: {
+          pages: [{ markdown: "# MACHITO\nTanga" }, { markdown: "Afro-Cubans" }],
+        },
+      },
+    });
+
+    expect(parsed.customId).toBe("machito-tanga");
+    expect(parsed.text).toBe("# MACHITO\nTanga\n\nAfro-Cubans");
+  });
+
+  test("falls back to document annotation when pages are missing", () => {
+    const parsed = parseOcrTextBatchOutput({
+      custom_id: "fallback",
+      response: {
+        body: {
+          document_annotation: "RICO RICO\n50 EXITOS TROPICALES",
+        },
+      },
+    });
+
+    expect(parsed.customId).toBe("fallback");
+    expect(parsed.text).toBe("RICO RICO\n50 EXITOS TROPICALES");
   });
 });

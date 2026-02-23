@@ -12,6 +12,8 @@ export const VISION_MODELS: EvalModelConfig[] = [
   { id: "mistral-medium-2508", kind: "chat", endpoint: "/v1/chat/completions" },
 ];
 
+export const OCR_TEXT_PARSER_MODELS: string[] = ["mistral-small-2506"];
+
 export function getVisionModelConfigById(modelId: string): EvalModelConfig | null {
   return VISION_MODELS.find((model) => model.id === modelId) ?? null;
 }
