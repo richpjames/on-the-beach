@@ -1,7 +1,7 @@
 import { Mistral } from "@mistralai/mistralai";
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from "node:fs";
-import { resolve, dirname } from "node:path";
-import { VISION_MODELS } from "./models";
+import { resolve, dirname, extname } from "node:path";
+import { VISION_MODELS, type EvalModelConfig } from "./models";
 import type { EvalManifest, PendingJobs } from "./types";
 
 const EVAL_DIR = dirname(import.meta.path);
@@ -12,15 +12,63 @@ const SCAN_PROMPT =
   "You are reading a photo of a music release cover. Respond with JSON only using keys artist and title. " +
   'If uncertain, use null values. Example: {"artist":"Radiohead","title":"OK Computer"}';
 
+const OCR_SCHEMA = {
+  name: "music_release_scan",
+  strict: true,
+  schema: {
+    type: "object",
+    additionalProperties: false,
+    properties: {
+      artist: { type: ["string", "null"] },
+      title: { type: ["string", "null"] },
+    },
+    required: ["artist", "title"],
+  },
+} as const;
+
 function loadManifest(): EvalManifest {
   const raw = readFileSync(resolve(FIXTURES_DIR, "manifest.json"), "utf-8");
   return JSON.parse(raw);
 }
 
-function imageToBase64(imagePath: string): string {
+function imageToDataUri(imagePath: string): string {
   const fullPath = resolve(FIXTURES_DIR, imagePath);
   const buffer = readFileSync(fullPath);
-  return buffer.toString("base64");
+  const ext = extname(imagePath).toLowerCase();
+  const mimeType = ext === ".png" ? "image/png" : ext === ".webp" ? "image/webp" : "image/jpeg";
+  return `data:${mimeType};base64,${buffer.toString("base64")}`;
+}
+
+function buildRequestBody(model: EvalModelConfig, dataUri: string): Record<string, unknown> {
+  if (model.kind === "ocr") {
+    return {
+      model: model.id,
+      document: {
+        type: "image_url",
+        image_url: dataUri,
+      },
+      document_annotation_format: {
+        type: "json_schema",
+        json_schema: OCR_SCHEMA,
+      },
+      document_annotation_prompt: SCAN_PROMPT,
+    };
+  }
+
+  return {
+    model: model.id,
+    temperature: 0,
+    response_format: { type: "json_object" },
+    messages: [
+      {
+        role: "user",
+        content: [
+          { type: "text", text: SCAN_PROMPT },
+          { type: "image_url", image_url: dataUri },
+        ],
+      },
+    ],
+  };
 }
 
 async function main() {
@@ -41,42 +89,42 @@ async function main() {
   );
 
   const client = new Mistral({ apiKey });
-
-  // Build requests (shared across all models — same images, same prompt)
-  const requests = manifest.cases.map((c) => ({
-    customId: c.id,
-    body: {
-      temperature: 0,
-      response_format: { type: "json_object" as const },
-      messages: [
-        {
-          role: "user" as const,
-          content: [
-            { type: "text" as const, text: SCAN_PROMPT },
-            {
-              type: "image_url" as const,
-              image_url: `data:image/jpeg;base64,${imageToBase64(c.image)}`,
-            },
-          ],
-        },
-      ],
-    },
-  }));
+  const imageByCaseId = new Map(
+    manifest.cases.map((testCase) => [testCase.id, imageToDataUri(testCase.image)]),
+  );
 
   const jobs: PendingJobs["jobs"] = [];
 
   for (const model of VISION_MODELS) {
+    const requests = manifest.cases.map((testCase) => {
+      const dataUri = imageByCaseId.get(testCase.id);
+      if (!dataUri) {
+        throw new Error(`Missing image data for case ${testCase.id}`);
+      }
+      return {
+        customId: testCase.id,
+        body: buildRequestBody(model, dataUri),
+      };
+    });
+
     try {
       const job = await client.batch.jobs.create({
-        model,
-        endpoint: "/v1/chat/completions",
+        model: model.id,
+        endpoint: model.endpoint,
         requests,
       });
-      jobs.push({ model, jobId: job.id });
-      console.log(`  ✓ ${model} → job ${job.id}`);
+
+      jobs.push({
+        model: model.id,
+        jobId: job.id,
+        endpoint: model.endpoint,
+        kind: model.kind,
+      });
+
+      console.log(`  ✓ ${model.id} (${model.endpoint}) → job ${job.id}`);
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
-      console.error(`  ✗ ${model} → ${msg}`);
+      console.error(`  ✗ ${model.id} (${model.endpoint}) → ${msg}`);
     }
   }
 
@@ -85,7 +133,6 @@ async function main() {
     process.exit(1);
   }
 
-  // Save job IDs for status/results scripts
   if (!existsSync(RESULTS_DIR)) mkdirSync(RESULTS_DIR, { recursive: true });
 
   const pending: PendingJobs = { submittedAt: new Date().toISOString(), jobs };

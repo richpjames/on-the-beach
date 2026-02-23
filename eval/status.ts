@@ -6,6 +6,7 @@ import type { PendingJobs } from "./types";
 const EVAL_DIR = dirname(import.meta.path);
 const RESULTS_DIR = resolve(EVAL_DIR, "results");
 const PENDING_PATH = resolve(RESULTS_DIR, "pending-jobs.json");
+const TERMINAL_STATUSES = new Set(["SUCCESS", "FAILED", "CANCELLED", "TIMEOUT_EXCEEDED"]);
 
 async function main() {
   const apiKey = process.env.MISTRAL_API_KEY;
@@ -39,7 +40,7 @@ async function main() {
       const job = await client.batch.jobs.get({ jobId });
       const progress = `${job.succeededRequests + job.failedRequests}/${job.totalRequests}`;
       const status = job.status;
-      if (status !== "SUCCESS" && status !== "FAILED" && status !== "CANCELLED") {
+      if (!TERMINAL_STATUSES.has(status)) {
         allDone = false;
       }
       console.log(
