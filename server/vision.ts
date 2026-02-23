@@ -96,11 +96,15 @@ export async function extractAlbumInfo(base64Image: string): Promise<ScanResult 
     const message = response.choices[0]?.message?.content;
     const textContent = contentToText(message);
     if (!textContent) {
+      console.error("[vision] Mistral returned no text content");
       return null;
     }
 
-    return parseScanJson(textContent);
-  } catch {
+    const result = parseScanJson(textContent);
+    console.log("[vision] Mistral scan result:", result);
+    return result;
+  } catch (err) {
+    console.error("[vision] Mistral API error:", err);
     return null;
   }
 }
