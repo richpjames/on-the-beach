@@ -1,3 +1,6 @@
+export type EvalEndpoint = "/v1/chat/completions" | "/v1/ocr";
+export type EvalModelKind = "chat" | "ocr";
+
 export interface EvalCase {
   id: string;
   image: string; // relative to eval/fixtures/
@@ -38,5 +41,10 @@ export interface EvalReport {
 
 export interface PendingJobs {
   submittedAt: string;
-  jobs: Array<{ model: string; jobId: string }>;
+  jobs: Array<{
+    model: string;
+    jobId: string;
+    endpoint?: EvalEndpoint;
+    kind?: EvalModelKind;
+  }>;
 }

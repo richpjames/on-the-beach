@@ -25,6 +25,15 @@ npm run dev
 
 Open the URL printed by Vite (typically http://localhost:5173).
 
+## Cover Scan Model
+
+`POST /api/release/scan` uses Mistral and supports two env vars:
+
+- `MISTRAL_API_KEY` (required): API key for Mistral.
+- `MISTRAL_SCAN_MODEL` (optional): model used for cover scanning.
+  - Default: `mistral-ocr-latest`
+  - If set to a non-OCR model (for example `mistral-small-latest`), the app uses chat-completions mode instead.
+
 ## Scripts
 
 ```bash
