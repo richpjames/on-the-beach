@@ -27,3 +27,7 @@ pnpm-debug.log*
 
 # Git worktrees
 .worktrees/
+
+# Eval results (generated, may contain large output)
+eval/results/*.json
+!eval/results/.gitkeep
