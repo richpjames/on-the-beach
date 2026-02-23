@@ -105,7 +105,8 @@ musicItemRoutes.post("/", async (c) => {
       result = await createMusicItemDirect(input);
     }
     return c.json(result.item, 201);
-  } catch {
+  } catch (err) {
+    console.error("[api] POST /api/music-items error:", err);
     return c.json({ error: "Failed to create music item" }, 500);
   }
 });
