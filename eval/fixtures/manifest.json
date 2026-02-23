@@ -149,6 +149,210 @@
       "image": "images/IMG_9952.jpeg",
       "artist": "Lecuona",
       "title": "Plays For Two"
+    },
+    {
+      "id": "aeoliah-crystal-illumination",
+      "image": "images/IMG_5300.jpeg",
+      "artist": "Aeoliah",
+      "title": "Crystal Illumination"
+    },
+    {
+      "id": "coro-minero-de-turon",
+      "image": "images/IMG_5301.jpeg",
+      "artist": "Coro Minero de Turón",
+      "title": "Coro Minero de Turón"
+    },
+    {
+      "id": "maggie-carles-luis-nodal-y-los-magneticos",
+      "image": "images/IMG_5304.jpeg",
+      "artist": "Maggie Carlés / Luis Nodal y los Magnéticos",
+      "title": "Maggie Carlés / Luis Nodal y los Magnéticos"
+    },
+    {
+      "id": "lucho-gatica-antonio-machin",
+      "image": "images/IMG_5305.jpeg",
+      "artist": "Lucho Gatica / Antonio Machin",
+      "title": "Lucho Gatica / Antonio Machin"
+    },
+    {
+      "id": "cesaria-evora-cabo-verde",
+      "image": "images/IMG_5306.jpeg",
+      "artist": "Cesaria Evora",
+      "title": "Cabo Verde"
+    },
+    {
+      "id": "melanie-golden-hour-of-melanie",
+      "image": "images/IMG_5307.jpeg",
+      "artist": "Melanie",
+      "title": "Golden Hour Of Melanie"
+    },
+    {
+      "id": "neil-young-after-the-gold-rush",
+      "image": "images/IMG_5308.jpeg",
+      "artist": "Neil Young",
+      "title": "After The Gold Rush"
+    },
+    {
+      "id": "steve-reich-sextet-six-marimbas",
+      "image": "images/IMG_5309.jpeg",
+      "artist": "Steve Reich",
+      "title": "Sextet / Six Marimbas"
+    },
+    {
+      "id": "gregory-isaacs-lovers-rock",
+      "image": "images/IMG_5310.jpeg",
+      "artist": "Gregory Isaacs",
+      "title": "Lovers' Rock"
+    },
+    {
+      "id": "curtis-mayfield-curtis-live",
+      "image": "images/IMG_5311.jpeg",
+      "artist": "Curtis Mayfield",
+      "title": "Curtis/Live!"
+    },
+    {
+      "id": "j-dilla-donuts",
+      "image": "images/IMG_5312.jpeg",
+      "artist": "J Dilla",
+      "title": "Donuts"
+    },
+    {
+      "id": "hugo-jara-estado-de-animo",
+      "image": "images/IMG_5313.jpeg",
+      "artist": "Hugo Jara",
+      "title": "Estado De Animo"
+    },
+    {
+      "id": "dorival-caymmi-caymmi",
+      "image": "images/IMG_5314.jpeg",
+      "artist": "Dorival Caymmi",
+      "title": "Caymmi"
+    },
+    {
+      "id": "dorival-caymmi-caymmi-odeon",
+      "image": "images/IMG_5315.jpeg",
+      "artist": "Dorival Caymmi",
+      "title": "Caymmi"
+    },
+    {
+      "id": "stevie-wonder-hotter-than-july",
+      "image": "images/IMG_5316.jpeg",
+      "artist": "Stevie Wonder",
+      "title": "Hotter Than July"
+    },
+    {
+      "id": "nite-jewel-no-sun",
+      "image": "images/IMG_5317.jpeg",
+      "artist": "Nite Jewel",
+      "title": "No Sun"
+    },
+    {
+      "id": "horace-silver-and-the-jazz-messengers",
+      "image": "images/IMG_5318.jpeg",
+      "artist": "Horace Silver and the Jazz Messengers",
+      "title": "Horace Silver and the Jazz Messengers"
+    },
+    {
+      "id": "max-romeo-revelation-time",
+      "image": "images/IMG_5319.jpeg",
+      "artist": "Max Romeo",
+      "title": "Revelation Time"
+    },
+    {
+      "id": "various-beat-girls-espanol",
+      "image": "images/IMG_5320.jpeg",
+      "artist": "Various",
+      "title": "Beat Girls Español!"
+    },
+    {
+      "id": "team-shadetek-pale-fire",
+      "image": "images/IMG_5321.jpeg",
+      "artist": "Team Shadetek",
+      "title": "Pale Fire"
+    },
+    {
+      "id": "astrud-gilberto-compact-jazz",
+      "image": "images/IMG_5322.jpeg",
+      "artist": "Astrud Gilberto",
+      "title": "Compact Jazz"
+    },
+    {
+      "id": "astrud-gilberto-beach-samba",
+      "image": "images/IMG_5323.jpeg",
+      "artist": "Astrud Gilberto",
+      "title": "Beach Samba"
+    },
+    {
+      "id": "various-campeones-xvii-concurso-cancion-asturiana",
+      "image": "images/IMG_5324.jpeg",
+      "artist": "Various",
+      "title": "Campeones XVII Concurso de Canción Asturiana"
+    },
+    {
+      "id": "paddy-mcaloon-i-trawl-the-megahertz",
+      "image": "images/IMG_5325.jpeg",
+      "artist": "Paddy McAloon",
+      "title": "I Trawl the Megahertz"
+    },
+    {
+      "id": "maranata-maranata",
+      "image": "images/IMG_5326.jpeg",
+      "artist": "Maranata",
+      "title": "Maranata"
+    },
+    {
+      "id": "antonio-carlos-jobim-tide",
+      "image": "images/IMG_5327.jpeg",
+      "artist": "Antonio Carlos Jobim",
+      "title": "Tide"
+    },
+    {
+      "id": "refused-songs-to-fan-the-flames-of-discontent",
+      "image": "images/IMG_5328.jpeg",
+      "artist": "Refused",
+      "title": "Songs to Fan the Flames of Discontent"
+    },
+    {
+      "id": "collard-roge-satie-4-handed-piano",
+      "image": "images/IMG_5329.jpeg",
+      "artist": "Jean-Philippe Collard & Pascal Rogé",
+      "title": "Satie: The 4 Handed Piano"
+    },
+    {
+      "id": "oren-ambarchi-shebang",
+      "image": "images/IMG_5330.jpeg",
+      "artist": "Oren Ambarchi",
+      "title": "Shebang"
+    },
+    {
+      "id": "laurent-garnier-planet-house-ep",
+      "image": "images/IMG_5331.jpeg",
+      "artist": "Laurent Garnier",
+      "title": "Planet House EP"
+    },
+    {
+      "id": "various-trojan-reggae-party-volume-one",
+      "image": "images/IMG_5332.jpeg",
+      "artist": "Various",
+      "title": "Trojan Reggae Party Volume One"
+    },
+    {
+      "id": "violeta-parra-un-rio-de-sangre",
+      "image": "images/IMG_5334.jpeg",
+      "artist": "Violeta Parra",
+      "title": "Un Rio de Sangre"
+    },
+    {
+      "id": "bob-marley-and-the-wailers-uprising",
+      "image": "images/IMG_5335.jpeg",
+      "artist": "Bob Marley & The Wailers",
+      "title": "Uprising"
+    },
+    {
+      "id": "various-macondo-revisitado",
+      "image": "images/IMG_5336.jpeg",
+      "artist": "Various",
+      "title": "Macondo Revisitado"
     }
   ]
 }
