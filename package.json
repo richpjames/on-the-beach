@@ -22,6 +22,9 @@
     "format:check": "oxfmt --check",
     "devcontainer": "devcontainer up --workspace-folder .",
     "devcontainer:ssh": "container_id=$(bun run devcontainer | sed -n 's/.*\"containerId\":\"\\([^\"]*\\)\".*/\\1/p' | tail -n1) && [ -n \"$container_id\" ] && docker exec -it \"$container_id\" bash",
+    "eval:submit": "bun eval/submit.ts",
+    "eval:status": "bun eval/status.ts",
+    "eval:results": "bun eval/results.ts",
     "prepare": "husky"
   },
   "dependencies": {
