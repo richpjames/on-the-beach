@@ -10,6 +10,7 @@ const RESULTS_DIR = resolve(EVAL_DIR, "results");
 
 const SCAN_PROMPT =
   "You are reading a photo of a CD or vinyl cover. Respond with JSON only using keys artist and title of the release." +
+  " If the release has no separate album title, use the artist name as the title." +
   'If uncertain, use null values. Example: {"artist":"Radiohead","title":"OK Computer"}';
 
 const OCR_SCHEMA = {

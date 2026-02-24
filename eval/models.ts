@@ -7,16 +7,9 @@ export interface EvalModelConfig {
 }
 
 export const VISION_MODELS: EvalModelConfig[] = [
-  {
-    id: "mistral-small-2506",
-    kind: "chat",
-    endpoint: "/v1/chat/completions",
-  },
-  {
-    id: "magistral-small-2509",
-    kind: "chat",
-    endpoint: "/v1/chat/completions",
-  },
+  { id: "mistral-ocr-latest", kind: "ocr", endpoint: "/v1/ocr" },
+  { id: "mistral-small-2506", kind: "chat", endpoint: "/v1/chat/completions" },
+  { id: "mistral-medium-2508", kind: "chat", endpoint: "/v1/chat/completions" },
 ];
 
 export const OCR_TEXT_PARSER_MODELS: string[] = ["mistral-small-2506"];
