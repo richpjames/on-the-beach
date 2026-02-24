@@ -118,25 +118,20 @@ async function main() {
     for (let ci = 0; ci < chunks.length; ci++) {
       const chunk = chunks[ci];
       const label = chunks.length > 1 ? ` [chunk ${ci + 1}/${chunks.length}]` : "";
-      try {
-        const job = await client.batch.jobs.create({
-          model: model.id,
-          endpoint: model.endpoint,
-          requests: chunk,
-        });
+      const job = await client.batch.jobs.create({
+        model: model.id,
+        endpoint: model.endpoint,
+        requests: chunk,
+      });
 
-        jobs.push({
-          model: model.id,
-          jobId: job.id,
-          endpoint: model.endpoint,
-          kind: model.kind,
-        });
+      jobs.push({
+        model: model.id,
+        jobId: job.id,
+        endpoint: model.endpoint,
+        kind: model.kind,
+      });
 
-        console.log(`  ✓ ${model.id} (${model.endpoint})${label} → job ${job.id}`);
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : String(err);
-        console.error(`  ✗ ${model.id} (${model.endpoint})${label} → ${msg}`);
-      }
+      console.log(`  ✓ ${model.id} (${model.endpoint})${label} → job ${job.id}`);
     }
   }
 
