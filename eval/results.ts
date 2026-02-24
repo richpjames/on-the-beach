@@ -161,7 +161,7 @@ async function main() {
 
   const report: EvalReport = {
     timestamp: new Date().toISOString(),
-    models: [...new Set(pending.jobs.map((job) => job.model))],
+    models: [],
     caseCount: manifest.cases.length,
     results: {},
   };
@@ -230,6 +230,7 @@ async function main() {
     });
 
     report.results[model] = { summary: summarize(details), details };
+    report.models.push(model);
   }
 
   for (const [ocrModel, ocrTextByCaseId] of ocrTextByModel.entries()) {

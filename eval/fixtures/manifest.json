@@ -353,6 +353,42 @@
       "image": "images/IMG_5336.jpeg",
       "artist": "Various",
       "title": "Macondo Revisitado"
+    },
+    {
+      "id": "barry-brown-vibes-of-barry-brown",
+      "image": "images/IMG_5339.jpeg",
+      "artist": "Barry Brown",
+      "title": "Vibes of Barry Brown"
+    },
+    {
+      "id": "barry-brown-barry-brown",
+      "image": "images/IMG_5340.jpeg",
+      "artist": "Barry Brown",
+      "title": "Barry Brown"
+    },
+    {
+      "id": "los-llopis-los-llopis",
+      "image": "images/IMG_5341.jpeg",
+      "artist": "Los Llopis",
+      "title": "Los Llopis"
+    },
+    {
+      "id": "jorge-negrete-jorge-negrete",
+      "image": "images/IMG_5342.jpeg",
+      "artist": "Jorge Negrete",
+      "title": "Jorge Negrete"
+    },
+    {
+      "id": "baden-powell-estudos",
+      "image": "images/IMG_5343.jpeg",
+      "artist": "Baden Powell",
+      "title": "Estudos"
+    },
+    {
+      "id": "tipico-santa-rosa-tipico-santa-rosa",
+      "image": "images/IMG_5345.jpeg",
+      "artist": "Tipico Santa Rosa",
+      "title": "Tipico Santa Rosa"
     }
   ]
 }
