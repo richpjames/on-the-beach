@@ -85,6 +85,7 @@ export interface CreateMusicItemInput {
   listenStatus?: ListenStatus;
   purchaseIntent?: PurchaseIntent;
   notes?: string;
+  artworkUrl?: string;
   label?: string;
   year?: number;
   country?: string;
@@ -102,6 +103,7 @@ export interface UpdateMusicItemInput {
   currency?: string;
   notes?: string | null;
   rating?: number | null;
+  artworkUrl?: string | null;
   label?: string | null;
   year?: number | null;
   country?: string | null;
@@ -125,6 +127,10 @@ export interface PaginatedResult<T> {
 export interface ScanResult {
   artist: string | null;
   title: string | null;
+}
+
+export interface UploadImageResult {
+  artworkUrl: string;
 }
 
 // Stacks

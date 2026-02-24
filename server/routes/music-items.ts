@@ -19,6 +19,11 @@ import type {
 } from "../../src/types";
 
 export const musicItemRoutes = new Hono();
+const LOCAL_UPLOADS_PATTERN = /^\/uploads\/[A-Za-z0-9._-]+$/;
+
+function isValidArtworkUrl(value: string): boolean {
+  return isValidUrl(value) || LOCAL_UPLOADS_PATTERN.test(value);
+}
 
 // ---------------------------------------------------------------------------
 // GET / — list music items
@@ -94,6 +99,9 @@ musicItemRoutes.get("/", async (c) => {
 
 musicItemRoutes.post("/", async (c) => {
   const input = (await c.req.json()) as CreateMusicItemInput;
+  if (input.artworkUrl !== undefined && !isValidArtworkUrl(input.artworkUrl)) {
+    return c.json({ error: "Invalid artwork URL" }, 400);
+  }
 
   try {
     let result;
@@ -186,6 +194,12 @@ musicItemRoutes.patch("/:id", async (c) => {
   }
   if (input.catalogueNumber !== undefined) {
     setFields.catalogueNumber = input.catalogueNumber;
+  }
+  if (input.artworkUrl !== undefined) {
+    if (input.artworkUrl !== null && !isValidArtworkUrl(input.artworkUrl)) {
+      return c.json({ error: "Invalid artwork URL" }, 400);
+    }
+    setFields.artworkUrl = input.artworkUrl;
   }
 
   // Handle artist name changes

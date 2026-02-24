@@ -21,6 +21,7 @@ app.route("/api/music-items", musicItemRoutes);
 app.route("/api/stacks", stackRoutes);
 app.route("/api/ingest", ingestRoutes);
 app.route("/api/release", releaseRoutes);
+app.use("/uploads/*", serveStatic({ root: "./" }));
 
 // ---------- Test-only routes ----------
 if (process.env.NODE_ENV === "test") {
@@ -44,7 +45,7 @@ if (isDev) {
   // avoiding the "Port undefined" error that occurs when Vite tries to derive the port itself.
   let viteHandle: ((req: unknown, res: unknown) => void) | null = null;
   const server = createHttpServer((req, res) => {
-    if (req.url?.startsWith("/api/")) {
+    if (req.url?.startsWith("/api/") || req.url?.startsWith("/uploads/")) {
       honoListener(req, res);
       return;
     }

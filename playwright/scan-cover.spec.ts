@@ -8,6 +8,16 @@ test.beforeEach(async ({ page, request }) => {
 });
 
 test("scan prefill opens details and fills artist/title", async ({ page }) => {
+  await page.route("**/api/release/image", async (route) => {
+    await route.fulfill({
+      status: 201,
+      contentType: "application/json",
+      body: JSON.stringify({
+        artworkUrl: "/uploads/mock-cover.jpg",
+      }),
+    });
+  });
+
   await page.route("**/api/release/scan", async (route) => {
     await route.fulfill({
       status: 200,
@@ -27,4 +37,12 @@ test("scan prefill opens details and fills artist/title", async ({ page }) => {
   await expect(page.locator(".add-form__details")).toHaveAttribute("open", "");
   await expect(page.locator('input[name="artist"]')).toHaveValue("Boards of Canada");
   await expect(page.locator('input[name="title"]')).toHaveValue("Music Has the Right to Children");
+  await expect(page.locator('input[name="artworkUrl"]')).toHaveValue("/uploads/mock-cover.jpg");
+
+  await page.getByRole("button", { name: "Add" }).click();
+  await expect(page.locator(".music-card").first()).toBeVisible({ timeout: 10_000 });
+  await expect(page.locator(".music-card__artwork").first()).toHaveAttribute(
+    "src",
+    "/uploads/mock-cover.jpg",
+  );
 });

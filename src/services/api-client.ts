@@ -8,6 +8,7 @@ import type {
   Stack,
   StackWithCount,
   ScanResult,
+  UploadImageResult,
 } from "../types";
 
 export class ApiClient {
@@ -164,6 +165,16 @@ export class ApiClient {
       body: JSON.stringify({ imageBase64 }),
     });
     if (!res.ok) throw new Error(`scanCover failed: ${res.status}`);
+    return res.json();
+  }
+
+  async uploadReleaseImage(imageBase64: string): Promise<UploadImageResult> {
+    const res = await fetch(`${this.baseUrl}/api/release/image`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ imageBase64 }),
+    });
+    if (!res.ok) throw new Error(`uploadReleaseImage failed: ${res.status}`);
     return res.json();
   }
 }
