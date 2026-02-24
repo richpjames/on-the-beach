@@ -4,6 +4,7 @@ import { resolve, dirname } from "node:path";
 import { parseScanJson } from "../server/scan-parser";
 import { OCR_TEXT_PARSER_MODELS, getVisionModelConfigById } from "./models";
 import { parseBatchOutput, parseOcrTextBatchOutput } from "./output-parser";
+import { buildRawOcrReport } from "./raw-ocr-report";
 import { scoreResult } from "./scoring";
 import { generateHtml } from "./html-report";
 import type {
@@ -211,17 +212,19 @@ async function main() {
 
     if (outputByCaseId.size === 0 && !allSucceeded) continue;
 
-    if (kind === "ocr" && ocrTextByCaseId.size > 0) {
+    if (kind === "ocr") {
       ocrTextByModel.set(model, ocrTextByCaseId);
     }
 
     const details: ModelResult[] = manifest.cases.map((testCase) => {
       const actual = outputByCaseId.get(testCase.id) ?? { artist: null, title: null };
       const scores = scoreResult(actual, { artist: testCase.artist, title: testCase.title });
+      const ocrText = kind === "ocr" ? (ocrTextByCaseId.get(testCase.id) ?? null) : undefined;
       return {
         id: testCase.id,
         expected: { artist: testCase.artist, title: testCase.title },
         actual,
+        ...(kind === "ocr" ? { ocrText } : {}),
         scores,
       };
     });
@@ -262,6 +265,15 @@ async function main() {
   const reportPath = resolve(RESULTS_DIR, filename + ".json");
   writeFileSync(reportPath, JSON.stringify(report, null, 2));
   console.log(`Detailed report saved to: ${reportPath}`);
+
+  const rawOcrReport = buildRawOcrReport({
+    timestamp: report.timestamp,
+    cases: manifest.cases,
+    ocrTextByModel,
+  });
+  const rawOcrPath = resolve(RESULTS_DIR, filename + ".raw-ocr.json");
+  writeFileSync(rawOcrPath, JSON.stringify(rawOcrReport, null, 2));
+  console.log(`Raw OCR output saved to: ${rawOcrPath}`);
 
   const htmlPath = resolve(RESULTS_DIR, filename + ".html");
   writeFileSync(htmlPath, generateHtml(report));
