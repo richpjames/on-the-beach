@@ -250,6 +250,10 @@ body {
   grid-column: span 2;
 }
 
+.add-form__extra input[name="artworkUrl"] {
+  grid-column: span 2;
+}
+
 /* ═══════════════════════════════════════════════════
    INPUTS — Windows 98 sunken edit fields
 ═══════════════════════════════════════════════════ */
@@ -551,6 +555,15 @@ select.input {
 .music-card__content {
   flex: 1;
   min-width: 0;
+}
+
+.music-card__artwork {
+  width: 108px;
+  height: 108px;
+  object-fit: cover;
+  border: 1px solid #224499;
+  background: #001033;
+  flex-shrink: 0;
 }
 
 .music-card__title {

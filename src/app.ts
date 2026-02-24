@@ -53,6 +53,7 @@ export class App {
     const detailsEl = form.querySelector(".add-form__details") as HTMLDetailsElement | null;
     const titleInput = form.querySelector('input[name="title"]') as HTMLInputElement | null;
     const artistInput = form.querySelector('input[name="artist"]') as HTMLInputElement | null;
+    const artworkInput = form.querySelector('input[name="artworkUrl"]') as HTMLInputElement | null;
     const scanButton = document.getElementById("add-form-scan-btn") as HTMLButtonElement | null;
     const scanInput = document.getElementById("scan-file-input") as HTMLInputElement | null;
     this.addFormInitialized = true;
@@ -67,7 +68,14 @@ export class App {
         const file = scanInput.files?.[0];
         if (!file) return;
 
-        await this.handleCoverScan(file, scanButton, detailsEl, artistInput, titleInput);
+        await this.handleCoverScan(
+          file,
+          scanButton,
+          detailsEl,
+          artistInput,
+          titleInput,
+          artworkInput,
+        );
         scanInput.value = "";
       });
     }
@@ -108,10 +116,14 @@ export class App {
       const genre = (formData.get("genre") as string) || undefined;
       const catalogueNumber = (formData.get("catalogueNumber") as string) || undefined;
       const notes = (formData.get("notes") as string) || undefined;
+      let artworkUrl = ((formData.get("artworkUrl") as string) || "").trim() || undefined;
 
       // Auto-prepend https:// if a URL is provided but has no protocol
       if (url && !/^https?:\/\//i.test(url)) {
         url = `https://${url}`;
+      }
+      if (artworkUrl && !/^https?:\/\//i.test(artworkUrl) && !artworkUrl.startsWith("/uploads/")) {
+        artworkUrl = `https://${artworkUrl}`;
       }
 
       try {
@@ -126,6 +138,7 @@ export class App {
           genre,
           catalogueNumber,
           notes,
+          artworkUrl,
         });
         // Assign selected stacks
         if (this.addFormSelectedStacks.length > 0) {
@@ -156,16 +169,21 @@ export class App {
     detailsEl: HTMLDetailsElement | null,
     artistInput: HTMLInputElement | null,
     titleInput: HTMLInputElement | null,
+    artworkInput: HTMLInputElement | null,
   ): Promise<void> {
     this.setScanButtonState(scanButton, true);
 
     try {
       const imageBase64 = await this.encodeScanImage(file);
-      const result = await this.api.scanCover(imageBase64);
-
+      const uploadResult = await this.api.uploadReleaseImage(imageBase64);
+      if (artworkInput) {
+        artworkInput.value = uploadResult.artworkUrl;
+      }
       if (detailsEl) {
         detailsEl.open = true;
       }
+
+      const result = await this.api.scanCover(imageBase64);
       if (artistInput && result.artist) {
         artistInput.value = result.artist;
       }
@@ -173,6 +191,10 @@ export class App {
         titleInput.value = result.title;
       }
     } catch (error) {
+      if (error instanceof Error && error.message.includes("uploadReleaseImage")) {
+        alert("Couldn't save the image. Enter details manually.");
+        return;
+      }
       if (error instanceof Error && error.message.includes("503")) {
         alert("Scan unavailable. Enter details manually.");
       } else {
@@ -393,6 +415,11 @@ export class App {
 
     return `
       <article class="music-card" data-item-id="${item.id}">
+        ${
+          item.artwork_url
+            ? `<img class="music-card__artwork" src="${this.escapeHtml(item.artwork_url)}" alt="Artwork for ${this.escapeHtml(item.title)}">`
+            : ""
+        }
         <div class="music-card__content">
           <div class="music-card__title">${this.escapeHtml(item.title)}</div>
           ${item.artist_name ? `<div class="music-card__artist">${this.escapeHtml(item.artist_name)}</div>` : ""}

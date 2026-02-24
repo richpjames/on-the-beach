@@ -3,16 +3,19 @@ import { Hono } from "hono";
 import { createReleaseRoutes } from "../../server/routes/release";
 
 const mockExtractAlbumInfo = mock();
+const mockSaveImage = mock();
 
 function makeApp(): Hono {
   const app = new Hono();
-  app.route("/api/release", createReleaseRoutes(mockExtractAlbumInfo));
+  app.route("/api/release", createReleaseRoutes(mockExtractAlbumInfo, mockSaveImage));
   return app;
 }
 
 describe("POST /api/release/scan", () => {
   beforeEach(() => {
     mockExtractAlbumInfo.mockReset();
+    mockSaveImage.mockReset();
+    mockSaveImage.mockResolvedValue("/uploads/mock.jpg");
   });
 
   test("returns 400 when imageBase64 is missing", async () => {
@@ -82,5 +85,58 @@ describe("POST /api/release/scan", () => {
     expect(res.status).toBe(503);
     const body = await res.json();
     expect(body.error).toBe("Scan unavailable");
+  });
+});
+
+describe("POST /api/release/image", () => {
+  beforeEach(() => {
+    mockExtractAlbumInfo.mockReset();
+    mockSaveImage.mockReset();
+    mockSaveImage.mockResolvedValue("/uploads/mock.jpg");
+  });
+
+  test("returns 400 when imageBase64 is missing", async () => {
+    const app = makeApp();
+
+    const res = await app.request("http://localhost/api/release/image", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({}),
+    });
+
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.error).toContain("imageBase64");
+    expect(mockSaveImage).not.toHaveBeenCalled();
+  });
+
+  test("returns 201 with artwork url on success", async () => {
+    const app = makeApp();
+
+    const res = await app.request("http://localhost/api/release/image", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ imageBase64: "YWJjZA==" }),
+    });
+
+    expect(res.status).toBe(201);
+    const body = await res.json();
+    expect(body).toEqual({ artworkUrl: "/uploads/mock.jpg" });
+    expect(mockSaveImage).toHaveBeenCalledWith("YWJjZA==");
+  });
+
+  test("returns 500 when image save fails", async () => {
+    mockSaveImage.mockRejectedValueOnce(new Error("disk full"));
+    const app = makeApp();
+
+    const res = await app.request("http://localhost/api/release/image", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ imageBase64: "YWJjZA==" }),
+    });
+
+    expect(res.status).toBe(500);
+    const body = await res.json();
+    expect(body.error).toBe("Failed to save image");
   });
 });

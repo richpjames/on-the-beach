@@ -1,4 +1,6 @@
 import { Hono } from "hono";
+import { mkdir, writeFile } from "node:fs/promises";
+import path from "node:path";
 import { extractAlbumInfo } from "../vision";
 import type { ScanResult } from "../../src/types";
 
@@ -33,9 +35,52 @@ function validateImageBase64(
 }
 
 export type ExtractAlbumInfoFn = (base64Image: string) => Promise<ScanResult | null>;
+export type SaveReleaseImageFn = (base64Image: string) => Promise<string>;
 
-export function createReleaseRoutes(scanReleaseCover: ExtractAlbumInfoFn = extractAlbumInfo): Hono {
+async function saveReleaseImage(base64Image: string): Promise<string> {
+  const uploadsDir = path.resolve(process.cwd(), process.env.UPLOADS_DIR ?? "uploads");
+  await mkdir(uploadsDir, { recursive: true });
+
+  const filename = `${crypto.randomUUID()}.jpg`;
+  const filePath = path.join(uploadsDir, filename);
+  const imageBytes = Buffer.from(base64Image, "base64");
+  await writeFile(filePath, imageBytes);
+
+  return `/uploads/${filename}`;
+}
+
+export function createReleaseRoutes(
+  scanReleaseCover: ExtractAlbumInfoFn = extractAlbumInfo,
+  saveImage: SaveReleaseImageFn = saveReleaseImage,
+): Hono {
   const routes = new Hono();
+
+  routes.post("/image", async (c) => {
+    let body: unknown;
+    try {
+      body = await c.req.json();
+    } catch (err) {
+      console.error("[api] POST /api/release/image invalid JSON:", err);
+      return c.json({ error: "Invalid JSON payload" }, 400);
+    }
+
+    if (!body || typeof body !== "object") {
+      return c.json({ error: "Invalid JSON payload" }, 400);
+    }
+
+    const validation = validateImageBase64((body as ScanRequestBody).imageBase64);
+    if (!validation.ok) {
+      return c.json({ error: validation.error }, 400);
+    }
+
+    try {
+      const artworkUrl = await saveImage(validation.value);
+      return c.json({ artworkUrl }, 201);
+    } catch (err) {
+      console.error("[api] POST /api/release/image failed to save image:", err);
+      return c.json({ error: "Failed to save image" }, 500);
+    }
+  });
 
   routes.post("/scan", async (c) => {
     let body: unknown;
