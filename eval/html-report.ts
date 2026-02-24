@@ -14,7 +14,7 @@ export function generateHtml(report: EvalReport): string {
   const gridCols = `repeat(${report.models.length}, 1fr)`;
 
   // Strip ocrText before embedding — keeps HTML file size manageable.
-  // The saved JSON will also omit ocrText; run results.ts to get the full file.
+  // JSON artifacts written by results.ts retain raw OCR output.
   const reportForEmbed = {
     ...report,
     results: Object.fromEntries(
