@@ -95,8 +95,10 @@ async function main() {
 
   const jobs: PendingJobs["jobs"] = [];
 
+  const CHUNK_SIZE = 20;
+
   for (const model of VISION_MODELS) {
-    const requests = manifest.cases.map((testCase) => {
+    const allRequests = manifest.cases.map((testCase) => {
       const dataUri = imageByCaseId.get(testCase.id);
       if (!dataUri) {
         throw new Error(`Missing image data for case ${testCase.id}`);
@@ -107,24 +109,33 @@ async function main() {
       };
     });
 
-    try {
-      const job = await client.batch.jobs.create({
-        model: model.id,
-        endpoint: model.endpoint,
-        requests,
-      });
+    const chunks = [];
+    for (let i = 0; i < allRequests.length; i += CHUNK_SIZE) {
+      chunks.push(allRequests.slice(i, i + CHUNK_SIZE));
+    }
 
-      jobs.push({
-        model: model.id,
-        jobId: job.id,
-        endpoint: model.endpoint,
-        kind: model.kind,
-      });
+    for (let ci = 0; ci < chunks.length; ci++) {
+      const chunk = chunks[ci];
+      const label = chunks.length > 1 ? ` [chunk ${ci + 1}/${chunks.length}]` : "";
+      try {
+        const job = await client.batch.jobs.create({
+          model: model.id,
+          endpoint: model.endpoint,
+          requests: chunk,
+        });
 
-      console.log(`  ✓ ${model.id} (${model.endpoint}) → job ${job.id}`);
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      console.error(`  ✗ ${model.id} (${model.endpoint}) → ${msg}`);
+        jobs.push({
+          model: model.id,
+          jobId: job.id,
+          endpoint: model.endpoint,
+          kind: model.kind,
+        });
+
+        console.log(`  ✓ ${model.id} (${model.endpoint})${label} → job ${job.id}`);
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        console.error(`  ✗ ${model.id} (${model.endpoint})${label} → ${msg}`);
+      }
     }
   }
 

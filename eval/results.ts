@@ -5,6 +5,7 @@ import { parseScanJson } from "../server/scan-parser";
 import { OCR_TEXT_PARSER_MODELS, getVisionModelConfigById } from "./models";
 import { parseBatchOutput, parseOcrTextBatchOutput } from "./output-parser";
 import { scoreResult } from "./scoring";
+import { generateHtml } from "./html-report";
 import type {
   EvalManifest,
   EvalModelKind,
@@ -159,59 +160,73 @@ async function main() {
 
   const report: EvalReport = {
     timestamp: new Date().toISOString(),
-    models: pending.jobs.map((job) => job.model),
+    models: [...new Set(pending.jobs.map((job) => job.model))],
     caseCount: manifest.cases.length,
     results: {},
   };
   const ocrTextByModel = new Map<string, Map<string, string>>();
 
-  for (const pendingJob of pending.jobs) {
-    const { model, jobId } = pendingJob;
-    const kind = getKindForPendingJob(pendingJob);
+  // Group pending jobs by model to merge chunked results
+  const jobsByModel = new Map<string, PendingJobs["jobs"]>();
+  for (const job of pending.jobs) {
+    const existing = jobsByModel.get(job.model) ?? [];
+    existing.push(job);
+    jobsByModel.set(job.model, existing);
+  }
 
-    try {
-      const job = await client.batch.jobs.get({ jobId, inline: true });
+  for (const [model, modelJobs] of jobsByModel.entries()) {
+    const kind = getKindForPendingJob(modelJobs[0]);
+    const outputByCaseId = new Map<string, { artist: string | null; title: string | null }>();
+    const ocrTextByCaseId = new Map<string, string>();
+    let allSucceeded = true;
 
-      if (job.status !== "SUCCESS") {
-        console.error(`Skipping ${model}: status=${job.status}`);
-        continue;
-      }
+    for (const pendingJob of modelJobs) {
+      try {
+        const job = await client.batch.jobs.get({ jobId: pendingJob.jobId, inline: true });
 
-      const outputByCaseId = new Map<string, { artist: string | null; title: string | null }>();
-      const ocrTextByCaseId = new Map<string, string>();
-      for (const output of job.outputs ?? []) {
-        const parsed = parseBatchOutput(output, kind);
-        if (!parsed.customId) continue;
-        outputByCaseId.set(parsed.customId, parsed.actual ?? { artist: null, title: null });
+        if (job.status !== "SUCCESS") {
+          console.error(`Skipping ${model} job ${pendingJob.jobId}: status=${job.status}`);
+          allSucceeded = false;
+          continue;
+        }
 
-        if (kind === "ocr") {
-          const parsedOcrText = parseOcrTextBatchOutput(output);
-          if (parsedOcrText.customId && parsedOcrText.text) {
-            ocrTextByCaseId.set(parsedOcrText.customId, parsedOcrText.text);
+        for (const output of job.outputs ?? []) {
+          const parsed = parseBatchOutput(output, kind);
+          if (!parsed.customId) continue;
+          outputByCaseId.set(parsed.customId, parsed.actual ?? { artist: null, title: null });
+
+          if (kind === "ocr") {
+            const parsedOcrText = parseOcrTextBatchOutput(output);
+            if (parsedOcrText.customId && parsedOcrText.text) {
+              ocrTextByCaseId.set(parsedOcrText.customId, parsedOcrText.text);
+            }
           }
         }
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        console.error(`Error fetching results for ${model} job ${pendingJob.jobId}: ${msg}`);
+        allSucceeded = false;
       }
-
-      if (kind === "ocr" && ocrTextByCaseId.size > 0) {
-        ocrTextByModel.set(model, ocrTextByCaseId);
-      }
-
-      const details: ModelResult[] = manifest.cases.map((testCase) => {
-        const actual = outputByCaseId.get(testCase.id) ?? { artist: null, title: null };
-        const scores = scoreResult(actual, { artist: testCase.artist, title: testCase.title });
-        return {
-          id: testCase.id,
-          expected: { artist: testCase.artist, title: testCase.title },
-          actual,
-          scores,
-        };
-      });
-
-      report.results[model] = { summary: summarize(details), details };
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      console.error(`Error fetching results for ${model}: ${msg}`);
     }
+
+    if (outputByCaseId.size === 0 && !allSucceeded) continue;
+
+    if (kind === "ocr" && ocrTextByCaseId.size > 0) {
+      ocrTextByModel.set(model, ocrTextByCaseId);
+    }
+
+    const details: ModelResult[] = manifest.cases.map((testCase) => {
+      const actual = outputByCaseId.get(testCase.id) ?? { artist: null, title: null };
+      const scores = scoreResult(actual, { artist: testCase.artist, title: testCase.title });
+      return {
+        id: testCase.id,
+        expected: { artist: testCase.artist, title: testCase.title },
+        actual,
+        scores,
+      };
+    });
+
+    report.results[model] = { summary: summarize(details), details };
   }
 
   for (const [ocrModel, ocrTextByCaseId] of ocrTextByModel.entries()) {
@@ -243,10 +258,14 @@ async function main() {
   printTable(report);
 
   if (!existsSync(RESULTS_DIR)) mkdirSync(RESULTS_DIR, { recursive: true });
-  const filename = report.timestamp.replace(/[:.]/g, "-") + ".json";
-  const reportPath = resolve(RESULTS_DIR, filename);
+  const filename = report.timestamp.replace(/[:.]/g, "-");
+  const reportPath = resolve(RESULTS_DIR, filename + ".json");
   writeFileSync(reportPath, JSON.stringify(report, null, 2));
   console.log(`Detailed report saved to: ${reportPath}`);
+
+  const htmlPath = resolve(RESULTS_DIR, filename + ".html");
+  writeFileSync(htmlPath, generateHtml(report));
+  console.log(`HTML report saved to: ${htmlPath}`);
 }
 
 main();
