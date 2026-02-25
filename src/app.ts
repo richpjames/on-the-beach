@@ -17,7 +17,7 @@ const STATUS_LABELS: Record<ListenStatus, string> = {
 
 export class App {
   private api: ApiClient;
-  private currentFilter: ListenStatus | "all" = "all";
+  private currentFilter: ListenStatus | "all" = "to-listen";
   private currentStack: number | null = null;
   private stacks: StackWithCount[] = [];
   private isReady = false;
