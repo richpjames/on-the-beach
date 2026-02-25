@@ -24,6 +24,7 @@ export class App {
   private addFormInitialized = false;
   private addFormSelectedStacks: number[] = [];
   private scanInProgress = false;
+  private ratingClearCandidate: { id: number; value: number } | null = null;
 
   constructor() {
     this.api = new ApiClient();
@@ -386,6 +387,57 @@ export class App {
           await this.renderMusicList();
         }
       }
+
+      // Rating radio
+      if (
+        (target as unknown as HTMLInputElement).type === "radio" &&
+        target.name?.startsWith("rating-")
+      ) {
+        const card = target.closest("[data-item-id]") as HTMLElement;
+        const id = Number(card?.dataset.itemId);
+        const rating = Number(target.value);
+        if (id) {
+          await this.api.updateMusicItem(id, { rating });
+          await this.renderMusicList();
+        }
+      }
+    });
+
+    list.addEventListener("mousedown", (e) => {
+      const input = (e.target as HTMLElement).closest(
+        'input[type="radio"]',
+      ) as HTMLInputElement | null;
+      if (!input || !input.name.startsWith("rating-")) return;
+
+      if (input.checked) {
+        const card = input.closest("[data-item-id]") as HTMLElement;
+        this.ratingClearCandidate = {
+          id: Number(card?.dataset.itemId),
+          value: Number(input.value),
+        };
+      } else {
+        this.ratingClearCandidate = null;
+      }
+    });
+
+    list.addEventListener("click", async (e) => {
+      const input = e.target as HTMLInputElement;
+      if (input.type !== "radio" || !input.name?.startsWith("rating-")) return;
+
+      if (this.ratingClearCandidate) {
+        const card = input.closest("[data-item-id]") as HTMLElement;
+        const id = Number(card?.dataset.itemId);
+        if (
+          id === this.ratingClearCandidate.id &&
+          Number(input.value) === this.ratingClearCandidate.value
+        ) {
+          this.ratingClearCandidate = null;
+          await this.api.updateMusicItem(id, { rating: null });
+          await this.renderMusicList();
+          return;
+        }
+      }
+      this.ratingClearCandidate = null;
     });
   }
 
@@ -417,6 +469,21 @@ export class App {
 
     container.innerHTML = result.items.map((item) => this.renderMusicCard(item)).join("");
   }
+  private renderStarRating(itemId: number, rating: number | null): string {
+    const stars = [5, 4, 3, 2, 1]
+      .map(
+        (n) => `
+          <input type="radio" id="star-${itemId}-${n}" name="rating-${itemId}" value="${n}" ${rating === n ? "checked" : ""}>
+          <label for="star-${itemId}-${n}" title="${n} star${n > 1 ? "s" : ""}">&#9733;</label>`,
+      )
+      .join("");
+    return `
+      <fieldset class="star-rating">
+        <legend class="visually-hidden">Rating</legend>
+        ${stars}
+      </fieldset>`;
+  }
+
   private renderMusicCard(item: MusicItemFull): string {
     const statusOptions = Object.entries(STATUS_LABELS)
       .map(
@@ -442,6 +509,7 @@ export class App {
           }
           <div class="music-card__meta">
             <select class="status-select">${statusOptions}</select>
+            ${["listened", "to-revisit"].includes(item.listen_status) ? this.renderStarRating(item.id, item.rating) : ""}
             ${
               item.primary_source
                 ? item.primary_url
