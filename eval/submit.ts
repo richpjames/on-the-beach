@@ -96,7 +96,7 @@ async function main() {
 
   const jobs: PendingJobs["jobs"] = [];
 
-  const CHUNK_SIZE = 20;
+  const CHUNK_SIZE = 3;
 
   for (const model of VISION_MODELS) {
     const allRequests = manifest.cases.map((testCase) => {
