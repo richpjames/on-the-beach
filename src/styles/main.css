@@ -326,6 +326,12 @@ select.input {
   background: var(--chrome-light);
 }
 
+.btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
 .btn--ghost {
   background: transparent;
   border-color: transparent;

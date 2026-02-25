@@ -56,7 +56,18 @@ export class App {
     const artworkInput = form.querySelector('input[name="artworkUrl"]') as HTMLInputElement | null;
     const scanButton = document.getElementById("add-form-scan-btn") as HTMLButtonElement | null;
     const scanInput = document.getElementById("scan-file-input") as HTMLInputElement | null;
+    const submitButton = document.getElementById("add-form-submit") as HTMLButtonElement;
     this.addFormInitialized = true;
+
+    const updateSubmitState = (): void => {
+      const fieldsToCheck = form.querySelectorAll<HTMLInputElement | HTMLTextAreaElement>(
+        'input[name="url"], input[name="title"], input[name="artist"], input[name="label"], input[name="year"], input[name="country"], input[name="genre"], input[name="catalogueNumber"], textarea[name="notes"]',
+      );
+      const hasData = Array.from(fieldsToCheck).some((el) => el.value.trim() !== "");
+      submitButton.disabled = !hasData;
+    };
+
+    form.addEventListener("input", updateSubmitState);
 
     if (scanButton && scanInput) {
       scanButton.addEventListener("click", () => {
@@ -148,6 +159,7 @@ export class App {
           await this.renderStackBar();
         }
         form.reset();
+        submitButton.disabled = true;
         await this.renderMusicList();
       } catch (error) {
         console.error("Failed to add item:", error);
