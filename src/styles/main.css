@@ -328,6 +328,60 @@ select.input {
   pointer-events: none;
 }
 
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.star-rating {
+  display: flex;
+  flex-direction: row-reverse;
+  border: none;
+  padding: 0;
+  margin: 0;
+  gap: 1px;
+}
+
+.star-rating input[type="radio"] {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+}
+
+.star-rating label {
+  cursor: pointer;
+  color: var(--chrome-darker);
+  font-size: 14px;
+  line-height: 1;
+  padding: 0 1px;
+}
+
+/* Fill on hover: the hovered star and all stars to its right (lower DOM index = higher value = visually left) */
+.star-rating label:hover,
+.star-rating label:hover ~ label {
+  color: #c8a000;
+}
+
+/* When hovering, reset the currently checked fill to avoid double-highlight */
+.star-rating:hover input[type="radio"]:checked ~ label {
+  color: var(--chrome-darker);
+}
+
+/* Fill checked star and all stars with lower value (higher DOM index) */
+.star-rating input[type="radio"]:checked ~ label {
+  color: #c8a000;
+}
+
+
 .btn--ghost {
   background: transparent;
   border-color: transparent;

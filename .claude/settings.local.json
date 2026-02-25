@@ -43,7 +43,9 @@
       "Bash(grep bun-types:*)",
       "Bash(bun add:*)",
       "Bash(source:*)",
-      "Bash(bun:*)"
+      "Bash(bun:*)",
+      "Bash(bunx playwright:*)",
+      "Skill(commit-commands:commit)"
     ]
   }
 }
