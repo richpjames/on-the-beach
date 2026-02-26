@@ -6,7 +6,7 @@ import {
   hasAnyNonEmptyField,
 } from "./ui/domain/add-form";
 import type { AddFormValues } from "./ui/domain/add-form";
-import { buildMusicItemFilters } from "./ui/domain/music-list";
+import { buildMusicItemFilters, buildContextKey } from "./ui/domain/music-list";
 import { constrainDimensions } from "./ui/domain/scan";
 import { initialAddFormState, transitionAddFormState } from "./ui/state/add-form-machine";
 import { initialAppState, transitionAppState } from "./ui/state/app-machine";
@@ -28,6 +28,7 @@ export class App {
   private appState = initialAppState;
   private addFormState = initialAddFormState;
   private ratingState = initialRatingState;
+  private dragState: { sourceCard: HTMLElement | null } = { sourceCard: null };
 
   constructor() {
     this.api = new ApiClient();
@@ -472,6 +473,65 @@ export class App {
         await this.api.updateMusicItem(itemId, { rating: null });
         await this.renderMusicList();
       }
+    });
+
+    list.addEventListener("dragstart", (event) => {
+      const card = (event.target as HTMLElement).closest(".music-card") as HTMLElement | null;
+      if (!card) return;
+      this.dragState.sourceCard = card;
+      card.classList.add("is-dragging");
+      event.dataTransfer?.setData("text/plain", card.dataset.itemId ?? "");
+    });
+
+    list.addEventListener("dragend", () => {
+      this.dragState.sourceCard?.classList.remove("is-dragging");
+      this.dragState.sourceCard = null;
+      list.querySelectorAll(".drop-target-above, .drop-target-below").forEach((el) => {
+        el.classList.remove("drop-target-above", "drop-target-below");
+      });
+    });
+
+    list.addEventListener("dragover", (event) => {
+      event.preventDefault();
+      const target = (event.target as HTMLElement).closest(".music-card") as HTMLElement | null;
+      if (!target || target === this.dragState.sourceCard) return;
+
+      list.querySelectorAll(".drop-target-above, .drop-target-below").forEach((el) => {
+        el.classList.remove("drop-target-above", "drop-target-below");
+      });
+
+      const rect = target.getBoundingClientRect();
+      const midpoint = rect.top + rect.height / 2;
+      if (event.clientY < midpoint) {
+        target.classList.add("drop-target-above");
+      } else {
+        target.classList.add("drop-target-below");
+      }
+    });
+
+    list.addEventListener("drop", async (event) => {
+      event.preventDefault();
+      const source = this.dragState.sourceCard;
+      if (!source) return;
+
+      const target = (event.target as HTMLElement).closest(".music-card") as HTMLElement | null;
+      if (!target || target === source) return;
+
+      const rect = target.getBoundingClientRect();
+      const insertBefore = event.clientY < rect.top + rect.height / 2;
+
+      if (insertBefore) {
+        list.insertBefore(source, target);
+      } else {
+        target.after(source);
+      }
+
+      const contextKey = buildContextKey(this.appState.currentFilter, this.appState.currentStack);
+      const itemIds = Array.from(list.querySelectorAll<HTMLElement>("[data-item-id]"))
+        .map((el) => Number(el.dataset.itemId))
+        .filter((id) => !Number.isNaN(id) && id > 0);
+
+      await this.api.saveOrder(contextKey, itemIds);
     });
   }
 
