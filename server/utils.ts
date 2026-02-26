@@ -10,6 +10,7 @@ interface ParsedUrl {
 const URL_PATTERNS: Array<{
   source: SourceName;
   pattern: RegExp;
+  normalizer?: (match: RegExpMatchArray) => string;
   extractor?: (match: RegExpMatchArray) => { potentialArtist?: string; potentialTitle?: string };
 }> = [
   {
@@ -35,6 +36,7 @@ const URL_PATTERNS: Array<{
   {
     source: "youtube",
     pattern: /^https?:\/\/(?:www\.)?(youtube\.com\/watch\?v=|youtu\.be\/)([a-zA-Z0-9_-]+)/,
+    normalizer: (match) => `https://www.youtube.com/watch?v=${match[2]}`,
   },
   {
     source: "apple_music",
@@ -72,12 +74,12 @@ const URL_PATTERNS: Array<{
 export function parseUrl(url: string): ParsedUrl {
   const trimmedUrl = url.trim();
 
-  for (const { source, pattern, extractor } of URL_PATTERNS) {
+  for (const { source, pattern, normalizer, extractor } of URL_PATTERNS) {
     const match = trimmedUrl.match(pattern);
     if (match) {
       return {
         source,
-        normalizedUrl: trimmedUrl.split("?")[0],
+        normalizedUrl: normalizer ? normalizer(match) : trimmedUrl.split("?")[0],
         ...(extractor?.(match) || {}),
       };
     }

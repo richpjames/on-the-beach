@@ -296,6 +296,39 @@ async function scrapeMixcloudOEmbed(
   }
 }
 
+async function scrapeYouTubeOEmbed(
+  url: string,
+  timeoutMs: number,
+): Promise<ScrapedMetadata | null> {
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    const oembedUrl = `https://www.youtube.com/oembed?format=json&url=${encodeURIComponent(url)}`;
+
+    const response = await fetch(oembedUrl, {
+      signal: controller.signal,
+      headers: { Accept: "application/json" },
+    });
+
+    clearTimeout(timer);
+
+    if (!response.ok) return null;
+
+    const data = (await response.json()) as unknown;
+    if (!isRecord(data)) return null;
+
+    const potentialTitle = getString(data.title);
+    const potentialArtist = getString(data.author_name);
+    const imageUrl = getString(data.thumbnail_url);
+
+    if (!potentialTitle && !potentialArtist && !imageUrl) return null;
+
+    return { potentialTitle, potentialArtist, imageUrl };
+  } catch {
+    return null;
+  }
+}
+
 export function parseDefaultOg(og: OgData): ScrapedMetadata {
   return {
     potentialTitle: og.ogTitle || og.title || undefined,
@@ -316,6 +349,10 @@ export async function scrapeUrl(
   timeoutMs = 5000,
 ): Promise<ScrapedMetadata | null> {
   try {
+    if (source === "youtube") {
+      return await scrapeYouTubeOEmbed(url, timeoutMs);
+    }
+
     if (source === "mixcloud") {
       const oembed = await scrapeMixcloudOEmbed(url, timeoutMs);
       if (oembed?.potentialArtist || oembed?.potentialTitle) {
