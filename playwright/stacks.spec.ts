@@ -4,13 +4,13 @@ test.describe("Stacks", () => {
   test.beforeEach(async ({ page, request }) => {
     await request.post("/api/__test__/reset");
     await page.goto("/");
-    await expect(page.getByPlaceholder("Paste a music link (optional)...")).toBeVisible();
+    await expect(page.getByPlaceholder("Paste a music link...")).toBeVisible();
   });
 
   test("can create a stack and assign a link to it", async ({ page }) => {
     // Add a link
     await page
-      .getByPlaceholder("Paste a music link (optional)...")
+      .getByPlaceholder("Paste a music link...")
       .fill("https://seekersinternational.bandcamp.com/album/test-stacks");
     await page.getByRole("button", { name: "Add" }).click();
     await expect(page.locator(".music-card").first()).toBeVisible({ timeout: 10_000 });
@@ -39,7 +39,7 @@ test.describe("Stacks", () => {
   test("shows stack chips on card after assignment", async ({ page }) => {
     // Add a link
     await page
-      .getByPlaceholder("Paste a music link (optional)...")
+      .getByPlaceholder("Paste a music link...")
       .fill("https://seekersinternational.bandcamp.com/album/chip-test");
     await page.getByRole("button", { name: "Add" }).click();
     await expect(page.locator(".music-card").first()).toBeVisible({ timeout: 10_000 });
@@ -65,7 +65,7 @@ test.describe("Stacks", () => {
   test("can rename and delete a stack from the management panel", async ({ page }) => {
     // Add a link and create a stack first
     await page
-      .getByPlaceholder("Paste a music link (optional)...")
+      .getByPlaceholder("Paste a music link...")
       .fill("https://seekersinternational.bandcamp.com/album/manage-test");
     await page.getByRole("button", { name: "Add" }).click();
     await expect(page.locator(".music-card").first()).toBeVisible({ timeout: 10_000 });

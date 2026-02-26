@@ -4,7 +4,7 @@ import { expect, test } from "@playwright/test";
 test.beforeEach(async ({ page, request }) => {
   await request.post("/api/__test__/reset");
   await page.goto("/");
-  await expect(page.getByPlaceholder("Paste a music link (optional)...")).toBeVisible();
+  await expect(page.getByPlaceholder("Paste a music link...")).toBeVisible();
 });
 
 test("scan prefill opens details and fills artist/title", async ({ page }) => {
