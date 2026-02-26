@@ -704,6 +704,31 @@ select.input {
   align-items: center;
 }
 
+.music-card__drag-handle {
+  cursor: grab;
+  opacity: 0.4;
+}
+
+.music-card__drag-handle:active {
+  cursor: grabbing;
+}
+
+.music-card:hover .music-card__drag-handle {
+  opacity: 1;
+}
+
+.music-card.is-dragging {
+  opacity: 0.35;
+}
+
+.music-card.drop-target-above {
+  border-top: 2px solid var(--win-blue);
+}
+
+.music-card.drop-target-below {
+  border-bottom: 2px solid var(--win-blue);
+}
+
 /* ═══════════════════════════════════════════════════
    BADGES — LED status indicators
 ═══════════════════════════════════════════════════ */
