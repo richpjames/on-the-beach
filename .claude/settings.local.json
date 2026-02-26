@@ -47,7 +47,12 @@
       "Bash(bunx playwright:*)",
       "Skill(commit-commands:commit)",
       "Bash(python3:*)",
-      "Bash(sed:*)"
+      "Bash(sed:*)",
+      "mcp__plugin_playwright_playwright__browser_wait_for",
+      "mcp__plugin_playwright_playwright__browser_tabs",
+      "mcp__plugin_playwright_playwright__browser_resize",
+      "mcp__plugin_playwright_playwright__browser_take_screenshot",
+      "Bash(npx devcontainer:*)"
     ]
   }
 }
