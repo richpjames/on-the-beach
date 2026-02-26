@@ -400,11 +400,16 @@ export class App {
       }
     });
 
+    const resolveRatingInput = (target: HTMLElement): HTMLInputElement | null => {
+      if (target instanceof HTMLLabelElement && target.htmlFor) {
+        return document.getElementById(target.htmlFor) as HTMLInputElement | null;
+      }
+      return target.closest('input[type="radio"]') as HTMLInputElement | null;
+    };
+
     list.addEventListener("mousedown", (e) => {
-      const input = (e.target as HTMLElement).closest(
-        'input[type="radio"]',
-      ) as HTMLInputElement | null;
-      if (!input || !input.name.startsWith("rating-")) return;
+      const input = resolveRatingInput(e.target as HTMLElement);
+      if (!input || input.type !== "radio" || !input.name.startsWith("rating-")) return;
 
       if (input.checked) {
         const card = input.closest("[data-item-id]") as HTMLElement | null;
@@ -420,8 +425,8 @@ export class App {
     });
 
     list.addEventListener("click", async (e) => {
-      const input = e.target as HTMLInputElement;
-      if (input.type !== "radio" || !input.name?.startsWith("rating-")) return;
+      const input = resolveRatingInput(e.target as HTMLElement);
+      if (!input || input.type !== "radio" || !input.name.startsWith("rating-")) return;
 
       if (this.ratingClearCandidate) {
         const card = input.closest("[data-item-id]") as HTMLElement | null;
