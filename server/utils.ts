@@ -35,7 +35,7 @@ const URL_PATTERNS: Array<{
   },
   {
     source: "youtube",
-    pattern: /^https?:\/\/(?:www\.)?(youtube\.com\/watch\?v=|youtu\.be\/)([a-zA-Z0-9_-]+)/,
+    pattern: /^https?:\/\/(?:(?:www|m)\.)?(youtube\.com\/watch\?v=|youtu\.be\/)([a-zA-Z0-9_-]+)/,
     normalizer: (match) => `https://www.youtube.com/watch?v=${match[2]}`,
   },
   {

@@ -15,6 +15,13 @@ describe("parseUrl - youtube", () => {
     expect(result.source).toBe("youtube");
     expect(result.normalizedUrl).toBe("https://www.youtube.com/watch?v=C9CkvAQkQLs");
   });
+
+  test("normalizes mobile m.youtube.com links to full watch URL", () => {
+    const result = parseUrl("https://m.youtube.com/watch?v=C9CkvAQkQLs");
+
+    expect(result.source).toBe("youtube");
+    expect(result.normalizedUrl).toBe("https://www.youtube.com/watch?v=C9CkvAQkQLs");
+  });
 });
 
 describe("parseUrl - apple music", () => {
