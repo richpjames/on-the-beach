@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { eq, and, inArray, sql } from "drizzle-orm";
 import { db } from "../db/index";
-import { musicItems, artists, musicItemStacks, stacks } from "../db/schema";
+import { musicItems, artists, musicItemStacks, stacks, musicItemOrder } from "../db/schema";
 import { isValidUrl, normalize } from "../utils";
 import {
   fullItemSelect,
@@ -20,6 +20,15 @@ import type {
 
 export const musicItemRoutes = new Hono();
 const LOCAL_UPLOADS_PATTERN = /^\/uploads\/[A-Za-z0-9._-]+$/;
+
+function buildContextKey(listenStatus: string | undefined, stackId: string | undefined): string {
+  const filter = listenStatus || "all";
+  const stack = stackId ? Number(stackId) : null;
+  if (filter === "all" && stack === null) return "all";
+  if (filter === "all") return `stack:${stack}`;
+  if (stack === null) return `filter:${filter}`;
+  return `filter:${filter}:stack:${stack}`;
+}
 
 function isValidArtworkUrl(value: string): boolean {
   return isValidUrl(value) || LOCAL_UPLOADS_PATTERN.test(value);
@@ -90,7 +99,26 @@ musicItemRoutes.get("/", async (c) => {
 
   const enriched = hydrateItemStacks(items, stackRows);
 
-  return c.json({ items: enriched, total: enriched.length });
+  // Apply custom sort order if one exists for this context
+  const contextKey = buildContextKey(listenStatus, stackId);
+  const orderRow = await db
+    .select()
+    .from(musicItemOrder)
+    .where(eq(musicItemOrder.contextKey, contextKey))
+    .get();
+
+  let finalItems: typeof enriched = enriched;
+  if (orderRow) {
+    const orderedIds = JSON.parse(orderRow.itemIds) as number[];
+    const indexMap = new Map(orderedIds.map((id, i) => [id, i]));
+    finalItems = [...enriched].sort((a, b) => {
+      const ai = indexMap.get(a.id) ?? Infinity;
+      const bi = indexMap.get(b.id) ?? Infinity;
+      return ai - bi;
+    });
+  }
+
+  return c.json({ items: finalItems, total: finalItems.length });
 });
 
 // ---------------------------------------------------------------------------
@@ -117,6 +145,31 @@ musicItemRoutes.post("/", async (c) => {
     console.error("[api] POST /api/music-items error:", err);
     return c.json({ error: "Failed to create music item" }, 500);
   }
+});
+
+// ---------------------------------------------------------------------------
+// PUT /order — save custom sort order for a context
+// ---------------------------------------------------------------------------
+
+musicItemRoutes.put("/order", async (c) => {
+  const body = (await c.req.json()) as { contextKey?: string; itemIds?: number[] };
+
+  if (!body.contextKey || !Array.isArray(body.itemIds)) {
+    return c.json({ error: "contextKey and itemIds are required" }, 400);
+  }
+
+  await db
+    .insert(musicItemOrder)
+    .values({
+      contextKey: body.contextKey,
+      itemIds: JSON.stringify(body.itemIds),
+    })
+    .onConflictDoUpdate({
+      target: musicItemOrder.contextKey,
+      set: { itemIds: JSON.stringify(body.itemIds) },
+    });
+
+  return c.json({ success: true });
 });
 
 // ---------------------------------------------------------------------------
