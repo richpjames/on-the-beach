@@ -89,6 +89,11 @@ export const stacks = sqliteTable("stacks", {
     .$defaultFn(() => new Date()),
 });
 
+export const musicItemOrder = sqliteTable("music_item_order", {
+  contextKey: text("context_key").primaryKey(),
+  itemIds: text("item_ids").notNull(), // JSON array of item IDs
+});
+
 export const musicItemStacks = sqliteTable(
   "music_item_stacks",
   {
