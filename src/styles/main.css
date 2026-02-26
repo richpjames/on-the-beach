@@ -626,6 +626,21 @@ select.input {
   flex-shrink: 0;
 }
 
+.music-card__artwork--placeholder {
+  border-color: transparent;
+  background: transparent;
+}
+
+.music-card__artwork--link {
+  cursor: pointer;
+}
+
+@media (max-width: 520px) {
+  .music-card__artwork--placeholder {
+    display: none;
+  }
+}
+
 .music-card__title {
   font-weight: normal;
   white-space: nowrap;
