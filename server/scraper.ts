@@ -6,6 +6,7 @@ export interface OgData {
   ogImage?: string;
   ogSiteName?: string;
   title?: string;
+  metaTags?: Record<string, string>;
 }
 
 export interface ScrapedMetadata {
@@ -41,6 +42,7 @@ export function parseOgTags(html: string): OgData {
   data.ogDescription = tags.get("og:description");
   data.ogImage = tags.get("og:image");
   data.ogSiteName = tags.get("og:site_name");
+  data.metaTags = Object.fromEntries(tags);
 
   // Fallback to <title> tag
   if (!data.ogTitle) {
@@ -99,12 +101,199 @@ export function parseAppleMusicOg(og: OgData): ScrapedMetadata {
   }
   // og:description on Apple Music often contains "Album · YEAR · N Songs" or artist info
   if (og.ogDescription) {
-    const artistMatch = og.ogDescription.match(/^(.+?)\s+[·\-]\s+/i);
+    const artistMatch = og.ogDescription.match(/^(.+?)\s+[·-]\s+/i);
     if (artistMatch) {
       result.potentialArtist = artistMatch[1].trim();
     }
   }
   return result;
+}
+
+function firstDefined(...values: Array<string | undefined>): string | undefined {
+  for (const value of values) {
+    const trimmed = value?.trim();
+    if (trimmed) return trimmed;
+  }
+  return undefined;
+}
+
+function normalizeMixcloudTitle(rawTitle: string): string {
+  return rawTitle
+    .replace(/\s+(?:on|at)\s+mixcloud(?:\s*\|.*)?$/i, "")
+    .replace(/\s+[|-]\s*mixcloud.*$/i, "")
+    .trim();
+}
+
+export function parseMixcloudOg(og: OgData): ScrapedMetadata {
+  const meta = og.metaTags ?? {};
+  const artistFromMeta = firstDefined(
+    meta["twitter:audio:artist_name"],
+    meta["music:musician_name"],
+    meta.author,
+    meta["twitter:creator"],
+  );
+  const rawTitle = firstDefined(meta["twitter:title"], og.ogTitle, og.title) ?? "";
+  const byMatch = rawTitle.match(
+    /^(?:stream\s+)?(.+?)\s+by\s+(.+?)(?:\s+(?:on|at)\s+mixcloud)?(?:\s*[|-].*)?$/i,
+  );
+
+  if (byMatch) {
+    const potentialTitle = normalizeMixcloudTitle(byMatch[1].trim());
+    const potentialArtist = firstDefined(artistFromMeta, byMatch[2].trim());
+    return {
+      potentialTitle: potentialTitle || undefined,
+      potentialArtist,
+      imageUrl: og.ogImage,
+    };
+  }
+
+  const potentialTitle = rawTitle ? normalizeMixcloudTitle(rawTitle) : undefined;
+  return {
+    potentialTitle,
+    potentialArtist: artistFromMeta,
+    imageUrl: og.ogImage,
+  };
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function getString(value: unknown): string | undefined {
+  if (typeof value !== "string") return undefined;
+  const trimmed = value.trim();
+  return trimmed || undefined;
+}
+
+function getTypeText(value: unknown): string {
+  if (typeof value === "string") return value;
+  if (Array.isArray(value)) {
+    return value.filter((item): item is string => typeof item === "string").join(" ");
+  }
+  return "";
+}
+
+function collectJsonLdObjects(value: unknown, out: Array<Record<string, unknown>>): void {
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      collectJsonLdObjects(item, out);
+    }
+    return;
+  }
+
+  if (!isRecord(value)) return;
+  out.push(value);
+  if ("@graph" in value) {
+    collectJsonLdObjects(value["@graph"], out);
+  }
+}
+
+function parseJsonLdScripts(html: string): Array<Record<string, unknown>> {
+  const scriptRegex = /<script[^>]*type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi;
+  const parsed: Array<Record<string, unknown>> = [];
+
+  let match: RegExpExecArray | null;
+  while ((match = scriptRegex.exec(html)) !== null) {
+    const raw = match[1]?.trim();
+    if (!raw) continue;
+
+    try {
+      const decoded = decodeHtmlEntities(raw);
+      const json = JSON.parse(decoded) as unknown;
+      collectJsonLdObjects(json, parsed);
+    } catch {
+      // Ignore invalid JSON-LD blobs.
+    }
+  }
+
+  return parsed;
+}
+
+function extractName(value: unknown): string | undefined {
+  const direct = getString(value);
+  if (direct) return direct;
+
+  if (!isRecord(value)) return undefined;
+  return getString(value.name) ?? getString(value.title);
+}
+
+function extractArtistFromJsonLd(item: Record<string, unknown>): string | undefined {
+  return firstDefined(
+    extractName(item.uploader),
+    extractName(item.author),
+    extractName(item.byArtist),
+    extractName(item.creator),
+    extractName(item.user),
+    extractName(item.owner),
+  );
+}
+
+function extractTitleFromJsonLd(item: Record<string, unknown>): string | undefined {
+  const title = getString(item.title);
+  if (title) return title;
+
+  const typeText = getTypeText(item["@type"]);
+  if (/(person|organization)$/i.test(typeText)) {
+    return undefined;
+  }
+
+  const name = getString(item.name);
+  if (!name || /^mixcloud$/i.test(name)) return undefined;
+  return name;
+}
+
+export function parseMixcloudJsonLd(html: string): ScrapedMetadata {
+  const entries = parseJsonLdScripts(html);
+
+  for (const entry of entries) {
+    const potentialArtist = extractArtistFromJsonLd(entry);
+    const potentialTitle = extractTitleFromJsonLd(entry);
+    if (potentialArtist || potentialTitle) {
+      return { potentialArtist, potentialTitle };
+    }
+  }
+
+  return {};
+}
+
+async function scrapeMixcloudOEmbed(
+  url: string,
+  timeoutMs: number,
+): Promise<ScrapedMetadata | null> {
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    const oembedUrl = `https://www.mixcloud.com/oembed/?format=json&url=${encodeURIComponent(url)}`;
+
+    const response = await fetch(oembedUrl, {
+      signal: controller.signal,
+      headers: {
+        Accept: "application/json",
+      },
+    });
+
+    clearTimeout(timer);
+
+    if (!response.ok) return null;
+
+    const data = (await response.json()) as unknown;
+    if (!isRecord(data)) return null;
+
+    const potentialTitle = getString(data.title) ?? getString(data.name);
+    const potentialArtist =
+      getString(data.author_name) ?? getString(data.author) ?? getString(data.uploader);
+    const imageUrl = getString(data.thumbnail_url) ?? getString(data.thumbnail);
+
+    if (!potentialTitle && !potentialArtist && !imageUrl) return null;
+
+    return {
+      potentialTitle,
+      potentialArtist,
+      imageUrl,
+    };
+  } catch {
+    return null;
+  }
 }
 
 export function parseDefaultOg(og: OgData): ScrapedMetadata {
@@ -118,6 +307,7 @@ export const SOURCE_PARSERS: Partial<Record<SourceName, OgParser>> = {
   bandcamp: parseBandcampOg,
   soundcloud: parseSoundcloudOg,
   apple_music: parseAppleMusicOg,
+  mixcloud: parseMixcloudOg,
 };
 
 export async function scrapeUrl(
@@ -126,6 +316,13 @@ export async function scrapeUrl(
   timeoutMs = 5000,
 ): Promise<ScrapedMetadata | null> {
   try {
+    if (source === "mixcloud") {
+      const oembed = await scrapeMixcloudOEmbed(url, timeoutMs);
+      if (oembed?.potentialArtist || oembed?.potentialTitle) {
+        return oembed;
+      }
+    }
+
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeoutMs);
 
@@ -161,6 +358,17 @@ export async function scrapeUrl(
     reader.cancel();
 
     const og = parseOgTags(html);
+    if (source === "mixcloud") {
+      const jsonLd = parseMixcloudJsonLd(html);
+      if (jsonLd.potentialArtist || jsonLd.potentialTitle) {
+        return {
+          potentialArtist: jsonLd.potentialArtist,
+          potentialTitle: jsonLd.potentialTitle,
+          imageUrl: og.ogImage,
+        };
+      }
+    }
+
     const parser = SOURCE_PARSERS[source] || parseDefaultOg;
     return parser(og);
   } catch {

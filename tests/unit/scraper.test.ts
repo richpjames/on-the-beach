@@ -5,6 +5,8 @@ import {
   parseBandcampOg,
   parseSoundcloudOg,
   parseAppleMusicOg,
+  parseMixcloudOg,
+  parseMixcloudJsonLd,
   parseDefaultOg,
   scrapeUrl,
 } from "../../server/scraper";
@@ -165,6 +167,53 @@ describe("parseAppleMusicOg", () => {
   });
 });
 
+describe("parseMixcloudOg", () => {
+  test('splits "Title by Artist" format and strips Mixcloud suffixes', () => {
+    const result = parseMixcloudOg({
+      ogTitle: "New Rap Music January 2026 by andrew | Mixcloud",
+      ogImage: "https://thumbnail.example/image.jpg",
+    });
+
+    expect(result.potentialTitle).toBe("New Rap Music January 2026");
+    expect(result.potentialArtist).toBe("andrew");
+    expect(result.imageUrl).toBe("https://thumbnail.example/image.jpg");
+  });
+
+  test("prefers explicit uploader metadata when available", () => {
+    const result = parseMixcloudOg({
+      ogTitle: "light sleeper radio 021 by nozwon",
+      metaTags: {
+        "twitter:audio:artist_name": "andrew",
+        "twitter:title": "new rap music january 2026",
+      },
+    });
+
+    expect(result.potentialArtist).toBe("andrew");
+    expect(result.potentialTitle).toBe("new rap music january 2026");
+  });
+});
+
+describe("parseMixcloudJsonLd", () => {
+  test("extracts title and uploader from JSON-LD scripts", () => {
+    const html = `
+      <html><head>
+        <script type="application/ld+json">
+          {
+            "@context":"https://schema.org",
+            "@type":"AudioObject",
+            "title":"new rap music january 2026",
+            "uploader":{"@type":"Person","name":"andrew"}
+          }
+        </script>
+      </head></html>
+    `;
+
+    const result = parseMixcloudJsonLd(html);
+    expect(result.potentialTitle).toBe("new rap music january 2026");
+    expect(result.potentialArtist).toBe("andrew");
+  });
+});
+
 describe("parseDefaultOg", () => {
   test("uses og:title as potentialTitle", () => {
     const result = parseDefaultOg({
@@ -251,6 +300,70 @@ describe("scrapeUrl", () => {
     );
     const result = await scrapeUrl("https://example.com", "unknown", 50);
     expect(result).toBeNull();
+    mock.restore();
+  });
+
+  test("uses Mixcloud JSON-LD metadata when present", async () => {
+    const html = `
+      <html><head>
+        <meta property="og:image" content="https://mixcloud.com/cover.jpg" />
+        <script type="application/ld+json">
+          {
+            "@context":"https://schema.org",
+            "@type":"AudioObject",
+            "title":"new rap music january 2026",
+            "uploader":{"@type":"Person","name":"andrew"}
+          }
+        </script>
+      </head><body></body></html>
+    `;
+
+    const fetchSpy = spyOn(globalThis, "fetch");
+    fetchSpy.mockResolvedValueOnce(
+      new Response("{}", {
+        status: 404,
+        headers: { "content-type": "application/json" },
+      }),
+    );
+    fetchSpy.mockResolvedValueOnce(
+      new Response(html, {
+        headers: { "content-type": "text/html; charset=utf-8" },
+      }),
+    );
+
+    const result = await scrapeUrl(
+      "https://www.mixcloud.com/nozwon/light-sleeper-radio-021/",
+      "mixcloud",
+    );
+    expect(result).not.toBeNull();
+    expect(result!.potentialTitle).toBe("new rap music january 2026");
+    expect(result!.potentialArtist).toBe("andrew");
+    expect(result!.imageUrl).toBe("https://mixcloud.com/cover.jpg");
+    mock.restore();
+  });
+
+  test("uses Mixcloud oEmbed metadata when available", async () => {
+    spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          title: "new rap music january 2026",
+          author_name: "andrew",
+          thumbnail_url: "https://mixcloud.com/oembed-cover.jpg",
+        }),
+        {
+          headers: { "content-type": "application/json; charset=utf-8" },
+        },
+      ),
+    );
+
+    const result = await scrapeUrl(
+      "https://www.mixcloud.com/nozwon/light-sleeper-radio-021/",
+      "mixcloud",
+    );
+    expect(result).not.toBeNull();
+    expect(result!.potentialTitle).toBe("new rap music january 2026");
+    expect(result!.potentialArtist).toBe("andrew");
+    expect(result!.imageUrl).toBe("https://mixcloud.com/oembed-cover.jpg");
     mock.restore();
   });
 });

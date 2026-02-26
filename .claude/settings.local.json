@@ -46,7 +46,8 @@
       "Bash(bun:*)",
       "Bash(bunx playwright:*)",
       "Skill(commit-commands:commit)",
-      "Bash(python3:*)"
+      "Bash(python3:*)",
+      "Bash(sed:*)"
     ]
   }
 }
