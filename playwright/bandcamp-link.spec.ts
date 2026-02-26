@@ -9,7 +9,7 @@ test("links with protocol https", async ({ page }) => {
     "https://seekersinternational.bandcamp.com/album/thewherebetweenyou-me-reissue";
 
   await page.goto("/");
-  await page.getByPlaceholder("Paste a music link (optional)...").fill(bandcampUrl);
+  await page.getByPlaceholder("Paste a music link...").fill(bandcampUrl);
   await page.getByRole("button", { name: "Add" }).click();
 
   const card = page
@@ -37,7 +37,7 @@ test("links without https", async ({ page }) => {
 
   await page.goto("/");
 
-  const urlInput = page.getByPlaceholder("Paste a music link (optional)...");
+  const urlInput = page.getByPlaceholder("Paste a music link...");
   await urlInput.fill(bandcampUrlNoProtocol);
   await page.getByRole("button", { name: "Add" }).click();
 

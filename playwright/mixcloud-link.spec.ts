@@ -10,7 +10,7 @@ test("mixcloud link uses uploader and title metadata instead of URL slug fallbac
   const mixcloudUrl = "https://www.mixcloud.com/nozwon/light-sleeper-radio-021/";
 
   await page.goto("/");
-  await page.getByPlaceholder("Paste a music link (optional)...").fill(mixcloudUrl);
+  await page.getByPlaceholder("Paste a music link...").fill(mixcloudUrl);
   await page.getByRole("button", { name: "Add" }).click();
 
   const card = page

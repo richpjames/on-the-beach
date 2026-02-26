@@ -6,7 +6,7 @@ test.beforeEach(async ({ request }) => {
 
 test("adding a link shows the new item", async ({ page }) => {
   await page.goto("/");
-  await expect(page.getByPlaceholder("Paste a music link (optional)...")).toBeVisible();
+  await expect(page.getByPlaceholder("Paste a music link...")).toBeVisible();
   page.on("dialog", async (dialog) => {
     await dialog.accept();
   });
@@ -14,7 +14,7 @@ test("adding a link shows the new item", async ({ page }) => {
   const bandcampUrl =
     "https://seekersinternational.bandcamp.com/album/thewherebetweenyou-me-reissue";
 
-  await page.getByPlaceholder("Paste a music link (optional)...").fill(bandcampUrl);
+  await page.getByPlaceholder("Paste a music link...").fill(bandcampUrl);
   await page.getByRole("button", { name: "Add" }).click();
 
   // Wait for the card to appear after the API round-trip
