@@ -25,7 +25,7 @@ export function renderMusicCard(item: MusicItemFull): string {
     .join("");
 
   return `
-    <article class="music-card" data-item-id="${item.id}">
+    <article class="music-card" data-item-id="${item.id}" draggable="true">
       ${
         item.artwork_url
           ? item.primary_url
@@ -59,6 +59,13 @@ export function renderMusicCard(item: MusicItemFull): string {
         </div>
       </div>
       <div class="music-card__actions">
+        <button type="button" class="btn btn--ghost music-card__drag-handle" title="Drag to reorder" data-action="drag-handle">
+          <svg width="10" height="16" viewBox="0 0 10 16" fill="currentColor">
+            <circle cx="3" cy="3" r="1.5"/><circle cx="7" cy="3" r="1.5"/>
+            <circle cx="3" cy="8" r="1.5"/><circle cx="7" cy="8" r="1.5"/>
+            <circle cx="3" cy="13" r="1.5"/><circle cx="7" cy="13" r="1.5"/>
+          </svg>
+        </button>
         ${
           item.primary_url
             ? `
