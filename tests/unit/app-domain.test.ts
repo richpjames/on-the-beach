@@ -5,7 +5,12 @@ import {
   getCoverScanErrorMessage,
   hasAnyNonEmptyField,
 } from "../../src/ui/domain/add-form";
-import { buildMusicItemFilters, getEmptyStateMessage } from "../../src/ui/domain/music-list";
+import {
+  buildMusicItemFilters,
+  getEmptyStateMessage,
+  buildContextKey,
+  applyOrder,
+} from "../../src/ui/domain/music-list";
 import { constrainDimensions } from "../../src/ui/domain/scan";
 
 describe("app domain helpers", () => {
@@ -85,5 +90,19 @@ describe("app domain helpers", () => {
   it("constrains image dimensions while preserving aspect ratio", () => {
     expect(constrainDimensions(500, 300, 1024)).toEqual({ width: 500, height: 300 });
     expect(constrainDimensions(2000, 1000, 1000)).toEqual({ width: 1000, height: 500 });
+  });
+
+  it("builds context keys for all filter/stack combinations", () => {
+    expect(buildContextKey("all", null)).toBe("all");
+    expect(buildContextKey("to-listen", null)).toBe("filter:to-listen");
+    expect(buildContextKey("all", 5)).toBe("stack:5");
+    expect(buildContextKey("listened", 3)).toBe("filter:listened:stack:3");
+  });
+
+  it("sorts items by saved order and puts unordered items last", () => {
+    const items = [{ id: 10 }, { id: 20 }, { id: 30 }];
+    expect(applyOrder(items, [30, 10, 20])).toEqual([{ id: 30 }, { id: 10 }, { id: 20 }]);
+    expect(applyOrder(items, [20])).toEqual([{ id: 20 }, { id: 10 }, { id: 30 }]);
+    expect(applyOrder(items, [])).toEqual(items);
   });
 });
