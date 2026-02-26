@@ -10,6 +10,8 @@ services:
       NODE_ENV: production
     volumes:
       - app-data:/app/data
+      - app-uploads:/app/uploads
 
 volumes:
   app-data:
+  app-uploads:
