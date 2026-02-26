@@ -70,7 +70,6 @@ describe("app domain helpers", () => {
 
   it("builds the same empty-state messages used by the UI", () => {
     expect(getEmptyStateMessage("all")).toContain("No music tracked yet");
-    expect(getEmptyStateMessage("to-revisit")).toBe('No items with status "Revisit"');
   });
 
   it("returns scan alert messages for known error types", () => {

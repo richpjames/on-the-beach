@@ -48,7 +48,7 @@ export function renderMusicCard(item: MusicItemFull): string {
         }
         <div class="music-card__meta">
           <select class="status-select">${statusOptions}</select>
-          ${["listened", "to-revisit"].includes(item.listen_status) ? renderStarRating(item.id, item.rating) : ""}
+          ${item.listen_status === "listened" || item.listen_status === "to-listen" ? renderStarRating(item.id, item.rating) : ""}
           ${
             item.primary_source
               ? item.primary_url
@@ -154,12 +154,17 @@ export function renderStackDropdownContent(
 }
 
 function renderStarRating(itemId: number, rating: number | null): string {
-  const stars = [5, 4, 3, 2, 1]
-    .map(
-      (value) => `
-        <input type="radio" id="star-${itemId}-${value}" name="rating-${itemId}" value="${value}" ${rating === value ? "checked" : ""}>
-        <label for="star-${itemId}-${value}" title="${value} star${value > 1 ? "s" : ""}">&#9733;</label>`,
-    )
+  const values = [5, 4.5, 4, 3.5, 3, 2.5, 2, 1.5, 1, 0.5];
+  const stars = values
+    .map((value) => {
+      const isHalf = value % 1 !== 0;
+      const cls = isHalf ? "star-label--half" : "star-label--full";
+      const idSuffix = String(value).replace(".", "-");
+      const title = `${value} star${value !== 1 ? "s" : ""}`;
+      return `
+        <input type="radio" id="star-${itemId}-${idSuffix}" name="rating-${itemId}" value="${value}" ${rating === value ? "checked" : ""}>
+        <label class="star-label ${cls}" for="star-${itemId}-${idSuffix}" title="${title}">&#9733;</label>`;
+    })
     .join("");
 
   return `
