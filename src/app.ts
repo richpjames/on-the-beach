@@ -367,15 +367,12 @@ export class App {
       }
 
       // Rating radio
-      if (
-        (target as unknown as HTMLInputElement).type === "radio" &&
-        target.name?.startsWith("rating-")
-      ) {
-        const card = target.closest("[data-item-id]") as HTMLElement;
+      const radioTarget = e.target as HTMLInputElement;
+      if (radioTarget.type === "radio" && radioTarget.name.startsWith("rating-")) {
+        const card = radioTarget.closest("[data-item-id]") as HTMLElement | null;
         const id = Number(card?.dataset.itemId);
-        const rating = Number(target.value);
         if (id) {
-          await this.api.updateMusicItem(id, { rating });
+          await this.api.updateMusicItem(id, { rating: Number(radioTarget.value) });
           await this.renderMusicList();
         }
       }
@@ -388,11 +385,13 @@ export class App {
       if (!input || !input.name.startsWith("rating-")) return;
 
       if (input.checked) {
-        const card = input.closest("[data-item-id]") as HTMLElement;
-        this.ratingClearCandidate = {
-          id: Number(card?.dataset.itemId),
-          value: Number(input.value),
-        };
+        const card = input.closest("[data-item-id]") as HTMLElement | null;
+        const id = Number(card?.dataset.itemId);
+        if (!id) {
+          this.ratingClearCandidate = null;
+          return;
+        }
+        this.ratingClearCandidate = { id, value: Number(input.value) };
       } else {
         this.ratingClearCandidate = null;
       }
@@ -403,8 +402,12 @@ export class App {
       if (input.type !== "radio" || !input.name?.startsWith("rating-")) return;
 
       if (this.ratingClearCandidate) {
-        const card = input.closest("[data-item-id]") as HTMLElement;
+        const card = input.closest("[data-item-id]") as HTMLElement | null;
         const id = Number(card?.dataset.itemId);
+        if (!id) {
+          this.ratingClearCandidate = null;
+          return;
+        }
         if (
           id === this.ratingClearCandidate.id &&
           Number(input.value) === this.ratingClearCandidate.value
