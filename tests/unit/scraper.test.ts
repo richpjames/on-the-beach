@@ -342,6 +342,36 @@ describe("scrapeUrl", () => {
     mock.restore();
   });
 
+  test("uses YouTube oEmbed metadata when available", async () => {
+    spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          title: "On the Beach (2016 Remaster)",
+          author_name: "neilyoungchannel",
+          thumbnail_url: "https://i.ytimg.com/vi/C9CkvAQkQLs/hqdefault.jpg",
+        }),
+        {
+          headers: { "content-type": "application/json; charset=utf-8" },
+        },
+      ),
+    );
+
+    const result = await scrapeUrl("https://www.youtube.com/watch?v=C9CkvAQkQLs", "youtube");
+    expect(result).not.toBeNull();
+    expect(result!.potentialTitle).toBe("On the Beach (2016 Remaster)");
+    expect(result!.potentialArtist).toBe("neilyoungchannel");
+    expect(result!.imageUrl).toBe("https://i.ytimg.com/vi/C9CkvAQkQLs/hqdefault.jpg");
+    mock.restore();
+  });
+
+  test("returns null when YouTube oEmbed fails", async () => {
+    spyOn(globalThis, "fetch").mockResolvedValueOnce(new Response("{}", { status: 404 }));
+
+    const result = await scrapeUrl("https://www.youtube.com/watch?v=badid", "youtube");
+    expect(result).toBeNull();
+    mock.restore();
+  });
+
   test("uses Mixcloud oEmbed metadata when available", async () => {
     spyOn(globalThis, "fetch").mockResolvedValueOnce(
       new Response(

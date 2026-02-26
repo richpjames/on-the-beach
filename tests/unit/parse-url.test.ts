@@ -1,6 +1,22 @@
 import { describe, test, expect } from "bun:test";
 import { parseUrl } from "../../src/repository/utils";
 
+describe("parseUrl - youtube", () => {
+  test("identifies youtube watch link and preserves video ID in normalizedUrl", () => {
+    const result = parseUrl("https://www.youtube.com/watch?v=C9CkvAQkQLs");
+
+    expect(result.source).toBe("youtube");
+    expect(result.normalizedUrl).toBe("https://www.youtube.com/watch?v=C9CkvAQkQLs");
+  });
+
+  test("normalizes youtu.be shortlinks to full watch URL", () => {
+    const result = parseUrl("https://youtu.be/C9CkvAQkQLs");
+
+    expect(result.source).toBe("youtube");
+    expect(result.normalizedUrl).toBe("https://www.youtube.com/watch?v=C9CkvAQkQLs");
+  });
+});
+
 describe("parseUrl - apple music", () => {
   test("identifies apple music album link and extracts title", () => {
     const result = parseUrl("https://music.apple.com/es/album/el-poder-verde/1810282984?l=en-GB");
