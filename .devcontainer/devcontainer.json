@@ -4,9 +4,11 @@
   "service": "app",
   "workspaceFolder": "/workspace",
   "features": {
-    "ghcr.io/anthropics/devcontainer-features/claude-code:1": {}
+    "ghcr.io/anthropics/devcontainer-features/claude-code:1": {},
   },
-  "mounts": ["source=${localEnv:HOME}/.claude,target=/root/.claude,type=bind,consistency=cached"],
-  "postCreateCommand": "npm install && npx playwright install --with-deps chromium && npm run db:migrate && npm run db:seed",
-  "forwardPorts": [3000]
+  "mounts": [
+    "source=${localEnv:HOME}/.claude,target=/root/.claude,type=bind,consistency=cached",
+  ],
+  "postCreateCommand": "npm install && npx playwright install --with-deps chromium && npm run db:migrate && npm run db:seed && export IS_SANDBOX=1",
+  "forwardPorts": [3000],
 }
