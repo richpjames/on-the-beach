@@ -7,9 +7,8 @@ import type {
   MusicItemFilters,
 } from "./types";
 
-const STATUS_LABELS: Record<ListenStatus, string> = {
+const STATUS_LABELS: Record<Exclude<ListenStatus, "listening">, string> = {
   "to-listen": "To Listen",
-  listening: "Listening",
   listened: "Listened",
   "to-revisit": "Revisit",
   done: "Done",
@@ -444,7 +443,7 @@ export class App {
       const message =
         this.currentFilter === "all"
           ? "No music tracked yet. Paste a link above to get started!"
-          : `No items with status "${STATUS_LABELS[this.currentFilter as ListenStatus]}"`;
+          : `No items with status "${STATUS_LABELS[this.currentFilter as keyof typeof STATUS_LABELS]}"`;
       container.innerHTML = `
         <div class="empty-state">
           <p>${message}</p>
