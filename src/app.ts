@@ -180,9 +180,11 @@ export class App {
       }
       if (artistInput && result.artist) {
         artistInput.value = result.artist;
+        artistInput.dispatchEvent(new Event("input", { bubbles: true }));
       }
       if (titleInput && result.title) {
         titleInput.value = result.title;
+        titleInput.dispatchEvent(new Event("input", { bubbles: true }));
       }
     } catch (error) {
       if (error instanceof Error && error.message.includes("503")) {
