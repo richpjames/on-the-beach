@@ -89,6 +89,15 @@ export class ApiClient {
     return this.updateMusicItem(id, { listenStatus: status });
   }
 
+  async saveOrder(contextKey: string, itemIds: number[]): Promise<void> {
+    const res = await fetch(`${this.baseUrl}/api/music-items/order`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ contextKey, itemIds }),
+    });
+    if (!res.ok) throw new Error(`saveOrder failed: ${res.status}`);
+  }
+
   // ── Stacks ───────────────────────────────────────────────────
 
   async createStack(name: string): Promise<Stack> {
