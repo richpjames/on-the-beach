@@ -38,10 +38,12 @@ Add an environment variable in Coolify:
 
 - `DATABASE_PATH`: `/app/data/on_the_beach.db`
 
-Add a persistent volume in Coolify:
+Add two persistent volumes in Coolify:
 
-- Source: a named volume (e.g. `on-the-beach-data`)
-- Destination: `/app/data`
+- Source: a named volume (e.g. `on-the-beach-data`), Destination: `/app/data`
+- Source: a named volume (e.g. `on-the-beach-uploads`), Destination: `/app/uploads`
+
+> **Important**: Without the `/app/uploads` volume, uploaded cover images are deleted on every deploy.
 
 Run one manual deploy to confirm baseline.
 
