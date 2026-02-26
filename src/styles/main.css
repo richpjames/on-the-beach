@@ -38,7 +38,6 @@
   --status-listen: #6699ff;
   --status-playing: #ffcc44;
   --status-done: #44ff88;
-  --status-revisit: #cc44ff;
   --status-grey: #888888;
 
   /* Danger */
@@ -350,7 +349,6 @@ select.input {
   border: none;
   padding: 0;
   margin: 0;
-  gap: 1px;
 }
 
 .star-rating input[type="radio"] {
@@ -361,27 +359,39 @@ select.input {
   pointer-events: none;
 }
 
-.star-rating label {
+.star-label {
   cursor: pointer;
   color: var(--chrome-darker);
   font-size: 14px;
   line-height: 1;
-  padding: 0 1px;
+  display: inline-block;
+  width: 0.5em;
+  overflow: hidden;
 }
 
-/* Fill on hover: the hovered star and all stars to its right (lower DOM index = higher value = visually left) */
-.star-rating label:hover,
-.star-rating label:hover ~ label {
+/* Left half of star: show left portion of the ★ character */
+.star-label--half {
+  margin-left: 2px;
+}
+
+/* Right half of star: indent text left so only the right portion is visible */
+.star-label--full {
+  text-indent: -0.5em;
+}
+
+/* Fill on hover: the hovered star and all stars to its left (lower values) */
+.star-rating .star-label:hover,
+.star-rating .star-label:hover ~ .star-label {
   color: #c8a000;
 }
 
 /* When hovering, reset the currently checked fill to avoid double-highlight */
-.star-rating:hover input[type="radio"]:checked ~ label {
+.star-rating:hover input[type="radio"]:checked ~ .star-label {
   color: var(--chrome-darker);
 }
 
 /* Fill checked star and all stars with lower value (higher DOM index) */
-.star-rating input[type="radio"]:checked ~ label {
+.star-rating input[type="radio"]:checked ~ .star-label {
   color: #c8a000;
 }
 
@@ -730,13 +740,6 @@ select.input {
   color: #44ff88;
   border-color: #006622;
   text-shadow: 0 0 4px #00ff44;
-}
-
-.badge--to-revisit {
-  background: #220033;
-  color: #cc44ff;
-  border-color: #660099;
-  text-shadow: 0 0 4px #aa00ff;
 }
 
 .badge--done {

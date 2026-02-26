@@ -1,5 +1,5 @@
 // Listen/purchase status types
-export type ListenStatus = "to-listen" | "listening" | "listened" | "to-revisit" | "done";
+export type ListenStatus = "to-listen" | "listening" | "listened" | "done";
 export type PurchaseIntent = "no" | "maybe" | "want" | "owned";
 export type ItemType = "album" | "ep" | "single" | "track" | "mix" | "compilation";
 export type PhysicalFormat = "vinyl" | "cd" | "cassette" | "minidisc" | "other";
