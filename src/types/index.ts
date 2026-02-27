@@ -138,6 +138,7 @@ export interface Stack {
   id: number;
   name: string;
   created_at: string;
+  parent_stack_id: number | null;
 }
 
 export interface StackWithCount extends Stack {

@@ -69,6 +69,7 @@ export class App {
     this.setupFilterBar();
     this.setupStackBar();
     this.setupStackManagePanel();
+    this.setupStackParentLinker();
     this.setupEventDelegation();
     this.setupCustomListScrollbar();
     void this.renderStackBar();
@@ -371,6 +372,11 @@ export class App {
       deleteBtn.hidden = !hasSelection;
       deleteBtn.disabled = !hasSelection;
       deleteBtn.title = hasSelection ? `Delete "${selectedStack.name}"` : "Delete selected stack";
+    }
+
+    const list = document.getElementById("music-list");
+    if (list instanceof HTMLElement) {
+      this.renderStackParentLinker(list);
     }
   }
 
@@ -767,6 +773,7 @@ export class App {
     const result = await this.api.listMusicItems(filters);
 
     container.innerHTML = renderMusicList(result.items, this.appState.currentFilter);
+    this.renderStackParentLinker(container);
     this.syncCustomListScrollbar();
     requestAnimationFrame(() => {
       this.syncCustomListScrollbar();
@@ -857,6 +864,104 @@ export class App {
         await this.deleteStackById(stackId);
       }
     });
+  }
+
+  private setupStackParentLinker(): void {
+    document.addEventListener("click", async (event) => {
+      const target = event.target as HTMLElement;
+      const linkButton = target.closest("#stack-parent-link-btn");
+      if (!(linkButton instanceof HTMLButtonElement)) {
+        return;
+      }
+
+      const parentSelect = document.getElementById("stack-parent-select");
+      if (!(parentSelect instanceof HTMLSelectElement) || this.appState.currentStack === null) {
+        return;
+      }
+
+      const parentStackId = Number(parentSelect.value);
+      if (!Number.isInteger(parentStackId) || parentStackId <= 0) {
+        return;
+      }
+
+      try {
+        await this.api.setStackParent(this.appState.currentStack, parentStackId);
+        parentSelect.value = "";
+        await this.renderStackBar();
+        if (this.appState.stackManageOpen) {
+          await this.renderStackManagePanel();
+        }
+        await this.renderMusicList();
+      } catch (error) {
+        console.error("Failed to add list to list:", error);
+        alert("Failed to add list to list. It may create a cycle.");
+      }
+    });
+  }
+
+  private renderStackParentLinker(list: HTMLElement): void {
+    const existing = list.querySelector("#stack-parent-linker");
+    if (existing instanceof HTMLElement) {
+      existing.remove();
+    }
+
+    if (this.appState.currentStack === null) {
+      return;
+    }
+
+    const currentStack = this.appState.stacks.find(
+      (stack) => stack.id === this.appState.currentStack,
+    );
+    if (!currentStack) {
+      return;
+    }
+
+    const parentCandidates = this.appState.stacks.filter(
+      (stack) => stack.id !== this.appState.currentStack,
+    );
+
+    const options =
+      (parentCandidates.length === 0
+        ? '<option value="">No other lists</option>'
+        : '<option value="">Parent list...</option>') +
+      parentCandidates
+        .map((stack) => `<option value="${stack.id}">${stack.name}</option>`)
+        .join("");
+
+    const linker = document.createElement("div");
+    linker.id = "stack-parent-linker";
+    linker.className = "music-list__parent-linker";
+    linker.innerHTML = `
+      <select id="stack-parent-select" class="input" aria-label="Parent list">
+        ${options}
+      </select>
+      <button
+        type="button"
+        id="stack-parent-link-btn"
+        class="btn btn--ghost"
+        title="Add current list to parent list"
+      >
+        +
+      </button>
+    `;
+
+    const parentSelect = linker.querySelector("#stack-parent-select");
+    const linkButton = linker.querySelector("#stack-parent-link-btn");
+    if (
+      !(parentSelect instanceof HTMLSelectElement) ||
+      !(linkButton instanceof HTMLButtonElement)
+    ) {
+      return;
+    }
+
+    const hasCandidates = parentCandidates.length > 0;
+    parentSelect.disabled = !hasCandidates;
+    linkButton.disabled = !hasCandidates;
+    if (currentStack.parent_stack_id !== null) {
+      parentSelect.value = String(currentStack.parent_stack_id);
+    }
+
+    list.appendChild(linker);
   }
 
   private renderAddFormStackChips(): void {

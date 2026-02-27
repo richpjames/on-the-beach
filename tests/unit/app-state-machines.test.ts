@@ -27,8 +27,8 @@ describe("app state machine", () => {
     state = transitionAppState(state, {
       type: "STACKS_LOADED",
       stacks: [
-        { id: 2, name: "Dub", created_at: "", item_count: 1 },
-        { id: 3, name: "House", created_at: "", item_count: 1 },
+        { id: 2, name: "Dub", created_at: "", parent_stack_id: null, item_count: 1 },
+        { id: 3, name: "House", created_at: "", parent_stack_id: null, item_count: 1 },
       ],
     });
 

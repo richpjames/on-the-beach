@@ -583,6 +583,32 @@ select.input {
   background: var(--playlist-bg);
 }
 
+.music-list__parent-linker {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px;
+  padding: 4px 8px 6px;
+  border-top: 1px solid #0a0a1a;
+  background: var(--playlist-bg-alt);
+}
+
+.music-list__parent-linker .input {
+  width: 180px;
+  height: 20px;
+  font-size: 11px;
+  padding: 1px 4px;
+}
+
+#stack-parent-link-btn {
+  min-width: 20px;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  font-size: 13px;
+  line-height: 1;
+}
+
 .music-scrollbar {
   display: grid;
   grid-template-rows: 19px minmax(0, 1fr) 19px;
@@ -1196,6 +1222,17 @@ a:hover {
   color: var(--chrome-dark);
   font-size: 10px;
   font-family: "Tahoma", sans-serif;
+}
+
+.stack-manage__parent-chip {
+  background: #001033;
+  color: #6699ff;
+  border-width: 1px;
+  border-style: solid;
+  border-color: #224499;
+  font-size: 9px;
+  font-family: "Tahoma", sans-serif;
+  padding: 1px 5px;
 }
 
 .stack-manage__rename-btn,

@@ -139,11 +139,11 @@ export class ApiClient {
 
   // ── Stacks ───────────────────────────────────────────────────
 
-  async createStack(name: string): Promise<Stack> {
+  async createStack(name: string, parentStackId?: number | null): Promise<Stack> {
     return this.requestJson<Stack>(
       "/api/stacks",
       "createStack",
-      this.jsonRequest("POST", { name }),
+      this.jsonRequest("POST", { name, parentStackId }),
     );
   }
 
@@ -184,6 +184,14 @@ export class ApiClient {
       `/api/stacks/items/${musicItemId}`,
       "setItemStacks",
       this.jsonRequest("POST", { stackIds }),
+    );
+  }
+
+  async setStackParent(stackId: number, parentStackId: number | null): Promise<void> {
+    await this.request(
+      `/api/stacks/${stackId}/parent`,
+      "setStackParent",
+      this.jsonRequest("PATCH", { parentStackId }),
     );
   }
 
