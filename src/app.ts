@@ -6,7 +6,7 @@ import {
   hasAnyNonEmptyField,
 } from "./ui/domain/add-form";
 import type { AddFormValues } from "./ui/domain/add-form";
-import { buildMusicItemFilters, buildContextKey } from "./ui/domain/music-list";
+import { buildMusicItemFilters } from "./ui/domain/music-list";
 import { constrainDimensions } from "./ui/domain/scan";
 import { initialAddFormState, transitionAddFormState } from "./ui/state/add-form-machine";
 import { initialAppState, transitionAppState } from "./ui/state/app-machine";
@@ -42,7 +42,7 @@ export class App {
   private appState = initialAppState;
   private addFormState = initialAddFormState;
   private ratingState = initialRatingState;
-  private dragState: { sourceCard: HTMLElement | null } = { sourceCard: null };
+  private activeItemActionMenuCleanup: (() => void) | null = null;
   private activeStackDropdownCleanup: ((skipOnClose?: boolean) => void) | null = null;
 
   constructor() {
@@ -392,10 +392,24 @@ export class App {
 
     list.addEventListener("click", async (event) => {
       const target = event.target as HTMLElement;
+      const menuToggle = target.closest('[data-action="toggle-item-menu"]') as HTMLElement | null;
+
+      if (menuToggle) {
+        const itemContext = this.resolveItemContext(menuToggle);
+        if (itemContext) {
+          this.toggleItemActionMenu(itemContext.card, menuToggle);
+        }
+        return;
+      }
+
+      if (target.closest(".music-card__menu-item")) {
+        this.closeItemActionMenu();
+      }
 
       if (target.dataset.action === "stack" || target.closest('[data-action="stack"]')) {
         const itemContext = this.resolveItemContext(target);
         if (itemContext) {
+          this.closeItemActionMenu();
           await this.renderStackDropdown(itemContext.card, itemContext.itemId);
         }
         return;
@@ -411,6 +425,7 @@ export class App {
         return;
       }
 
+      this.closeItemActionMenu();
       itemContext.card.remove();
       await this.api.deleteMusicItem(itemContext.itemId);
     });
@@ -490,61 +505,6 @@ export class App {
         await this.renderMusicList();
       }
     });
-
-    list.addEventListener("dragstart", (event) => {
-      const card = (event.target as HTMLElement).closest(".music-card") as HTMLElement | null;
-      if (!card) return;
-      this.dragState.sourceCard = card;
-      card.classList.add("is-dragging");
-      event.dataTransfer?.setData("text/plain", card.dataset.itemId ?? "");
-    });
-
-    list.addEventListener("dragend", () => {
-      this.dragState.sourceCard?.classList.remove("is-dragging");
-      this.dragState.sourceCard = null;
-      this.clearDropTargets(list);
-    });
-
-    list.addEventListener("dragover", (event) => {
-      event.preventDefault();
-      const target = (event.target as HTMLElement).closest(".music-card") as HTMLElement | null;
-      if (!target || target === this.dragState.sourceCard) return;
-
-      this.clearDropTargets(list);
-
-      const rect = target.getBoundingClientRect();
-      const midpoint = rect.top + rect.height / 2;
-      if (event.clientY < midpoint) {
-        target.classList.add("drop-target-above");
-      } else {
-        target.classList.add("drop-target-below");
-      }
-    });
-
-    list.addEventListener("drop", async (event) => {
-      event.preventDefault();
-      const source = this.dragState.sourceCard;
-      if (!source) return;
-
-      const target = (event.target as HTMLElement).closest(".music-card") as HTMLElement | null;
-      if (!target || target === source) return;
-
-      const rect = target.getBoundingClientRect();
-      const insertBefore = event.clientY < rect.top + rect.height / 2;
-
-      if (insertBefore) {
-        list.insertBefore(source, target);
-      } else {
-        target.after(source);
-      }
-
-      const contextKey = buildContextKey(this.appState.currentFilter, this.appState.currentStack);
-      const itemIds = Array.from(list.querySelectorAll<HTMLElement>("[data-item-id]"))
-        .map((el) => Number(el.dataset.itemId))
-        .filter((id) => !Number.isNaN(id) && id > 0);
-
-      await this.api.saveOrder(contextKey, itemIds);
-    });
   }
 
   private resolveItemContext(target: HTMLElement): ItemContext | null {
@@ -565,12 +525,6 @@ export class App {
     return input !== null && input.type === "radio" && input.name.startsWith("rating-");
   }
 
-  private clearDropTargets(list: HTMLElement): void {
-    list.querySelectorAll(".drop-target-above, .drop-target-below").forEach((el) => {
-      el.classList.remove("drop-target-above", "drop-target-below");
-    });
-  }
-
   private resolveRatingInput(target: HTMLElement): HTMLInputElement | null {
     if (target instanceof HTMLLabelElement && target.htmlFor) {
       return document.getElementById(target.htmlFor) as HTMLInputElement | null;
@@ -585,6 +539,7 @@ export class App {
       return;
     }
 
+    this.closeItemActionMenu();
     const filters = buildMusicItemFilters(this.appState.currentFilter, this.appState.currentStack);
     const result = await this.api.listMusicItems(filters);
 
@@ -767,6 +722,75 @@ export class App {
   private closeActiveStackDropdown(): void {
     this.activeStackDropdownCleanup?.(true);
     this.activeStackDropdownCleanup = null;
+  }
+
+  private closeItemActionMenu(): void {
+    this.activeItemActionMenuCleanup?.();
+    this.activeItemActionMenuCleanup = null;
+  }
+
+  private toggleItemActionMenu(cardEl: HTMLElement, toggleEl: HTMLElement): void {
+    const panel = cardEl.querySelector(".music-card__menu-panel");
+    if (!(panel instanceof HTMLElement)) {
+      return;
+    }
+
+    const alreadyOpen = !panel.hidden;
+    this.closeItemActionMenu();
+
+    if (alreadyOpen) {
+      return;
+    }
+
+    panel.hidden = false;
+    toggleEl.setAttribute("aria-expanded", "true");
+
+    let closed = false;
+    const close = (): void => {
+      if (closed) {
+        return;
+      }
+
+      closed = true;
+      panel.hidden = true;
+      toggleEl.setAttribute("aria-expanded", "false");
+      document.removeEventListener("keydown", onEscape);
+      document.removeEventListener("click", onOutsideClick);
+
+      if (this.activeItemActionMenuCleanup === close) {
+        this.activeItemActionMenuCleanup = null;
+      }
+    };
+
+    const onEscape = (event: KeyboardEvent): void => {
+      if (event.key === "Escape") {
+        close();
+      }
+    };
+
+    const onOutsideClick = (event: MouseEvent): void => {
+      const target = event.target;
+      if (!(target instanceof HTMLElement)) {
+        return;
+      }
+
+      if (panel.contains(target) || toggleEl.contains(target)) {
+        return;
+      }
+
+      close();
+    };
+
+    this.activeItemActionMenuCleanup = close;
+    document.addEventListener("keydown", onEscape);
+
+    setTimeout(() => {
+      if (closed) {
+        return;
+      }
+
+      document.addEventListener("click", onOutsideClick);
+    }, 0);
   }
 
   private async openStackDropdown(options: StackDropdownOptions): Promise<void> {
