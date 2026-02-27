@@ -1,6 +1,6 @@
 import { eq, and } from "drizzle-orm";
 import { db } from "./db/index";
-import { musicItems, artists, musicLinks, sources } from "./db/schema";
+import { musicItems, artists, musicLinks, sources, musicItemStacks, stacks } from "./db/schema";
 import { parseUrl, isValidUrl, normalize, capitalize } from "./utils";
 import { scrapeUrl } from "./scraper";
 import type { CreateMusicItemInput, MusicItemFull } from "../src/types";
@@ -87,11 +87,23 @@ export async function getSourceId(sourceName: string): Promise<number | null> {
 export type { ItemWithStacks } from "./hydrate-item-stacks";
 export { hydrateItemStacks } from "./hydrate-item-stacks";
 
-/** Fetch a single full item by its id. */
+/** Fetch a single full item by its id, including stacks. */
 export async function fetchFullItem(id: number): Promise<MusicItemFull | null> {
   const rows = await fullItemSelect().where(eq(musicItems.id, id));
   if (!rows[0]) return null;
-  return { ...(rows[0] as unknown as MusicItemFull), stacks: [] };
+
+  const stackRows = await db
+    .select({ musicItemId: musicItemStacks.musicItemId, id: stacks.id, name: stacks.name })
+    .from(musicItemStacks)
+    .innerJoin(stacks, eq(stacks.id, musicItemStacks.stackId))
+    .where(eq(musicItemStacks.musicItemId, id));
+
+  const item = {
+    ...(rows[0] as unknown as MusicItemFull),
+    stacks: [] as Array<{ id: number; name: string }>,
+  };
+  item.stacks = stackRows.map((r) => ({ id: r.id, name: r.name }));
+  return item;
 }
 
 // ---------------------------------------------------------------------------

@@ -6,6 +6,7 @@ const mockCreate = mock();
 // Mock createMusicItemFromUrl before importing the route
 mock.module("../../server/music-item-creator", () => ({
   createMusicItemFromUrl: mockCreate,
+  fetchFullItem: mock(),
 }));
 
 // Import after mock is set up
