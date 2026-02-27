@@ -119,6 +119,7 @@ function renderReleasePage(item: MusicItemFull, cssHref: string): string {
             ${metaFields ? `<p class="release-page__meta">${metaFields}</p>` : ""}
             ${item.catalogue_number ? `<p class="release-page__catalogue">${escapeHtml(item.catalogue_number)}</p>` : ""}
             ${item.notes ? `<p class="release-page__notes">${escapeHtml(item.notes)}</p>` : ""}
+            ${item.rating !== null ? `<p class="release-page__rating">${"★".repeat(item.rating)}${"☆".repeat(5 - item.rating)}</p>` : ""}
           </div>
 
           <div id="edit-mode" hidden>
@@ -214,8 +215,9 @@ export function createReleasePageRoutes(fetchItem: FetchItemFn = fetchFullItem):
   const routes = new Hono();
 
   routes.get("/:id", async (c) => {
-    const id = Number(c.req.param("id"));
-    if (Number.isNaN(id)) {
+    const rawId = c.req.param("id");
+    const id = Number(rawId);
+    if (!Number.isInteger(id) || id <= 0) {
       return c.text("Invalid ID", 400);
     }
 

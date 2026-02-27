@@ -7,6 +7,7 @@ const mockCreate = mock();
 // Mock createMusicItemFromUrl before importing
 mock.module("../../server/music-item-creator", () => ({
   createMusicItemFromUrl: mockCreate,
+  fetchFullItem: mock(),
 }));
 
 const { startSmtpIngest } = await import("../../server/smtp-ingest");
