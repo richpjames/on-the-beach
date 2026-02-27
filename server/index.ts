@@ -5,8 +5,10 @@ import { musicItemRoutes } from "./routes/music-items";
 import { stackRoutes } from "./routes/stacks";
 import { ingestRoutes } from "./routes/ingest";
 import { releaseRoutes } from "./routes/release";
+import { getUploadsDir, rewriteUploadsRequestPath } from "./uploads";
 
 const app = new Hono();
+const uploadsDir = getUploadsDir();
 
 // ---------- Request logging ----------
 app.use("*", logger());
@@ -21,7 +23,13 @@ app.route("/api/music-items", musicItemRoutes);
 app.route("/api/stacks", stackRoutes);
 app.route("/api/ingest", ingestRoutes);
 app.route("/api/release", releaseRoutes);
-app.use("/uploads/*", serveStatic({ root: "./" }));
+app.use(
+  "/uploads/*",
+  serveStatic({
+    root: uploadsDir,
+    rewriteRequestPath: rewriteUploadsRequestPath,
+  }),
+);
 
 // ---------- Test-only routes ----------
 if (process.env.NODE_ENV === "test") {
@@ -63,6 +71,7 @@ if (isDev) {
 
   server.listen(port, () => {
     console.log(`Dev server running on http://localhost:${port}`);
+    console.log(`Uploads dir: ${uploadsDir}`);
   });
 } else {
   // ---- Production: serve built static files ----
@@ -75,6 +84,7 @@ if (isDev) {
     fetch: app.fetch,
   });
   console.log(`Server running on http://localhost:${port}`);
+  console.log(`Uploads dir: ${uploadsDir}`);
 }
 
 // ---------- SMTP ingest (opt-in via SMTP_ENABLED=true) ----------

@@ -11,6 +11,7 @@ RUN bun run build
 
 ENV NODE_ENV=production
 ENV PORT=3000
+ENV UPLOADS_DIR=/app/uploads
 EXPOSE 3000
 
 CMD ["bun", "server/index.ts"]

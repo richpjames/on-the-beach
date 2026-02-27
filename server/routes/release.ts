@@ -3,6 +3,7 @@ import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { extractAlbumInfo } from "../vision";
 import type { ScanResult } from "../../src/types";
+import { getUploadsDir, toUploadsPublicPath } from "../uploads";
 
 const MAX_IMAGE_BASE64_LENGTH = 2_000_000;
 const BASE64_PATTERN = /^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/;
@@ -38,7 +39,7 @@ export type ExtractAlbumInfoFn = (base64Image: string) => Promise<ScanResult | n
 export type SaveReleaseImageFn = (base64Image: string) => Promise<string>;
 
 async function saveReleaseImage(base64Image: string): Promise<string> {
-  const uploadsDir = path.resolve(process.cwd(), process.env.UPLOADS_DIR ?? "uploads");
+  const uploadsDir = getUploadsDir();
   await mkdir(uploadsDir, { recursive: true });
 
   const filename = `${crypto.randomUUID()}.jpg`;
@@ -46,7 +47,7 @@ async function saveReleaseImage(base64Image: string): Promise<string> {
   const imageBytes = Buffer.from(base64Image, "base64");
   await writeFile(filePath, imageBytes);
 
-  return `/uploads/${filename}`;
+  return toUploadsPublicPath(filename);
 }
 
 export function createReleaseRoutes(

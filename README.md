@@ -36,18 +36,18 @@ Open http://localhost:3000.
 
 ## Environment Variables
 
-| Variable | Required | Default | Description |
-|---|---|---|---|
-| `DATABASE_PATH` | No | `on_the_beach.db` | Path to the SQLite database file |
-| `PORT` | No | `3000` | HTTP server port |
-| `UPLOADS_DIR` | No | `uploads` | Directory for uploaded cover images |
-| `MISTRAL_API_KEY` | No | — | Enables AI cover scanning |
-| `MISTRAL_SCAN_MODEL` | No | `mistral-ocr-latest` | Model for cover scanning. Non-OCR models use chat-completions mode. |
-| `SMTP_ENABLED` | No | `false` | Set to `true` to start the embedded SMTP server |
-| `SMTP_PORT` | No | `2525` | Port for the embedded SMTP server |
-| `SMTP_ALLOWED_FROM` | No | (all) | Comma-separated sender addresses to accept |
-| `INGEST_API_KEY` | No | — | Secret token for the HTTP email ingest webhook. Required to enable it. |
-| `INGEST_ENABLED` | No | `true` | Set to `false` to disable the HTTP ingest endpoint without removing the key |
+| Variable             | Required | Default              | Description                                                                 |
+| -------------------- | -------- | -------------------- | --------------------------------------------------------------------------- |
+| `DATABASE_PATH`      | No       | `on_the_beach.db`    | Path to the SQLite database file                                            |
+| `PORT`               | No       | `3000`               | HTTP server port                                                            |
+| `UPLOADS_DIR`        | No       | `uploads`            | Directory for uploaded cover images                                         |
+| `MISTRAL_API_KEY`    | No       | —                    | Enables AI cover scanning                                                   |
+| `MISTRAL_SCAN_MODEL` | No       | `mistral-ocr-latest` | Model for cover scanning. Non-OCR models use chat-completions mode.         |
+| `SMTP_ENABLED`       | No       | `false`              | Set to `true` to start the embedded SMTP server                             |
+| `SMTP_PORT`          | No       | `2525`               | Port for the embedded SMTP server                                           |
+| `SMTP_ALLOWED_FROM`  | No       | (all)                | Comma-separated sender addresses to accept                                  |
+| `INGEST_API_KEY`     | No       | —                    | Secret token for the HTTP email ingest webhook. Required to enable it.      |
+| `INGEST_ENABLED`     | No       | `true`               | Set to `false` to disable the HTTP ingest endpoint without removing the key |
 
 ## Scripts
 
@@ -88,6 +88,8 @@ Append `?provider=sendgrid` for SendGrid payloads.
 ## Data Storage
 
 Data is stored in a SQLite file on the server. In production, mount a persistent volume at the path set by `DATABASE_PATH`. Cover image uploads are stored under `UPLOADS_DIR` and also require a persistent volume.
+
+For container deployments, prefer an absolute uploads path (for example `UPLOADS_DIR=/app/uploads`) and mount that path as a persistent volume.
 
 ## Deployment
 

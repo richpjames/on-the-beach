@@ -54,7 +54,10 @@
       "mcp__plugin_playwright_playwright__browser_take_screenshot",
       "Bash(npx devcontainer:*)",
       "Bash(ssh:*)",
-      "Bash(ssh-keygen:*)"
+      "Bash(ssh-keygen:*)",
+      "Bash(DATABASE_PATH=on_the_beach_prod.db bun run:*)",
+      "Bash(open:*)",
+      "Bash(scp:*)"
     ]
   }
 }

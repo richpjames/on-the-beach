@@ -7,6 +7,7 @@ services:
       - "3000:3000"
     environment:
       DATABASE_PATH: /app/data/on_the_beach.db
+      UPLOADS_DIR: /app/uploads
       NODE_ENV: production
     volumes:
       - app-data:/app/data
