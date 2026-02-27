@@ -113,3 +113,24 @@ export const musicItemStacks = sqliteTable(
     index("idx_music_item_stacks_music_item_id").on(table.musicItemId),
   ],
 );
+
+export const stackParents = sqliteTable(
+  "stack_parents",
+  {
+    parentStackId: integer("parent_stack_id")
+      .notNull()
+      .references(() => stacks.id, { onDelete: "cascade" }),
+    childStackId: integer("child_stack_id")
+      .notNull()
+      .references(() => stacks.id, { onDelete: "cascade" }),
+    createdAt: integer("created_at", { mode: "timestamp" })
+      .notNull()
+      .$defaultFn(() => new Date()),
+  },
+  (table) => [
+    primaryKey({ columns: [table.parentStackId, table.childStackId] }),
+    unique("stack_parents_child_stack_unique").on(table.childStackId),
+    index("idx_stack_parents_parent_stack_id").on(table.parentStackId),
+    index("idx_stack_parents_child_stack_id").on(table.childStackId),
+  ],
+);

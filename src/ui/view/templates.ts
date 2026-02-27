@@ -135,6 +135,11 @@ export function renderStackManageList(stacks: StackWithCount[]): string {
       <div class="stack-manage__item" data-manage-stack-id="${stack.id}">
         <span class="stack-manage__name">${escapeHtml(stack.name)}</span>
         <span class="stack-manage__count">${stack.item_count} items</span>
+        ${
+          stack.parent_stack_id === null
+            ? ""
+            : `<span class="stack-manage__parent-chip" title="Has parent list">nested</span>`
+        }
         <button class="stack-manage__rename-btn">rename</button>
         <button class="stack-manage__delete-btn">delete</button>
       </div>

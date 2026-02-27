@@ -1,7 +1,14 @@
 import { Hono } from "hono";
 import { eq, and, inArray, sql } from "drizzle-orm";
 import { db } from "../db/index";
-import { musicItems, artists, musicItemStacks, stacks, musicItemOrder } from "../db/schema";
+import {
+  musicItems,
+  artists,
+  musicItemStacks,
+  stacks,
+  musicItemOrder,
+  stackParents,
+} from "../db/schema";
 import { isValidUrl, normalize } from "../utils";
 import { applyOrder, buildContextKey } from "../../shared/music-list-context";
 import {
@@ -48,6 +55,43 @@ const DIRECT_UPDATE_FIELDS: ReadonlyArray<
   "genre",
   "catalogueNumber",
 ];
+
+async function collectDescendantStackIds(rootStackId: number): Promise<number[]> {
+  const links = await db
+    .select({
+      parentStackId: stackParents.parentStackId,
+      childStackId: stackParents.childStackId,
+    })
+    .from(stackParents);
+
+  const childrenByParent = new Map<number, number[]>();
+  for (const link of links) {
+    const children = childrenByParent.get(link.parentStackId) ?? [];
+    children.push(link.childStackId);
+    childrenByParent.set(link.parentStackId, children);
+  }
+
+  const descendants = new Set<number>([rootStackId]);
+  const queue = [rootStackId];
+  while (queue.length > 0) {
+    const current = queue.shift();
+    if (current === undefined) {
+      continue;
+    }
+
+    const children = childrenByParent.get(current) ?? [];
+    for (const child of children) {
+      if (descendants.has(child)) {
+        continue;
+      }
+
+      descendants.add(child);
+      queue.push(child);
+    }
+  }
+
+  return [...descendants];
+}
 
 function isValidArtworkUrl(value: string): boolean {
   return isValidUrl(value) || LOCAL_UPLOADS_PATTERN.test(value);
@@ -118,6 +162,9 @@ async function applyArtistUpdate(
 musicItemRoutes.get("/", async (c) => {
   const { listenStatus, purchaseIntent, search, stackId } = c.req.query();
   const parsedStackId = stackId ? Number(stackId) : null;
+  if (parsedStackId !== null && (!Number.isInteger(parsedStackId) || parsedStackId <= 0)) {
+    return c.json({ error: "Invalid stack ID" }, 400);
+  }
 
   // Start building conditions
   const conditions = [];
@@ -140,9 +187,18 @@ musicItemRoutes.get("/", async (c) => {
   }
 
   if (parsedStackId !== null) {
-    conditions.push(
-      sql`${musicItems.id} IN (SELECT ${musicItemStacks.musicItemId} FROM ${musicItemStacks} WHERE ${musicItemStacks.stackId} = ${parsedStackId})`,
-    );
+    const stackIds = await collectDescendantStackIds(parsedStackId);
+    const memberships = await db
+      .select({ musicItemId: musicItemStacks.musicItemId })
+      .from(musicItemStacks)
+      .where(inArray(musicItemStacks.stackId, stackIds));
+    const itemIds = [...new Set(memberships.map((membership) => membership.musicItemId))];
+
+    if (itemIds.length === 0) {
+      return c.json({ items: [], total: 0 });
+    }
+
+    conditions.push(inArray(musicItems.id, itemIds));
   }
 
   let query = fullItemSelect().$dynamic();
