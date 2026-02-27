@@ -52,7 +52,9 @@
       "mcp__plugin_playwright_playwright__browser_tabs",
       "mcp__plugin_playwright_playwright__browser_resize",
       "mcp__plugin_playwright_playwright__browser_take_screenshot",
-      "Bash(npx devcontainer:*)"
+      "Bash(npx devcontainer:*)",
+      "Bash(ssh:*)",
+      "Bash(ssh-keygen:*)"
     ]
   }
 }
