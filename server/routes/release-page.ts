@@ -28,7 +28,14 @@ function escapeHtml(str: string): string {
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#x27;");
+}
+
+const SAFE_ARTWORK_URL = /^(https?:\/\/|\/uploads\/)/;
+
+function safeArtworkUrl(url: string): string | null {
+  return SAFE_ARTWORK_URL.test(url) ? url : null;
 }
 
 function renderNotFoundPage(): string {
@@ -104,7 +111,7 @@ function renderReleasePage(item: MusicItemFull, cssHref: string): string {
             <button type="button" class="btn" id="edit-btn">Edit</button>
           </div>
 
-          ${item.artwork_url ? `<img class="release-page__artwork" src="${escapeHtml(item.artwork_url)}" alt="Artwork for ${escapeHtml(item.title)}" />` : ""}
+          ${safeArtworkUrl(item.artwork_url ?? "") ? `<img class="release-page__artwork" src="${escapeHtml(item.artwork_url!)}" alt="Artwork for ${escapeHtml(item.title)}" />` : ""}
 
           <div id="view-mode">
             <h2 class="release-page__title">${escapeHtml(item.title)}</h2>
@@ -185,11 +192,12 @@ function renderReleasePage(item: MusicItemFull, cssHref: string): string {
       });
 
       document.getElementById('status-select').addEventListener('change', async (e) => {
-        await fetch('/api/music-items/' + ITEM_ID, {
+        const res = await fetch('/api/music-items/' + ITEM_ID, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ listenStatus: e.target.value }),
         });
+        if (!res.ok) alert('Failed to update status.');
       });
 
       document.getElementById('delete-btn').addEventListener('click', async () => {
@@ -211,7 +219,14 @@ export function createReleasePageRoutes(fetchItem: FetchItemFn = fetchFullItem):
       return c.text("Invalid ID", 400);
     }
 
-    const item = await fetchItem(id);
+    let item: MusicItemFull | null;
+    try {
+      item = await fetchItem(id);
+    } catch (err) {
+      console.error("[release-page] GET /r/:id fetchItem error:", err);
+      return c.html(renderNotFoundPage(), 500);
+    }
+
     if (!item) {
       return c.html(renderNotFoundPage(), 404);
     }
