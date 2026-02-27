@@ -14,43 +14,80 @@ import type {
 export class ApiClient {
   constructor(private baseUrl: string = "") {}
 
+  private buildUrl(path: string): string {
+    return `${this.baseUrl}${path}`;
+  }
+
+  private jsonRequest(method: "POST" | "PATCH" | "PUT", body: unknown): RequestInit {
+    return {
+      method,
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    };
+  }
+
+  private async request(path: string, action: string, init?: RequestInit): Promise<Response> {
+    const response = await fetch(this.buildUrl(path), init);
+    if (!response.ok) {
+      throw new Error(`${action} failed: ${response.status}`);
+    }
+
+    return response;
+  }
+
+  private async requestJson<T>(path: string, action: string, init?: RequestInit): Promise<T> {
+    const response = await this.request(path, action, init);
+    return (await response.json()) as T;
+  }
+
+  private async requestJsonOrNull<T>(
+    path: string,
+    action: string,
+    init?: RequestInit,
+  ): Promise<T | null> {
+    const response = await fetch(this.buildUrl(path), init);
+    if (response.status === 404) {
+      return null;
+    }
+
+    if (!response.ok) {
+      throw new Error(`${action} failed: ${response.status}`);
+    }
+
+    return (await response.json()) as T;
+  }
+
+  private async requestSuccess(path: string, action: string, init?: RequestInit): Promise<boolean> {
+    const body = await this.requestJson<{ success?: boolean }>(path, action, init);
+    return body.success === true;
+  }
+
   // ── Music Items ──────────────────────────────────────────────
 
   async createMusicItem(input: CreateMusicItemInput): Promise<MusicItemFull> {
-    const res = await fetch(`${this.baseUrl}/api/music-items`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(input),
-    });
-    if (!res.ok) throw new Error(`createMusicItem failed: ${res.status}`);
-    return res.json();
+    return this.requestJson<MusicItemFull>(
+      "/api/music-items",
+      "createMusicItem",
+      this.jsonRequest("POST", input),
+    );
   }
 
   async getMusicItem(id: number): Promise<MusicItemFull | null> {
-    const res = await fetch(`${this.baseUrl}/api/music-items/${id}`);
-    if (res.status === 404) return null;
-    if (!res.ok) throw new Error(`getMusicItem failed: ${res.status}`);
-    return res.json();
+    return this.requestJsonOrNull<MusicItemFull>(`/api/music-items/${id}`, "getMusicItem");
   }
 
   async updateMusicItem(id: number, input: UpdateMusicItemInput): Promise<MusicItemFull | null> {
-    const res = await fetch(`${this.baseUrl}/api/music-items/${id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(input),
-    });
-    if (res.status === 404) return null;
-    if (!res.ok) throw new Error(`updateMusicItem failed: ${res.status}`);
-    return res.json();
+    return this.requestJsonOrNull<MusicItemFull>(
+      `/api/music-items/${id}`,
+      "updateMusicItem",
+      this.jsonRequest("PATCH", input),
+    );
   }
 
   async deleteMusicItem(id: number): Promise<boolean> {
-    const res = await fetch(`${this.baseUrl}/api/music-items/${id}`, {
+    return this.requestSuccess(`/api/music-items/${id}`, "deleteMusicItem", {
       method: "DELETE",
     });
-    if (!res.ok) throw new Error(`deleteMusicItem failed: ${res.status}`);
-    const body = await res.json();
-    return body.success === true;
   }
 
   async listMusicItems(filters?: MusicItemFilters): Promise<PaginatedResult<MusicItemFull>> {
@@ -79,10 +116,10 @@ export class ApiClient {
     }
 
     const qs = params.toString();
-    const url = `${this.baseUrl}/api/music-items${qs ? `?${qs}` : ""}`;
-    const res = await fetch(url);
-    if (!res.ok) throw new Error(`listMusicItems failed: ${res.status}`);
-    return res.json();
+    return this.requestJson<PaginatedResult<MusicItemFull>>(
+      `/api/music-items${qs ? `?${qs}` : ""}`,
+      "listMusicItems",
+    );
   }
 
   async updateListenStatus(id: number, status: ListenStatus): Promise<MusicItemFull | null> {
@@ -90,100 +127,81 @@ export class ApiClient {
   }
 
   async saveOrder(contextKey: string, itemIds: number[]): Promise<void> {
-    const res = await fetch(`${this.baseUrl}/api/music-items/order`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ contextKey, itemIds }),
-    });
-    if (!res.ok) throw new Error(`saveOrder failed: ${res.status}`);
+    await this.request(
+      "/api/music-items/order",
+      "saveOrder",
+      this.jsonRequest("PUT", {
+        contextKey,
+        itemIds,
+      }),
+    );
   }
 
   // ── Stacks ───────────────────────────────────────────────────
 
   async createStack(name: string): Promise<Stack> {
-    const res = await fetch(`${this.baseUrl}/api/stacks`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name }),
-    });
-    if (!res.ok) throw new Error(`createStack failed: ${res.status}`);
-    return res.json();
+    return this.requestJson<Stack>(
+      "/api/stacks",
+      "createStack",
+      this.jsonRequest("POST", { name }),
+    );
   }
 
   async renameStack(id: number, name: string): Promise<Stack | null> {
-    const res = await fetch(`${this.baseUrl}/api/stacks/${id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name }),
-    });
-    if (res.status === 404) return null;
-    if (!res.ok) throw new Error(`renameStack failed: ${res.status}`);
-    return res.json();
+    return this.requestJsonOrNull<Stack>(
+      `/api/stacks/${id}`,
+      "renameStack",
+      this.jsonRequest("PATCH", { name }),
+    );
   }
 
   async deleteStack(id: number): Promise<boolean> {
-    const res = await fetch(`${this.baseUrl}/api/stacks/${id}`, {
-      method: "DELETE",
-    });
-    if (!res.ok) throw new Error(`deleteStack failed: ${res.status}`);
-    const body = await res.json();
-    return body.success === true;
+    return this.requestSuccess(`/api/stacks/${id}`, "deleteStack", { method: "DELETE" });
   }
 
   async listStacks(): Promise<StackWithCount[]> {
-    const res = await fetch(`${this.baseUrl}/api/stacks`);
-    if (!res.ok) throw new Error(`listStacks failed: ${res.status}`);
-    return res.json();
+    return this.requestJson<StackWithCount[]>("/api/stacks", "listStacks");
   }
 
   async getStacksForItem(musicItemId: number): Promise<Stack[]> {
-    const res = await fetch(`${this.baseUrl}/api/stacks/items/${musicItemId}`);
-    if (!res.ok) throw new Error(`getStacksForItem failed: ${res.status}`);
-    return res.json();
+    return this.requestJson<Stack[]>(`/api/stacks/items/${musicItemId}`, "getStacksForItem");
   }
 
   async addItemToStack(musicItemId: number, stackId: number): Promise<void> {
-    const res = await fetch(`${this.baseUrl}/api/stacks/items/${musicItemId}/${stackId}`, {
+    await this.request(`/api/stacks/items/${musicItemId}/${stackId}`, "addItemToStack", {
       method: "PUT",
     });
-    if (!res.ok) throw new Error(`addItemToStack failed: ${res.status}`);
   }
 
   async removeItemFromStack(musicItemId: number, stackId: number): Promise<void> {
-    const res = await fetch(`${this.baseUrl}/api/stacks/items/${musicItemId}/${stackId}`, {
+    await this.request(`/api/stacks/items/${musicItemId}/${stackId}`, "removeItemFromStack", {
       method: "DELETE",
     });
-    if (!res.ok) throw new Error(`removeItemFromStack failed: ${res.status}`);
   }
 
   async setItemStacks(musicItemId: number, stackIds: number[]): Promise<void> {
-    const res = await fetch(`${this.baseUrl}/api/stacks/items/${musicItemId}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ stackIds }),
-    });
-    if (!res.ok) throw new Error(`setItemStacks failed: ${res.status}`);
+    await this.request(
+      `/api/stacks/items/${musicItemId}`,
+      "setItemStacks",
+      this.jsonRequest("POST", { stackIds }),
+    );
   }
 
   // ── Release Scan ────────────────────────────────────────────
 
   async scanCover(imageBase64: string): Promise<ScanResult> {
-    const res = await fetch(`${this.baseUrl}/api/release/scan`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ imageBase64 }),
-    });
-    if (!res.ok) throw new Error(`scanCover failed: ${res.status}`);
-    return res.json();
+    return this.requestJson<ScanResult>(
+      "/api/release/scan",
+      "scanCover",
+      this.jsonRequest("POST", { imageBase64 }),
+    );
   }
 
   async uploadReleaseImage(imageBase64: string): Promise<UploadImageResult> {
-    const res = await fetch(`${this.baseUrl}/api/release/image`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ imageBase64 }),
-    });
-    if (!res.ok) throw new Error(`uploadReleaseImage failed: ${res.status}`);
-    return res.json();
+    return this.requestJson<UploadImageResult>(
+      "/api/release/image",
+      "uploadReleaseImage",
+      this.jsonRequest("POST", { imageBase64 }),
+    );
   }
 }
