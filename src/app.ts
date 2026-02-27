@@ -42,6 +42,11 @@ export class App {
   private appState = initialAppState;
   private addFormState = initialAddFormState;
   private ratingState = initialRatingState;
+  private musicListEl: HTMLElement | null = null;
+  private musicListScrollbarEl: HTMLElement | null = null;
+  private musicListTrackEl: HTMLElement | null = null;
+  private musicListThumbEl: HTMLElement | null = null;
+  private listThumbDrag: { startY: number; startTop: number } | null = null;
   private activeItemActionMenuCleanup: (() => void) | null = null;
   private activeStackDropdownCleanup: ((skipOnClose?: boolean) => void) | null = null;
 
@@ -65,6 +70,7 @@ export class App {
     this.setupStackBar();
     this.setupStackManagePanel();
     this.setupEventDelegation();
+    this.setupCustomListScrollbar();
     void this.renderStackBar();
     void this.renderMusicList();
   }
@@ -406,7 +412,12 @@ export class App {
         this.closeItemActionMenu();
       }
 
-      if (target.dataset.action === "stack" || target.closest('[data-action="stack"]')) {
+      if (
+        target.dataset.action === "stack" ||
+        target.dataset.action === "stack-menu" ||
+        target.closest('[data-action="stack"]') ||
+        target.closest('[data-action="stack-menu"]')
+      ) {
         const itemContext = this.resolveItemContext(target);
         if (itemContext) {
           this.closeItemActionMenu();
@@ -415,7 +426,9 @@ export class App {
         return;
       }
 
-      const deleteBtn = target.closest('[data-action="delete"]') as HTMLElement | null;
+      const deleteBtn = target.closest(
+        '[data-action="delete"], [data-action="delete-menu"]',
+      ) as HTMLElement | null;
       if (!deleteBtn) {
         return;
       }
@@ -533,6 +546,180 @@ export class App {
     return target.closest('input[type="radio"]') as HTMLInputElement | null;
   }
 
+  private setupCustomListScrollbar(): void {
+    const list = document.getElementById("music-list");
+    const scrollbar = document.getElementById("music-list-scrollbar");
+    const track = document.getElementById("music-list-scroll-track");
+    const thumb = document.getElementById("music-list-scroll-thumb");
+    if (
+      !(list instanceof HTMLElement) ||
+      !(scrollbar instanceof HTMLElement) ||
+      !(track instanceof HTMLElement) ||
+      !(thumb instanceof HTMLElement)
+    ) {
+      return;
+    }
+
+    this.musicListEl = list;
+    this.musicListScrollbarEl = scrollbar;
+    this.musicListTrackEl = track;
+    this.musicListThumbEl = thumb;
+
+    const upButton = scrollbar.querySelector('[data-scroll-btn="up"]');
+    const downButton = scrollbar.querySelector('[data-scroll-btn="down"]');
+
+    const scrollByStep = (delta: number): void => {
+      list.scrollBy({ top: delta, behavior: "auto" });
+    };
+
+    let repeatTimer: ReturnType<typeof setInterval> | null = null;
+    const startRepeatScroll = (delta: number): void => {
+      if (repeatTimer) {
+        clearInterval(repeatTimer);
+      }
+
+      repeatTimer = setInterval(() => {
+        scrollByStep(delta);
+      }, 60);
+    };
+
+    const stopRepeatScroll = (): void => {
+      if (!repeatTimer) {
+        return;
+      }
+
+      clearInterval(repeatTimer);
+      repeatTimer = null;
+    };
+
+    const bindScrollButton = (button: Element | null, delta: number): void => {
+      if (!(button instanceof HTMLButtonElement)) {
+        return;
+      }
+
+      button.addEventListener("click", () => {
+        scrollByStep(delta);
+      });
+      button.addEventListener("mousedown", () => {
+        startRepeatScroll(delta);
+      });
+      button.addEventListener("mouseup", stopRepeatScroll);
+      button.addEventListener("mouseleave", stopRepeatScroll);
+    };
+
+    bindScrollButton(upButton, -40);
+    bindScrollButton(downButton, 40);
+    document.addEventListener("mouseup", stopRepeatScroll);
+    window.addEventListener("blur", stopRepeatScroll);
+
+    track.addEventListener("mousedown", (event) => {
+      if (event.target === thumb) {
+        return;
+      }
+
+      const trackRect = track.getBoundingClientRect();
+      const thumbRect = thumb.getBoundingClientRect();
+      const clickOffset = event.clientY - trackRect.top;
+      const thumbTop = thumbRect.top - trackRect.top;
+      const direction = clickOffset < thumbTop ? -1 : 1;
+
+      list.scrollBy({ top: direction * Math.max(80, list.clientHeight * 0.8), behavior: "auto" });
+    });
+
+    const onDragMove = (event: MouseEvent): void => {
+      if (
+        !this.listThumbDrag ||
+        !this.musicListEl ||
+        !this.musicListTrackEl ||
+        !this.musicListThumbEl
+      ) {
+        return;
+      }
+
+      const scrollRange = this.musicListEl.scrollHeight - this.musicListEl.clientHeight;
+      if (scrollRange <= 0) {
+        return;
+      }
+
+      const trackHeight = this.musicListTrackEl.clientHeight;
+      const thumbHeight = this.musicListThumbEl.offsetHeight;
+      const maxThumbTop = Math.max(trackHeight - thumbHeight, 0);
+      if (maxThumbTop <= 0) {
+        return;
+      }
+
+      const nextTop = Math.max(
+        0,
+        Math.min(
+          maxThumbTop,
+          this.listThumbDrag.startTop + (event.clientY - this.listThumbDrag.startY),
+        ),
+      );
+      const ratio = nextTop / maxThumbTop;
+      this.musicListEl.scrollTop = ratio * scrollRange;
+    };
+
+    const onDragEnd = (): void => {
+      this.listThumbDrag = null;
+      document.removeEventListener("mousemove", onDragMove);
+    };
+
+    thumb.addEventListener("mousedown", (event) => {
+      event.preventDefault();
+      const trackRect = track.getBoundingClientRect();
+      const thumbRect = thumb.getBoundingClientRect();
+      this.listThumbDrag = {
+        startY: event.clientY,
+        startTop: thumbRect.top - trackRect.top,
+      };
+      document.addEventListener("mousemove", onDragMove);
+      document.addEventListener("mouseup", onDragEnd, { once: true });
+    });
+
+    list.addEventListener("scroll", () => {
+      this.syncCustomListScrollbar();
+    });
+    window.addEventListener("resize", () => {
+      this.syncCustomListScrollbar();
+    });
+
+    this.syncCustomListScrollbar();
+  }
+
+  private syncCustomListScrollbar(): void {
+    if (
+      !this.musicListEl ||
+      !this.musicListScrollbarEl ||
+      !this.musicListTrackEl ||
+      !this.musicListThumbEl
+    ) {
+      return;
+    }
+
+    const scrollRange = this.musicListEl.scrollHeight - this.musicListEl.clientHeight;
+    const hasOverflow = scrollRange > 0;
+    this.musicListScrollbarEl.classList.toggle("is-disabled", !hasOverflow);
+
+    const trackHeight = this.musicListTrackEl.clientHeight;
+    if (!hasOverflow || trackHeight <= 0) {
+      this.musicListThumbEl.style.height = `${trackHeight}px`;
+      this.musicListThumbEl.style.top = "0px";
+      return;
+    }
+
+    const minThumbHeight = 56;
+    const thumbHeight = Math.max(
+      minThumbHeight,
+      Math.floor((this.musicListEl.clientHeight / this.musicListEl.scrollHeight) * trackHeight),
+    );
+    const maxThumbTop = Math.max(trackHeight - thumbHeight, 0);
+    const scrollRatio = scrollRange <= 0 ? 0 : this.musicListEl.scrollTop / scrollRange;
+    const thumbTop = Math.round(maxThumbTop * scrollRatio);
+
+    this.musicListThumbEl.style.height = `${thumbHeight}px`;
+    this.musicListThumbEl.style.top = `${thumbTop}px`;
+  }
+
   private async renderMusicList(): Promise<void> {
     const container = document.getElementById("music-list");
     if (!container) {
@@ -544,6 +731,10 @@ export class App {
     const result = await this.api.listMusicItems(filters);
 
     container.innerHTML = renderMusicList(result.items, this.appState.currentFilter);
+    this.syncCustomListScrollbar();
+    requestAnimationFrame(() => {
+      this.syncCustomListScrollbar();
+    });
   }
 
   private async renderStackManagePanel(): Promise<void> {

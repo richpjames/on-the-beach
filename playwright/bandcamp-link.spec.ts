@@ -14,7 +14,7 @@ test("links with protocol https", async ({ page }) => {
 
   const card = page
     .locator(".music-card", {
-      has: page.locator(`a[href="${bandcampUrl}"]`),
+      has: page.locator(`a[title="Open link"][href="${bandcampUrl}"]`),
     })
     .first();
 
@@ -41,7 +41,11 @@ test("links without https", async ({ page }) => {
   await urlInput.fill(bandcampUrlNoProtocol);
   await page.getByRole("button", { name: "Add" }).click();
 
-  const card = page.locator(".music-card").first();
+  const card = page
+    .locator(".music-card", {
+      has: page.locator(`a[title="Open link"][href="${expectedNormalizedUrl}"]`),
+    })
+    .first();
   await expect(card).toBeVisible({ timeout: 10_000 });
 
   // The card should show the title from URL parsing

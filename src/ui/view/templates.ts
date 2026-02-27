@@ -111,12 +111,14 @@ export function renderMusicCard(item: MusicItemFull): string {
               ? `<a href="${escapeHtml(item.primary_url)}" target="_blank" rel="noopener noreferrer" class="music-card__menu-item">Open link</a>`
               : ""
           }
-          <button type="button" class="music-card__menu-item" data-action="stack">Manage stacks</button>
+          <button type="button" class="music-card__menu-item" data-action="stack-menu">
+            Manage stacks
+          </button>
           <a href="/r/${item.id}" class="music-card__menu-item">View release page</a>
           <button
             type="button"
             class="music-card__menu-item music-card__menu-item--danger"
-            data-action="delete"
+            data-action="delete-menu"
           >
             Delete
           </button>
