@@ -5,6 +5,7 @@ import { musicItemRoutes } from "./routes/music-items";
 import { stackRoutes } from "./routes/stacks";
 import { ingestRoutes } from "./routes/ingest";
 import { releaseRoutes } from "./routes/release";
+import { releasePageRoutes } from "./routes/release-page";
 import { getUploadsDir, rewriteUploadsRequestPath } from "./uploads";
 
 const app = new Hono();
@@ -23,6 +24,7 @@ app.route("/api/music-items", musicItemRoutes);
 app.route("/api/stacks", stackRoutes);
 app.route("/api/ingest", ingestRoutes);
 app.route("/api/release", releaseRoutes);
+app.route("/r", releasePageRoutes);
 app.use(
   "/uploads/*",
   serveStatic({
@@ -53,7 +55,11 @@ if (isDev) {
   // avoiding the "Port undefined" error that occurs when Vite tries to derive the port itself.
   let viteHandle: ((req: unknown, res: unknown) => void) | null = null;
   const server = createHttpServer((req, res) => {
-    if (req.url?.startsWith("/api/") || req.url?.startsWith("/uploads/")) {
+    if (
+      req.url?.startsWith("/api/") ||
+      req.url?.startsWith("/uploads/") ||
+      req.url?.startsWith("/r/")
+    ) {
       honoListener(req, res);
       return;
     }
