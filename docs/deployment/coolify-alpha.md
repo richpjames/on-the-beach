@@ -34,9 +34,10 @@ Create a new Coolify application from `richpjames/on-the-beach`:
 > (Hono + SQLite) to handle `/api/*` routes. The Dockerfile builds the frontend and
 > starts the Bun server in a single container.
 
-Add an environment variable in Coolify:
+Add environment variables in Coolify:
 
 - `DATABASE_PATH`: `/app/data/on_the_beach.db`
+- `UPLOADS_DIR`: `/app/uploads`
 
 Add two persistent volumes in Coolify:
 
