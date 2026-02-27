@@ -630,7 +630,10 @@ select.input {
 .music-card__artwork {
   width: 108px;
   height: 108px;
+  aspect-ratio: 1 / 1;
   object-fit: cover;
+  object-position: center;
+  display: block;
   border: 1px solid #224499;
   background: #001033;
   flex-shrink: 0;
