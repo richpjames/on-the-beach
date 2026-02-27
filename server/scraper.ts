@@ -117,6 +117,63 @@ function firstDefined(...values: Array<string | undefined>): string | undefined 
   return undefined;
 }
 
+function hasScrapedMetadata(
+  metadata: ScrapedMetadata | null | undefined,
+): metadata is ScrapedMetadata {
+  return Boolean(metadata?.potentialArtist || metadata?.potentialTitle || metadata?.imageUrl);
+}
+
+function normalizeMixcloudImageUrl(url: string | undefined): string | undefined {
+  const trimmed = url?.trim();
+  if (!trimmed) return undefined;
+
+  const unsafeSizeMatch = trimmed.match(/\/unsafe\/(\d+)x(\d+)\//i);
+  if (unsafeSizeMatch) {
+    const width = Number(unsafeSizeMatch[1]);
+    const height = Number(unsafeSizeMatch[2]);
+    if (
+      Number.isFinite(width) &&
+      Number.isFinite(height) &&
+      width > 0 &&
+      height > 0 &&
+      width !== height
+    ) {
+      const size = Math.max(width, height);
+      return trimmed.replace(/\/unsafe\/\d+x\d+\//i, `/unsafe/${size}x${size}/`);
+    }
+    return trimmed;
+  }
+
+  try {
+    const parsed = new URL(trimmed);
+    if (!parsed.hostname.toLowerCase().endsWith("mixcloud.com")) return trimmed;
+
+    const widthParam = parsed.searchParams.get("w") ?? parsed.searchParams.get("width");
+    const heightParam = parsed.searchParams.get("h") ?? parsed.searchParams.get("height");
+    const width = Number(widthParam);
+    const height = Number(heightParam);
+
+    if (
+      Number.isFinite(width) &&
+      Number.isFinite(height) &&
+      width > 0 &&
+      height > 0 &&
+      width !== height
+    ) {
+      const size = Math.max(width, height);
+      if (parsed.searchParams.has("w")) parsed.searchParams.set("w", String(size));
+      if (parsed.searchParams.has("width")) parsed.searchParams.set("width", String(size));
+      if (parsed.searchParams.has("h")) parsed.searchParams.set("h", String(size));
+      if (parsed.searchParams.has("height")) parsed.searchParams.set("height", String(size));
+      return parsed.toString();
+    }
+  } catch {
+    // Ignore URL parse errors and keep original value.
+  }
+
+  return trimmed;
+}
+
 function normalizeMixcloudTitle(rawTitle: string): string {
   return rawTitle
     .replace(/\s+(?:on|at)\s+mixcloud(?:\s*\|.*)?$/i, "")
@@ -133,6 +190,15 @@ export function parseMixcloudOg(og: OgData): ScrapedMetadata {
     meta["twitter:creator"],
   );
   const rawTitle = firstDefined(meta["twitter:title"], og.ogTitle, og.title) ?? "";
+  const imageUrl = normalizeMixcloudImageUrl(
+    firstDefined(
+      og.ogImage,
+      meta["og:image:secure_url"],
+      meta["twitter:image"],
+      meta["twitter:image:src"],
+      meta["thumbnail"],
+    ),
+  );
   const byMatch = rawTitle.match(
     /^(?:stream\s+)?(.+?)\s+by\s+(.+?)(?:\s+(?:on|at)\s+mixcloud)?(?:\s*[|-].*)?$/i,
   );
@@ -143,7 +209,7 @@ export function parseMixcloudOg(og: OgData): ScrapedMetadata {
     return {
       potentialTitle: potentialTitle || undefined,
       potentialArtist,
-      imageUrl: og.ogImage,
+      imageUrl,
     };
   }
 
@@ -151,7 +217,7 @@ export function parseMixcloudOg(og: OgData): ScrapedMetadata {
   return {
     potentialTitle,
     potentialArtist: artistFromMeta,
-    imageUrl: og.ogImage,
+    imageUrl,
   };
 }
 
@@ -242,14 +308,48 @@ function extractTitleFromJsonLd(item: Record<string, unknown>): string | undefin
   return name;
 }
 
+function extractImageFromJsonLdValue(value: unknown): string | undefined {
+  const direct = getString(value);
+  if (direct) return direct;
+
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      const nested = extractImageFromJsonLdValue(item);
+      if (nested) return nested;
+    }
+    return undefined;
+  }
+
+  if (!isRecord(value)) return undefined;
+
+  return firstDefined(
+    getString(value.url),
+    getString(value.contentUrl),
+    getString(value.thumbnailUrl),
+    getString(value["@id"]),
+  );
+}
+
+function extractImageFromJsonLd(item: Record<string, unknown>): string | undefined {
+  return normalizeMixcloudImageUrl(
+    firstDefined(
+      extractImageFromJsonLdValue(item.image),
+      extractImageFromJsonLdValue(item.thumbnailUrl),
+      extractImageFromJsonLdValue(item.thumbnail),
+      extractImageFromJsonLdValue(item.contentUrl),
+    ),
+  );
+}
+
 export function parseMixcloudJsonLd(html: string): ScrapedMetadata {
   const entries = parseJsonLdScripts(html);
 
   for (const entry of entries) {
     const potentialArtist = extractArtistFromJsonLd(entry);
     const potentialTitle = extractTitleFromJsonLd(entry);
-    if (potentialArtist || potentialTitle) {
-      return { potentialArtist, potentialTitle };
+    const imageUrl = extractImageFromJsonLd(entry);
+    if (potentialArtist || potentialTitle || imageUrl) {
+      return { potentialArtist, potentialTitle, imageUrl };
     }
   }
 
@@ -282,7 +382,9 @@ async function scrapeMixcloudOEmbed(
     const potentialTitle = getString(data.title) ?? getString(data.name);
     const potentialArtist =
       getString(data.author_name) ?? getString(data.author) ?? getString(data.uploader);
-    const imageUrl = getString(data.thumbnail_url) ?? getString(data.thumbnail);
+    const imageUrl = normalizeMixcloudImageUrl(
+      firstDefined(getString(data.thumbnail_url), getString(data.thumbnail), getString(data.image)),
+    );
 
     if (!potentialTitle && !potentialArtist && !imageUrl) return null;
 
@@ -348,16 +450,23 @@ export async function scrapeUrl(
   source: SourceName,
   timeoutMs = 5000,
 ): Promise<ScrapedMetadata | null> {
+  let mixcloudOEmbed: ScrapedMetadata | null = null;
+
+  if (source === "mixcloud") {
+    mixcloudOEmbed = await scrapeMixcloudOEmbed(url, timeoutMs);
+  }
+
   try {
     if (source === "youtube") {
       return await scrapeYouTubeOEmbed(url, timeoutMs);
     }
 
-    if (source === "mixcloud") {
-      const oembed = await scrapeMixcloudOEmbed(url, timeoutMs);
-      if (oembed?.potentialArtist || oembed?.potentialTitle) {
-        return oembed;
-      }
+    if (
+      source === "mixcloud" &&
+      mixcloudOEmbed?.potentialArtist &&
+      mixcloudOEmbed?.potentialTitle
+    ) {
+      return mixcloudOEmbed;
     }
 
     const controller = new AbortController();
@@ -375,12 +484,14 @@ export async function scrapeUrl(
 
     const contentType = response.headers.get("content-type") || "";
     if (!contentType.includes("text/html")) {
-      return null;
+      return hasScrapedMetadata(mixcloudOEmbed) ? mixcloudOEmbed : null;
     }
 
     // Read only up to the </head> or MAX_HEAD_BYTES
     const reader = response.body?.getReader();
-    if (!reader) return null;
+    if (!reader) {
+      return hasScrapedMetadata(mixcloudOEmbed) ? mixcloudOEmbed : null;
+    }
 
     let html = "";
     const decoder = new TextDecoder();
@@ -396,19 +507,29 @@ export async function scrapeUrl(
 
     const og = parseOgTags(html);
     if (source === "mixcloud") {
+      const mixcloudOg = parseMixcloudOg(og);
       const jsonLd = parseMixcloudJsonLd(html);
-      if (jsonLd.potentialArtist || jsonLd.potentialTitle) {
-        return {
-          potentialArtist: jsonLd.potentialArtist,
-          potentialTitle: jsonLd.potentialTitle,
-          imageUrl: og.ogImage,
-        };
-      }
+
+      const merged: ScrapedMetadata = {
+        potentialArtist: firstDefined(
+          jsonLd.potentialArtist,
+          mixcloudOEmbed?.potentialArtist,
+          mixcloudOg.potentialArtist,
+        ),
+        potentialTitle: firstDefined(
+          jsonLd.potentialTitle,
+          mixcloudOEmbed?.potentialTitle,
+          mixcloudOg.potentialTitle,
+        ),
+        imageUrl: firstDefined(jsonLd.imageUrl, mixcloudOEmbed?.imageUrl, mixcloudOg.imageUrl),
+      };
+
+      return hasScrapedMetadata(merged) ? merged : null;
     }
 
     const parser = SOURCE_PARSERS[source] || parseDefaultOg;
     return parser(og);
   } catch {
-    return null;
+    return hasScrapedMetadata(mixcloudOEmbed) ? mixcloudOEmbed : null;
   }
 }

@@ -191,6 +191,19 @@ describe("parseMixcloudOg", () => {
     expect(result.potentialArtist).toBe("andrew");
     expect(result.potentialTitle).toBe("new rap music january 2026");
   });
+
+  test("falls back to Twitter image metadata and normalizes to square", () => {
+    const result = parseMixcloudOg({
+      ogTitle: "light sleeper radio 021 by nozwon",
+      metaTags: {
+        "twitter:image": "https://thumbnailer.mixcloud.com/unsafe/640x360/extaudio/abc.jpg",
+      },
+    });
+
+    expect(result.imageUrl).toBe(
+      "https://thumbnailer.mixcloud.com/unsafe/640x640/extaudio/abc.jpg",
+    );
+  });
 });
 
 describe("parseMixcloudJsonLd", () => {
@@ -211,6 +224,25 @@ describe("parseMixcloudJsonLd", () => {
     const result = parseMixcloudJsonLd(html);
     expect(result.potentialTitle).toBe("new rap music january 2026");
     expect(result.potentialArtist).toBe("andrew");
+  });
+
+  test("extracts image from JSON-LD", () => {
+    const html = `
+      <html><head>
+        <script type="application/ld+json">
+          {
+            "@context":"https://schema.org",
+            "@type":"AudioObject",
+            "image":{"@type":"ImageObject","url":"https://thumbnailer.mixcloud.com/unsafe/300x500/extaudio/abc.jpg"}
+          }
+        </script>
+      </head></html>
+    `;
+
+    const result = parseMixcloudJsonLd(html);
+    expect(result.imageUrl).toBe(
+      "https://thumbnailer.mixcloud.com/unsafe/500x500/extaudio/abc.jpg",
+    );
   });
 });
 
@@ -394,6 +426,31 @@ describe("scrapeUrl", () => {
     expect(result!.potentialTitle).toBe("new rap music january 2026");
     expect(result!.potentialArtist).toBe("andrew");
     expect(result!.imageUrl).toBe("https://mixcloud.com/oembed-cover.jpg");
+    mock.restore();
+  });
+
+  test("retains Mixcloud image from oEmbed when page scrape fails", async () => {
+    const fetchSpy = spyOn(globalThis, "fetch");
+    fetchSpy.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          thumbnail_url: "https://thumbnailer.mixcloud.com/unsafe/800x450/extaudio/xyz.jpg",
+        }),
+        {
+          headers: { "content-type": "application/json; charset=utf-8" },
+        },
+      ),
+    );
+    fetchSpy.mockRejectedValueOnce(new Error("network error"));
+
+    const result = await scrapeUrl(
+      "https://www.mixcloud.com/nozwon/light-sleeper-radio-021/",
+      "mixcloud",
+    );
+    expect(result).not.toBeNull();
+    expect(result!.imageUrl).toBe(
+      "https://thumbnailer.mixcloud.com/unsafe/800x800/extaudio/xyz.jpg",
+    );
     mock.restore();
   });
 });
