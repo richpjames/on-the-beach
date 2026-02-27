@@ -104,4 +104,30 @@ test.describe("Stacks", () => {
     await page.locator(".stack-manage__delete-btn").first().click();
     await expect(page.locator(".stack-tab", { hasText: "NewName" })).not.toBeVisible();
   });
+
+  test("can delete the currently selected stack from the stack bar", async ({ page }) => {
+    await page
+      .getByPlaceholder("Paste a music link...")
+      .fill("https://seekersinternational.bandcamp.com/album/delete-selected-stack");
+    await page.getByRole("button", { name: "Add" }).click();
+    await expect(page.locator(".music-card").first()).toBeVisible({ timeout: 10_000 });
+
+    await page
+      .locator(".music-card")
+      .first()
+      .locator('.music-card__action-btn[data-action="stack"]')
+      .click();
+    await page.locator(".stack-dropdown__new-input").fill("Throwaway");
+    await page.locator(".stack-dropdown__new-input").press("Enter");
+    await page.keyboard.press("Escape");
+
+    await page.locator(".stack-tab", { hasText: "Throwaway" }).click();
+    await expect(page.locator("#delete-stack-btn")).toBeVisible();
+
+    page.once("dialog", (dialog) => dialog.accept());
+    await page.locator("#delete-stack-btn").click();
+
+    await expect(page.locator(".stack-tab", { hasText: "Throwaway" })).not.toBeVisible();
+    await expect(page.locator(".stack-tab[data-stack='all']")).toHaveClass(/active/);
+  });
 });

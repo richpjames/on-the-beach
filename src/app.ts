@@ -340,6 +340,7 @@ export class App {
 
     const bar = document.getElementById("stack-bar");
     const manageBtn = document.getElementById("manage-stacks-btn");
+    const deleteBtn = document.getElementById("delete-stack-btn");
     if (!bar || !manageBtn) {
       return;
     }
@@ -361,6 +362,16 @@ export class App {
     if (allBtn) {
       allBtn.className = `stack-tab${this.appState.currentStack === null ? " active" : ""}`;
     }
+
+    if (deleteBtn instanceof HTMLButtonElement) {
+      const selectedStack = this.appState.stacks.find(
+        (stack) => stack.id === this.appState.currentStack,
+      );
+      const hasSelection = selectedStack !== undefined;
+      deleteBtn.hidden = !hasSelection;
+      deleteBtn.disabled = !hasSelection;
+      deleteBtn.title = hasSelection ? `Delete "${selectedStack.name}"` : "Delete selected stack";
+    }
   }
 
   private setupStackBar(): void {
@@ -369,10 +380,18 @@ export class App {
       return;
     }
 
-    bar.addEventListener("click", (event) => {
+    bar.addEventListener("click", async (event) => {
       const target = event.target as HTMLElement;
+      const deleteBtn = target.closest("#delete-stack-btn");
+      if (deleteBtn) {
+        if (this.appState.currentStack !== null) {
+          await this.deleteStackById(this.appState.currentStack);
+        }
+        return;
+      }
+
       const tab = target.closest(".stack-tab") as HTMLElement | null;
-      if (!tab || tab.id === "manage-stacks-btn") {
+      if (!tab || tab.id === "manage-stacks-btn" || tab.id === "delete-stack-btn") {
         return;
       }
 
@@ -388,6 +407,23 @@ export class App {
       void this.renderStackBar();
       void this.renderMusicList();
     });
+  }
+
+  private async deleteStackById(stackId: number): Promise<void> {
+    const stack = this.appState.stacks.find((candidate) => candidate.id === stackId);
+    const stackName = stack?.name ?? "this stack";
+    if (!confirm(`Delete "${stackName}"? Links won't be deleted, just untagged.`)) {
+      return;
+    }
+
+    await this.api.deleteStack(stackId);
+    this.appState = transitionAppState(this.appState, {
+      type: "STACK_DELETED",
+      stackId,
+    });
+    await this.renderStackBar();
+    await this.renderStackManagePanel();
+    await this.renderMusicList();
   }
 
   private setupEventDelegation(): void {
@@ -818,19 +854,7 @@ export class App {
       }
 
       if (target.classList.contains("stack-manage__delete-btn")) {
-        const stack = this.appState.stacks.find((candidate) => candidate.id === stackId);
-        if (!confirm(`Delete "${stack?.name}"? Links won't be deleted, just untagged.`)) {
-          return;
-        }
-
-        await this.api.deleteStack(stackId);
-        this.appState = transitionAppState(this.appState, {
-          type: "STACK_DELETED",
-          stackId,
-        });
-        await this.renderStackBar();
-        await this.renderStackManagePanel();
-        await this.renderMusicList();
+        await this.deleteStackById(stackId);
       }
     });
   }
