@@ -58,7 +58,9 @@
               >
                 Scan
               </button>
-              <button type="submit" id="add-form-submit" class="btn btn--primary" disabled>Add</button>
+              <button type="submit" id="add-form-submit" class="btn btn--primary" disabled>
+                Add
+              </button>
             </div>
 
             <details class="add-form__details">
@@ -84,12 +86,7 @@
                 />
                 <input type="text" name="country" placeholder="Country" class="input" />
                 <input type="text" name="genre" placeholder="Genre" class="input" />
-                <input
-                  type="text"
-                  name="artworkUrl"
-                  placeholder="Artwork URL"
-                  class="input"
-                />
+                <input type="text" name="artworkUrl" placeholder="Artwork URL" class="input" />
                 <input
                   type="text"
                   name="catalogueNumber"
@@ -160,8 +157,33 @@
         </section>
 
         <section class="list-section">
-          <div id="music-list" class="music-list">
-            <!-- Music items inserted by JS -->
+          <div class="music-list-shell">
+            <div id="music-list" class="music-list">
+              <!-- Music items inserted by JS -->
+            </div>
+            <div id="music-list-scrollbar" class="music-scrollbar">
+              <button
+                type="button"
+                class="music-scrollbar__button"
+                data-scroll-btn="up"
+                aria-label="Scroll up"
+                tabindex="-1"
+              >
+                ▲
+              </button>
+              <div id="music-list-scroll-track" class="music-scrollbar__track">
+                <div id="music-list-scroll-thumb" class="music-scrollbar__thumb"></div>
+              </div>
+              <button
+                type="button"
+                class="music-scrollbar__button"
+                data-scroll-btn="down"
+                aria-label="Scroll down"
+                tabindex="-1"
+              >
+                ▼
+              </button>
+            </div>
           </div>
         </section>
       </main>

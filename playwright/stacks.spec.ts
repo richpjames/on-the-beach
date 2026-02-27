@@ -16,7 +16,11 @@ test.describe("Stacks", () => {
     await expect(page.locator(".music-card").first()).toBeVisible({ timeout: 10_000 });
 
     // Open stack dropdown on the card
-    await page.locator(".music-card").first().locator('[data-action="stack"]').click();
+    await page
+      .locator(".music-card")
+      .first()
+      .locator('.music-card__action-btn[data-action="stack"]')
+      .click();
     await expect(page.locator(".stack-dropdown")).toBeVisible();
 
     // Create a new stack inline
@@ -45,7 +49,11 @@ test.describe("Stacks", () => {
     await expect(page.locator(".music-card").first()).toBeVisible({ timeout: 10_000 });
 
     // Assign to a new stack via the card dropdown
-    await page.locator(".music-card").first().locator('[data-action="stack"]').click();
+    await page
+      .locator(".music-card")
+      .first()
+      .locator('.music-card__action-btn[data-action="stack"]')
+      .click();
     await expect(page.locator(".stack-dropdown")).toBeVisible();
     await page.locator(".stack-dropdown__new-input").fill("Late Night");
     await page.locator(".stack-dropdown__new-input").press("Enter");
@@ -71,7 +79,11 @@ test.describe("Stacks", () => {
     await expect(page.locator(".music-card").first()).toBeVisible({ timeout: 10_000 });
 
     // Create stack via card dropdown
-    await page.locator(".music-card").first().locator('[data-action="stack"]').click();
+    await page
+      .locator(".music-card")
+      .first()
+      .locator('.music-card__action-btn[data-action="stack"]')
+      .click();
     await page.locator(".stack-dropdown__new-input").fill("OldName");
     await page.locator(".stack-dropdown__new-input").press("Enter");
     await page.keyboard.press("Escape");
