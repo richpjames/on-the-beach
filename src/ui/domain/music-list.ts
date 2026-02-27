@@ -1,4 +1,5 @@
 import type { ListenStatus, MusicItemFilters } from "../../types";
+import { applyOrder, buildContextKey } from "../../../shared/music-list-context";
 import { STATUS_LABELS } from "./status";
 
 export type FilterSelection = ListenStatus | "all";
@@ -20,25 +21,7 @@ export function buildMusicItemFilters(
   return Object.keys(filters).length > 0 ? filters : undefined;
 }
 
-export function buildContextKey(
-  currentFilter: FilterSelection,
-  currentStack: number | null,
-): string {
-  if (currentFilter === "all" && currentStack === null) return "all";
-  if (currentFilter === "all") return `stack:${currentStack}`;
-  if (currentStack === null) return `filter:${currentFilter}`;
-  return `filter:${currentFilter}:stack:${currentStack}`;
-}
-
-export function applyOrder<T extends { id: number }>(items: T[], orderedIds: number[]): T[] {
-  if (orderedIds.length === 0) return items;
-  const indexMap = new Map(orderedIds.map((id, index) => [id, index]));
-  return [...items].sort((a, b) => {
-    const ai = indexMap.get(a.id) ?? Infinity;
-    const bi = indexMap.get(b.id) ?? Infinity;
-    return ai - bi;
-  });
-}
+export { applyOrder, buildContextKey };
 
 export function getEmptyStateMessage(currentFilter: FilterSelection): string {
   if (currentFilter === "all") {

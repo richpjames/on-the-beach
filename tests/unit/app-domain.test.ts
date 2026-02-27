@@ -99,10 +99,10 @@ describe("app domain helpers", () => {
     expect(buildContextKey("listened", 3)).toBe("filter:listened:stack:3");
   });
 
-  it("sorts items by saved order and puts unordered items last", () => {
+  it("sorts items by saved order and puts unordered items first", () => {
     const items = [{ id: 10 }, { id: 20 }, { id: 30 }];
     expect(applyOrder(items, [30, 10, 20])).toEqual([{ id: 30 }, { id: 10 }, { id: 20 }]);
-    expect(applyOrder(items, [20])).toEqual([{ id: 20 }, { id: 10 }, { id: 30 }]);
+    expect(applyOrder(items, [20])).toEqual([{ id: 10 }, { id: 30 }, { id: 20 }]);
     expect(applyOrder(items, [])).toEqual(items);
   });
 });

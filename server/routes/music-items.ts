@@ -3,6 +3,7 @@ import { eq, and, inArray, sql } from "drizzle-orm";
 import { db } from "../db/index";
 import { musicItems, artists, musicItemStacks, stacks, musicItemOrder } from "../db/schema";
 import { isValidUrl, normalize } from "../utils";
+import { applyOrder, buildContextKey } from "../../shared/music-list-context";
 import {
   fullItemSelect,
   fetchFullItem,
@@ -20,18 +21,94 @@ import type {
 
 export const musicItemRoutes = new Hono();
 const LOCAL_UPLOADS_PATTERN = /^\/uploads\/[A-Za-z0-9._-]+$/;
+type MusicItemUpdateSet = Record<string, unknown>;
 
-function buildContextKey(listenStatus: string | undefined, stackId: string | undefined): string {
-  const filter = listenStatus || "all";
-  const stack = stackId ? Number(stackId) : null;
-  if (filter === "all" && stack === null) return "all";
-  if (filter === "all") return `stack:${stack}`;
-  if (stack === null) return `filter:${filter}`;
-  return `filter:${filter}:stack:${stack}`;
-}
+const DIRECT_UPDATE_FIELDS: ReadonlyArray<
+  | "itemType"
+  | "purchaseIntent"
+  | "notes"
+  | "rating"
+  | "priceCents"
+  | "currency"
+  | "label"
+  | "year"
+  | "country"
+  | "genre"
+  | "catalogueNumber"
+> = [
+  "itemType",
+  "purchaseIntent",
+  "notes",
+  "rating",
+  "priceCents",
+  "currency",
+  "label",
+  "year",
+  "country",
+  "genre",
+  "catalogueNumber",
+];
 
 function isValidArtworkUrl(value: string): boolean {
   return isValidUrl(value) || LOCAL_UPLOADS_PATTERN.test(value);
+}
+
+function applyTitleUpdate(setFields: MusicItemUpdateSet, input: UpdateMusicItemInput): void {
+  if (input.title === undefined) {
+    return;
+  }
+
+  setFields.title = input.title;
+  setFields.normalizedTitle = normalize(input.title);
+}
+
+function applyListenStatusUpdate(setFields: MusicItemUpdateSet, input: UpdateMusicItemInput): void {
+  if (input.listenStatus === undefined) {
+    return;
+  }
+
+  setFields.listenStatus = input.listenStatus;
+  if (input.listenStatus === "listened" || input.listenStatus === "done") {
+    setFields.listenedAt = new Date();
+  }
+}
+
+function applyDirectUpdateFields(setFields: MusicItemUpdateSet, input: UpdateMusicItemInput): void {
+  for (const field of DIRECT_UPDATE_FIELDS) {
+    const value = input[field];
+    if (value !== undefined) {
+      setFields[field] = value;
+    }
+  }
+}
+
+function applyArtworkUpdate(setFields: MusicItemUpdateSet, input: UpdateMusicItemInput): boolean {
+  if (input.artworkUrl === undefined) {
+    return true;
+  }
+
+  if (input.artworkUrl !== null && !isValidArtworkUrl(input.artworkUrl)) {
+    return false;
+  }
+
+  setFields.artworkUrl = input.artworkUrl;
+  return true;
+}
+
+async function applyArtistUpdate(
+  setFields: MusicItemUpdateSet,
+  input: UpdateMusicItemInput,
+): Promise<void> {
+  if (input.artistName === undefined) {
+    return;
+  }
+
+  if (input.artistName) {
+    setFields.artistId = await getOrCreateArtist(input.artistName);
+    return;
+  }
+
+  setFields.artistId = null;
 }
 
 // ---------------------------------------------------------------------------
@@ -40,6 +117,7 @@ function isValidArtworkUrl(value: string): boolean {
 
 musicItemRoutes.get("/", async (c) => {
   const { listenStatus, purchaseIntent, search, stackId } = c.req.query();
+  const parsedStackId = stackId ? Number(stackId) : null;
 
   // Start building conditions
   const conditions = [];
@@ -61,10 +139,9 @@ musicItemRoutes.get("/", async (c) => {
     );
   }
 
-  if (stackId) {
-    const sid = Number(stackId);
+  if (parsedStackId !== null) {
     conditions.push(
-      sql`${musicItems.id} IN (SELECT ${musicItemStacks.musicItemId} FROM ${musicItemStacks} WHERE ${musicItemStacks.stackId} = ${sid})`,
+      sql`${musicItems.id} IN (SELECT ${musicItemStacks.musicItemId} FROM ${musicItemStacks} WHERE ${musicItemStacks.stackId} = ${parsedStackId})`,
     );
   }
 
@@ -100,7 +177,7 @@ musicItemRoutes.get("/", async (c) => {
   const enriched = hydrateItemStacks(items, stackRows);
 
   // Apply custom sort order if one exists for this context
-  const contextKey = buildContextKey(listenStatus, stackId);
+  const contextKey = buildContextKey(listenStatus, parsedStackId);
   const orderRow = await db
     .select()
     .from(musicItemOrder)
@@ -110,12 +187,7 @@ musicItemRoutes.get("/", async (c) => {
   let finalItems: typeof enriched = enriched;
   if (orderRow) {
     const orderedIds = JSON.parse(orderRow.itemIds) as number[];
-    const indexMap = new Map(orderedIds.map((id, i) => [id, i]));
-    finalItems = [...enriched].sort((a, b) => {
-      const ai = indexMap.get(a.id) ?? Infinity;
-      const bi = indexMap.get(b.id) ?? Infinity;
-      return ai - bi;
-    });
+    finalItems = applyOrder(enriched, orderedIds);
   }
 
   return c.json({ items: finalItems, total: finalItems.length });
@@ -202,67 +274,16 @@ musicItemRoutes.patch("/:id", async (c) => {
 
   const input = (await c.req.json()) as UpdateMusicItemInput;
 
-  // Build the dynamic set object
-  const setFields: Record<string, unknown> = {};
+  const setFields: MusicItemUpdateSet = {};
+  applyTitleUpdate(setFields, input);
+  applyListenStatusUpdate(setFields, input);
+  applyDirectUpdateFields(setFields, input);
 
-  if (input.title !== undefined) {
-    setFields.title = input.title;
-    setFields.normalizedTitle = normalize(input.title);
-  }
-  if (input.itemType !== undefined) {
-    setFields.itemType = input.itemType;
-  }
-  if (input.listenStatus !== undefined) {
-    setFields.listenStatus = input.listenStatus;
-    if (input.listenStatus === "listened" || input.listenStatus === "done") {
-      setFields.listenedAt = new Date();
-    }
-  }
-  if (input.purchaseIntent !== undefined) {
-    setFields.purchaseIntent = input.purchaseIntent;
-  }
-  if (input.notes !== undefined) {
-    setFields.notes = input.notes;
-  }
-  if (input.rating !== undefined) {
-    setFields.rating = input.rating;
-  }
-  if (input.priceCents !== undefined) {
-    setFields.priceCents = input.priceCents;
-  }
-  if (input.currency !== undefined) {
-    setFields.currency = input.currency;
-  }
-  if (input.label !== undefined) {
-    setFields.label = input.label;
-  }
-  if (input.year !== undefined) {
-    setFields.year = input.year;
-  }
-  if (input.country !== undefined) {
-    setFields.country = input.country;
-  }
-  if (input.genre !== undefined) {
-    setFields.genre = input.genre;
-  }
-  if (input.catalogueNumber !== undefined) {
-    setFields.catalogueNumber = input.catalogueNumber;
-  }
-  if (input.artworkUrl !== undefined) {
-    if (input.artworkUrl !== null && !isValidArtworkUrl(input.artworkUrl)) {
-      return c.json({ error: "Invalid artwork URL" }, 400);
-    }
-    setFields.artworkUrl = input.artworkUrl;
+  if (!applyArtworkUpdate(setFields, input)) {
+    return c.json({ error: "Invalid artwork URL" }, 400);
   }
 
-  // Handle artist name changes
-  if (input.artistName !== undefined) {
-    if (input.artistName) {
-      setFields.artistId = await getOrCreateArtist(input.artistName);
-    } else {
-      setFields.artistId = null;
-    }
-  }
+  await applyArtistUpdate(setFields, input);
 
   if (Object.keys(setFields).length > 0) {
     setFields.updatedAt = new Date();

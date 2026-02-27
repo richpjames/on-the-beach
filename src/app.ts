@@ -23,12 +23,27 @@ import {
   renderStackRenameEditor,
 } from "./ui/view/templates";
 
+interface ItemContext {
+  card: HTMLElement;
+  itemId: number;
+}
+
+interface StackDropdownOptions {
+  container: HTMLElement;
+  selectedStackIds: Set<number>;
+  onToggle: (stackId: number, checked: boolean) => Promise<void> | void;
+  onCreate: (name: string) => Promise<void>;
+  onClose?: () => void;
+  shouldIgnoreOutsideClick?: (target: HTMLElement) => boolean;
+}
+
 export class App {
   private api: ApiClient;
   private appState = initialAppState;
   private addFormState = initialAddFormState;
   private ratingState = initialRatingState;
   private dragState: { sourceCard: HTMLElement | null } = { sourceCard: null };
+  private activeStackDropdownCleanup: ((skipOnClose?: boolean) => void) | null = null;
 
   constructor() {
     this.api = new ApiClient();
@@ -379,58 +394,57 @@ export class App {
       const target = event.target as HTMLElement;
 
       if (target.dataset.action === "stack" || target.closest('[data-action="stack"]')) {
-        const card = target.closest("[data-item-id]") as HTMLElement | null;
-        const id = Number(card?.dataset.itemId);
-        if (id && card) {
-          await this.renderStackDropdown(card, id);
+        const itemContext = this.resolveItemContext(target);
+        if (itemContext) {
+          await this.renderStackDropdown(itemContext.card, itemContext.itemId);
         }
         return;
       }
 
-      const deleteBtn = target.closest('[data-action="delete"]');
+      const deleteBtn = target.closest('[data-action="delete"]') as HTMLElement | null;
       if (!deleteBtn) {
         return;
       }
 
-      const card = deleteBtn.closest("[data-item-id]") as HTMLElement | null;
-      const id = Number(card?.dataset.itemId);
-      if (!id || !card || !confirm("Delete this item?")) {
+      const itemContext = this.resolveItemContext(deleteBtn);
+      if (!itemContext || !confirm("Delete this item?")) {
         return;
       }
 
-      card.remove();
-      await this.api.deleteMusicItem(id);
+      itemContext.card.remove();
+      await this.api.deleteMusicItem(itemContext.itemId);
     });
 
     list.addEventListener("change", async (event) => {
-      const target = event.target as HTMLSelectElement;
+      const target = event.target as HTMLElement;
 
-      if (target.classList.contains("status-select")) {
-        const card = target.closest("[data-item-id]") as HTMLElement | null;
-        const id = Number(card?.dataset.itemId);
-        const status = target.value as ListenStatus;
-
-        if (id) {
-          await this.api.updateListenStatus(id, status);
-          await this.renderMusicList();
+      if (target instanceof HTMLSelectElement && target.classList.contains("status-select")) {
+        const itemContext = this.resolveItemContext(target);
+        if (!itemContext) {
+          return;
         }
+
+        await this.api.updateListenStatus(itemContext.itemId, target.value as ListenStatus);
+        await this.renderMusicList();
+        return;
       }
 
-      const radioTarget = event.target as HTMLInputElement;
-      if (radioTarget.type === "radio" && radioTarget.name.startsWith("rating-")) {
-        const card = radioTarget.closest("[data-item-id]") as HTMLElement | null;
-        const id = Number(card?.dataset.itemId);
-
-        if (id) {
-          await this.api.updateMusicItem(id, { rating: Number(radioTarget.value) });
-          await this.renderMusicList();
-        }
+      if (!(target instanceof HTMLInputElement) || !this.isRatingInput(target)) {
+        return;
       }
+
+      const itemContext = this.resolveItemContext(target);
+      if (!itemContext) {
+        return;
+      }
+
+      await this.api.updateMusicItem(itemContext.itemId, { rating: Number(target.value) });
+      await this.renderMusicList();
     });
 
     list.addEventListener("mousedown", (event) => {
       const input = this.resolveRatingInput(event.target as HTMLElement);
-      if (!input || input.type !== "radio" || !input.name.startsWith("rating-")) {
+      if (!this.isRatingInput(input)) {
         return;
       }
 
@@ -439,38 +453,40 @@ export class App {
         return;
       }
 
-      const card = input.closest("[data-item-id]") as HTMLElement | null;
-      const itemId = Number(card?.dataset.itemId);
-      if (!itemId) {
+      const itemContext = this.resolveItemContext(input);
+      if (!itemContext) {
         this.ratingState = transitionRatingState(this.ratingState, { type: "RESET" });
         return;
       }
 
       this.ratingState = transitionRatingState(this.ratingState, {
         type: "POINTER_DOWN_ON_CHECKED",
-        itemId,
+        itemId: itemContext.itemId,
         value: Number(input.value),
       });
     });
 
     list.addEventListener("click", async (event) => {
       const input = this.resolveRatingInput(event.target as HTMLElement);
-      if (!input || input.type !== "radio" || !input.name.startsWith("rating-")) {
+      if (!this.isRatingInput(input)) {
         return;
       }
 
-      const card = input.closest("[data-item-id]") as HTMLElement | null;
-      const itemId = Number(card?.dataset.itemId);
-      if (!itemId) {
+      const itemContext = this.resolveItemContext(input);
+      if (!itemContext) {
         this.ratingState = transitionRatingState(this.ratingState, { type: "RESET" });
         return;
       }
 
-      const clickResult = resolveRatingClick(this.ratingState, itemId, Number(input.value));
+      const clickResult = resolveRatingClick(
+        this.ratingState,
+        itemContext.itemId,
+        Number(input.value),
+      );
       this.ratingState = clickResult.state;
 
       if (clickResult.shouldClear) {
-        await this.api.updateMusicItem(itemId, { rating: null });
+        await this.api.updateMusicItem(itemContext.itemId, { rating: null });
         await this.renderMusicList();
       }
     });
@@ -486,9 +502,7 @@ export class App {
     list.addEventListener("dragend", () => {
       this.dragState.sourceCard?.classList.remove("is-dragging");
       this.dragState.sourceCard = null;
-      list.querySelectorAll(".drop-target-above, .drop-target-below").forEach((el) => {
-        el.classList.remove("drop-target-above", "drop-target-below");
-      });
+      this.clearDropTargets(list);
     });
 
     list.addEventListener("dragover", (event) => {
@@ -496,9 +510,7 @@ export class App {
       const target = (event.target as HTMLElement).closest(".music-card") as HTMLElement | null;
       if (!target || target === this.dragState.sourceCard) return;
 
-      list.querySelectorAll(".drop-target-above, .drop-target-below").forEach((el) => {
-        el.classList.remove("drop-target-above", "drop-target-below");
-      });
+      this.clearDropTargets(list);
 
       const rect = target.getBoundingClientRect();
       const midpoint = rect.top + rect.height / 2;
@@ -532,6 +544,30 @@ export class App {
         .filter((id) => !Number.isNaN(id) && id > 0);
 
       await this.api.saveOrder(contextKey, itemIds);
+    });
+  }
+
+  private resolveItemContext(target: HTMLElement): ItemContext | null {
+    const card = target.closest("[data-item-id]") as HTMLElement | null;
+    if (!card) {
+      return null;
+    }
+
+    const itemId = Number(card.dataset.itemId);
+    if (!Number.isInteger(itemId) || itemId <= 0) {
+      return null;
+    }
+
+    return { card, itemId };
+  }
+
+  private isRatingInput(input: HTMLInputElement | null): input is HTMLInputElement {
+    return input !== null && input.type === "radio" && input.name.startsWith("rating-");
+  }
+
+  private clearDropTargets(list: HTMLElement): void {
+    list.querySelectorAll(".drop-target-above, .drop-target-below").forEach((el) => {
+      el.classList.remove("drop-target-above", "drop-target-below");
     });
   }
 
@@ -666,36 +702,145 @@ export class App {
   }
 
   private async showAddFormStackDropdown(): Promise<void> {
-    document.querySelectorAll(".stack-dropdown").forEach((dropdown) => {
-      dropdown.remove();
-    });
-
-    const stacks = await this.api.listStacks();
-    const selectedStackIds = new Set(this.addFormState.selectedStackIds);
-
-    const dropdown = document.createElement("div");
-    dropdown.className = "stack-dropdown";
-    dropdown.innerHTML = renderStackDropdownContent(stacks, selectedStackIds);
-
     const picker = document.getElementById("add-form-stacks");
-    if (!picker) {
+    if (!(picker instanceof HTMLElement)) {
       return;
     }
 
-    picker.appendChild(dropdown);
+    await this.openStackDropdown({
+      container: picker,
+      selectedStackIds: new Set(this.addFormState.selectedStackIds),
+      onToggle: (stackId, checked) => {
+        this.addFormState = transitionAddFormState(this.addFormState, {
+          type: "STACK_TOGGLED",
+          stackId,
+          checked,
+        });
+        this.renderAddFormStackChips();
+      },
+      onCreate: async (name) => {
+        const stack = await this.api.createStack(name);
+        this.addFormState = transitionAddFormState(this.addFormState, {
+          type: "STACK_ADDED",
+          stackId: stack.id,
+        });
+        await this.renderStackBar();
+        this.renderAddFormStackChips();
+        await this.showAddFormStackDropdown();
+      },
+      shouldIgnoreOutsideClick: (target) => target.closest("#add-form-stack-btn") !== null,
+    });
+  }
 
-    dropdown.addEventListener("change", (event) => {
+  private async renderStackDropdown(cardEl: HTMLElement, itemId: number): Promise<void> {
+    const actionsEl = cardEl.querySelector(".music-card__actions");
+    if (!(actionsEl instanceof HTMLElement)) {
+      return;
+    }
+
+    const itemStacks = await this.api.getStacksForItem(itemId);
+    actionsEl.style.position = "relative";
+    await this.openStackDropdown({
+      container: actionsEl,
+      selectedStackIds: new Set(itemStacks.map((stack) => stack.id)),
+      onToggle: async (stackId, checked) => {
+        if (checked) {
+          await this.api.addItemToStack(itemId, stackId);
+        } else {
+          await this.api.removeItemFromStack(itemId, stackId);
+        }
+
+        await this.renderStackBar();
+      },
+      onCreate: async (name) => {
+        const stack = await this.api.createStack(name);
+        await this.api.addItemToStack(itemId, stack.id);
+        await this.renderStackBar();
+        await this.renderStackDropdown(cardEl, itemId);
+      },
+      onClose: () => {
+        void this.renderMusicList();
+      },
+    });
+  }
+
+  private closeActiveStackDropdown(): void {
+    this.activeStackDropdownCleanup?.(true);
+    this.activeStackDropdownCleanup = null;
+  }
+
+  private async openStackDropdown(options: StackDropdownOptions): Promise<void> {
+    this.closeActiveStackDropdown();
+
+    const stacks = await this.api.listStacks();
+
+    const dropdown = document.createElement("div");
+    dropdown.className = "stack-dropdown";
+    dropdown.innerHTML = renderStackDropdownContent(stacks, options.selectedStackIds);
+    options.container.appendChild(dropdown);
+
+    let closed = false;
+    const closeOnEscape = (event: KeyboardEvent): void => {
+      if (event.key === "Escape") {
+        close();
+      }
+    };
+
+    const clickOutside = (event: MouseEvent): void => {
+      const target = event.target;
+      if (!(target instanceof HTMLElement)) {
+        return;
+      }
+
+      if (dropdown.contains(target) || options.shouldIgnoreOutsideClick?.(target)) {
+        return;
+      }
+
+      close();
+    };
+
+    const close = (skipOnClose = false): void => {
+      if (closed) {
+        return;
+      }
+
+      closed = true;
+      dropdown.remove();
+      document.removeEventListener("keydown", closeOnEscape);
+      document.removeEventListener("click", clickOutside);
+
+      if (this.activeStackDropdownCleanup === close) {
+        this.activeStackDropdownCleanup = null;
+      }
+
+      if (!skipOnClose) {
+        options.onClose?.();
+      }
+    };
+
+    this.activeStackDropdownCleanup = close;
+    document.addEventListener("keydown", closeOnEscape);
+
+    setTimeout(() => {
+      if (closed) {
+        return;
+      }
+
+      document.addEventListener("click", clickOutside);
+    }, 0);
+
+    dropdown.addEventListener("change", async (event) => {
       const target = event.target as HTMLInputElement;
       if (!target.classList.contains("stack-dropdown__checkbox")) {
         return;
       }
 
-      this.addFormState = transitionAddFormState(this.addFormState, {
-        type: "STACK_TOGGLED",
-        stackId: Number(target.dataset.stackId),
-        checked: target.checked,
-      });
-      this.renderAddFormStackChips();
+      const stackId = Number(target.dataset.stackId);
+      if (!Number.isInteger(stackId) || stackId <= 0) {
+        return;
+      }
+
+      await options.onToggle(stackId, target.checked);
     });
 
     const newInput = dropdown.querySelector(".stack-dropdown__new-input");
@@ -711,125 +856,8 @@ export class App {
           return;
         }
 
-        const stack = await this.api.createStack(name);
-        this.addFormState = transitionAddFormState(this.addFormState, {
-          type: "STACK_ADDED",
-          stackId: stack.id,
-        });
-        await this.renderStackBar();
-        this.renderAddFormStackChips();
-        await this.showAddFormStackDropdown();
+        await options.onCreate(name);
       });
     }
-
-    const closeOnEscape = (event: KeyboardEvent): void => {
-      if (event.key !== "Escape") {
-        return;
-      }
-
-      dropdown.remove();
-      document.removeEventListener("keydown", closeOnEscape);
-    };
-
-    document.addEventListener("keydown", closeOnEscape);
-
-    setTimeout(() => {
-      const clickOutside = (event: MouseEvent): void => {
-        const target = event.target as HTMLElement;
-        if (dropdown.contains(target) || target.closest("#add-form-stack-btn")) {
-          return;
-        }
-
-        dropdown.remove();
-        document.removeEventListener("click", clickOutside);
-      };
-
-      document.addEventListener("click", clickOutside);
-    }, 0);
-  }
-
-  private async renderStackDropdown(cardEl: HTMLElement, itemId: number): Promise<void> {
-    document.querySelectorAll(".stack-dropdown").forEach((dropdown) => {
-      dropdown.remove();
-    });
-
-    const [stacks, itemStacks] = await Promise.all([
-      this.api.listStacks(),
-      this.api.getStacksForItem(itemId),
-    ]);
-    const selectedStackIds = new Set(itemStacks.map((stack) => stack.id));
-
-    const dropdown = document.createElement("div");
-    dropdown.className = "stack-dropdown";
-    dropdown.innerHTML = renderStackDropdownContent(stacks, selectedStackIds);
-
-    const actionsEl = cardEl.querySelector(".music-card__actions");
-    if (!(actionsEl instanceof HTMLElement)) {
-      return;
-    }
-
-    actionsEl.style.position = "relative";
-    actionsEl.appendChild(dropdown);
-
-    dropdown.addEventListener("change", async (event) => {
-      const target = event.target as HTMLInputElement;
-      if (!target.classList.contains("stack-dropdown__checkbox")) {
-        return;
-      }
-
-      const stackId = Number(target.dataset.stackId);
-      if (target.checked) {
-        await this.api.addItemToStack(itemId, stackId);
-      } else {
-        await this.api.removeItemFromStack(itemId, stackId);
-      }
-
-      await this.renderStackBar();
-    });
-
-    const newInput = dropdown.querySelector(".stack-dropdown__new-input");
-    if (newInput instanceof HTMLInputElement) {
-      newInput.addEventListener("keydown", async (event) => {
-        if (event.key !== "Enter") {
-          return;
-        }
-
-        const name = newInput.value.trim();
-        if (!name) {
-          return;
-        }
-
-        const stack = await this.api.createStack(name);
-        await this.api.addItemToStack(itemId, stack.id);
-        await this.renderStackBar();
-        await this.renderStackDropdown(cardEl, itemId);
-      });
-    }
-
-    const closeOnEscape = (event: KeyboardEvent): void => {
-      if (event.key !== "Escape") {
-        return;
-      }
-
-      dropdown.remove();
-      document.removeEventListener("keydown", closeOnEscape);
-      void this.renderMusicList();
-    };
-
-    document.addEventListener("keydown", closeOnEscape);
-
-    setTimeout(() => {
-      const clickOutside = (event: MouseEvent): void => {
-        if (dropdown.contains(event.target as Node)) {
-          return;
-        }
-
-        dropdown.remove();
-        document.removeEventListener("click", clickOutside);
-        void this.renderMusicList();
-      };
-
-      document.addEventListener("click", clickOutside);
-    }, 0);
   }
 }
