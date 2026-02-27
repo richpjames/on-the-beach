@@ -85,6 +85,12 @@ export function renderMusicCard(item: MusicItemFull): string {
             <line x1="5" y1="12" x2="19" y2="12"></line>
           </svg>
         </button>
+        <a href="/r/${item.id}" class="btn btn--ghost" title="View release page">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path>
+            <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path>
+          </svg>
+        </a>
         <button type="button" class="btn btn--ghost btn--danger" data-action="delete" title="Delete">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <polyline points="3 6 5 6 21 6"></polyline>

@@ -1211,3 +1211,86 @@ body::after {
   padding: 4px 12px;
   z-index: 9999;
 }
+
+/* ─── Release Permalink Page ────────────────────────────────────────────── */
+
+.release-page {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 12px;
+  max-width: 600px;
+}
+
+.release-page__nav {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 4px;
+}
+
+.release-page__artwork {
+  width: 100%;
+  max-width: 400px;
+  height: auto;
+  display: block;
+  border: 2px solid var(--chrome-dark);
+}
+
+.release-page__title {
+  font-family: var(--font-mono);
+  font-size: 1.4rem;
+  color: var(--playlist-text);
+  margin: 0;
+}
+
+.release-page__artist {
+  color: var(--playlist-text-hover);
+  font-size: 1rem;
+}
+
+.release-page__meta {
+  color: var(--chrome-dark);
+  font-size: 0.85rem;
+}
+
+.release-page__catalogue {
+  color: var(--chrome-dark);
+  font-size: 0.85rem;
+}
+
+.release-page__notes {
+  color: var(--playlist-text);
+  font-size: 0.9rem;
+  white-space: pre-wrap;
+}
+
+.release-page__edit-row {
+  display: flex;
+  gap: 8px;
+}
+
+.release-page__edit-row .input {
+  flex: 1;
+}
+
+.release-page__edit-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.release-page__status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.release-page__stacks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.release-page__footer {
+  margin-top: 8px;
+}
