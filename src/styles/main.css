@@ -649,6 +649,82 @@ select.input {
   .music-card__artwork--placeholder {
     display: none;
   }
+
+  .music-card {
+    padding: 8px 6px;
+    min-height: 60px;
+    gap: 8px;
+  }
+
+  .music-card__artwork {
+    width: 72px;
+    height: 72px;
+  }
+
+  .music-card__title {
+    font-size: 12px;
+  }
+
+  .music-card__artist {
+    font-size: 11px;
+  }
+
+  .music-card__meta {
+    margin-top: 6px;
+    gap: 6px;
+  }
+
+  .music-card__actions {
+    gap: 4px;
+    align-self: flex-start;
+    padding-top: 4px;
+  }
+
+  .btn--ghost {
+    width: 40px;
+    height: 40px;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .status-select {
+    height: 28px;
+    font-size: 12px;
+    padding: 2px 4px;
+  }
+
+  .filter-btn {
+    height: 32px;
+    padding: 0 12px;
+    font-size: 12px;
+  }
+
+  .filter-bar {
+    padding: 4px;
+    gap: 4px;
+  }
+
+  .filter-bar::before {
+    font-size: 10px;
+    padding: 0 8px 0 2px;
+  }
+
+  .stack-tab {
+    padding: 4px 12px 5px;
+    font-size: 12px;
+  }
+
+  .btn {
+    height: 32px;
+    font-size: 12px;
+  }
+
+  .input {
+    height: 32px;
+    font-size: 12px;
+  }
 }
 
 .music-card__title {
