@@ -63,10 +63,6 @@ function renderReleasePage(item: MusicItemFull, cssHref: string): string {
     .map((s) => escapeHtml(s!))
     .join(" · ");
 
-  const stackChips = item.stacks
-    .map((s) => `<span class="music-card__stack-chip">${escapeHtml(s.name)}</span>`)
-    .join("");
-
   return `<!doctype html>
 <html lang="en">
   <head>
@@ -125,7 +121,18 @@ function renderReleasePage(item: MusicItemFull, cssHref: string): string {
             <select id="status-select" class="status-select">${statusOptions}</select>
           </div>
 
-          ${stackChips ? `<div class="release-page__stacks">${stackChips}</div>` : ""}
+          <div class="release-page__stacks">
+            <div id="stack-chips"></div>
+            <div class="release-page__stack-adder">
+              <button type="button" class="btn stack-picker__add" id="stack-picker-toggle">+ Stack</button>
+              <div class="stack-dropdown" id="stack-picker" hidden>
+                <div id="stack-picker-list"></div>
+                <div class="stack-dropdown__new">
+                  <input type="text" class="input stack-dropdown__new-input" id="new-stack-input" placeholder="New stack…" />
+                </div>
+              </div>
+            </div>
+          </div>
 
           <div class="release-page__footer">
             <button type="button" class="btn" id="edit-btn">Edit</button>
@@ -190,6 +197,87 @@ function renderReleasePage(item: MusicItemFull, cssHref: string): string {
         const res = await fetch('/api/music-items/' + ITEM_ID, { method: 'DELETE' });
         if (res.ok) window.location.href = '/';
       });
+
+      // ── Stacks ──────────────────────────────────────────────────────────────
+      let allStacks = [];
+      const assignedIds = new Set(${JSON.stringify(item.stacks.map((s) => s.id))});
+
+      function htmlEsc(str) {
+        return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+      }
+
+      function renderStackChips() {
+        const el = document.getElementById('stack-chips');
+        const assigned = allStacks.filter(s => assignedIds.has(s.id));
+        el.innerHTML = assigned.map(s =>
+          '<span class="stack-chip">' + htmlEsc(s.name) +
+          '<button type="button" class="stack-chip__remove" data-sid="' + s.id + '" title="Remove">×</button>' +
+          '</span>'
+        ).join('');
+        el.querySelectorAll('.stack-chip__remove').forEach(btn => {
+          btn.addEventListener('click', () => toggleStack(parseInt(btn.dataset.sid), false));
+        });
+      }
+
+      function renderStackPicker() {
+        const el = document.getElementById('stack-picker-list');
+        el.innerHTML = allStacks.map(s =>
+          '<label class="stack-dropdown__item">' +
+          '<input type="checkbox" class="stack-dropdown__checkbox" data-sid="' + s.id + '"' +
+          (assignedIds.has(s.id) ? ' checked' : '') + '> ' +
+          htmlEsc(s.name) + '</label>'
+        ).join('');
+        el.querySelectorAll('.stack-dropdown__checkbox').forEach(cb => {
+          cb.addEventListener('change', () => toggleStack(parseInt(cb.dataset.sid), cb.checked));
+        });
+      }
+
+      async function toggleStack(stackId, add) {
+        const method = add ? 'PUT' : 'DELETE';
+        const res = await fetch('/api/stacks/items/' + ITEM_ID + '/' + stackId, { method });
+        if (res.ok) {
+          add ? assignedIds.add(stackId) : assignedIds.delete(stackId);
+          renderStackChips();
+          renderStackPicker();
+        }
+      }
+
+      async function loadStacks() {
+        const res = await fetch('/api/stacks');
+        if (res.ok) { allStacks = await res.json(); renderStackChips(); renderStackPicker(); }
+      }
+
+      document.getElementById('stack-picker-toggle').addEventListener('click', e => {
+        e.stopPropagation();
+        const picker = document.getElementById('stack-picker');
+        picker.hidden = !picker.hidden;
+        if (!picker.hidden) document.getElementById('new-stack-input').focus();
+      });
+
+      document.addEventListener('click', () => {
+        document.getElementById('stack-picker').hidden = true;
+      });
+
+      document.getElementById('stack-picker').addEventListener('click', e => e.stopPropagation());
+
+      document.getElementById('new-stack-input').addEventListener('keydown', async e => {
+        if (e.key !== 'Enter') return;
+        const name = e.target.value.trim();
+        if (!name) return;
+        const res = await fetch('/api/stacks', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name })
+        });
+        if (res.ok) {
+          const stack = await res.json();
+          e.target.value = '';
+          allStacks.push(stack);
+          await toggleStack(stack.id, true);
+        }
+      });
+
+      loadStacks();
     </script>
   </body>
 </html>`;
