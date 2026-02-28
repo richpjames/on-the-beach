@@ -1537,6 +1537,16 @@ body::after {
   display: flex;
   flex-wrap: wrap;
   gap: 4px;
+  align-items: center;
+}
+
+.release-page__stack-adder {
+  position: relative;
+  display: inline-flex;
+}
+
+#stack-chips {
+  display: contents;
 }
 
 .release-page__footer {
