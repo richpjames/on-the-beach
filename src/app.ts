@@ -1,5 +1,5 @@
 import { ApiClient } from "./services/api-client";
-import type { ListenStatus } from "./types";
+import type { ListenStatus, StackWithCount } from "./types";
 import {
   buildCreateMusicItemInputFromValues,
   getCoverScanErrorMessage,
@@ -57,7 +57,16 @@ export class App {
   async initialize(): Promise<void> {
     this.setupAddForm();
     this.appState = transitionAppState(this.appState, { type: "APP_READY" });
-    this.initializeUI();
+
+    const serverState = this.readServerState();
+    if (serverState) {
+      this.appState = transitionAppState(this.appState, {
+        type: "STACKS_LOADED",
+        stacks: serverState.stacks,
+      });
+    }
+
+    this.initializeUI(serverState !== null);
 
     const versionEl = document.getElementById("app-version");
     if (versionEl) {
@@ -65,15 +74,32 @@ export class App {
     }
   }
 
-  private initializeUI(): void {
+  private readServerState(): { stacks: StackWithCount[] } | null {
+    const el = document.getElementById("__initial_state__");
+    if (!el?.textContent) return null;
+    try {
+      return JSON.parse(el.textContent) as { stacks: StackWithCount[] };
+    } catch {
+      return null;
+    }
+  }
+
+  private initializeUI(hasServerData: boolean): void {
     this.setupFilterBar();
     this.setupStackBar();
     this.setupStackManagePanel();
     this.setupStackParentLinker();
     this.setupEventDelegation();
     this.setupCustomListScrollbar();
-    void this.renderStackBar();
-    void this.renderMusicList();
+
+    if (hasServerData) {
+      requestAnimationFrame(() => {
+        this.syncCustomListScrollbar();
+      });
+    } else {
+      void this.renderStackBar();
+      void this.renderMusicList();
+    }
   }
 
   private setupAddForm(): void {
