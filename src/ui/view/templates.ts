@@ -35,18 +35,20 @@ export function renderMusicCard(item: MusicItemFull): string {
           : `<img class="music-card__artwork music-card__artwork--placeholder" src="/favicon-32x32.png" alt="No artwork available">`
       }
       <div class="music-card__content">
-        <div class="music-card__title">${escapeHtml(item.title)}</div>
-        ${item.artist_name ? `<div class="music-card__artist">${escapeHtml(item.artist_name)}</div>` : ""}
-        ${
-          item.stacks.length > 0
-            ? `<div class="music-card__stacks">${item.stacks
-                .map(
-                  (stack) =>
-                    `<span class="music-card__stack-chip">${escapeHtml(stack.name)}</span>`,
-                )
-                .join("")}</div>`
-            : ""
-        }
+        <a href="/r/${item.id}" class="music-card__link">
+          <div class="music-card__title">${escapeHtml(item.title)}</div>
+          ${item.artist_name ? `<div class="music-card__artist">${escapeHtml(item.artist_name)}</div>` : ""}
+          ${
+            item.stacks.length > 0
+              ? `<div class="music-card__stacks">${item.stacks
+                  .map(
+                    (stack) =>
+                      `<span class="music-card__stack-chip">${escapeHtml(stack.name)}</span>`,
+                  )
+                  .join("")}</div>`
+              : ""
+          }
+        </a>
         <div class="music-card__meta">
           <select class="status-select">${statusOptions}</select>
           ${item.listen_status === "listened" ? renderStarRating(item.id, item.rating) : ""}
