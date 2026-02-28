@@ -1,4 +1,4 @@
-import { test, expect } from "@playwright/test";
+import { test, expect } from "./fixtures/parallel-test";
 
 test("footer shows semver version", async ({ page }) => {
   await page.goto("/");

@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./fixtures/parallel-test";
 
 test.beforeEach(async ({ request }) => {
   await request.post("/api/__test__/reset");
