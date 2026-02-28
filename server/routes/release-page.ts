@@ -88,52 +88,59 @@ function renderReleasePage(item: MusicItemFull, cssHref: string): string {
             <a href="/" class="btn">← back to list</a>
           </div>
 
-          ${safeArtworkUrl(item.artwork_url ?? "") ? `<img class="release-page__artwork" src="${escapeHtml(item.artwork_url!)}" alt="Artwork for ${escapeHtml(item.title)}" />` : ""}
+          <div class="release-page__body">
 
-          <div id="view-mode">
-            <h2 class="release-page__title">${escapeHtml(item.title)}</h2>
-            ${item.artist_name ? `<p class="release-page__artist">${escapeHtml(item.artist_name)}</p>` : ""}
-            ${metaFields ? `<p class="release-page__meta">${metaFields}</p>` : ""}
-            ${item.catalogue_number ? `<p class="release-page__catalogue">${escapeHtml(item.catalogue_number)}</p>` : ""}
-            ${item.notes ? `<p class="release-page__notes">${escapeHtml(item.notes)}</p>` : ""}
-            ${item.rating !== null ? `<p class="release-page__rating">${"★".repeat(item.rating)}${"☆".repeat(5 - item.rating)}</p>` : ""}
-            <div id="stack-chips" class="release-page__stacks"></div>
-          </div>
+            ${safeArtworkUrl(item.artwork_url ?? "") ? `<img class="release-page__artwork" src="${escapeHtml(item.artwork_url!)}" alt="Artwork for ${escapeHtml(item.title)}" />` : ""}
 
-          <div id="edit-mode" hidden>
-            <div class="release-page__edit-fields">
-              <input class="input" type="text" id="edit-title" value="${escapeHtml(item.title)}" placeholder="Title" />
-              <input class="input" type="text" id="edit-artist" value="${escapeHtml(item.artist_name ?? "")}" placeholder="Artist" />
-              <div class="release-page__edit-row">
-                <input class="input" type="number" id="edit-year" value="${item.year ?? ""}" placeholder="Year" min="1900" max="2099" />
-                <input class="input" type="text" id="edit-label" value="${escapeHtml(item.label ?? "")}" placeholder="Label" />
-                <input class="input" type="text" id="edit-country" value="${escapeHtml(item.country ?? "")}" placeholder="Country" />
+            <div class="release-page__content">
+
+              <div id="view-mode">
+                <h2 class="release-page__title">${escapeHtml(item.title)}</h2>
+                ${item.artist_name ? `<p class="release-page__artist">${escapeHtml(item.artist_name)}</p>` : ""}
+                ${metaFields ? `<p class="release-page__meta">${metaFields}</p>` : ""}
+                ${item.catalogue_number ? `<p class="release-page__catalogue">${escapeHtml(item.catalogue_number)}</p>` : ""}
+                ${item.notes ? `<p class="release-page__notes">${escapeHtml(item.notes)}</p>` : ""}
+                ${item.rating !== null ? `<p class="release-page__rating">${"★".repeat(item.rating)}${"☆".repeat(5 - item.rating)}</p>` : ""}
+                <div id="stack-chips" class="release-page__stacks"></div>
               </div>
-              <input class="input" type="text" id="edit-genre" value="${escapeHtml(item.genre ?? "")}" placeholder="Genre" />
-              <input class="input" type="text" id="edit-catalogue" value="${escapeHtml(item.catalogue_number ?? "")}" placeholder="Catalogue number" />
-              <textarea class="input" id="edit-notes" placeholder="Notes">${escapeHtml(item.notes ?? "")}</textarea>
-              <div class="release-page__edit-actions">
-                <button type="button" class="btn btn--primary" id="save-btn">Save changes</button>
-                <button type="button" class="btn" id="cancel-btn">Cancel</button>
+
+              <div id="edit-mode" hidden>
+                <div class="release-page__edit-fields">
+                  <input class="input" type="text" id="edit-title" value="${escapeHtml(item.title)}" placeholder="Title" />
+                  <input class="input" type="text" id="edit-artist" value="${escapeHtml(item.artist_name ?? "")}" placeholder="Artist" />
+                  <div class="release-page__edit-row">
+                    <input class="input" type="number" id="edit-year" value="${item.year ?? ""}" placeholder="Year" min="1900" max="2099" />
+                    <input class="input" type="text" id="edit-label" value="${escapeHtml(item.label ?? "")}" placeholder="Label" />
+                    <input class="input" type="text" id="edit-country" value="${escapeHtml(item.country ?? "")}" placeholder="Country" />
+                  </div>
+                  <input class="input" type="text" id="edit-genre" value="${escapeHtml(item.genre ?? "")}" placeholder="Genre" />
+                  <input class="input" type="text" id="edit-catalogue" value="${escapeHtml(item.catalogue_number ?? "")}" placeholder="Catalogue number" />
+                  <textarea class="input" id="edit-notes" placeholder="Notes">${escapeHtml(item.notes ?? "")}</textarea>
+                  <div class="release-page__edit-actions">
+                    <button type="button" class="btn btn--primary" id="save-btn">Save changes</button>
+                    <button type="button" class="btn" id="cancel-btn">Cancel</button>
+                  </div>
+                </div>
+                <div class="release-page__edit-stacks">
+                  <div class="release-page__edit-stacks-header">Stacks</div>
+                  <div id="stack-picker-list" class="release-page__edit-stacks-list"></div>
+                  <div class="release-page__edit-stacks-new">
+                    <input type="text" class="input stack-dropdown__new-input" id="new-stack-input" placeholder="New stack…" />
+                  </div>
+                </div>
               </div>
+
+              <div class="release-page__status">
+                <label for="status-select">Status</label>
+                <select id="status-select" class="status-select">${statusOptions}</select>
+              </div>
+
+              <div class="release-page__footer">
+                <button type="button" class="btn" id="edit-btn">Edit</button>
+                <button type="button" class="btn" id="delete-btn">Delete</button>
+              </div>
+
             </div>
-            <div class="release-page__edit-stacks">
-              <div class="release-page__edit-stacks-header">Stacks</div>
-              <div id="stack-picker-list" class="release-page__edit-stacks-list"></div>
-              <div class="release-page__edit-stacks-new">
-                <input type="text" class="input stack-dropdown__new-input" id="new-stack-input" placeholder="New stack…" />
-              </div>
-            </div>
-          </div>
-
-          <div class="release-page__status">
-            <label for="status-select">Status</label>
-            <select id="status-select" class="status-select">${statusOptions}</select>
-          </div>
-
-          <div class="release-page__footer">
-            <button type="button" class="btn" id="edit-btn">Edit</button>
-            <button type="button" class="btn" id="delete-btn">Delete</button>
           </div>
 
         </div>
