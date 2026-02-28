@@ -89,8 +89,7 @@ function renderReleasePage(item: MusicItemFull, cssHref: string): string {
         <div class="release-page">
 
           <div class="release-page__nav">
-            <a href="/" class="btn btn--ghost">← back to list</a>
-            <button type="button" class="btn" id="edit-btn">Edit</button>
+            <a href="/" class="btn">← back to list</a>
           </div>
 
           ${safeArtworkUrl(item.artwork_url ?? "") ? `<img class="release-page__artwork" src="${escapeHtml(item.artwork_url!)}" alt="Artwork for ${escapeHtml(item.title)}" />` : ""}
@@ -117,7 +116,7 @@ function renderReleasePage(item: MusicItemFull, cssHref: string): string {
             <textarea class="input" id="edit-notes" placeholder="Notes">${escapeHtml(item.notes ?? "")}</textarea>
             <div class="release-page__edit-actions">
               <button type="button" class="btn btn--primary" id="save-btn">Save changes</button>
-              <button type="button" class="btn btn--ghost" id="cancel-btn">Cancel</button>
+              <button type="button" class="btn" id="cancel-btn">Cancel</button>
             </div>
           </div>
 
@@ -129,7 +128,8 @@ function renderReleasePage(item: MusicItemFull, cssHref: string): string {
           ${stackChips ? `<div class="release-page__stacks">${stackChips}</div>` : ""}
 
           <div class="release-page__footer">
-            <button type="button" class="btn btn--ghost btn--danger" id="delete-btn">Delete</button>
+            <button type="button" class="btn" id="edit-btn">Edit</button>
+            <button type="button" class="btn" id="delete-btn">Delete</button>
           </div>
 
         </div>
@@ -142,12 +142,14 @@ function renderReleasePage(item: MusicItemFull, cssHref: string): string {
         document.getElementById('view-mode').hidden = true;
         document.getElementById('edit-mode').hidden = false;
         document.getElementById('edit-btn').hidden = true;
+        document.getElementById('delete-btn').hidden = true;
       });
 
       document.getElementById('cancel-btn').addEventListener('click', () => {
         document.getElementById('edit-mode').hidden = true;
         document.getElementById('view-mode').hidden = false;
         document.getElementById('edit-btn').hidden = false;
+        document.getElementById('delete-btn').hidden = false;
       });
 
       document.getElementById('save-btn').addEventListener('click', async () => {

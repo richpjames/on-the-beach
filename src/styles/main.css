@@ -1410,6 +1410,8 @@ body::after {
   gap: 12px;
   padding: 12px;
   max-width: 600px;
+  width: 100%;
+  margin: 0 auto;
 }
 
 .release-page__nav {
@@ -1421,7 +1423,6 @@ body::after {
 
 .release-page__artwork {
   width: 100%;
-  max-width: 400px;
   height: auto;
   display: block;
   border: 2px solid var(--chrome-dark);
@@ -1442,7 +1443,7 @@ body::after {
 
 .release-page__title {
   font-family: var(--font-mono);
-  font-size: 1.4rem;
+  font-size: 1.05rem;
   color: var(--chrome-black);
   margin: 0;
 }
@@ -1539,5 +1540,7 @@ body::after {
 }
 
 .release-page__footer {
-  margin-top: 8px;
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
 }
