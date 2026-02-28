@@ -27,13 +27,13 @@ export function renderMusicCard(item: MusicItemFull): string {
 
   return `
     <article class="music-card${hasArtwork ? "" : " music-card--no-artwork"}" data-item-id="${item.id}">
-      ${
-        item.artwork_url
-          ? item.primary_url
-            ? `<a href="${escapeHtml(item.primary_url)}" target="_blank" rel="noopener noreferrer"><img class="music-card__artwork music-card__artwork--link" src="${escapeHtml(item.artwork_url)}" alt="Artwork for ${escapeHtml(item.title)}"></a>`
-            : `<img class="music-card__artwork" src="${escapeHtml(item.artwork_url)}" alt="Artwork for ${escapeHtml(item.title)}">`
-          : `<img class="music-card__artwork music-card__artwork--placeholder" src="/favicon-32x32.png" alt="No artwork available">`
-      }
+      <a href="/r/${item.id}">
+        ${
+          item.artwork_url
+            ? `<img class="music-card__artwork music-card__artwork--link" src="${escapeHtml(item.artwork_url)}" alt="Artwork for ${escapeHtml(item.title)}">`
+            : `<img class="music-card__artwork music-card__artwork--placeholder" src="/favicon-32x32.png" alt="No artwork available">`
+        }
+      </a>
       <div class="music-card__content">
         <a href="/r/${item.id}" class="music-card__link">
           <div class="music-card__title">${escapeHtml(item.title)}</div>
