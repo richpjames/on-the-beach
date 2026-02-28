@@ -75,7 +75,8 @@ function renderReleasePage(item: MusicItemFull, cssHref: string): string {
     <link href="https://fonts.googleapis.com/css2?family=VT323&family=Share+Tech+Mono&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="${escapeHtml(cssHref)}" />
   </head>
-  <body>
+  <body class="release-page-body">
+    ${safeArtworkUrl(item.artwork_url ?? "") ? `<div class="release-page__backdrop" style="background-image: url('${escapeHtml(item.artwork_url!)}')"></div>` : ""}
     <div id="app">
       <header class="header">
         <h1>On The Beach</h1>
