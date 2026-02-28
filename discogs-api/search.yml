@@ -5,10 +5,10 @@ info:
 
 http:
   method: GET
-  url: https://api.discogs.com/database/search?q=Violetta parra&type=release
+  url: https://api.discogs.com/database/search?q=Cabo Verde Cesaria Evora&type=release
   params:
     - name: q
-      value: Violetta parra
+      value: Cabo Verde Cesaria Evora
       type: query
     - name: type
       value: release
