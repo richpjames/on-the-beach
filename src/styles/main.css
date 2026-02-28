@@ -1481,8 +1481,8 @@ body::after {
 /* ── Edit mode form panel ── */
 .release-page #edit-mode {
   display: grid;
-  grid-template-columns: 1fr;
-  gap: 6px;
+  grid-template-columns: 2fr 1fr;
+  gap: 8px;
   padding: 8px;
   border-width: 2px;
   border-style: solid;
@@ -1490,13 +1490,51 @@ body::after {
   background: var(--chrome-light);
 }
 
-.release-page #edit-mode > .input {
+.release-page__edit-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.release-page__edit-fields > .input {
   width: 100%;
 }
 
-.release-page #edit-mode textarea.input {
+.release-page__edit-fields textarea.input {
   height: 80px;
   resize: vertical;
+}
+
+.release-page__edit-stacks {
+  display: flex;
+  flex-direction: column;
+  border-width: 2px;
+  border-style: solid;
+  border-color: var(--chrome-dark) var(--chrome-white) var(--chrome-white) var(--chrome-dark);
+  background: var(--chrome-white);
+  overflow: hidden;
+  min-width: 0;
+}
+
+.release-page__edit-stacks-header {
+  font-size: 11px;
+  font-family: "Tahoma", sans-serif;
+  padding: 3px 6px;
+  background: var(--chrome);
+  border-bottom: 1px solid var(--chrome-dark);
+  font-weight: bold;
+  color: var(--chrome-black);
+}
+
+.release-page__edit-stacks-list {
+  flex: 1;
+  overflow-y: auto;
+}
+
+.release-page__edit-stacks-new {
+  border-top: 1px solid var(--chrome-dark);
+  padding: 4px;
 }
 
 .release-page__edit-row {
@@ -1540,14 +1578,6 @@ body::after {
   align-items: center;
 }
 
-.release-page__stack-adder {
-  position: relative;
-  display: inline-flex;
-}
-
-#stack-chips {
-  display: contents;
-}
 
 .release-page__footer {
   display: flex;
