@@ -20,9 +20,6 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Install unzip for Bun setup
-        run: apt-get update && apt-get install -y unzip
-
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
 
@@ -37,10 +34,14 @@ jobs:
     timeout-minutes: 30
     container:
       image: mcr.microsoft.com/playwright:v1.58.2-jammy
+      options: --user root --ipc=host
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Install unzip for Bun setup
+        run: apt-get update && apt-get install -y unzip
 
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
