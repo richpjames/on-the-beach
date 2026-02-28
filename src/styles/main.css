@@ -689,6 +689,7 @@ select.input {
 .music-card {
   display: flex;
   align-items: center;
+  flex-shrink: 0;
   gap: 8px;
   padding: 6px 8px;
   background: var(--playlist-bg);
@@ -761,6 +762,7 @@ select.input {
     padding: 8px 6px;
     min-height: 74px;
     gap: 8px;
+    align-items: flex-start;
   }
 
   .music-card--no-artwork {
@@ -770,6 +772,10 @@ select.input {
   .music-card__artwork {
     width: 64px;
     height: 64px;
+  }
+
+  .music-card .music-card__content {
+    min-height: 0;
   }
 
   .music-card__title {
@@ -788,8 +794,9 @@ select.input {
   .music-card .music-card__actions {
     position: relative;
     gap: 0;
-    align-self: center;
+    align-self: flex-start;
     padding-top: 0;
+    margin-top: 1px;
   }
 
   .music-card .music-card__action-btn {
@@ -868,6 +875,7 @@ select.input {
   flex-wrap: wrap;
   gap: 3px;
   margin-top: 3px;
+  min-width: 0;
 }
 
 .music-card__stack-chip {
@@ -879,6 +887,9 @@ select.input {
   border: 1px solid #224499;
   font-size: 10px;
   font-family: "Tahoma", sans-serif;
+  max-width: 100%;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
 .music-card__meta {
@@ -925,7 +936,7 @@ select.input {
   padding: 2px;
   display: flex;
   flex-direction: column;
-  z-index: 120;
+  z-index: 10000;
 }
 
 .music-card__menu-panel[hidden] {
