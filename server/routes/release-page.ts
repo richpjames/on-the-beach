@@ -97,41 +97,38 @@ function renderReleasePage(item: MusicItemFull, cssHref: string): string {
             ${item.catalogue_number ? `<p class="release-page__catalogue">${escapeHtml(item.catalogue_number)}</p>` : ""}
             ${item.notes ? `<p class="release-page__notes">${escapeHtml(item.notes)}</p>` : ""}
             ${item.rating !== null ? `<p class="release-page__rating">${"★".repeat(item.rating)}${"☆".repeat(5 - item.rating)}</p>` : ""}
+            <div id="stack-chips" class="release-page__stacks"></div>
           </div>
 
           <div id="edit-mode" hidden>
-            <input class="input" type="text" id="edit-title" value="${escapeHtml(item.title)}" placeholder="Title" />
-            <input class="input" type="text" id="edit-artist" value="${escapeHtml(item.artist_name ?? "")}" placeholder="Artist" />
-            <div class="release-page__edit-row">
-              <input class="input" type="number" id="edit-year" value="${item.year ?? ""}" placeholder="Year" min="1900" max="2099" />
-              <input class="input" type="text" id="edit-label" value="${escapeHtml(item.label ?? "")}" placeholder="Label" />
-              <input class="input" type="text" id="edit-country" value="${escapeHtml(item.country ?? "")}" placeholder="Country" />
+            <div class="release-page__edit-fields">
+              <input class="input" type="text" id="edit-title" value="${escapeHtml(item.title)}" placeholder="Title" />
+              <input class="input" type="text" id="edit-artist" value="${escapeHtml(item.artist_name ?? "")}" placeholder="Artist" />
+              <div class="release-page__edit-row">
+                <input class="input" type="number" id="edit-year" value="${item.year ?? ""}" placeholder="Year" min="1900" max="2099" />
+                <input class="input" type="text" id="edit-label" value="${escapeHtml(item.label ?? "")}" placeholder="Label" />
+                <input class="input" type="text" id="edit-country" value="${escapeHtml(item.country ?? "")}" placeholder="Country" />
+              </div>
+              <input class="input" type="text" id="edit-genre" value="${escapeHtml(item.genre ?? "")}" placeholder="Genre" />
+              <input class="input" type="text" id="edit-catalogue" value="${escapeHtml(item.catalogue_number ?? "")}" placeholder="Catalogue number" />
+              <textarea class="input" id="edit-notes" placeholder="Notes">${escapeHtml(item.notes ?? "")}</textarea>
+              <div class="release-page__edit-actions">
+                <button type="button" class="btn btn--primary" id="save-btn">Save changes</button>
+                <button type="button" class="btn" id="cancel-btn">Cancel</button>
+              </div>
             </div>
-            <input class="input" type="text" id="edit-genre" value="${escapeHtml(item.genre ?? "")}" placeholder="Genre" />
-            <input class="input" type="text" id="edit-catalogue" value="${escapeHtml(item.catalogue_number ?? "")}" placeholder="Catalogue number" />
-            <textarea class="input" id="edit-notes" placeholder="Notes">${escapeHtml(item.notes ?? "")}</textarea>
-            <div class="release-page__edit-actions">
-              <button type="button" class="btn btn--primary" id="save-btn">Save changes</button>
-              <button type="button" class="btn" id="cancel-btn">Cancel</button>
+            <div class="release-page__edit-stacks">
+              <div class="release-page__edit-stacks-header">Stacks</div>
+              <div id="stack-picker-list" class="release-page__edit-stacks-list"></div>
+              <div class="release-page__edit-stacks-new">
+                <input type="text" class="input stack-dropdown__new-input" id="new-stack-input" placeholder="New stack…" />
+              </div>
             </div>
           </div>
 
           <div class="release-page__status">
             <label for="status-select">Status</label>
             <select id="status-select" class="status-select">${statusOptions}</select>
-          </div>
-
-          <div class="release-page__stacks">
-            <div id="stack-chips"></div>
-            <div class="release-page__stack-adder">
-              <button type="button" class="btn stack-picker__add" id="stack-picker-toggle">+ Stack</button>
-              <div class="stack-dropdown" id="stack-picker" hidden>
-                <div id="stack-picker-list"></div>
-                <div class="stack-dropdown__new">
-                  <input type="text" class="input stack-dropdown__new-input" id="new-stack-input" placeholder="New stack…" />
-                </div>
-              </div>
-            </div>
           </div>
 
           <div class="release-page__footer">
@@ -247,19 +244,6 @@ function renderReleasePage(item: MusicItemFull, cssHref: string): string {
         const res = await fetch('/api/stacks');
         if (res.ok) { allStacks = await res.json(); renderStackChips(); renderStackPicker(); }
       }
-
-      document.getElementById('stack-picker-toggle').addEventListener('click', e => {
-        e.stopPropagation();
-        const picker = document.getElementById('stack-picker');
-        picker.hidden = !picker.hidden;
-        if (!picker.hidden) document.getElementById('new-stack-input').focus();
-      });
-
-      document.addEventListener('click', () => {
-        document.getElementById('stack-picker').hidden = true;
-      });
-
-      document.getElementById('stack-picker').addEventListener('click', e => e.stopPropagation());
 
       document.getElementById('new-stack-input').addEventListener('keydown', async e => {
         if (e.key !== 'Enter') return;
