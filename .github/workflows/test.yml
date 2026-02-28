@@ -32,6 +32,8 @@ jobs:
   e2e:
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    container:
+      image: mcr.microsoft.com/playwright:v1.58.2-jammy
 
     steps:
       - name: Checkout
@@ -45,9 +47,6 @@ jobs:
 
       - name: Setup database
         run: bun run db:migrate && bun run db:seed
-
-      - name: Install Playwright browser
-        run: bunx playwright install --with-deps chromium
 
       - name: Run Playwright tests
         run: bun run test:e2e
