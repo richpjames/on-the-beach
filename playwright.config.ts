@@ -9,7 +9,7 @@ function resolveWorkers(): number {
 
   // Keep CI deterministic and conservative; use more local workers by default.
   if (process.env.CI) {
-    return 3;
+    return 4;
   }
 
   return Math.min(6, Math.max(2, os.availableParallelism() - 1));
