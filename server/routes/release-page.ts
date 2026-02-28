@@ -199,8 +199,9 @@ function renderReleasePage(item: MusicItemFull, cssHref: string): string {
       });
 
       // ── Stacks ──────────────────────────────────────────────────────────────
-      let allStacks = [];
-      const assignedIds = new Set(${JSON.stringify(item.stacks.map((s) => s.id))});
+      const ITEM_STACKS = ${JSON.stringify(item.stacks)};
+      const assignedIds = new Set(ITEM_STACKS.map(s => s.id));
+      let allStacks = ITEM_STACKS;
 
       function htmlEsc(str) {
         return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
@@ -277,6 +278,7 @@ function renderReleasePage(item: MusicItemFull, cssHref: string): string {
         }
       });
 
+      renderStackChips();
       loadStacks();
     </script>
   </body>
