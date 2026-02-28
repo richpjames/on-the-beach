@@ -1,6 +1,6 @@
 # AGENTS.md
 
-
+Use Bun.js. This project is built and deployed with Bun.js.
 
 ## Build/Change Playbook For Agents
 
