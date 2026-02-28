@@ -6,6 +6,7 @@ import { stackRoutes } from "./routes/stacks";
 import { ingestRoutes } from "./routes/ingest";
 import { releaseRoutes } from "./routes/release";
 import { releasePageRoutes } from "./routes/release-page";
+import { rssRoutes } from "./routes/rss";
 import { getUploadsDir, rewriteUploadsRequestPath } from "./uploads";
 
 const app = new Hono();
@@ -25,6 +26,7 @@ app.route("/api/stacks", stackRoutes);
 app.route("/api/ingest", ingestRoutes);
 app.route("/api/release", releaseRoutes);
 app.route("/r", releasePageRoutes);
+app.route("/feed", rssRoutes);
 app.use(
   "/uploads/*",
   serveStatic({
