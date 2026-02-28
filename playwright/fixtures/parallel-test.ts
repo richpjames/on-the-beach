@@ -12,7 +12,8 @@ type WorkerFixtures = {
 
 export const test = base.extend<{}, WorkerFixtures>({
   workerBaseURL: [
-    async (_fixtures, use, workerInfo) => {
+    async ({ playwright }, use, workerInfo) => {
+      void playwright;
       const port = SERVER_BASE_PORT + workerInfo.workerIndex;
       const databasePath = `/tmp/on_the_beach.playwright.worker-${workerInfo.workerIndex}.db`;
       const env = {
