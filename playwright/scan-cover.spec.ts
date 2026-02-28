@@ -1,5 +1,5 @@
 import path from "node:path";
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./fixtures/parallel-test";
 
 test.beforeEach(async ({ page, request }) => {
   await request.post("/api/__test__/reset");
