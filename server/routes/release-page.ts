@@ -1,27 +1,9 @@
 import { Hono } from "hono";
-import { readFile } from "node:fs/promises";
-import path from "node:path";
 import { fetchFullItem } from "../music-item-creator";
 import type { MusicItemFull } from "../../src/types";
+import { getPageAssets } from "../page-assets";
 
 export type FetchItemFn = (id: number) => Promise<MusicItemFull | null>;
-
-let cssHrefCache: string | null = null;
-
-async function getCssHref(): Promise<string> {
-  if (process.env.NODE_ENV !== "production") {
-    return "/src/styles/main.css";
-  }
-  if (cssHrefCache) return cssHrefCache;
-  try {
-    const html = await readFile(path.resolve("dist/index.html"), "utf-8");
-    const match = html.match(/href="(\/assets\/[^"]+\.css)"/);
-    cssHrefCache = match?.[1] ?? "/assets/index.css";
-  } catch {
-    cssHrefCache = "/assets/index.css";
-  }
-  return cssHrefCache;
-}
 
 function escapeHtml(str: string): string {
   return str
@@ -233,7 +215,7 @@ export function createReleasePageRoutes(fetchItem: FetchItemFn = fetchFullItem):
       return c.html(renderNotFoundPage(), 404);
     }
 
-    const cssHref = await getCssHref();
+    const { cssHref } = await getPageAssets();
     return c.html(renderReleasePage(item, cssHref));
   });
 

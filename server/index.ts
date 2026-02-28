@@ -6,6 +6,7 @@ import { stackRoutes } from "./routes/stacks";
 import { ingestRoutes } from "./routes/ingest";
 import { releaseRoutes } from "./routes/release";
 import { releasePageRoutes } from "./routes/release-page";
+import { mainPageRoutes } from "./routes/main-page";
 import { rssRoutes } from "./routes/rss";
 import { getUploadsDir, rewriteUploadsRequestPath } from "./uploads";
 
@@ -19,6 +20,9 @@ app.onError((err, c) => {
   console.error(`[api] ${c.req.method} ${c.req.path} error:`, err);
   return c.json({ error: "Internal server error" }, 500);
 });
+
+// ---------- Main page (SSR) ----------
+app.route("/", mainPageRoutes);
 
 // ---------- API routes ----------
 app.route("/api/music-items", musicItemRoutes);
@@ -58,6 +62,7 @@ if (isDev) {
   let viteHandle: ((req: unknown, res: unknown) => void) | null = null;
   const server = createHttpServer((req, res) => {
     if (
+      req.url === "/" ||
       req.url?.startsWith("/api/") ||
       req.url?.startsWith("/uploads/") ||
       req.url === "/r" ||
