@@ -49,6 +49,9 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
+      - name: Install Playwright WebKit
+        run: npx playwright install webkit
+
       - name: Setup database
         run: bun run db:migrate && bun run db:seed
 

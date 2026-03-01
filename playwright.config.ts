@@ -1,4 +1,4 @@
-import { defineConfig } from "@playwright/test";
+import { defineConfig, devices } from "@playwright/test";
 import os from "node:os";
 
 function resolveWorkers(): number {
@@ -24,4 +24,41 @@ export default defineConfig({
   use: {
     headless: true,
   },
+  projects: [
+    {
+      name: "chromium",
+      testIgnore: /ui-percy\.spec\.ts/,
+      use: {
+        ...devices["Desktop Chrome"],
+      },
+    },
+    {
+      name: "ui-chrome-desktop",
+      testMatch: /ui-percy\.spec\.ts/,
+      use: {
+        ...devices["Desktop Chrome"],
+      },
+    },
+    {
+      name: "ui-chrome-mobile",
+      testMatch: /ui-percy\.spec\.ts/,
+      use: {
+        ...devices["Pixel 7"],
+      },
+    },
+    {
+      name: "ui-safari-desktop",
+      testMatch: /ui-percy\.spec\.ts/,
+      use: {
+        ...devices["Desktop Safari"],
+      },
+    },
+    {
+      name: "ui-safari-mobile",
+      testMatch: /ui-percy\.spec\.ts/,
+      use: {
+        ...devices["iPhone 13"],
+      },
+    },
+  ],
 });
