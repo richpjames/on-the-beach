@@ -1,4 +1,5 @@
 import percySnapshot from "@percy/playwright";
+import path from "node:path";
 import type { Page, TestInfo } from "@playwright/test";
 import { expect, test } from "./fixtures/parallel-test";
 
@@ -39,27 +40,29 @@ test("captures main and release views", async ({ page }, testInfo) => {
   await page.goto("/");
   await expect(page.getByPlaceholder("Paste a music link...")).toBeVisible();
 
-  await addManualItem(page, {
-    title: "Ritual Waves",
-    artist: "Sea of Gates",
-    label: "Low Tide Audio",
-    year: "2024",
-    genre: "Ambient",
-    notes: "Percy fixture item one",
-  });
+  const scanFixturePath = path.join(process.cwd(), "playwright/fixtures/cover-sample.png");
+  const uploadedArtworkUrl = "/uploads/sally-oldfield-water-bearer.png";
+
+  await mockCoverScanRoutes(page, scanFixturePath, uploadedArtworkUrl);
+  await addItemViaCoverScan(page, scanFixturePath, uploadedArtworkUrl);
+
   await addManualItem(page, {
     title: "Night Bus Tape",
     artist: "Slope Unit",
     label: "Shoreline Works",
     year: "2023",
     genre: "Dub Techno",
-    notes: "Percy fixture item two",
+    notes: "Percy fixture manual item",
   });
 
   await expect(page.locator(".music-card")).toHaveCount(2);
   await captureSnapshot(page, testInfo, "main-app-view");
 
-  await page.locator(".music-card .music-card__link").first().click();
+  await page
+    .locator(".music-card", { hasText: "Water Bearer" })
+    .first()
+    .locator(".music-card__link")
+    .click();
   await page.waitForURL(/\/r\/\d+$/);
   await expect(page.locator(".release-page")).toBeVisible();
   await expect(page.locator("#view-mode")).toBeVisible();
@@ -101,4 +104,66 @@ async function addManualItem(page: Page, item: ManualItemInput): Promise<void> {
 
   await page.getByRole("button", { name: "Add" }).click();
   await expect(cards).toHaveCount(cardCountBefore + 1, { timeout: 10_000 });
+}
+
+async function mockCoverScanRoutes(
+  page: Page,
+  fixturePath: string,
+  uploadedArtworkUrl: string,
+): Promise<void> {
+  await page.route("**/api/release/image", async (route) => {
+    await route.fulfill({
+      status: 201,
+      contentType: "application/json",
+      body: JSON.stringify({
+        artworkUrl: uploadedArtworkUrl,
+      }),
+    });
+  });
+
+  await page.route("**/api/release/scan", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        artist: "Sally Oldfield",
+        title: "Water Bearer",
+      }),
+    });
+  });
+
+  await page.route(`**${uploadedArtworkUrl}`, async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "image/png",
+      path: fixturePath,
+    });
+  });
+}
+
+async function addItemViaCoverScan(
+  page: Page,
+  fixturePath: string,
+  uploadedArtworkUrl: string,
+): Promise<void> {
+  const cards = page.locator(".music-card");
+  const cardCountBefore = await cards.count();
+
+  await page.getByRole("button", { name: "Scan album cover" }).click();
+  await page.locator("#scan-file-input").setInputFiles(fixturePath);
+
+  await expect(page.locator(".add-form__details")).toHaveAttribute("open", "");
+  await expect(page.locator('input[name="artist"]')).toHaveValue("Sally Oldfield");
+  await expect(page.locator('input[name="title"]')).toHaveValue("Water Bearer");
+  await expect(page.locator('input[name="artworkUrl"]')).toHaveValue(uploadedArtworkUrl);
+
+  await page.getByRole("button", { name: "Add" }).click();
+  await expect(cards).toHaveCount(cardCountBefore + 1, { timeout: 10_000 });
+
+  const scannedCard = page.locator(".music-card", { hasText: "Water Bearer" }).first();
+  await expect(scannedCard).toBeVisible();
+  await expect(scannedCard.locator(".music-card__artwork").first()).toHaveAttribute(
+    "src",
+    uploadedArtworkUrl,
+  );
 }

@@ -29,40 +29,21 @@ jobs:
       - name: Run unit tests
         run: bun run test:unit
 
-  e2e:
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-    container:
-      image: mcr.microsoft.com/playwright:v1.58.2-jammy
-      options: --user root --ipc=host
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Install unzip for Bun setup
-        run: apt-get update && apt-get install -y unzip
-
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@v2
-
-      - name: Install dependencies
-        run: bun install --frozen-lockfile
-
-      - name: Install Playwright WebKit
-        run: npx playwright install webkit
-
-      - name: Setup database
-        run: bun run db:migrate && bun run db:seed
-
-      - name: Run Playwright tests
-        run: bun run test:e2e
-
-  percy:
+  browser-checks:
+    name: ${{ matrix.check }}
     runs-on: ubuntu-latest
     timeout-minutes: 45
-    needs: e2e
-    if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.fork == false }}
+    if: ${{ matrix.check != 'percy' || github.event_name != 'pull_request' || github.event.pull_request.head.repo.fork == false }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - check: e2e
+            run_command: bun run test:e2e
+            needs_percy_token: false
+          - check: percy
+            run_command: bunx @percy/cli exec -- bun run test:e2e:ui
+            needs_percy_token: true
     container:
       image: mcr.microsoft.com/playwright:v1.58.2-jammy
       options: --user root --ipc=host
@@ -87,6 +68,7 @@ jobs:
         run: bun run db:migrate && bun run db:seed
 
       - name: Validate Percy token
+        if: ${{ matrix.needs_percy_token }}
         env:
           PERCY_TOKEN: ${{ secrets.PERCY_TOKEN }}
         run: |
@@ -95,7 +77,7 @@ jobs:
             exit 1
           fi
 
-      - name: Run Percy visual checks
+      - name: Run browser checks
         env:
           PERCY_TOKEN: ${{ secrets.PERCY_TOKEN }}
-        run: bunx @percy/cli exec -- bun run test:e2e:ui
+        run: ${{ matrix.run_command }}
