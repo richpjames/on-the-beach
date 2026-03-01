@@ -67,6 +67,36 @@ describe("app domain helpers", () => {
     expect(payload.artworkUrl).toBe("/uploads/test.jpg");
   });
 
+  it("builds a direct-create payload when link and artwork are missing", () => {
+    const payload = buildCreateMusicItemInputFromValues({
+      url: "",
+      title: "",
+      artist: "",
+      itemType: "album",
+      label: "",
+      year: "",
+      country: "",
+      genre: "",
+      catalogueNumber: "",
+      notes: "",
+      artworkUrl: "",
+    });
+
+    expect(payload).toEqual({
+      url: undefined,
+      title: undefined,
+      artistName: undefined,
+      itemType: "album",
+      label: undefined,
+      year: undefined,
+      country: undefined,
+      genre: undefined,
+      catalogueNumber: undefined,
+      notes: undefined,
+      artworkUrl: undefined,
+    });
+  });
+
   it("returns API filter object only when needed", () => {
     expect(buildMusicItemFilters("all", null)).toBeUndefined();
     expect(buildMusicItemFilters("listened", null)).toEqual({ listenStatus: "listened" });

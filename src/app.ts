@@ -3,7 +3,6 @@ import type { ListenStatus, StackWithCount } from "./types";
 import {
   buildCreateMusicItemInputFromValues,
   getCoverScanErrorMessage,
-  hasAnyNonEmptyField,
 } from "./ui/domain/add-form";
 import type { AddFormValues } from "./ui/domain/add-form";
 import { buildMusicItemFilters } from "./ui/domain/music-list";
@@ -122,16 +121,7 @@ export class App {
     const scanButton = document.getElementById("add-form-scan-btn");
     const scanInput = document.getElementById("scan-file-input");
 
-    const updateSubmitState = (): void => {
-      const fieldsToCheck = form.querySelectorAll<HTMLInputElement | HTMLTextAreaElement>(
-        'input[name="url"], input[name="title"], input[name="artist"], input[name="label"], input[name="year"], input[name="country"], input[name="genre"], input[name="catalogueNumber"], textarea[name="notes"]',
-      );
-      submitButton.disabled = !hasAnyNonEmptyField(
-        Array.from(fieldsToCheck, (field) => field.value),
-      );
-    };
-
-    form.addEventListener("input", updateSubmitState);
+    submitButton.disabled = false;
 
     if (scanButton instanceof HTMLButtonElement && scanInput instanceof HTMLInputElement) {
       scanButton.addEventListener("click", () => {
@@ -199,11 +189,10 @@ export class App {
         }
 
         form.reset();
-        submitButton.disabled = true;
         await this.renderMusicList();
       } catch (error) {
         console.error("Failed to add item:", error);
-        alert("Failed to add item. Please check the URL and try again.");
+        alert("Failed to add item. Please try again.");
       }
     });
   }

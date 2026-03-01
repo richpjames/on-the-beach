@@ -204,9 +204,20 @@ body {
     font-family: "Tahoma", sans-serif;
 }
 
-.add-form__row {
-    display: flex;
+.add-form__primary {
+    display: grid;
+    grid-template-columns: 1fr 1fr auto;
     gap: 3px;
+    align-items: center;
+}
+
+.add-form__primary select[name="itemType"] {
+    grid-column: 1 / 3;
+}
+
+.add-form__primary #add-form-submit {
+    grid-column: 3;
+    grid-row: 1 / 3;
 }
 
 .add-form__scan-input {
@@ -252,11 +263,24 @@ body {
     margin-top: 5px;
 }
 
-.add-form__extra select {
+.add-form__scan-controls {
+    display: flex;
+    justify-content: flex-start;
+}
+
+.add-form__extra input[name="url"],
+.add-form__extra .add-form__scan-controls,
+.add-form__extra input[name="artworkUrl"] {
     grid-column: span 2;
 }
 
-.add-form__extra input[name="artworkUrl"] {
+.add-form__extra textarea {
+    min-height: 72px;
+    resize: vertical;
+}
+
+.add-form__extra .stack-picker,
+.add-form__extra textarea {
     grid-column: span 2;
 }
 
@@ -817,6 +841,32 @@ select.input {
 }
 
 @media (max-width: 520px) {
+    .add-form__primary {
+        grid-template-columns: 1fr;
+    }
+
+    .add-form__primary select[name="itemType"],
+    .add-form__primary #add-form-submit {
+        grid-column: auto;
+        grid-row: auto;
+    }
+
+    .add-form__primary #add-form-submit {
+        width: 100%;
+    }
+
+    .add-form__extra {
+        grid-template-columns: 1fr;
+    }
+
+    .add-form__extra input[name="url"],
+    .add-form__extra .add-form__scan-controls,
+    .add-form__extra input[name="artworkUrl"],
+    .add-form__extra textarea,
+    .add-form__extra .stack-picker {
+        grid-column: auto;
+    }
+
     .music-list {
         padding-bottom: 150px;
     }
