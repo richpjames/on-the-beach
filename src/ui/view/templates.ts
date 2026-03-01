@@ -199,7 +199,7 @@ export function renderStackDropdownContent(
   `;
 }
 
-function renderStarRating(itemId: number, rating: number | null): string {
+export function renderStarRating(itemId: number, rating: number | null, cssClass?: string): string {
   const values = [5, 4.5, 4, 3.5, 3, 2.5, 2, 1.5, 1, 0.5];
   const stars = values
     .map((value) => {
@@ -209,12 +209,12 @@ function renderStarRating(itemId: number, rating: number | null): string {
       const title = `${value} star${value !== 1 ? "s" : ""}`;
       return `
         <input type="radio" id="star-${itemId}-${idSuffix}" name="rating-${itemId}" value="${value}" ${rating === value ? "checked" : ""}>
-        <label class="star-label ${cls}" for="star-${itemId}-${idSuffix}" title="${title}">&#9733;</label>`;
+        <label class="star-label ${cls}" for="star-${itemId}-${idSuffix}" title="${title}"></label>`;
     })
     .join("");
 
   return `
-    <fieldset class="star-rating">
+    <fieldset class="star-rating${cssClass ? ` ${cssClass}` : ""}">
       <legend class="visually-hidden">Rating</legend>
       ${stars}
     </fieldset>`;
