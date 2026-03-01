@@ -3,7 +3,7 @@ import { rmSync } from "node:fs";
 import { once } from "node:events";
 import { test as base, expect } from "@playwright/test";
 
-const SERVER_BASE_PORT = Number(process.env.PLAYWRIGHT_SERVER_BASE_PORT ?? "4500");
+const SERVER_BASE_PORT = Number(process.env.PLAYWRIGHT_SERVER_BASE_PORT ?? "47000");
 const SERVER_START_TIMEOUT_MS = 90_000;
 
 type WorkerFixtures = {
@@ -14,8 +14,8 @@ export const test = base.extend<{}, WorkerFixtures>({
   workerBaseURL: [
     async ({ playwright }, use, workerInfo) => {
       void playwright;
-      const port = SERVER_BASE_PORT + workerInfo.workerIndex;
-      const databasePath = `/tmp/on_the_beach.playwright.worker-${workerInfo.workerIndex}.db`;
+      const port = SERVER_BASE_PORT + workerInfo.parallelIndex;
+      const databasePath = `/tmp/on_the_beach.playwright.parallel-${workerInfo.parallelIndex}.worker-${workerInfo.workerIndex}.db`;
       const env = {
         ...process.env,
         PORT: String(port),

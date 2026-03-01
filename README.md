@@ -57,6 +57,7 @@ bun run build           # Build frontend for production
 bun run typecheck       # Type-check without building
 bun run test:unit       # Unit tests (Bun test)
 bun run test:e2e        # Smoke E2E tests (Playwright)
+bun run test:e2e:ui     # UI visual snapshots (Playwright projects for Chrome/Safari, desktop/mobile)
 bun run test:e2e:full   # Full E2E suite (Playwright)
 bun run db:generate     # Generate Drizzle migrations
 bun run db:migrate      # Apply migrations
@@ -64,6 +65,29 @@ bun run db:studio       # Open Drizzle Studio
 bun run db:seed         # Seed the database
 bun run lint            # Lint with oxlint
 bun run format          # Format with oxfmt
+```
+
+## Visual Regression (Percy)
+
+Percy uploads require a `PERCY_TOKEN`.
+
+- Local run (uploads snapshots):
+
+```bash
+PERCY_TOKEN=<your-token> npx percy exec -- bun run test:e2e:ui
+```
+
+- Local run without Percy upload (still runs tests):
+
+```bash
+bun run test:e2e:ui
+```
+
+- CI setup: add `PERCY_TOKEN` as a GitHub Actions secret and pass it in the Percy step:
+
+```yaml
+env:
+  PERCY_TOKEN: ${{ secrets.PERCY_TOKEN }}
 ```
 
 ## Email Ingest

@@ -12,6 +12,7 @@
     "test:unit": "bun test tests/unit",
     "test:unit:watch": "bun test --watch tests/unit",
     "test:e2e": "playwright test playwright/add-link.spec.ts playwright/bandcamp-link.spec.ts playwright/stacks.spec.ts playwright/scan-cover.spec.ts playwright/version.spec.ts playwright/rating.spec.ts",
+    "test:e2e:ui": "playwright test playwright/ui-percy.spec.ts --project=ui-chrome-desktop --project=ui-chrome-mobile --project=ui-safari-desktop --project=ui-safari-mobile --workers=1",
     "test:e2e:full": "bunx playwright test playwright",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
@@ -36,6 +37,8 @@
   },
   "devDependencies": {
     "@hono/node-server": "^1.19.9",
+    "@percy/playwright": "^1.0.10",
+    "@percy/sdk-utils": "^1.31.8",
     "@playwright/test": "^1.58.2",
     "@types/better-sqlite3": "^7.6.13",
     "@types/mailparser": "^3.4.6",
