@@ -376,17 +376,33 @@ select.input {
     line-height: 1;
     display: inline-block;
     width: 0.5em;
-    overflow: hidden;
+    height: 1em;
+    position: relative;
 }
 
-/* Left half of star: show left portion of the ★ character */
+.star-label::before {
+    content: "★";
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 1em;
+    color: inherit;
+    pointer-events: none;
+}
+
+/* Left half: clip the right half of the 1em pseudo-element */
 .star-label--half {
     margin-left: 2px;
 }
 
-/* Right half of star: indent text left so only the right portion is visible */
-.star-label--full {
-    text-indent: -0.5em;
+.star-label--half::before {
+    clip-path: inset(0 50% 0 0);
+}
+
+/* Right half: shift pseudo-element left so its right half aligns with the label box */
+.star-label--full::before {
+    left: -0.5em;
+    clip-path: inset(0 0 0 50%);
 }
 
 /* Fill on hover: the hovered star and all stars to its left (lower values) */
@@ -403,6 +419,14 @@ select.input {
 /* Fill checked star and all stars with lower value (higher DOM index) */
 .star-rating input[type="radio"]:checked ~ .star-label {
     color: #c8a000;
+}
+
+.star-rating--large .star-label {
+    font-size: 28px;
+}
+
+.star-rating--large .star-label--half {
+    margin-left: 4px;
 }
 
 .btn--ghost {
@@ -1642,6 +1666,19 @@ body::after {
     flex-wrap: wrap;
     gap: 4px;
     align-items: center;
+}
+
+.release-page__source-link {
+    display: inline-block;
+    margin-top: 6px;
+    font-size: 0.85rem;
+    color: var(--chrome-darker);
+    text-decoration: underline;
+    text-underline-offset: 2px;
+}
+
+.release-page__source-link:hover {
+    color: var(--chrome-black);
 }
 
 .release-page__footer {
