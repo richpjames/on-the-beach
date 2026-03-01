@@ -71,6 +71,36 @@ describe("POST /api/release/scan", () => {
     expect(mockExtractAlbumInfo).toHaveBeenCalledWith("YWJjZA==");
   });
 
+  test("returns enriched fields when scan function returns them", async () => {
+    mockExtractAlbumInfo.mockResolvedValueOnce({
+      artist: "Radiohead",
+      title: "OK Computer",
+      year: 1997,
+      label: "Parlophone",
+      country: "GB",
+      catalogueNumber: "CDPUSH45",
+    });
+
+    const app = makeApp();
+
+    const res = await app.request("http://localhost/api/release/scan", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ imageBase64: "YWJjZA==" }),
+    });
+
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body).toEqual({
+      artist: "Radiohead",
+      title: "OK Computer",
+      year: 1997,
+      label: "Parlophone",
+      country: "GB",
+      catalogueNumber: "CDPUSH45",
+    });
+  });
+
   test("returns 503 when vision extraction fails", async () => {
     mockExtractAlbumInfo.mockResolvedValueOnce(null);
 
