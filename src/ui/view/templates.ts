@@ -51,7 +51,7 @@ export function renderMusicCard(item: MusicItemFull): string {
         </a>
         <div class="music-card__meta">
           <select class="status-select">${statusOptions}</select>
-          ${item.listen_status === "listened" ? renderStarRating(item.id, item.rating) : ""}
+          ${item.listen_status === "listened" || item.listen_status === "to-listen" ? renderStarRating(item.id, item.rating) : ""}
           ${
             item.primary_source
               ? item.primary_url

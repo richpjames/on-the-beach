@@ -57,7 +57,10 @@
       "Bash(ssh-keygen:*)",
       "Bash(DATABASE_PATH=on_the_beach_prod.db bun run:*)",
       "Bash(open:*)",
-      "Bash(scp:*)"
+      "Bash(scp:*)",
+      "mcp__plugin_playwright_playwright__browser_click",
+      "mcp__plugin_playwright_playwright__browser_evaluate",
+      "mcp__plugin_playwright_playwright__browser_run_code"
     ]
   }
 }
