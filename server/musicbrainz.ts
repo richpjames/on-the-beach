@@ -49,8 +49,9 @@ export async function lookupRelease(
   artist: string,
   title: string,
 ): Promise<MusicBrainzFields | null> {
-  const query = `artist:${encodeURIComponent(artist)} AND release:${encodeURIComponent(title)}`;
-  const url = `${MB_API_BASE}/release?query=${query}&limit=1&fmt=json`;
+  const query = `artist:${artist} AND release:${title}`;
+  const params = new URLSearchParams({ query, limit: "1", fmt: "json" });
+  const url = `${MB_API_BASE}/release?${params}`;
 
   try {
     const response = await fetch(url, {
