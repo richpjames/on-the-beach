@@ -2,6 +2,8 @@ import { Hono } from "hono";
 import { fetchFullItem } from "../music-item-creator";
 import type { MusicItemFull } from "../../src/types";
 import { getPageAssets } from "../page-assets";
+import { renderStarRating } from "../../src/ui/view/templates";
+import { parseUrl } from "../utils";
 
 export type FetchItemFn = (id: number) => Promise<MusicItemFull | null>;
 
@@ -12,6 +14,24 @@ function escapeHtml(str: string): string {
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#x27;");
+}
+
+const SOURCE_DISPLAY_NAMES: Record<string, string> = {
+  bandcamp: "Bandcamp",
+  spotify: "Spotify",
+  soundcloud: "SoundCloud",
+  youtube: "YouTube",
+  apple_music: "Apple Music",
+  discogs: "Discogs",
+  tidal: "Tidal",
+  deezer: "Deezer",
+  mixcloud: "Mixcloud",
+  physical: "Physical",
+  unknown: "Link",
+};
+
+function sourceDisplayName(source: string): string {
+  return SOURCE_DISPLAY_NAMES[source] ?? source.charAt(0).toUpperCase() + source.slice(1);
 }
 
 const SAFE_ARTWORK_URL = /^(https?:\/\/|\/uploads\/)/;
@@ -37,7 +57,7 @@ function renderNotFoundPage(): string {
       <main class="main">
         <div class="release-page">
           <p>Not found — this release doesn't exist.</p>
-          <a href="/" class="btn btn--ghost">← back to list</a>
+          <a href="/" class="btn btn--ghost">◄</a>
         </div>
       </main>
     </div>
@@ -86,7 +106,7 @@ function renderReleasePage(item: MusicItemFull, cssHref: string): string {
         <div class="release-page">
 
           <div class="release-page__nav">
-            <a href="/" class="btn">← back to list</a>
+            <a href="/" class="btn">◄</a>
           </div>
 
           <div class="release-page__body">
@@ -101,8 +121,9 @@ function renderReleasePage(item: MusicItemFull, cssHref: string): string {
                 ${metaFields ? `<p class="release-page__meta">${metaFields}</p>` : ""}
                 ${item.catalogue_number ? `<p class="release-page__catalogue">${escapeHtml(item.catalogue_number)}</p>` : ""}
                 ${item.notes ? `<p class="release-page__notes">${escapeHtml(item.notes)}</p>` : ""}
-                ${item.rating !== null ? `<p class="release-page__rating">${"★".repeat(item.rating)}${"☆".repeat(5 - item.rating)}</p>` : ""}
+                ${renderStarRating(item.id, item.rating, "star-rating--large")}
                 <div id="stack-chips" class="release-page__stacks"></div>
+                ${item.primary_url ? `<a class="release-page__source-link" href="${escapeHtml(item.primary_url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(sourceDisplayName(item.primary_source ?? parseUrl(item.primary_url).source))}</a>` : ""}
               </div>
 
               <div id="edit-mode" hidden>
@@ -272,6 +293,56 @@ function renderReleasePage(item: MusicItemFull, cssHref: string): string {
 
       renderStackChips();
       loadStacks();
+
+      // ── Star Rating ─────────────────────────────────────────────────────────
+      let ratingPendingClear = null;
+
+      function resolveRatingInput(target) {
+        if (target.tagName === 'LABEL' && target.htmlFor) {
+          return document.getElementById(target.htmlFor);
+        }
+        return target.closest('input[type="radio"]');
+      }
+
+      const ratingFieldset = document.querySelector('.star-rating--large');
+      if (ratingFieldset) {
+        ratingFieldset.addEventListener('mousedown', (e) => {
+          const input = resolveRatingInput(e.target);
+          if (!input) return;
+          if (input.checked) {
+            ratingPendingClear = { value: Number(input.value) };
+          } else {
+            ratingPendingClear = null;
+          }
+        });
+
+        ratingFieldset.addEventListener('change', async (e) => {
+          const input = e.target;
+          if (!input || input.type !== 'radio') return;
+          ratingPendingClear = null;
+          const res = await fetch('/api/music-items/' + ITEM_ID, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ rating: Number(input.value) }),
+          });
+          if (!res.ok) alert('Failed to update rating.');
+        });
+
+        ratingFieldset.addEventListener('click', async (e) => {
+          const input = resolveRatingInput(e.target);
+          if (!input) return;
+          if (ratingPendingClear && ratingPendingClear.value === Number(input.value)) {
+            input.checked = false;
+            ratingPendingClear = null;
+            const res = await fetch('/api/music-items/' + ITEM_ID, {
+              method: 'PATCH',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ rating: null }),
+            });
+            if (!res.ok) alert('Failed to clear rating.');
+          }
+        });
+      }
     </script>
   </body>
 </html>`;
