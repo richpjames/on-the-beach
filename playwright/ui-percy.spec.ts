@@ -3,6 +3,16 @@ import type { Page, TestInfo } from "@playwright/test";
 import { expect, test } from "./fixtures/parallel-test";
 
 const PERCY_CSS = `
+  body::before,
+  body::after {
+    display: none !important;
+    content: none !important;
+  }
+
+  body {
+    padding-bottom: 16px !important;
+  }
+
   #app-version {
     visibility: hidden;
   }
