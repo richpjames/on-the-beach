@@ -127,6 +127,8 @@ export interface PaginatedResult<T> {
 export interface ScanResult {
   artist: string | null;
   title: string | null;
+  // Optional fields populated by MusicBrainz enrichment. genre is omitted
+  // intentionally — it requires a separate release-group lookup.
   year?: number | null;
   label?: string | null;
   country?: string | null;
