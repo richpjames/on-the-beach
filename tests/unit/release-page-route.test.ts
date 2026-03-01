@@ -58,7 +58,7 @@ describe("GET /r/:id", () => {
     expect(res.status).toBe(404);
     const html = await res.text();
     expect(html).toContain("Not found");
-    expect(html).toContain("back to list");
+    expect(html).toContain("◄");
   });
 
   test("returns 200 HTML for a valid item", async () => {
