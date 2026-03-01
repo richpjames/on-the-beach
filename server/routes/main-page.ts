@@ -74,7 +74,12 @@ async function fetchInitialItems(): Promise<MusicItemFull[]> {
     })
     .from(musicItemStacks)
     .innerJoin(stacks, eq(stacks.id, musicItemStacks.stackId))
-    .where(inArray(musicItemStacks.musicItemId, items.map((i) => i.id)));
+    .where(
+      inArray(
+        musicItemStacks.musicItemId,
+        items.map((i) => i.id),
+      ),
+    );
 
   const enriched = hydrateItemStacks(items, stackRows);
 
@@ -102,9 +107,7 @@ function renderMainPage(opts: {
   isDev: boolean;
   appVersion: string;
 }): string {
-  const viteClient = opts.isDev
-    ? `\n    <script type="module" src="/@vite/client"></script>`
-    : "";
+  const viteClient = opts.isDev ? `\n    <script type="module" src="/@vite/client"></script>` : "";
 
   return `<!doctype html>
 <html lang="en">
@@ -144,45 +147,45 @@ function renderMainPage(opts: {
       <main class="main">
         <section class="add-section">
           <form id="add-form" class="add-form" method="post">
-            <div class="add-form__row">
-              <input
-                type="text"
-                id="url-input"
-                name="url"
-                placeholder="Paste a music link..."
-                class="input"
-              />
-              <input
-                type="file"
-                id="scan-file-input"
-                class="add-form__scan-input"
-                accept="image/*"
-              />
-              <button
-                type="button"
-                id="add-form-scan-btn"
-                class="btn add-form__scan-btn"
-                aria-label="Scan album cover"
-              >
-                Scan
-              </button>
-              <button type="submit" id="add-form-submit" class="btn btn--primary" disabled>
-                Add
-              </button>
+            <div class="add-form__primary">
+              <input type="text" name="artist" placeholder="Artist" class="input" />
+              <input type="text" name="title" placeholder="Album" class="input" />
+              <select name="itemType" class="input">
+                <option value="album">Album</option>
+                <option value="ep">EP</option>
+                <option value="single">Single</option>
+                <option value="track">Track</option>
+                <option value="mix">Mix</option>
+              </select>
+              <button type="submit" id="add-form-submit" class="btn btn--primary">Add</button>
             </div>
 
             <details class="add-form__details">
-              <summary>More options</summary>
+              <summary>Add more details</summary>
               <div class="add-form__extra">
-                <input type="text" name="title" placeholder="Title" class="input" />
-                <input type="text" name="artist" placeholder="Artist" class="input" />
-                <select name="itemType" class="input">
-                  <option value="album">Album</option>
-                  <option value="ep">EP</option>
-                  <option value="single">Single</option>
-                  <option value="track">Track</option>
-                  <option value="mix">Mix</option>
-                </select>
+                <input
+                  type="text"
+                  id="url-input"
+                  name="url"
+                  placeholder="Paste a music link..."
+                  class="input"
+                />
+                <div class="add-form__scan-controls">
+                  <input
+                    type="file"
+                    id="scan-file-input"
+                    class="add-form__scan-input"
+                    accept="image/*"
+                  />
+                  <button
+                    type="button"
+                    id="add-form-scan-btn"
+                    class="btn add-form__scan-btn"
+                    aria-label="Scan album cover"
+                  >
+                    Scan
+                  </button>
+                </div>
                 <input type="text" name="label" placeholder="Label" class="input" />
                 <input
                   type="number"
