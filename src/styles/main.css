@@ -314,10 +314,12 @@ select.input {
     text-align: center;
     height: 22px;
     white-space: nowrap;
+    text-decoration: none;
 }
 
 .btn:hover {
     background: var(--chrome-light);
+    text-decoration: none;
 }
 
 .btn:active {

@@ -57,7 +57,7 @@ function renderNotFoundPage(): string {
       <main class="main">
         <div class="release-page">
           <p>Not found — this release doesn't exist.</p>
-          <a href="/" class="btn btn--ghost">← back to list</a>
+          <a href="/" class="btn btn--ghost">◄</a>
         </div>
       </main>
     </div>
@@ -106,7 +106,7 @@ function renderReleasePage(item: MusicItemFull, cssHref: string): string {
         <div class="release-page">
 
           <div class="release-page__nav">
-            <a href="/" class="btn">← back to list</a>
+            <a href="/" class="btn">◄</a>
           </div>
 
           <div class="release-page__body">
