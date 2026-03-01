@@ -33,17 +33,12 @@ jobs:
     name: ${{ matrix.check }}
     runs-on: ubuntu-latest
     timeout-minutes: 45
-    if: ${{ matrix.check != 'percy' || github.event_name != 'pull_request' || github.event.pull_request.head.repo.fork == false }}
     strategy:
       fail-fast: false
       matrix:
         include:
           - check: e2e
-            run_command: bun run test:e2e
-            needs_percy_token: false
           - check: percy
-            run_command: bunx @percy/cli exec -- bun run test:e2e:ui
-            needs_percy_token: true
     container:
       image: mcr.microsoft.com/playwright:v1.58.2-jammy
       options: --user root --ipc=host
@@ -68,7 +63,7 @@ jobs:
         run: bun run db:migrate && bun run db:seed
 
       - name: Validate Percy token
-        if: ${{ matrix.needs_percy_token }}
+        if: ${{ matrix.check == 'percy' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.fork == false) }}
         env:
           PERCY_TOKEN: ${{ secrets.PERCY_TOKEN }}
         run: |
@@ -77,7 +72,12 @@ jobs:
             exit 1
           fi
 
-      - name: Run browser checks
+      - name: Run E2E checks
+        if: ${{ matrix.check == 'e2e' }}
+        run: bun run test:e2e
+
+      - name: Run Percy visual checks
+        if: ${{ matrix.check == 'percy' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.fork == false) }}
         env:
           PERCY_TOKEN: ${{ secrets.PERCY_TOKEN }}
-        run: ${{ matrix.run_command }}
+        run: bunx @percy/cli exec -- bun run test:e2e:ui
