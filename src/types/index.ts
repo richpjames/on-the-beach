@@ -127,6 +127,10 @@ export interface PaginatedResult<T> {
 export interface ScanResult {
   artist: string | null;
   title: string | null;
+  year?: number | null;
+  label?: string | null;
+  country?: string | null;
+  catalogueNumber?: string | null;
 }
 
 export interface UploadImageResult {
