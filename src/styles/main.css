@@ -390,19 +390,22 @@ select.input {
     pointer-events: none;
 }
 
-/* Left half: clip the right half of the 1em pseudo-element */
+/* Left half: clip to show only the left half of the star glyph.
+   The ★ glyph occupies ~57% of the em box (left-aligned), so the visual
+   centre is at ~30% of the element width — not 50%. */
 .star-label--half {
     margin-left: 2px;
 }
 
 .star-label--half::before {
-    clip-path: inset(0 50% 0 0);
+    clip-path: inset(0 70% 0 0);
 }
 
-/* Right half: shift pseudo-element left so its right half aligns with the label box */
+/* Right half: shift pseudo-element left so both ::before elements share
+   the same visual origin, then clip to reveal only the right half. */
 .star-label--full::before {
     left: -0.5em;
-    clip-path: inset(0 0 0 50%);
+    clip-path: inset(0 0 0 30%);
 }
 
 /* Fill on hover: the hovered star and all stars to its left (lower values) */
