@@ -1056,8 +1056,8 @@ export class App {
       onCreate: async (name) => {
         const stack = await this.api.createStack(name);
         await this.api.addItemToStack(itemId, stack.id);
-        await this.renderStackBar();
         await this.renderStackDropdown(cardEl, itemId);
+        await this.renderStackBar();
       },
       onClose: () => {
         void this.renderMusicList();
