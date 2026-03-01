@@ -58,8 +58,14 @@ test("captures main and release views", async ({ page }, testInfo) => {
 });
 
 async function captureSnapshot(page: Page, testInfo: TestInfo, viewName: string): Promise<void> {
+  const viewport = page.viewportSize();
+  const widths = viewport ? [viewport.width] : undefined;
+  const minHeight = viewport?.height;
+
   await percySnapshot(page, `${testInfo.project.name} - ${viewName}`, {
     percyCSS: PERCY_CSS,
+    widths,
+    minHeight,
   });
 }
 
