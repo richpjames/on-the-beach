@@ -2,6 +2,8 @@ import { Hono } from "hono";
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { extractAlbumInfo } from "../vision";
+import { lookupRelease } from "../musicbrainz";
+import { createScanEnricher } from "../scan-enricher";
 import type { ScanResult } from "../../src/types";
 import { getUploadsDir, toUploadsPublicPath } from "../uploads";
 
@@ -51,7 +53,7 @@ async function saveReleaseImage(base64Image: string): Promise<string> {
 }
 
 export function createReleaseRoutes(
-  scanReleaseCover: ExtractAlbumInfoFn = extractAlbumInfo,
+  scanReleaseCover: ExtractAlbumInfoFn = createScanEnricher(extractAlbumInfo, lookupRelease),
   saveImage: SaveReleaseImageFn = saveReleaseImage,
 ): Hono {
   const routes = new Hono();
