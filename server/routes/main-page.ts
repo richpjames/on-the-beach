@@ -155,6 +155,20 @@ function renderMainPage(opts: {
                 placeholder="Paste a music link..."
                 class="input"
               />
+              <input
+                type="file"
+                id="scan-file-input"
+                class="add-form__scan-input"
+                accept="image/*"
+              />
+              <button
+                type="button"
+                id="add-form-scan-btn"
+                class="btn add-form__scan-btn"
+                aria-label="Scan album cover"
+              >
+                Scan
+              </button>
               <button type="submit" id="add-form-submit" class="btn btn--primary">Add</button>
             </div>
 
@@ -172,22 +186,6 @@ function renderMainPage(opts: {
               <details class="add-form__details">
                 <summary>Add more details</summary>
                 <div class="add-form__extra">
-                  <div class="add-form__scan-controls">
-                  <input
-                    type="file"
-                    id="scan-file-input"
-                    class="add-form__scan-input"
-                    accept="image/*"
-                  />
-                  <button
-                    type="button"
-                    id="add-form-scan-btn"
-                    class="btn add-form__scan-btn"
-                    aria-label="Scan album cover"
-                  >
-                    Scan
-                  </button>
-                </div>
                 <input type="text" name="label" placeholder="Label" class="input" />
                 <input
                   type="number"
