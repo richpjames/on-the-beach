@@ -170,6 +170,14 @@ export class App {
     form.addEventListener("submit", async (event) => {
       event.preventDefault();
 
+      const secondary = form.querySelector<HTMLElement>(".add-form__secondary");
+      if (secondary?.hidden) {
+        secondary.hidden = false;
+        const artistInput = form.querySelector<HTMLInputElement>('input[name="artist"]');
+        artistInput?.focus();
+        return;
+      }
+
       if (!this.appState.isReady) {
         alert("App is still loading. Please try again in a moment.");
         return;
@@ -189,6 +197,8 @@ export class App {
         }
 
         form.reset();
+        const secondary = form.querySelector<HTMLElement>(".add-form__secondary");
+        if (secondary) secondary.hidden = true;
         await this.renderMusicList();
       } catch (error) {
         console.error("Failed to add item:", error);
