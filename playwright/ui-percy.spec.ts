@@ -149,6 +149,15 @@ async function addItemViaCoverScan(
   const cards = page.locator(".music-card");
   const cardCountBefore = await cards.count();
 
+  const details = page.locator(".add-form__details");
+  const isOpen = await details.evaluate(
+    (element) => element instanceof HTMLDetailsElement && element.open,
+  );
+  if (!isOpen) {
+    await details.locator("summary").click();
+    await expect(details).toHaveAttribute("open", "");
+  }
+
   await page.getByRole("button", { name: "Scan album cover" }).click();
   await page.locator("#scan-file-input").setInputFiles(fixturePath);
 
