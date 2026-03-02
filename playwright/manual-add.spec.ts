@@ -4,18 +4,21 @@ test.beforeEach(async ({ request }) => {
   await request.post("/api/__test__/reset");
 });
 
-test("initial form only shows artist, album, and type until details are expanded", async ({
+test("initial form shows link input first, artist and album revealed after clicking Add", async ({
   page,
 }) => {
   await page.goto("/");
 
+  await expect(page.getByPlaceholder("Paste a music link...")).toBeVisible();
+  await expect(page.locator('input[name="artist"]')).toBeHidden();
+  await expect(page.locator('input[name="title"]')).toBeHidden();
+  await expect(page.locator('select[name="itemType"]')).toBeHidden();
+
+  await page.getByRole("button", { name: "Add" }).click();
+
   await expect(page.locator('input[name="artist"]')).toBeVisible();
   await expect(page.locator('input[name="title"]')).toBeVisible();
   await expect(page.locator('select[name="itemType"]')).toBeVisible();
-  await expect(page.getByPlaceholder("Paste a music link...")).toBeHidden();
-
-  await page.locator(".add-form__details summary").click();
-  await expect(page.getByPlaceholder("Paste a music link...")).toBeVisible();
 });
 
 test("can manually add a release without link or artwork", async ({ page }) => {
@@ -23,7 +26,8 @@ test("can manually add a release without link or artwork", async ({ page }) => {
 
   const addButton = page.getByRole("button", { name: "Add" });
   await expect(addButton).toBeEnabled();
-  await addButton.click();
+  await addButton.click(); // reveals artist/album fields
+  await addButton.click(); // submits with empty fields
 
   const card = page.locator(".music-card").first();
   await expect(card).toBeVisible({ timeout: 10_000 });

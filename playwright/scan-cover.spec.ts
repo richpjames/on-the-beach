@@ -4,8 +4,8 @@ import { expect, test } from "./fixtures/parallel-test";
 test.beforeEach(async ({ page, request }) => {
   await request.post("/api/__test__/reset");
   await page.goto("/");
-  await page.locator(".add-form__details summary").click();
-  await expect(page.getByPlaceholder("Paste a music link...")).toBeVisible();
+  await page.getByRole("button", { name: "Add" }).click(); // reveals secondary section
+  await page.locator(".add-form__details summary").click(); // opens scan controls
 });
 
 test("scan prefill opens details and fills artist/title", async ({ page }) => {

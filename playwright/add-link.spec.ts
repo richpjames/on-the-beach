@@ -6,8 +6,6 @@ test.beforeEach(async ({ request }) => {
 
 test("adding a link shows the new item", async ({ page }) => {
   await page.goto("/");
-  await page.locator(".add-form__details summary").click();
-  await expect(page.getByPlaceholder("Paste a music link...")).toBeVisible();
   page.on("dialog", async (dialog) => {
     await dialog.accept();
   });

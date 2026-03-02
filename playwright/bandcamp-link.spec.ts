@@ -9,7 +9,6 @@ test("links with protocol https", async ({ page }) => {
     "https://seekersinternational.bandcamp.com/album/thewherebetweenyou-me-reissue";
 
   await page.goto("/");
-  await page.locator(".add-form__details summary").click();
   await page.getByPlaceholder("Paste a music link...").fill(bandcampUrl);
   await page.getByRole("button", { name: "Add" }).click();
 
@@ -37,7 +36,6 @@ test("links without https", async ({ page }) => {
   const expectedNormalizedUrl = "https://phewjapan.bandcamp.com/album/paper-masks";
 
   await page.goto("/");
-  await page.locator(".add-form__details summary").click();
 
   const urlInput = page.getByPlaceholder("Paste a music link...");
   await urlInput.fill(bandcampUrlNoProtocol);

@@ -8,9 +8,9 @@ test("star rating appears on listened items and persists", async ({ page }) => {
   await page.goto("/");
 
   // Add an item manually via the title field (no URL)
-  await page.locator(".add-form__details summary").click();
+  await page.getByRole("button", { name: "Add" }).click(); // reveals artist/album fields
   await page.locator('input[name="title"]').fill("Test Album");
-  await page.getByRole("button", { name: "Add" }).click();
+  await page.getByRole("button", { name: "Add" }).click(); // submits
   const card = page.locator(".music-card").first();
   await expect(card).toBeVisible({ timeout: 10_000 });
 

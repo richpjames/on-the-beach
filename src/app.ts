@@ -171,11 +171,15 @@ export class App {
       event.preventDefault();
 
       const secondary = form.querySelector<HTMLElement>(".add-form__secondary");
-      if (secondary?.hidden) {
+      const urlInput = form.querySelector<HTMLInputElement>('input[name="url"]');
+      if (secondary?.hidden && !urlInput?.value.trim()) {
         secondary.hidden = false;
         const artistInput = form.querySelector<HTMLInputElement>('input[name="artist"]');
         artistInput?.focus();
         return;
+      }
+      if (secondary?.hidden) {
+        secondary.hidden = false;
       }
 
       if (!this.appState.isReady) {

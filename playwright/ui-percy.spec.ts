@@ -38,7 +38,7 @@ test.beforeEach(async ({ request }) => {
 
 test("captures main and release views", async ({ page }, testInfo) => {
   await page.goto("/");
-  await expect(page.locator('input[name="artist"]')).toBeVisible();
+  await expect(page.getByPlaceholder("Paste a music link...")).toBeVisible();
 
   const scanFixturePath = path.join(process.cwd(), "playwright/fixtures/cover-sample.png");
   const uploadedArtworkUrl = "/uploads/sally-oldfield-water-bearer.png";
@@ -82,7 +82,17 @@ async function captureSnapshot(page: Page, testInfo: TestInfo, viewName: string)
   });
 }
 
+async function ensureSecondaryVisible(page: Page): Promise<void> {
+  const secondary = page.locator(".add-form__secondary");
+  if (await secondary.isHidden()) {
+    await page.getByRole("button", { name: "Add" }).click();
+    await expect(secondary).toBeVisible();
+  }
+}
+
 async function addManualItem(page: Page, item: ManualItemInput): Promise<void> {
+  await ensureSecondaryVisible(page);
+
   const details = page.locator(".add-form__details");
   const isOpen = await details.evaluate(
     (element) => element instanceof HTMLDetailsElement && element.open,
@@ -148,6 +158,8 @@ async function addItemViaCoverScan(
 ): Promise<void> {
   const cards = page.locator(".music-card");
   const cardCountBefore = await cards.count();
+
+  await ensureSecondaryVisible(page);
 
   const details = page.locator(".add-form__details");
   const isOpen = await details.evaluate(
