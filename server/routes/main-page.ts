@@ -148,6 +148,17 @@ function renderMainPage(opts: {
         <section class="add-section">
           <form id="add-form" class="add-form" method="post">
             <div class="add-form__primary">
+              <input
+                type="text"
+                id="url-input"
+                name="url"
+                placeholder="Paste a music link..."
+                class="input"
+              />
+              <button type="submit" id="add-form-submit" class="btn btn--primary">Add</button>
+            </div>
+
+            <div class="add-form__secondary" hidden>
               <input type="text" name="artist" placeholder="Artist" class="input" />
               <input type="text" name="title" placeholder="Album" class="input" />
               <select name="itemType" class="input">
@@ -157,20 +168,11 @@ function renderMainPage(opts: {
                 <option value="track">Track</option>
                 <option value="mix">Mix</option>
               </select>
-              <button type="submit" id="add-form-submit" class="btn btn--primary">Add</button>
-            </div>
 
-            <details class="add-form__details">
-              <summary>Add more details</summary>
-              <div class="add-form__extra">
-                <input
-                  type="text"
-                  id="url-input"
-                  name="url"
-                  placeholder="Paste a music link..."
-                  class="input"
-                />
-                <div class="add-form__scan-controls">
+              <details class="add-form__details">
+                <summary>Add more details</summary>
+                <div class="add-form__extra">
+                  <div class="add-form__scan-controls">
                   <input
                     type="file"
                     id="scan-file-input"
@@ -205,18 +207,19 @@ function renderMainPage(opts: {
                   class="input"
                 />
                 <textarea name="notes" placeholder="Notes" class="input"></textarea>
-                <div class="stack-picker" id="add-form-stacks">
-                  <div class="stack-picker__chips" id="add-form-stack-chips"></div>
-                  <button
-                    type="button"
-                    class="stack-picker__add btn btn--ghost"
-                    id="add-form-stack-btn"
-                  >
-                    + Stack
-                  </button>
+                  <div class="stack-picker" id="add-form-stacks">
+                    <div class="stack-picker__chips" id="add-form-stack-chips"></div>
+                    <button
+                      type="button"
+                      class="stack-picker__add btn btn--ghost"
+                      id="add-form-stack-btn"
+                    >
+                      + Stack
+                    </button>
+                  </div>
                 </div>
-              </div>
-            </details>
+              </details>
+            </div>
           </form>
         </section>
 
