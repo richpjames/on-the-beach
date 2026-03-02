@@ -4,7 +4,6 @@ test.describe("Stacks", () => {
   test.beforeEach(async ({ page, request }) => {
     await request.post("/api/__test__/reset");
     await page.goto("/");
-    await page.locator(".add-form__details summary").click();
     await expect(page.getByPlaceholder("Paste a music link...")).toBeVisible();
   });
 
