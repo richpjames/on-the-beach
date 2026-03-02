@@ -138,6 +138,9 @@ export class App {
           return;
         }
 
+        const secondary = form.querySelector<HTMLElement>(".add-form__secondary");
+        if (secondary?.hidden) secondary.hidden = false;
+
         await this.handleCoverScan(
           file,
           scanButton,
