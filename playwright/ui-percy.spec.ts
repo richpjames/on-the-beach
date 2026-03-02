@@ -38,7 +38,7 @@ test.beforeEach(async ({ request }) => {
 
 test("captures main and release views", async ({ page }, testInfo) => {
   await page.goto("/");
-  await expect(page.getByPlaceholder("Paste a music link...")).toBeVisible();
+  await expect(page.locator('input[name="artist"]')).toBeVisible();
 
   const scanFixturePath = path.join(process.cwd(), "playwright/fixtures/cover-sample.png");
   const uploadedArtworkUrl = "/uploads/sally-oldfield-water-bearer.png";
