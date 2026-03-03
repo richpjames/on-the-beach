@@ -312,6 +312,8 @@ function renderReleasePage(item: MusicItemFull, cssHref: string): string {
           artworkUploadBtn.disabled = true;
           artworkUploadBtn.textContent = 'Uploading…';
 
+          const previousUrl = artworkUrlInput.value;
+
           try {
             const dataUrl = await new Promise((resolve, reject) => {
               const reader = new FileReader();
@@ -329,6 +331,7 @@ function renderReleasePage(item: MusicItemFull, cssHref: string): string {
             const { artworkUrl } = await res.json();
             artworkUrlInput.value = artworkUrl;
           } catch (err) {
+            artworkUrlInput.value = previousUrl;
             alert('Failed to upload image.');
             console.error(err);
           } finally {

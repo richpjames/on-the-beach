@@ -13,8 +13,6 @@ test("can replace release image via file upload in edit mode", async ({ page, re
   });
   const item = await res.json();
 
-  await page.goto(`/r/${item.id}`);
-
   // Mock the upload endpoint
   await page.route("**/api/release/image", async (route) => {
     await route.fulfill({
@@ -23,6 +21,8 @@ test("can replace release image via file upload in edit mode", async ({ page, re
       body: JSON.stringify({ artworkUrl: "/uploads/mock-replaced.jpg" }),
     });
   });
+
+  await page.goto(`/r/${item.id}`);
 
   // Enter edit mode
   await page.getByRole("button", { name: "Edit" }).click();
