@@ -138,6 +138,11 @@ function renderReleasePage(item: MusicItemFull, cssHref: string): string {
                   <input class="input" type="text" id="edit-genre" value="${escapeHtml(item.genre ?? "")}" placeholder="Genre" />
                   <input class="input" type="text" id="edit-catalogue" value="${escapeHtml(item.catalogue_number ?? "")}" placeholder="Catalogue number" />
                   <textarea class="input" id="edit-notes" placeholder="Notes">${escapeHtml(item.notes ?? "")}</textarea>
+                  <div class="release-page__edit-artwork">
+                    <input type="file" id="artwork-file-input" accept="image/*" style="display:none" />
+                    <button type="button" class="btn" id="artwork-upload-btn">Replace image</button>
+                    <input class="input" type="text" id="edit-artwork-url" value="${escapeHtml(item.artwork_url ?? "")}" placeholder="Artwork URL" />
+                  </div>
                   <div class="release-page__edit-actions">
                     <button type="button" class="btn btn--primary" id="save-btn">Save changes</button>
                     <button type="button" class="btn" id="cancel-btn">Cancel</button>
@@ -196,6 +201,7 @@ function renderReleasePage(item: MusicItemFull, cssHref: string): string {
           genre: document.getElementById('edit-genre').value.trim() || null,
           catalogueNumber: document.getElementById('edit-catalogue').value.trim() || null,
           notes: document.getElementById('edit-notes').value.trim() || null,
+          artworkUrl: document.getElementById('edit-artwork-url').value.trim() || null,
         };
         const res = await fetch('/api/music-items/' + ITEM_ID, {
           method: 'PATCH',
@@ -290,6 +296,48 @@ function renderReleasePage(item: MusicItemFull, cssHref: string): string {
           await toggleStack(stack.id, true);
         }
       });
+
+      // ── Artwork upload ───────────────────────────────────────────────────
+      const artworkUploadBtn = document.getElementById('artwork-upload-btn');
+      const artworkFileInput = document.getElementById('artwork-file-input');
+      const artworkUrlInput = document.getElementById('edit-artwork-url');
+
+      if (artworkUploadBtn && artworkFileInput && artworkUrlInput) {
+        artworkUploadBtn.addEventListener('click', () => artworkFileInput.click());
+
+        artworkFileInput.addEventListener('change', async () => {
+          const file = artworkFileInput.files?.[0];
+          if (!file) return;
+
+          artworkUploadBtn.disabled = true;
+          artworkUploadBtn.textContent = 'Uploading…';
+
+          try {
+            const dataUrl = await new Promise((resolve, reject) => {
+              const reader = new FileReader();
+              reader.onload = () => resolve(reader.result);
+              reader.onerror = reject;
+              reader.readAsDataURL(file);
+            });
+            const base64 = dataUrl.split(',')[1];
+            const res = await fetch('/api/release/image', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ imageBase64: base64 }),
+            });
+            if (!res.ok) throw new Error('Upload failed: ' + res.status);
+            const { artworkUrl } = await res.json();
+            artworkUrlInput.value = artworkUrl;
+          } catch (err) {
+            alert('Failed to upload image.');
+            console.error(err);
+          } finally {
+            artworkUploadBtn.disabled = false;
+            artworkUploadBtn.textContent = 'Replace image';
+            artworkFileInput.value = '';
+          }
+        });
+      }
 
       renderStackChips();
       loadStacks();
