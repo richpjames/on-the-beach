@@ -1,9 +1,13 @@
 import type { MusicItemFull, StackWithCount } from "../../types";
+import { renderStarRatingControl } from "../components/star-rating";
 import type { FilterSelection } from "../domain/music-list";
 import { getEmptyStateMessage } from "../domain/music-list";
 import { STATUS_LABELS } from "../domain/status";
 
-export function renderMusicList(items: MusicItemFull[], currentFilter: FilterSelection): string {
+export function renderMusicList(
+  items: MusicItemFull[],
+  currentFilter: FilterSelection,
+): string {
   if (items.length === 0) {
     const message = getEmptyStateMessage(currentFilter);
     return `
@@ -51,11 +55,7 @@ export function renderMusicCard(item: MusicItemFull): string {
         </a>
         <div class="music-card__meta">
           <select class="status-select">${statusOptions}</select>
-          ${
-            item.listen_status === "to-listen" || item.listen_status === "listened"
-              ? renderStarRating(item.id, item.rating)
-              : ""
-          }
+          ${renderStarRating(item.id, item.rating)}
           ${
             item.primary_source
               ? item.primary_url
@@ -203,25 +203,16 @@ export function renderStackDropdownContent(
   `;
 }
 
-export function renderStarRating(itemId: number, rating: number | null, cssClass?: string): string {
-  const values = [5, 4.5, 4, 3.5, 3, 2.5, 2, 1.5, 1, 0.5];
-  const stars = values
-    .map((value) => {
-      const isHalf = value % 1 !== 0;
-      const cls = isHalf ? "star-label--half" : "star-label--full";
-      const idSuffix = String(value).replace(".", "-");
-      const title = `${value} star${value !== 1 ? "s" : ""}`;
-      return `
-        <input type="radio" id="star-${itemId}-${idSuffix}" name="rating-${itemId}" value="${value}" ${rating === value ? "checked" : ""}>
-        <label class="star-label ${cls}" for="star-${itemId}-${idSuffix}" title="${title}"></label>`;
-    })
-    .join("");
-
-  return `
-    <fieldset class="star-rating${cssClass ? ` ${cssClass}` : ""}">
-      <legend class="visually-hidden">Rating</legend>
-      ${stars}
-    </fieldset>`;
+export function renderStarRating(
+  itemId: number,
+  rating: number | null,
+  cssClass?: string,
+): string {
+  return renderStarRatingControl({
+    itemId,
+    rating,
+    className: cssClass,
+  });
 }
 
 export function escapeHtml(text: string): string {

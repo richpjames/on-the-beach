@@ -448,6 +448,70 @@ select.input {
     margin-left: 4px;
 }
 
+.rating-stars {
+    display: inline-flex;
+    flex-direction: row-reverse;
+    align-items: center;
+    gap: 1px;
+}
+
+.rating-stars__star {
+    appearance: none;
+    border: 1px solid transparent;
+    background: transparent;
+    color: var(--chrome-darker);
+    cursor: pointer;
+    padding: 0;
+    width: 16px;
+    height: 16px;
+    line-height: 1;
+    font-size: 15px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.rating-stars__star span {
+    display: block;
+    pointer-events: none;
+}
+
+.rating-stars__star.is-active-full {
+    color: #c8a000;
+}
+
+.rating-stars__star.is-active-half span {
+    color: transparent;
+    background: linear-gradient(90deg, #c8a000 50%, var(--chrome-darker) 50%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+.rating-stars__star:focus-visible {
+    outline: none;
+    border-color: #6699ff;
+    background: #001133;
+}
+
+.rating-stars.is-pending {
+    opacity: 0.65;
+}
+
+.rating-stars.is-pending .rating-stars__star {
+    cursor: progress;
+}
+
+.rating-stars__star:disabled {
+    pointer-events: none;
+}
+
+.rating-stars.star-rating--large .rating-stars__star {
+    width: 30px;
+    height: 30px;
+    font-size: 28px;
+}
+
 .btn--ghost {
     background: transparent;
     border-color: transparent;

@@ -14,18 +14,32 @@ test("star rating appears on to-listen items and persists", async ({ page }) => 
   const card = page.locator(".music-card").first();
   await expect(card).toBeVisible({ timeout: 10_000 });
 
-  // Rating widget should be visible on to-listen items
-  await expect(card.locator(".star-rating")).toBeVisible({ timeout: 5_000 });
+  // Rating widget is visible on all items
+  await expect(card.locator("[data-rating-stars]")).toBeVisible({
+    timeout: 5_000,
+  });
 
-  // Click 3 stars
-  await card.locator('label[for$="-3"]').click();
+  // Click 3 stars and wait for the PATCH to complete before reloading
+  await Promise.all([
+    page.waitForResponse(
+      (resp) => resp.url().includes("/api/music-items/") && resp.request().method() === "PATCH",
+    ),
+    card.locator('[data-rating-star="3"]').click(),
+  ]);
 
   // Re-fetch the page and confirm rating is persisted
   await page.reload();
   const reloadedCard = page.locator(".music-card").first();
-  await expect(reloadedCard.locator('input[value="3"]')).toBeChecked({ timeout: 5_000 });
+  await expect(reloadedCard.locator('[data-rating-star="3"]')).toHaveClass(/is-active-full/, {
+    timeout: 5_000,
+  });
 
-  // Click the checked star's label again to clear the rating
-  await reloadedCard.locator('label[for$="-3"]').click();
-  await expect(reloadedCard.locator('input[value="3"]')).not.toBeChecked({ timeout: 5_000 });
+  // Click the checked star again to clear the rating
+  await Promise.all([
+    page.waitForResponse(
+      (resp) => resp.url().includes("/api/music-items/") && resp.request().method() === "PATCH",
+    ),
+    reloadedCard.locator('[data-rating-star="3"]').click(),
+  ]);
+  await expect(reloadedCard.locator('[data-rating-star="3"]')).not.toHaveClass(/is-active/);
 });

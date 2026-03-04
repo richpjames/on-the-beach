@@ -346,51 +346,129 @@ function renderReleasePage(item: MusicItemFull, cssHref: string): string {
       loadStacks();
 
       // ── Star Rating ─────────────────────────────────────────────────────────
-      let ratingPendingClear = null;
+      const ratingEl = document.querySelector('[data-rating-stars]');
+      const MIN_RATING = 0.5;
+      const MAX_RATING = 5;
+      const HALF_STEP = 0.5;
 
-      function resolveRatingInput(target) {
-        if (target.tagName === 'LABEL' && target.htmlFor) {
-          return document.getElementById(target.htmlFor);
-        }
-        return target.closest('input[type="radio"]');
+      function normalizeRating(value) {
+        if (value === null || Number.isNaN(value) || !Number.isFinite(value)) return null;
+        const rounded = Math.round(value / HALF_STEP) * HALF_STEP;
+        if (rounded < MIN_RATING || rounded > MAX_RATING) return null;
+        return rounded;
       }
 
-      const ratingFieldset = document.querySelector('.star-rating--large');
-      if (ratingFieldset) {
-        ratingFieldset.addEventListener('mousedown', (e) => {
-          const input = resolveRatingInput(e.target);
-          if (!input) return;
-          if (input.checked) {
-            ratingPendingClear = { value: Number(input.value) };
-          } else {
-            ratingPendingClear = null;
+      function getFillState(rating, starValue) {
+        if (rating === null) return 'empty';
+        if (rating >= starValue) return 'full';
+        if (Math.abs(rating - (starValue - HALF_STEP)) < 0.001) return 'half';
+        return 'empty';
+      }
+
+      function setRatingButtonsDisabled(element, disabled) {
+        element.querySelectorAll('[data-rating-star]').forEach((candidate) => {
+          if (candidate instanceof HTMLButtonElement) {
+            candidate.disabled = disabled;
           }
         });
+      }
 
-        ratingFieldset.addEventListener('change', async (e) => {
-          const input = e.target;
-          if (!input || input.type !== 'radio') return;
-          ratingPendingClear = null;
-          const res = await fetch('/api/music-items/' + ITEM_ID, {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ rating: Number(input.value) }),
-          });
-          if (!res.ok) alert('Failed to update rating.');
+      function applyRatingVisualState(element) {
+        const preview = normalizeRating(
+          element.dataset.previewValue ? Number(element.dataset.previewValue) : null,
+        );
+        const selected = normalizeRating(
+          element.dataset.ratingValue ? Number(element.dataset.ratingValue) : null,
+        );
+        const effective = preview ?? selected;
+
+        element.querySelectorAll('[data-rating-star]').forEach((candidate) => {
+          if (!(candidate instanceof HTMLButtonElement)) return;
+          const starValue = normalizeRating(Number(candidate.dataset.ratingStar));
+          const fill = starValue === null ? 'empty' : getFillState(effective, starValue);
+          const selectedState = starValue === null ? 'empty' : getFillState(selected, starValue);
+          candidate.classList.toggle('is-active-full', fill === 'full');
+          candidate.classList.toggle('is-active-half', fill === 'half');
+          candidate.setAttribute('aria-pressed', selectedState === 'empty' ? 'false' : 'true');
+        });
+      }
+
+      function resolveValueFromPointer(button, event) {
+        const fullValue = normalizeRating(Number(button.dataset.ratingStar));
+        if (fullValue === null) return null;
+        if (event.detail === 0) return fullValue;
+
+        const rect = button.getBoundingClientRect();
+        if (rect.width <= 0) return fullValue;
+
+        const clickX = event.clientX - rect.left;
+        const isLeftHalf = clickX < rect.width / 2;
+        return normalizeRating(isLeftHalf ? fullValue - HALF_STEP : fullValue);
+      }
+
+      if (ratingEl) {
+        ratingEl.addEventListener('pointermove', (event) => {
+          if (ratingEl.classList.contains('is-pending')) return;
+          const target = event.target;
+          if (!(target instanceof HTMLElement)) return;
+          const button = target.closest('[data-rating-star]');
+          if (!(button instanceof HTMLButtonElement)) return;
+          const previewValue = resolveValueFromPointer(button, event);
+          if (previewValue === null) return;
+          ratingEl.dataset.previewValue = String(previewValue);
+          applyRatingVisualState(ratingEl);
         });
 
-        ratingFieldset.addEventListener('click', async (e) => {
-          const input = resolveRatingInput(e.target);
-          if (!input) return;
-          if (ratingPendingClear && ratingPendingClear.value === Number(input.value)) {
-            input.checked = false;
-            ratingPendingClear = null;
+        ratingEl.addEventListener('pointerout', (event) => {
+          if (ratingEl.classList.contains('is-pending')) return;
+          const target = event.target;
+          if (!(target instanceof Node) || !ratingEl.contains(target)) return;
+          const related = event.relatedTarget;
+          if (related instanceof Node && ratingEl.contains(related)) return;
+          delete ratingEl.dataset.previewValue;
+          applyRatingVisualState(ratingEl);
+        });
+
+        ratingEl.addEventListener('click', async (event) => {
+          if (ratingEl.classList.contains('is-pending')) return;
+          const target = event.target;
+          if (!(target instanceof HTMLElement)) return;
+          const button = target.closest('[data-rating-star]');
+          if (!(button instanceof HTMLButtonElement)) return;
+
+          const selectedValue = resolveValueFromPointer(button, event);
+          if (selectedValue === null) return;
+
+          const current = normalizeRating(
+            ratingEl.dataset.ratingValue ? Number(ratingEl.dataset.ratingValue) : null,
+          );
+          const next = current === selectedValue ? null : selectedValue;
+
+          delete ratingEl.dataset.previewValue;
+          ratingEl.dataset.ratingValue = next === null ? '' : String(next);
+          applyRatingVisualState(ratingEl);
+          ratingEl.classList.add('is-pending');
+          setRatingButtonsDisabled(ratingEl, true);
+
+          try {
             const res = await fetch('/api/music-items/' + ITEM_ID, {
               method: 'PATCH',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ rating: null }),
+              body: JSON.stringify({ rating: next }),
             });
-            if (!res.ok) alert('Failed to clear rating.');
+            if (!res.ok) {
+              ratingEl.dataset.ratingValue = current === null ? '' : String(current);
+              applyRatingVisualState(ratingEl);
+              alert('Failed to update rating.');
+            }
+          } catch (error) {
+            ratingEl.dataset.ratingValue = current === null ? '' : String(current);
+            applyRatingVisualState(ratingEl);
+            alert('Failed to update rating.');
+            console.error(error);
+          } finally {
+            ratingEl.classList.remove('is-pending');
+            setRatingButtonsDisabled(ratingEl, false);
           }
         });
       }

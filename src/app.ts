@@ -7,13 +7,16 @@ import {
 import type { AddFormValues } from "./ui/domain/add-form";
 import { buildMusicItemFilters } from "./ui/domain/music-list";
 import { constrainDimensions } from "./ui/domain/scan";
+import {
+  clearStarRatingPreview,
+  resolveStarRatingHover,
+  resolveStarRatingInteraction,
+  setStarRatingPending,
+  setStarRatingPreview,
+  setStarRatingValue,
+} from "./ui/components/star-rating";
 import { initialAddFormState, transitionAddFormState } from "./ui/state/add-form-machine";
 import { initialAppState, transitionAppState } from "./ui/state/app-machine";
-import {
-  initialRatingState,
-  resolveRatingClick,
-  transitionRatingState,
-} from "./ui/state/rating-machine";
 import {
   renderAddFormStackChips,
   renderMusicList,
@@ -40,11 +43,11 @@ export class App {
   private api: ApiClient;
   private appState = initialAppState;
   private addFormState = initialAddFormState;
-  private ratingState = initialRatingState;
   private musicListEl: HTMLElement | null = null;
   private musicListScrollbarEl: HTMLElement | null = null;
   private musicListTrackEl: HTMLElement | null = null;
   private musicListThumbEl: HTMLElement | null = null;
+  private activeStarRatingPreviewEl: HTMLElement | null = null;
   private listThumbDrag: { startY: number; startTop: number } | null = null;
   private activeItemActionMenuCleanup: (() => void) | null = null;
   private activeStackDropdownCleanup: ((skipOnClose?: boolean) => void) | null = null;
@@ -470,6 +473,39 @@ export class App {
       return;
     }
 
+    list.addEventListener("pointermove", (event) => {
+      const hover = resolveStarRatingHover(event as MouseEvent);
+      if (!hover) {
+        return;
+      }
+
+      if (this.activeStarRatingPreviewEl && this.activeStarRatingPreviewEl !== hover.element) {
+        clearStarRatingPreview(this.activeStarRatingPreviewEl);
+      }
+
+      setStarRatingPreview(hover.element, hover.hoverRating);
+      this.activeStarRatingPreviewEl = hover.element;
+    });
+
+    list.addEventListener("pointerout", (event) => {
+      if (!this.activeStarRatingPreviewEl) {
+        return;
+      }
+
+      const target = event.target as Node | null;
+      if (!target || !this.activeStarRatingPreviewEl.contains(target)) {
+        return;
+      }
+
+      const relatedTarget = event.relatedTarget as Node | null;
+      if (relatedTarget && this.activeStarRatingPreviewEl.contains(relatedTarget)) {
+        return;
+      }
+
+      clearStarRatingPreview(this.activeStarRatingPreviewEl);
+      this.activeStarRatingPreviewEl = null;
+    });
+
     list.addEventListener("click", async (event) => {
       const target = event.target as HTMLElement;
       const menuToggle = target.closest('[data-action="toggle-item-menu"]') as HTMLElement | null;
@@ -484,6 +520,25 @@ export class App {
 
       if (target.closest(".music-card__menu-item")) {
         this.closeItemActionMenu();
+      }
+
+      const starRating = resolveStarRatingInteraction(event as MouseEvent);
+      if (starRating) {
+        this.closeItemActionMenu();
+        clearStarRatingPreview(starRating.element);
+        this.activeStarRatingPreviewEl = null;
+        setStarRatingPending(starRating.element, true);
+        setStarRatingValue(starRating.element, starRating.nextRating);
+        try {
+          await this.api.updateMusicItem(starRating.itemId, { rating: starRating.nextRating });
+        } catch (error) {
+          console.error("Failed to update rating:", error);
+          setStarRatingValue(starRating.element, starRating.currentRating);
+          alert("Failed to update rating. Please try again.");
+        } finally {
+          setStarRatingPending(starRating.element, false);
+        }
+        return;
       }
 
       if (
@@ -530,67 +585,6 @@ export class App {
         await this.renderMusicList();
         return;
       }
-
-      if (!(target instanceof HTMLInputElement) || !this.isRatingInput(target)) {
-        return;
-      }
-
-      const itemContext = this.resolveItemContext(target);
-      if (!itemContext) {
-        return;
-      }
-
-      await this.api.updateMusicItem(itemContext.itemId, { rating: Number(target.value) });
-      await this.renderMusicList();
-    });
-
-    list.addEventListener("mousedown", (event) => {
-      const input = this.resolveRatingInput(event.target as HTMLElement);
-      if (!this.isRatingInput(input)) {
-        return;
-      }
-
-      if (!input.checked) {
-        this.ratingState = transitionRatingState(this.ratingState, { type: "RESET" });
-        return;
-      }
-
-      const itemContext = this.resolveItemContext(input);
-      if (!itemContext) {
-        this.ratingState = transitionRatingState(this.ratingState, { type: "RESET" });
-        return;
-      }
-
-      this.ratingState = transitionRatingState(this.ratingState, {
-        type: "POINTER_DOWN_ON_CHECKED",
-        itemId: itemContext.itemId,
-        value: Number(input.value),
-      });
-    });
-
-    list.addEventListener("click", async (event) => {
-      const input = this.resolveRatingInput(event.target as HTMLElement);
-      if (!this.isRatingInput(input)) {
-        return;
-      }
-
-      const itemContext = this.resolveItemContext(input);
-      if (!itemContext) {
-        this.ratingState = transitionRatingState(this.ratingState, { type: "RESET" });
-        return;
-      }
-
-      const clickResult = resolveRatingClick(
-        this.ratingState,
-        itemContext.itemId,
-        Number(input.value),
-      );
-      this.ratingState = clickResult.state;
-
-      if (clickResult.shouldClear) {
-        await this.api.updateMusicItem(itemContext.itemId, { rating: null });
-        await this.renderMusicList();
-      }
     });
   }
 
@@ -606,18 +600,6 @@ export class App {
     }
 
     return { card, itemId };
-  }
-
-  private isRatingInput(input: HTMLInputElement | null): input is HTMLInputElement {
-    return input !== null && input.type === "radio" && input.name.startsWith("rating-");
-  }
-
-  private resolveRatingInput(target: HTMLElement): HTMLInputElement | null {
-    if (target instanceof HTMLLabelElement && target.htmlFor) {
-      return document.getElementById(target.htmlFor) as HTMLInputElement | null;
-    }
-
-    return target.closest('input[type="radio"]') as HTMLInputElement | null;
   }
 
   private setupCustomListScrollbar(): void {
@@ -798,6 +780,10 @@ export class App {
     const container = document.getElementById("music-list");
     if (!container) {
       return;
+    }
+
+    if (this.activeStarRatingPreviewEl) {
+      this.activeStarRatingPreviewEl = null;
     }
 
     this.closeItemActionMenu();
