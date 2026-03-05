@@ -24,18 +24,18 @@ export function parseOgTags(html: string): OgData {
 
   // Match <meta> tags with property/name and content in either order
   const metaRegex =
-    /<meta\s+(?:[^>]*?)(?:property|name)\s*=\s*["']([^"']+)["'][^>]*?content\s*=\s*["']([^"']*?)["'][^>]*?\/?>/gi;
+    /<meta\s+(?:[^>]*?)(?:property|name)\s*=\s*(["'])([^"']+)\1[^>]*?content\s*=\s*(["'])([\s\S]*?)\3[^>]*?\/?>/gi;
   const metaRegexReversed =
-    /<meta\s+(?:[^>]*?)content\s*=\s*["']([^"']*?)["'][^>]*?(?:property|name)\s*=\s*["']([^"']+)["'][^>]*?\/?>/gi;
+    /<meta\s+(?:[^>]*?)content\s*=\s*(["'])([\s\S]*?)\1[^>]*?(?:property|name)\s*=\s*(["'])([^"']+)\3[^>]*?\/?>/gi;
 
   const tags = new Map<string, string>();
 
   let match: RegExpExecArray | null;
   while ((match = metaRegex.exec(html)) !== null) {
-    tags.set(match[1].toLowerCase(), decodeHtmlEntities(match[2]));
+    tags.set(match[2].toLowerCase(), decodeHtmlEntities(match[4]));
   }
   while ((match = metaRegexReversed.exec(html)) !== null) {
-    tags.set(match[2].toLowerCase(), decodeHtmlEntities(match[1]));
+    tags.set(match[4].toLowerCase(), decodeHtmlEntities(match[2]));
   }
 
   data.ogTitle = tags.get("og:title");
@@ -61,9 +61,16 @@ export function decodeHtmlEntities(text: string): string {
     .replace(/&lt;/g, "<")
     .replace(/&gt;/g, ">")
     .replace(/&quot;/g, '"')
+    .replace(/&apos;/g, "'")
     .replace(/&#39;/g, "'")
-    .replace(/&#x27;/g, "'")
-    .replace(/&#(\d+);/g, (_, num) => String.fromCharCode(Number(num)));
+    .replace(/&#x([0-9a-f]+);/gi, (raw, hex) => {
+      const codePoint = Number.parseInt(hex, 16);
+      return Number.isFinite(codePoint) ? String.fromCodePoint(codePoint) : raw;
+    })
+    .replace(/&#(\d+);/g, (raw, num) => {
+      const codePoint = Number.parseInt(num, 10);
+      return Number.isFinite(codePoint) ? String.fromCodePoint(codePoint) : raw;
+    });
 }
 
 export function parseBandcampOg(og: OgData): ScrapedMetadata {

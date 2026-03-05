@@ -16,12 +16,14 @@ describe("decodeHtmlEntities", () => {
     expect(decodeHtmlEntities("Rock &amp; Roll")).toBe("Rock & Roll");
     expect(decodeHtmlEntities("&lt;b&gt;bold&lt;/b&gt;")).toBe("<b>bold</b>");
     expect(decodeHtmlEntities("&quot;quoted&quot;")).toBe('"quoted"');
+    expect(decodeHtmlEntities("it&apos;s")).toBe("it's");
     expect(decodeHtmlEntities("it&#39;s")).toBe("it's");
     expect(decodeHtmlEntities("it&#x27;s")).toBe("it's");
   });
 
   test("decodes numeric entities", () => {
     expect(decodeHtmlEntities("&#8211;")).toBe("\u2013");
+    expect(decodeHtmlEntities("it&#x2019;s")).toBe("it\u2019s");
   });
 });
 
@@ -69,6 +71,16 @@ describe("parseOgTags", () => {
     `;
     const result = parseOgTags(html);
     expect(result.ogTitle).toBe("Rock & Roll");
+  });
+
+  test("preserves apostrophes in quoted meta content values", () => {
+    const html = `
+      <html><head>
+        <meta property="og:title" content="It's a Beautiful Place" />
+      </head></html>
+    `;
+    const result = parseOgTags(html);
+    expect(result.ogTitle).toBe("It's a Beautiful Place");
   });
 
   test("extracts og:site_name", () => {
