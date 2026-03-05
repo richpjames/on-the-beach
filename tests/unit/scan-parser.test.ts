@@ -23,6 +23,13 @@ describe("parseScanJson", () => {
     });
   });
 
+  test("coerces literal null strings to null", () => {
+    expect(parseScanJson('{"artist":"NULL","title":" null "}')).toEqual({
+      artist: null,
+      title: null,
+    });
+  });
+
   test("returns null for invalid JSON", () => {
     expect(parseScanJson("not json")).toBeNull();
   });
