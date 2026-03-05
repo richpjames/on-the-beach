@@ -90,9 +90,8 @@ function renderReleasePage(item: MusicItemFull, cssHref: string): string {
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="robots" content="noindex, nofollow" />
     <title>${escapeHtml(item.title)} — On The Beach</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=VT323&family=Share+Tech+Mono&display=swap" rel="stylesheet" />
+    <link rel="preconnect" href="https://fonts.coollabs.io" />
+    <link href="https://fonts.coollabs.io/css2?family=VT323&family=Share+Tech+Mono&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="${escapeHtml(cssHref)}" />
   </head>
   <body class="release-page-body">
