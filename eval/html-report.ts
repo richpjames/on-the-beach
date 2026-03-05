@@ -34,8 +34,8 @@ export function generateHtml(report: EvalReport): string {
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>OCR Eval — ${date}</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=DM+Sans:ital,wght@0,400;0,500;0,700;1,400&family=Playfair+Display:wght@700;900&display=swap" rel="stylesheet">
+<link rel="preconnect" href="https://fonts.coollabs.io">
+<link href="https://fonts.coollabs.io/css2?family=JetBrains+Mono:wght@400;600&family=DM+Sans:ital,wght@0,400;0,500;0,700;1,400&family=Playfair+Display:wght@700;900&display=swap" rel="stylesheet">
 <style>
   :root {
     --bg: #0e0e0e;
