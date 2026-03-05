@@ -19,189 +19,167 @@
     <link rel="stylesheet" href="/src/styles/main.css" />
   </head>
   <body>
-    <div id="app">
-      <header class="header">
-        <h1>On The Beach</h1>
-        <p class="header__subtitle">Music Tracking</p>
-        <div class="header__winbuttons">
-          <button class="header__winbtn" aria-label="Minimize" tabindex="-1">_</button>
-          <button class="header__winbtn" aria-label="Maximize" tabindex="-1">□</button>
-          <button class="header__winbtn header__winbtn--close" aria-label="Close" tabindex="-1">
-            ✕
+    <header class="header">
+      <h1>On The Beach</h1>
+      <p class="header__subtitle">Music Tracking</p>
+      <div class="header__winbuttons">
+        <button class="header__winbtn" aria-label="Minimize" tabindex="-1">_</button>
+        <button class="header__winbtn" aria-label="Maximize" tabindex="-1">□</button>
+        <button class="header__winbtn header__winbtn--close" aria-label="Close" tabindex="-1">
+          ✕
+        </button>
+      </div>
+    </header>
+
+    <main class="main">
+      <section class="add-section">
+        <form id="add-form" class="add-form" method="post">
+          <div class="add-form__primary">
+            <input
+              type="text"
+              id="url-input"
+              name="url"
+              placeholder="Paste a music link..."
+              class="input"
+            />
+            <input type="file" id="scan-file-input" class="add-form__scan-input" accept="image/*" />
+            <button
+              type="button"
+              id="add-form-scan-btn"
+              class="btn add-form__scan-btn"
+              aria-label="Scan album cover"
+            >
+              Scan
+            </button>
+            <button type="submit" id="add-form-submit" class="btn btn--primary" disabled>
+              Add
+            </button>
+          </div>
+
+          <div class="add-form__secondary" hidden>
+            <input type="text" name="artist" placeholder="Artist" class="input" />
+            <input type="text" name="title" placeholder="Album" class="input" />
+            <select name="itemType" class="input">
+              <option value="album">Album</option>
+              <option value="ep">EP</option>
+              <option value="single">Single</option>
+              <option value="track">Track</option>
+              <option value="mix">Mix</option>
+            </select>
+
+            <details class="add-form__details">
+              <summary>Add more details</summary>
+              <div class="add-form__extra">
+                <input type="text" name="label" placeholder="Label" class="input" />
+                <input
+                  type="number"
+                  name="year"
+                  placeholder="Year"
+                  min="1900"
+                  max="2099"
+                  class="input"
+                />
+                <input type="text" name="country" placeholder="Country" class="input" />
+                <input type="text" name="genre" placeholder="Genre" class="input" />
+                <input type="text" name="artworkUrl" placeholder="Artwork URL" class="input" />
+                <input
+                  type="text"
+                  name="catalogueNumber"
+                  placeholder="Catalogue number"
+                  class="input"
+                />
+                <textarea name="notes" placeholder="Notes" class="input"></textarea>
+                <div class="stack-picker" id="add-form-stacks">
+                  <div class="stack-picker__chips" id="add-form-stack-chips"></div>
+                  <button type="button" class="stack-picker__add btn btn--ghost" id="add-form-stack-btn">
+                    + Stack
+                  </button>
+                </div>
+              </div>
+            </details>
+          </div>
+        </form>
+      </section>
+
+      <section class="stack-section">
+        <div id="stack-bar" class="stack-bar">
+          <button class="stack-tab active" data-stack="all">All</button>
+          <button class="stack-tab stack-tab--manage" id="manage-stacks-btn" title="Manage stacks">
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <circle cx="12" cy="12" r="3"></circle>
+              <path
+                d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"
+              ></path>
+            </svg>
+          </button>
+          <button
+            class="stack-tab stack-tab--delete"
+            id="delete-stack-btn"
+            title="Delete selected stack"
+            hidden
+            aria-label="Delete selected stack"
+          >
+            🗑
           </button>
         </div>
-      </header>
+        <div id="stack-manage" class="stack-manage" hidden>
+          <div id="stack-manage-list"></div>
+          <div class="stack-manage__create">
+            <input type="text" id="stack-manage-input" class="input" placeholder="New stack name..." />
+            <button type="button" id="stack-manage-create-btn" class="btn btn--primary">Create</button>
+          </div>
+        </div>
+      </section>
 
-      <main class="main">
-        <section class="add-section">
-          <form id="add-form" class="add-form" method="post">
-            <div class="add-form__primary">
-              <input
-                type="text"
-                id="url-input"
-                name="url"
-                placeholder="Paste a music link..."
-                class="input"
-              />
-              <input
-                type="file"
-                id="scan-file-input"
-                class="add-form__scan-input"
-                accept="image/*"
-              />
-              <button
-                type="button"
-                id="add-form-scan-btn"
-                class="btn add-form__scan-btn"
-                aria-label="Scan album cover"
-              >
-                Scan
-              </button>
-              <button type="submit" id="add-form-submit" class="btn btn--primary" disabled>
-                Add
-              </button>
-            </div>
+      <section class="filter-section">
+        <div id="filter-bar" class="filter-bar">
+          <button class="filter-btn" data-filter="all">All</button>
+          <button class="filter-btn active" data-filter="to-listen">To Listen</button>
+          <button class="filter-btn" data-filter="listened">Listened</button>
+        </div>
+      </section>
 
-            <div class="add-form__secondary" hidden>
-              <input type="text" name="artist" placeholder="Artist" class="input" />
-              <input type="text" name="title" placeholder="Album" class="input" />
-              <select name="itemType" class="input">
-                <option value="album">Album</option>
-                <option value="ep">EP</option>
-                <option value="single">Single</option>
-                <option value="track">Track</option>
-                <option value="mix">Mix</option>
-              </select>
-
-              <details class="add-form__details">
-                <summary>Add more details</summary>
-                <div class="add-form__extra">
-                  <input type="text" name="label" placeholder="Label" class="input" />
-                  <input
-                    type="number"
-                    name="year"
-                    placeholder="Year"
-                    min="1900"
-                    max="2099"
-                    class="input"
-                  />
-                  <input type="text" name="country" placeholder="Country" class="input" />
-                  <input type="text" name="genre" placeholder="Genre" class="input" />
-                  <input type="text" name="artworkUrl" placeholder="Artwork URL" class="input" />
-                  <input
-                    type="text"
-                    name="catalogueNumber"
-                    placeholder="Catalogue number"
-                    class="input"
-                  />
-                  <textarea name="notes" placeholder="Notes" class="input"></textarea>
-                  <div class="stack-picker" id="add-form-stacks">
-                    <div class="stack-picker__chips" id="add-form-stack-chips"></div>
-                    <button
-                      type="button"
-                      class="stack-picker__add btn btn--ghost"
-                      id="add-form-stack-btn"
-                    >
-                      + Stack
-                    </button>
-                  </div>
-                </div>
-              </details>
-            </div>
-          </form>
-        </section>
-
-        <section class="stack-section">
-          <div id="stack-bar" class="stack-bar">
-            <button class="stack-tab active" data-stack="all">All</button>
+      <section class="list-section">
+        <div class="music-list-shell">
+          <div id="music-list" class="music-list">
+            <!-- Music items inserted by JS -->
+          </div>
+          <div id="music-list-scrollbar" class="music-scrollbar">
             <button
-              class="stack-tab stack-tab--manage"
-              id="manage-stacks-btn"
-              title="Manage stacks"
+              type="button"
+              class="music-scrollbar__button"
+              data-scroll-btn="up"
+              aria-label="Scroll up"
+              tabindex="-1"
             >
-              <svg
-                width="14"
-                height="14"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-              >
-                <circle cx="12" cy="12" r="3"></circle>
-                <path
-                  d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"
-                ></path>
-              </svg>
+              ▲
             </button>
+            <div id="music-list-scroll-track" class="music-scrollbar__track">
+              <div id="music-list-scroll-thumb" class="music-scrollbar__thumb"></div>
+            </div>
             <button
-              class="stack-tab stack-tab--delete"
-              id="delete-stack-btn"
-              title="Delete selected stack"
-              hidden
-              aria-label="Delete selected stack"
+              type="button"
+              class="music-scrollbar__button"
+              data-scroll-btn="down"
+              aria-label="Scroll down"
+              tabindex="-1"
             >
-              🗑
+              ▼
             </button>
           </div>
-          <div id="stack-manage" class="stack-manage" hidden>
-            <div id="stack-manage-list"></div>
-            <div class="stack-manage__create">
-              <input
-                type="text"
-                id="stack-manage-input"
-                class="input"
-                placeholder="New stack name..."
-              />
-              <button type="button" id="stack-manage-create-btn" class="btn btn--primary">
-                Create
-              </button>
-            </div>
-          </div>
-        </section>
-
-        <section class="filter-section">
-          <div id="filter-bar" class="filter-bar">
-            <button class="filter-btn" data-filter="all">All</button>
-            <button class="filter-btn active" data-filter="to-listen">To Listen</button>
-            <button class="filter-btn" data-filter="listened">Listened</button>
-          </div>
-        </section>
-
-        <section class="list-section">
-          <div class="music-list-shell">
-            <div id="music-list" class="music-list">
-              <!-- Music items inserted by JS -->
-            </div>
-            <div id="music-list-scrollbar" class="music-scrollbar">
-              <button
-                type="button"
-                class="music-scrollbar__button"
-                data-scroll-btn="up"
-                aria-label="Scroll up"
-                tabindex="-1"
-              >
-                ▲
-              </button>
-              <div id="music-list-scroll-track" class="music-scrollbar__track">
-                <div id="music-list-scroll-thumb" class="music-scrollbar__thumb"></div>
-              </div>
-              <button
-                type="button"
-                class="music-scrollbar__button"
-                data-scroll-btn="down"
-                aria-label="Scroll down"
-                tabindex="-1"
-              >
-                ▼
-              </button>
-            </div>
-          </div>
-        </section>
-      </main>
-      <footer class="footer">
-        <span id="app-version"></span>
-      </footer>
-    </div>
+        </div>
+      </section>
+    </main>
+    <footer class="footer">
+      <span id="app-version"></span>
+    </footer>
 
     <script type="module" src="/src/main.ts"></script>
   </body>

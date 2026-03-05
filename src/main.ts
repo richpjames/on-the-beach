@@ -7,7 +7,7 @@ async function bootstrap() {
     console.log("[App] Initialized successfully");
   } catch (error) {
     console.error("[App] Failed to initialize:", error);
-    document.getElementById("app")!.innerHTML = `
+    document.body.innerHTML = `
       <div class="error-screen">
         <h1>Failed to load</h1>
         <p>Could not connect to the server. Please try again.</p>

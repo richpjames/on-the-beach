@@ -54,8 +54,7 @@
 /* ═══════════════════════════════════════════════════
    BODY — Windows 98 Desktop
 ═══════════════════════════════════════════════════ */
-body {
-    font-family: "Tahoma", "MS Sans Serif", "Arial", sans-serif;
+html {
     background-color: #008080;
     background-image:
         repeating-linear-gradient(
@@ -72,17 +71,14 @@ body {
             rgba(0, 0, 0, 0.02) 1px,
             rgba(0, 0, 0, 0.02) 2px
         );
-    color: #000000;
-    line-height: 1.3;
-    min-height: 100vh;
-    font-size: 11px;
-    padding: 16px 16px 44px;
 }
 
-/* ═══════════════════════════════════════════════════
-   APP WINDOW — Floating window on desktop
-═══════════════════════════════════════════════════ */
-#app {
+body {
+    font-family: "Tahoma", "MS Sans Serif", "Arial", sans-serif;
+    color: #000000;
+    line-height: 1.3;
+    font-size: 11px;
+    padding: 16px 16px 44px;
     max-width: 680px;
     margin: 0 auto;
     background: var(--chrome);
@@ -1560,7 +1556,7 @@ body::after {
 
 /* ─── Release Permalink Page ────────────────────────────────────────────── */
 
-/* Blurred artwork backdrop — sits behind the #app window on the "desktop" */
+/* Blurred artwork backdrop — sits behind the app window on the "desktop" */
 .release-page__backdrop {
     position: fixed;
     inset: 0;
@@ -1574,11 +1570,11 @@ body::after {
 }
 
 /* Widen the app window on the release page so artwork can be large */
-.release-page-body #app {
+.release-page-body {
     max-width: 650px;
 }
 
-.release-page-body #app,
+.release-page-body > :not(.release-page__backdrop),
 .release-page-body .main {
     position: relative;
     z-index: 1;
