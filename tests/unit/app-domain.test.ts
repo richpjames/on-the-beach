@@ -133,6 +133,7 @@ describe("app domain helpers", () => {
     const items = [{ id: 10 }, { id: 20 }, { id: 30 }];
     expect(applyOrder(items, [30, 10, 20])).toEqual([{ id: 30 }, { id: 10 }, { id: 20 }]);
     expect(applyOrder(items, [20])).toEqual([{ id: 10 }, { id: 30 }, { id: 20 }]);
+    expect(applyOrder(items, [20, 20, 10, 10])).toEqual([{ id: 30 }, { id: 20 }, { id: 10 }]);
     expect(applyOrder(items, [])).toEqual(items);
   });
 });
