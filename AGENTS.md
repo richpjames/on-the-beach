@@ -1,5 +1,7 @@
 # AGENTS.md
 
+This project uses Bun, not node.
+
 ### Before pushing
 - Ensure you have run all the tests locally 
 ### On pushing
