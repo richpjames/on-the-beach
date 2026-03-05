@@ -49,18 +49,16 @@ function renderNotFoundPage(): string {
     <title>Not Found — On The Beach</title>
   </head>
   <body>
-    <div id="app">
-      <header class="header">
-        <h1>On The Beach</h1>
-        <p class="header__subtitle">Music Tracking</p>
-      </header>
-      <main class="main">
-        <div class="release-page">
-          <p>Not found — this release doesn't exist.</p>
-          <a href="/" class="btn btn--ghost">◄</a>
-        </div>
-      </main>
-    </div>
+    <header class="header">
+      <h1>On The Beach</h1>
+      <p class="header__subtitle">Music Tracking</p>
+    </header>
+    <main class="main">
+      <div class="release-page">
+        <p>Not found — this release doesn't exist.</p>
+        <a href="/" class="btn btn--ghost">◄</a>
+      </div>
+    </main>
   </body>
 </html>`;
 }
@@ -96,13 +94,12 @@ function renderReleasePage(item: MusicItemFull, cssHref: string): string {
   </head>
   <body class="release-page-body">
     ${safeArtworkUrl(item.artwork_url ?? "") ? `<div class="release-page__backdrop" style="background-image: url('${escapeHtml(item.artwork_url!)}')"></div>` : ""}
-    <div id="app">
-      <header class="header">
-        <h1>On The Beach</h1>
-        <p class="header__subtitle">Music Tracking</p>
-      </header>
-      <main class="main">
-        <div class="release-page">
+    <header class="header">
+      <h1>On The Beach</h1>
+      <p class="header__subtitle">Music Tracking</p>
+    </header>
+    <main class="main">
+      <div class="release-page">
 
           <div class="release-page__nav">
             <a href="/" class="btn">◄</a>
@@ -169,9 +166,8 @@ function renderReleasePage(item: MusicItemFull, cssHref: string): string {
             </div>
           </div>
 
-        </div>
-      </main>
-    </div>
+      </div>
+    </main>
     <script>
       const ITEM_ID = ${item.id};
 

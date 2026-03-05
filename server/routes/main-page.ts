@@ -130,7 +130,6 @@ function renderMainPage(opts: {
     <link rel="stylesheet" href="${escapeHtml(opts.cssHref)}" />
   </head>
   <body>
-    <div id="app">
       <header class="header">
         <h1>On The Beach</h1>
         <p class="header__subtitle">Music Tracking</p>
@@ -311,7 +310,6 @@ function renderMainPage(opts: {
       <footer class="footer">
         <span id="app-version">v${escapeHtml(opts.appVersion)}</span>
       </footer>
-    </div>
 
     <script id="__initial_state__" type="application/json">${opts.stacksJson}</script>${viteClient}
     <script type="module" src="${escapeHtml(opts.scriptSrc)}"></script>
