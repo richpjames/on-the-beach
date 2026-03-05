@@ -1,5 +1,18 @@
 import type { ScanResult } from "../src/types";
 
+function normalizeNullableString(value: unknown): string | null {
+  if (typeof value !== "string") {
+    return null;
+  }
+
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return null;
+  }
+
+  return trimmed.toLowerCase() === "null" ? null : trimmed;
+}
+
 export function parseScanJson(rawContent: string): ScanResult | null {
   const trimmed = rawContent.trim();
   const fenced = trimmed.match(/^```(?:json)?\s*([\s\S]*?)\s*```$/i);
@@ -11,8 +24,8 @@ export function parseScanJson(rawContent: string): ScanResult | null {
       return null;
     }
 
-    const artist = typeof parsed.artist === "string" ? parsed.artist.trim() || null : null;
-    const title = typeof parsed.title === "string" ? parsed.title.trim() || null : null;
+    const artist = normalizeNullableString(parsed.artist);
+    const title = normalizeNullableString(parsed.title);
 
     if (
       parsed.artist !== null &&
