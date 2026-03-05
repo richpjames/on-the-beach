@@ -4,10 +4,7 @@ import type { FilterSelection } from "../domain/music-list";
 import { getEmptyStateMessage } from "../domain/music-list";
 import { STATUS_LABELS } from "../domain/status";
 
-export function renderMusicList(
-  items: MusicItemFull[],
-  currentFilter: FilterSelection,
-): string {
+export function renderMusicList(items: MusicItemFull[], currentFilter: FilterSelection): string {
   if (items.length === 0) {
     const message = getEmptyStateMessage(currentFilter);
     return `
@@ -66,6 +63,21 @@ export function renderMusicCard(item: MusicItemFull): string {
         </div>
       </div>
       <div class="music-card__actions">
+        <button
+          type="button"
+          class="btn btn--ghost music-card__drag-handle"
+          title="Reorder item"
+          aria-label="Reorder item"
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+            <circle cx="8" cy="6" r="1.4"></circle>
+            <circle cx="16" cy="6" r="1.4"></circle>
+            <circle cx="8" cy="12" r="1.4"></circle>
+            <circle cx="16" cy="12" r="1.4"></circle>
+            <circle cx="8" cy="18" r="1.4"></circle>
+            <circle cx="16" cy="18" r="1.4"></circle>
+          </svg>
+        </button>
         ${
           item.primary_url
             ? `
@@ -203,11 +215,7 @@ export function renderStackDropdownContent(
   `;
 }
 
-export function renderStarRating(
-  itemId: number,
-  rating: number | null,
-  cssClass?: string,
-): string {
+export function renderStarRating(itemId: number, rating: number | null, cssClass?: string): string {
   return renderStarRatingControl({
     itemId,
     rating,

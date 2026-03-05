@@ -5,7 +5,7 @@ import {
   getCoverScanErrorMessage,
 } from "./ui/domain/add-form";
 import type { AddFormValues } from "./ui/domain/add-form";
-import { buildMusicItemFilters } from "./ui/domain/music-list";
+import { buildContextKey, buildMusicItemFilters } from "./ui/domain/music-list";
 import { constrainDimensions } from "./ui/domain/scan";
 import {
   clearStarRatingPreview,
@@ -39,6 +39,15 @@ interface StackDropdownOptions {
   shouldIgnoreOutsideClick?: (target: HTMLElement) => boolean;
 }
 
+interface ReorderDragState {
+  pointerId: number;
+  startX: number;
+  startY: number;
+  moved: boolean;
+  card: HTMLElement;
+  handle: HTMLElement;
+}
+
 export class App {
   private api: ApiClient;
   private appState = initialAppState;
@@ -51,6 +60,7 @@ export class App {
   private listThumbDrag: { startY: number; startTop: number } | null = null;
   private activeItemActionMenuCleanup: (() => void) | null = null;
   private activeStackDropdownCleanup: ((skipOnClose?: boolean) => void) | null = null;
+  private reorderDragState: ReorderDragState | null = null;
 
   constructor() {
     this.api = new ApiClient();
@@ -473,7 +483,25 @@ export class App {
       return;
     }
 
+    list.addEventListener("pointerdown", (event) => {
+      this.startReorderDrag(event, list);
+    });
+
+    document.addEventListener("pointermove", (event) => {
+      this.handleReorderPointerMove(event, list);
+    });
+    document.addEventListener("pointerup", (event) => {
+      void this.finishReorderDrag(event);
+    });
+    document.addEventListener("pointercancel", (event) => {
+      void this.finishReorderDrag(event);
+    });
+
     list.addEventListener("pointermove", (event) => {
+      if (this.reorderDragState) {
+        return;
+      }
+
       const hover = resolveStarRatingHover(event as MouseEvent);
       if (!hover) {
         return;
@@ -488,6 +516,10 @@ export class App {
     });
 
     list.addEventListener("pointerout", (event) => {
+      if (this.reorderDragState) {
+        return;
+      }
+
       if (!this.activeStarRatingPreviewEl) {
         return;
       }
@@ -600,6 +632,135 @@ export class App {
     }
 
     return { card, itemId };
+  }
+
+  private startReorderDrag(event: PointerEvent, list: HTMLElement): void {
+    const target = event.target;
+    if (!(target instanceof HTMLElement)) {
+      return;
+    }
+
+    const handle = target.closest(".music-card__drag-handle") as HTMLElement | null;
+    if (!handle) {
+      return;
+    }
+
+    const itemContext = this.resolveItemContext(handle);
+    if (!itemContext) {
+      return;
+    }
+
+    this.closeItemActionMenu();
+    this.closeActiveStackDropdown();
+    this.reorderDragState = {
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+      moved: false,
+      card: itemContext.card,
+      handle,
+    };
+
+    itemContext.card.classList.add("is-dragging");
+    handle.setPointerCapture?.(event.pointerId);
+    event.preventDefault();
+    list.style.userSelect = "none";
+  }
+
+  private handleReorderPointerMove(event: PointerEvent, list: HTMLElement): void {
+    if (!this.reorderDragState || event.pointerId !== this.reorderDragState.pointerId) {
+      return;
+    }
+
+    const distanceX = event.clientX - this.reorderDragState.startX;
+    const distanceY = event.clientY - this.reorderDragState.startY;
+    if (!this.reorderDragState.moved) {
+      const distance = Math.hypot(distanceX, distanceY);
+      if (distance < 5) {
+        return;
+      }
+
+      this.reorderDragState.moved = true;
+    }
+
+    const hovered = document.elementFromPoint(event.clientX, event.clientY);
+    if (!(hovered instanceof HTMLElement)) {
+      return;
+    }
+
+    const overCard = hovered.closest("[data-item-id]") as HTMLElement | null;
+    if (!overCard || overCard === this.reorderDragState.card) {
+      return;
+    }
+
+    if (overCard.parentElement !== list) {
+      return;
+    }
+
+    const overRect = overCard.getBoundingClientRect();
+    const placeBefore = event.clientY < overRect.top + overRect.height / 2;
+    if (placeBefore) {
+      if (this.reorderDragState.card.nextElementSibling === overCard) {
+        return;
+      }
+
+      list.insertBefore(this.reorderDragState.card, overCard);
+      return;
+    }
+
+    if (overCard.nextElementSibling === this.reorderDragState.card) {
+      return;
+    }
+
+    list.insertBefore(this.reorderDragState.card, overCard.nextElementSibling);
+  }
+
+  private async finishReorderDrag(event: PointerEvent): Promise<void> {
+    if (!this.reorderDragState || event.pointerId !== this.reorderDragState.pointerId) {
+      return;
+    }
+
+    const { card, handle, pointerId, moved } = this.reorderDragState;
+    this.reorderDragState = null;
+    card.classList.remove("is-dragging");
+    if (handle.hasPointerCapture?.(pointerId)) {
+      handle.releasePointerCapture(pointerId);
+    }
+
+    const list = document.getElementById("music-list");
+    if (list instanceof HTMLElement) {
+      list.style.removeProperty("user-select");
+    }
+
+    if (!moved) {
+      return;
+    }
+
+    await this.persistMusicListOrder();
+  }
+
+  private async persistMusicListOrder(): Promise<void> {
+    const list = document.getElementById("music-list");
+    if (!(list instanceof HTMLElement)) {
+      return;
+    }
+
+    const itemIds = Array.from(list.querySelectorAll<HTMLElement>("[data-item-id]"))
+      .map((card) => Number(card.dataset.itemId))
+      .filter((id) => Number.isInteger(id) && id > 0);
+
+    if (itemIds.length === 0) {
+      return;
+    }
+
+    const contextKey = buildContextKey(this.appState.currentFilter, this.appState.currentStack);
+    try {
+      await this.api.saveOrder(contextKey, itemIds);
+    } catch (error) {
+      console.error("Failed to persist reordered items:", error);
+      await this.renderMusicList();
+      alert("Failed to save the new order. Please try again.");
+    }
   }
 
   private setupCustomListScrollbar(): void {

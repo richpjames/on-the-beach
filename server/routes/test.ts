@@ -7,6 +7,7 @@ import {
   artists,
   stacks,
   stackParents,
+  musicItemOrder,
 } from "../db/schema";
 
 export const testRoutes = new Hono();
@@ -17,6 +18,7 @@ testRoutes.post("/reset", async (c) => {
   await db.delete(stackParents);
   await db.delete(musicLinks);
   await db.delete(musicItems);
+  await db.delete(musicItemOrder);
   await db.delete(artists);
   await db.delete(stacks);
   // sources are seeded/static — leave them alone

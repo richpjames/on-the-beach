@@ -21,10 +21,11 @@ export function applyOrder<T extends { id: number }>(items: T[], orderedIds: num
     return items;
   }
 
-  const orderedSet = new Set(orderedIds);
+  const uniqueOrderedIds = [...new Set(orderedIds)];
+  const orderedSet = new Set(uniqueOrderedIds);
   const unordered = items.filter((item) => !orderedSet.has(item.id));
   const itemMap = new Map(items.map((item) => [item.id, item]));
-  const ordered = orderedIds
+  const ordered = uniqueOrderedIds
     .map((id) => itemMap.get(id))
     .filter((item): item is T => item !== undefined);
 
