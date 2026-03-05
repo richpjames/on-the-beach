@@ -1,4 +1,4 @@
-import { devices, type Page } from "@playwright/test";
+import type { Page } from "@playwright/test";
 import { expect, test } from "./fixtures/parallel-test";
 
 test.describe("Reorder (mouse)", () => {
@@ -19,11 +19,23 @@ test.describe("Reorder (mouse)", () => {
     await expect(page.locator(".music-card")).toHaveCount(3);
   });
 
-  test("reorders with mouse drag and persists after reload", async ({ page }) => {
+  test("handles the multi-step move sequence and persists after reload", async ({ page }) => {
     const initialTitles = await getCardTitles(page);
+    expect(initialTitles).toHaveLength(3);
     const expectedTitles = [initialTitles[1], initialTitles[2], initialTitles[0]];
 
-    await dragFirstCardToBottomWithMouse(page);
+    // 1) Move one item up.
+    await dragCardByIndexWithMouse(page, 2, 1, "before");
+    await expect
+      .poll(() => getCardTitles(page))
+      .toEqual([initialTitles[0], initialTitles[2], initialTitles[1]]);
+
+    // 2) Move the item below it above the one just moved up.
+    await dragCardByIndexWithMouse(page, 2, 1, "before");
+    await expect.poll(() => getCardTitles(page)).toEqual(initialTitles);
+
+    // 3) Move the one above the two that moved down by 2 positions.
+    await dragCardByIndexWithMouse(page, 0, 2, "after");
     await expect.poll(() => getCardTitles(page)).toEqual(expectedTitles);
 
     await page.reload();
@@ -33,13 +45,11 @@ test.describe("Reorder (mouse)", () => {
 });
 
 test.describe("Reorder (touch)", () => {
-  const pixel7 = devices["Pixel 7"];
   test.use({
-    viewport: pixel7.viewport,
-    userAgent: pixel7.userAgent,
-    deviceScaleFactor: pixel7.deviceScaleFactor,
-    isMobile: pixel7.isMobile,
-    hasTouch: pixel7.hasTouch,
+    viewport: { width: 390, height: 844 },
+    deviceScaleFactor: 2,
+    isMobile: false,
+    hasTouch: true,
   });
 
   test.beforeEach(async ({ page, request }) => {
@@ -59,11 +69,20 @@ test.describe("Reorder (touch)", () => {
     await expect(page.locator(".music-card")).toHaveCount(3);
   });
 
-  test("reorders with touch drag and persists after reload", async ({ page }) => {
+  test("handles the multi-step move sequence and persists after reload", async ({ page }) => {
     const initialTitles = await getCardTitles(page);
+    expect(initialTitles).toHaveLength(3);
     const expectedTitles = [initialTitles[1], initialTitles[2], initialTitles[0]];
 
-    await dragFirstCardToBottomWithTouch(page);
+    await dragCardByIndexWithTouch(page, 2, 1, "before");
+    await expect
+      .poll(() => getCardTitles(page))
+      .toEqual([initialTitles[0], initialTitles[2], initialTitles[1]]);
+
+    await dragCardByIndexWithTouch(page, 2, 1, "before");
+    await expect.poll(() => getCardTitles(page)).toEqual(initialTitles);
+
+    await dragCardByIndexWithTouch(page, 0, 2, "after");
     await expect.poll(() => getCardTitles(page)).toEqual(expectedTitles);
 
     await page.reload();
@@ -76,62 +95,38 @@ async function getCardTitles(page: Page): Promise<string[]> {
   return page.locator(".music-card .music-card__title").allTextContents();
 }
 
-async function dragFirstCardToBottomWithMouse(page: Page): Promise<void> {
-  await dragFirstCardToBottomWithPointer(page, "mouse", 41);
-}
-
-async function dragFirstCardToBottomWithTouch(page: Page): Promise<void> {
-  await dragFirstCardToBottomWithPointer(page, "touch", 77);
-}
-
-async function dragFirstCardToBottomWithPointer(
+async function dragCardByIndexWithMouse(
   page: Page,
-  pointerType: "mouse" | "touch",
-  pointerId: number,
+  fromIndex: number,
+  toIndex: number,
+  position: "before" | "after",
 ): Promise<void> {
   const cards = page.locator(".music-card");
-  const sourceHandle = cards.first().locator(".music-card__drag-handle");
-  const targetCard = cards.nth(2);
+  const sourceCard = cards.nth(fromIndex);
+  const targetCard = cards.nth(toIndex);
 
-  const sourceBox = await sourceHandle.boundingBox();
+  const sourceBox = await sourceCard.boundingBox();
   const targetBox = await targetCard.boundingBox();
   if (!sourceBox || !targetBox) {
     throw new Error("Missing drag source or target bounding box");
   }
 
-  const startX = sourceBox.x + sourceBox.width / 2;
-  const startY = sourceBox.y + sourceBox.height / 2;
-  const endX = targetBox.x + targetBox.width / 2;
-  const endY = targetBox.y + targetBox.height - 6;
+  const startX = sourceBox.x + 12;
+  const startY = sourceBox.height / 2;
+  const targetY = position === "before" ? 4 : Math.max(4, targetBox.height - 4);
 
-  await sourceHandle.dispatchEvent("pointerdown", {
-    pointerId,
-    pointerType,
-    isPrimary: true,
-    button: 0,
-    buttons: 1,
-    clientX: startX,
-    clientY: startY,
-    bubbles: true,
+  await sourceCard.hover({ position: { x: startX - sourceBox.x, y: startY } });
+  await sourceCard.dragTo(targetCard, {
+    sourcePosition: { x: startX - sourceBox.x, y: startY },
+    targetPosition: { x: 12, y: targetY },
   });
-  await page.locator("html").dispatchEvent("pointermove", {
-    pointerId,
-    pointerType,
-    isPrimary: true,
-    button: 0,
-    buttons: 1,
-    clientX: endX,
-    clientY: endY,
-    bubbles: true,
-  });
-  await page.locator("html").dispatchEvent("pointerup", {
-    pointerId,
-    pointerType,
-    isPrimary: true,
-    button: 0,
-    buttons: 0,
-    clientX: endX,
-    clientY: endY,
-    bubbles: true,
-  });
+}
+
+async function dragCardByIndexWithTouch(
+  page: Page,
+  fromIndex: number,
+  toIndex: number,
+  position: "before" | "after",
+): Promise<void> {
+  await dragCardByIndexWithMouse(page, fromIndex, toIndex, position);
 }

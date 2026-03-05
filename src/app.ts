@@ -1,4 +1,5 @@
 import { ApiClient } from "./services/api-client";
+import Sortable from "sortablejs";
 import type { ListenStatus, StackWithCount } from "./types";
 import {
   buildCreateMusicItemInputFromValues,
@@ -39,15 +40,6 @@ interface StackDropdownOptions {
   shouldIgnoreOutsideClick?: (target: HTMLElement) => boolean;
 }
 
-interface ReorderDragState {
-  pointerId: number;
-  startX: number;
-  startY: number;
-  moved: boolean;
-  card: HTMLElement;
-  handle: HTMLElement;
-}
-
 export class App {
   private api: ApiClient;
   private appState = initialAppState;
@@ -60,7 +52,8 @@ export class App {
   private listThumbDrag: { startY: number; startTop: number } | null = null;
   private activeItemActionMenuCleanup: (() => void) | null = null;
   private activeStackDropdownCleanup: ((skipOnClose?: boolean) => void) | null = null;
-  private reorderDragState: ReorderDragState | null = null;
+  private musicListSortable: Sortable | null = null;
+  private isReordering = false;
 
   constructor() {
     this.api = new ApiClient();
@@ -102,6 +95,7 @@ export class App {
     this.setupStackManagePanel();
     this.setupStackParentLinker();
     this.setupEventDelegation();
+    this.setupMusicListReorder();
     this.setupCustomListScrollbar();
 
     if (hasServerData) {
@@ -483,22 +477,8 @@ export class App {
       return;
     }
 
-    list.addEventListener("pointerdown", (event) => {
-      this.startReorderDrag(event, list);
-    });
-
-    document.addEventListener("pointermove", (event) => {
-      this.handleReorderPointerMove(event, list);
-    });
-    document.addEventListener("pointerup", (event) => {
-      void this.finishReorderDrag(event);
-    });
-    document.addEventListener("pointercancel", (event) => {
-      void this.finishReorderDrag(event);
-    });
-
     list.addEventListener("pointermove", (event) => {
-      if (this.reorderDragState) {
+      if (this.isReordering) {
         return;
       }
 
@@ -516,7 +496,7 @@ export class App {
     });
 
     list.addEventListener("pointerout", (event) => {
-      if (this.reorderDragState) {
+      if (this.isReordering) {
         return;
       }
 
@@ -634,109 +614,38 @@ export class App {
     return { card, itemId };
   }
 
-  private startReorderDrag(event: PointerEvent, list: HTMLElement): void {
-    const target = event.target;
-    if (!(target instanceof HTMLElement)) {
-      return;
-    }
-
-    const handle = target.closest(".music-card__drag-handle") as HTMLElement | null;
-    if (!handle) {
-      return;
-    }
-
-    const itemContext = this.resolveItemContext(handle);
-    if (!itemContext) {
-      return;
-    }
-
-    this.closeItemActionMenu();
-    this.closeActiveStackDropdown();
-    this.reorderDragState = {
-      pointerId: event.pointerId,
-      startX: event.clientX,
-      startY: event.clientY,
-      moved: false,
-      card: itemContext.card,
-      handle,
-    };
-
-    itemContext.card.classList.add("is-dragging");
-    handle.setPointerCapture?.(event.pointerId);
-    event.preventDefault();
-    list.style.userSelect = "none";
-  }
-
-  private handleReorderPointerMove(event: PointerEvent, list: HTMLElement): void {
-    if (!this.reorderDragState || event.pointerId !== this.reorderDragState.pointerId) {
-      return;
-    }
-
-    const distanceX = event.clientX - this.reorderDragState.startX;
-    const distanceY = event.clientY - this.reorderDragState.startY;
-    if (!this.reorderDragState.moved) {
-      const distance = Math.hypot(distanceX, distanceY);
-      if (distance < 5) {
-        return;
-      }
-
-      this.reorderDragState.moved = true;
-    }
-
-    const hovered = document.elementFromPoint(event.clientX, event.clientY);
-    if (!(hovered instanceof HTMLElement)) {
-      return;
-    }
-
-    const overCard = hovered.closest("[data-item-id]") as HTMLElement | null;
-    if (!overCard || overCard === this.reorderDragState.card) {
-      return;
-    }
-
-    if (overCard.parentElement !== list) {
-      return;
-    }
-
-    const overRect = overCard.getBoundingClientRect();
-    const placeBefore = event.clientY < overRect.top + overRect.height / 2;
-    if (placeBefore) {
-      if (this.reorderDragState.card.nextElementSibling === overCard) {
-        return;
-      }
-
-      list.insertBefore(this.reorderDragState.card, overCard);
-      return;
-    }
-
-    if (overCard.nextElementSibling === this.reorderDragState.card) {
-      return;
-    }
-
-    list.insertBefore(this.reorderDragState.card, overCard.nextElementSibling);
-  }
-
-  private async finishReorderDrag(event: PointerEvent): Promise<void> {
-    if (!this.reorderDragState || event.pointerId !== this.reorderDragState.pointerId) {
-      return;
-    }
-
-    const { card, handle, pointerId, moved } = this.reorderDragState;
-    this.reorderDragState = null;
-    card.classList.remove("is-dragging");
-    if (handle.hasPointerCapture?.(pointerId)) {
-      handle.releasePointerCapture(pointerId);
-    }
-
+  private setupMusicListReorder(): void {
     const list = document.getElementById("music-list");
-    if (list instanceof HTMLElement) {
-      list.style.removeProperty("user-select");
-    }
-
-    if (!moved) {
+    if (!(list instanceof HTMLElement) || this.musicListSortable) {
       return;
     }
 
-    await this.persistMusicListOrder();
+    this.musicListSortable = Sortable.create(list, {
+      draggable: ".music-card",
+      animation: 160,
+      fallbackTolerance: 4,
+      invertSwap: true,
+      swapThreshold: 0.35,
+      // Keep interactive controls clickable while making the card body draggable.
+      filter: "button,input,select,textarea,[data-action],.music-card__menu-item",
+      preventOnFilter: false,
+      ghostClass: "music-card--drag-ghost",
+      chosenClass: "music-card--drag-chosen",
+      dragClass: "music-card--dragging",
+      onStart: () => {
+        this.isReordering = true;
+        this.closeItemActionMenu();
+        this.closeActiveStackDropdown();
+      },
+      onEnd: (event: Sortable.SortableEvent) => {
+        this.isReordering = false;
+        if (event.oldIndex === event.newIndex) {
+          return;
+        }
+
+        void this.persistMusicListOrder();
+      },
+    });
   }
 
   private async persistMusicListOrder(): Promise<void> {
@@ -952,6 +861,7 @@ export class App {
     const result = await this.api.listMusicItems(filters);
 
     container.innerHTML = renderMusicList(result.items, this.appState.currentFilter);
+    this.setupMusicListReorder();
     this.renderStackParentLinker(container);
     this.syncCustomListScrollbar();
     requestAnimationFrame(() => {

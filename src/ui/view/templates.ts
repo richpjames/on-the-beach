@@ -63,21 +63,6 @@ export function renderMusicCard(item: MusicItemFull): string {
         </div>
       </div>
       <div class="music-card__actions">
-        <button
-          type="button"
-          class="btn btn--ghost music-card__drag-handle"
-          title="Reorder item"
-          aria-label="Reorder item"
-        >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-            <circle cx="8" cy="6" r="1.4"></circle>
-            <circle cx="16" cy="6" r="1.4"></circle>
-            <circle cx="8" cy="12" r="1.4"></circle>
-            <circle cx="16" cy="12" r="1.4"></circle>
-            <circle cx="8" cy="18" r="1.4"></circle>
-            <circle cx="16" cy="18" r="1.4"></circle>
-          </svg>
-        </button>
         ${
           item.primary_url
             ? `

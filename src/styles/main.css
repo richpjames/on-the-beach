@@ -838,8 +838,13 @@ select.input {
     background: #0e1a30;
 }
 
-.music-card.is-dragging {
+.music-card--drag-chosen,
+.music-card--dragging {
     opacity: 0.72;
+}
+
+.music-card--drag-ghost {
+    opacity: 0.45;
 }
 
 .music-card__content {
@@ -963,12 +968,6 @@ select.input {
         margin-top: 1px;
     }
 
-    .music-card .music-card__drag-handle {
-        width: 30px;
-        height: 30px;
-        padding: 0;
-    }
-
     .music-card .music-card__action-btn {
         display: none;
     }
@@ -1078,18 +1077,6 @@ select.input {
     align-self: stretch;
     padding-top: 3px;
     position: relative;
-}
-
-.music-card__drag-handle {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    cursor: grab;
-    touch-action: none;
-}
-
-.music-card__drag-handle:active {
-    cursor: grabbing;
 }
 
 .music-card__action-btn {
