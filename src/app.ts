@@ -201,7 +201,10 @@ export class App {
       const values = this.readAddFormValues(formData);
 
       try {
-        const item = await this.api.createMusicItem(buildCreateMusicItemInputFromValues(values));
+        const item = await this.api.createMusicItem({
+          ...buildCreateMusicItemInputFromValues(values),
+          listenStatus: "to-listen",
+        });
 
         if (this.addFormState.selectedStackIds.length > 0) {
           await this.api.setItemStacks(item.id, this.addFormState.selectedStackIds);
@@ -213,7 +216,9 @@ export class App {
         form.reset();
         const secondary = form.querySelector<HTMLElement>(".add-form__secondary");
         if (secondary) secondary.hidden = true;
-        await this.renderMusicList();
+        if (this.shouldRefreshListAfterAdd()) {
+          await this.renderMusicList();
+        }
       } catch (error) {
         console.error("Failed to add item:", error);
         alert("Failed to add item. Please try again.");
@@ -240,6 +245,10 @@ export class App {
   private readStringField(formData: FormData, name: string): string {
     const value = formData.get(name);
     return typeof value === "string" ? value : "";
+  }
+
+  private shouldRefreshListAfterAdd(): boolean {
+    return this.appState.currentFilter === "all" || this.appState.currentFilter === "to-listen";
   }
 
   private setScanButtonState(button: HTMLButtonElement, isLoading: boolean): void {
