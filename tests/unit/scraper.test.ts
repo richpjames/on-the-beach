@@ -440,7 +440,12 @@ describe("scrapeUrl", () => {
     expect(result!.potentialArtist).toBe("Theo Parrish");
     expect(result!.itemType).toBe("album");
     expect(result!.releases).toEqual([
-      { artist: "Theo Parrish", title: "In Motion", itemType: "album" },
+      {
+        candidateId: "cand-1-theo-parrish-in-motion",
+        artist: "Theo Parrish",
+        title: "In Motion",
+        itemType: "album",
+      },
     ]);
     mock.restore();
     process.env = { ...originalEnv };
@@ -671,8 +676,18 @@ describe("scrapeUrl", () => {
     const result = await scrapeUrl("https://obscuremusic.example/releases", "unknown");
     expect(result).not.toBeNull();
     expect(result!.releases).toEqual([
-      { artist: "Artist One", title: "First Album", itemType: "album" },
-      { artist: "Artist Two", title: "Second EP", itemType: "ep" },
+      {
+        candidateId: "cand-1-artist-one-first-album",
+        artist: "Artist One",
+        title: "First Album",
+        itemType: "album",
+      },
+      {
+        candidateId: "cand-2-artist-two-second-ep",
+        artist: "Artist Two",
+        title: "Second EP",
+        itemType: "ep",
+      },
     ]);
     expect(result!.potentialTitle).toBe("First Album");
     expect(result!.potentialArtist).toBe("Artist One");

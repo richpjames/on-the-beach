@@ -1,4 +1,4 @@
-import type { MusicItemFull, StackWithCount } from "../../types";
+import type { LinkReleaseCandidate, MusicItemFull, StackWithCount } from "../../types";
 import { renderStarRatingControl } from "../components/star-rating";
 import type { FilterSelection } from "../domain/music-list";
 import { getEmptyStateMessage } from "../domain/music-list";
@@ -198,6 +198,47 @@ export function renderStackDropdownContent(
              placeholder="New stack...">
     </div>
   `;
+}
+
+export function renderAmbiguousLinkCandidates(
+  candidates: LinkReleaseCandidate[],
+  selectedCandidateId: string | null,
+): string {
+  return candidates
+    .map((candidate) => {
+      const isSelected = candidate.candidateId === selectedCandidateId;
+      return `
+        <button
+          type="button"
+          class="link-picker__candidate${isSelected ? " is-selected" : ""}"
+          data-candidate-id="${escapeHtml(candidate.candidateId)}"
+          aria-pressed="${isSelected ? "true" : "false"}"
+        >
+          <span class="link-picker__candidate-main">
+            <span class="link-picker__candidate-title">${escapeHtml(candidate.title)}</span>
+            ${
+              candidate.artist
+                ? `<span class="link-picker__candidate-artist">${escapeHtml(candidate.artist)}</span>`
+                : ""
+            }
+          </span>
+          <span class="link-picker__candidate-meta">
+            ${
+              candidate.itemType
+                ? `<span class="badge badge--source">${escapeHtml(candidate.itemType)}</span>`
+                : ""
+            }
+            ${candidate.isPrimary ? `<span class="badge badge--source">primary</span>` : ""}
+          </span>
+          ${
+            candidate.evidence
+              ? `<span class="link-picker__candidate-evidence">${escapeHtml(candidate.evidence)}</span>`
+              : ""
+          }
+        </button>
+      `;
+    })
+    .join("");
 }
 
 export function renderStarRating(itemId: number, rating: number | null, cssClass?: string): string {

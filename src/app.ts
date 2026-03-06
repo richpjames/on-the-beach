@@ -1,11 +1,16 @@
-import { ApiClient } from "./services/api-client";
+import { AmbiguousLinkApiError, ApiClient } from "./services/api-client";
 import Sortable from "sortablejs";
-import type { ListenStatus, StackWithCount } from "./types";
+import type { AddFormValues as AddFormValuesInput } from "./ui/domain/add-form";
+import type {
+  AmbiguousLinkPayload,
+  LinkReleaseCandidate,
+  ListenStatus,
+  StackWithCount,
+} from "./types";
 import {
   buildCreateMusicItemInputFromValues,
   getCoverScanErrorMessage,
 } from "./ui/domain/add-form";
-import type { AddFormValues } from "./ui/domain/add-form";
 import { buildContextKey, buildMusicItemFilters } from "./ui/domain/music-list";
 import { constrainDimensions } from "./ui/domain/scan";
 import {
@@ -20,6 +25,7 @@ import { initialAddFormState, transitionAddFormState } from "./ui/state/add-form
 import { initialAppState, transitionAppState } from "./ui/state/app-machine";
 import {
   renderAddFormStackChips,
+  renderAmbiguousLinkCandidates,
   renderMusicList,
   renderStackDropdownContent,
   renderStackManageList,
@@ -40,6 +46,14 @@ interface StackDropdownOptions {
   shouldIgnoreOutsideClick?: (target: HTMLElement) => boolean;
 }
 
+interface LinkPickerState {
+  url: string;
+  message: string;
+  values: AddFormValuesInput;
+  candidates: LinkReleaseCandidate[];
+  selectedCandidateId: string | null;
+}
+
 export class App {
   private api: ApiClient;
   private appState = initialAppState;
@@ -54,6 +68,7 @@ export class App {
   private activeStackDropdownCleanup: ((skipOnClose?: boolean) => void) | null = null;
   private musicListSortable: Sortable | null = null;
   private isReordering = false;
+  private linkPickerState: LinkPickerState | null = null;
 
   constructor() {
     this.api = new ApiClient();
@@ -94,6 +109,7 @@ export class App {
     this.setupStackBar();
     this.setupStackManagePanel();
     this.setupStackParentLinker();
+    this.setupLinkPicker();
     this.setupEventDelegation();
     this.setupMusicListReorder();
     this.setupCustomListScrollbar();
@@ -197,66 +213,8 @@ export class App {
         return;
       }
 
-      const formData = new FormData(form);
-      const values = this.readAddFormValues(formData);
-      let mbReleaseId: string | undefined;
-      let mbArtistId: string | undefined;
-
-      if (values.artist.trim() && values.title.trim()) {
-        try {
-          const enrichment = await this.api.lookupRelease(
-            values.artist.trim(),
-            values.title.trim(),
-            values.year.trim() || undefined,
-          );
-
-          if (enrichment.year != null && !values.year.trim()) {
-            values.year = String(enrichment.year);
-          }
-          if (enrichment.label && !values.label.trim()) {
-            values.label = enrichment.label;
-          }
-          if (enrichment.country && !values.country.trim()) {
-            values.country = enrichment.country;
-          }
-          if (enrichment.catalogueNumber && !values.catalogueNumber.trim()) {
-            values.catalogueNumber = enrichment.catalogueNumber;
-          }
-          if (enrichment.artworkUrl && !values.artworkUrl.trim()) {
-            values.artworkUrl = enrichment.artworkUrl;
-          }
-          if (enrichment.musicbrainzReleaseId) {
-            mbReleaseId = enrichment.musicbrainzReleaseId;
-          }
-          if (enrichment.musicbrainzArtistId) {
-            mbArtistId = enrichment.musicbrainzArtistId;
-          }
-        } catch {
-          // non-fatal: enrichment failure does not block saving
-        }
-      }
-
       try {
-        const item = await this.api.createMusicItem({
-          ...buildCreateMusicItemInputFromValues(values),
-          listenStatus: "to-listen",
-          musicbrainzReleaseId: mbReleaseId,
-          musicbrainzArtistId: mbArtistId,
-        });
-
-        if (this.addFormState.selectedStackIds.length > 0) {
-          await this.api.setItemStacks(item.id, this.addFormState.selectedStackIds);
-          this.addFormState = transitionAddFormState(this.addFormState, { type: "CLEAR_STACKS" });
-          this.renderAddFormStackChips();
-          await this.renderStackBar();
-        }
-
-        form.reset();
-        const secondary = form.querySelector<HTMLElement>(".add-form__secondary");
-        if (secondary) secondary.hidden = true;
-        if (this.shouldRefreshListAfterAdd()) {
-          await this.renderMusicList();
-        }
+        await this.createItemFromValues(this.readAddFormValues(new FormData(form)), form);
       } catch (error) {
         console.error("Failed to add item:", error);
         alert("Failed to add item. Please try again.");
@@ -264,7 +222,7 @@ export class App {
     });
   }
 
-  private readAddFormValues(formData: FormData): AddFormValues {
+  private readAddFormValues(formData: FormData): AddFormValuesInput {
     return {
       url: this.readStringField(formData, "url"),
       title: this.readStringField(formData, "title"),
@@ -283,6 +241,293 @@ export class App {
   private readStringField(formData: FormData, name: string): string {
     const value = formData.get(name);
     return typeof value === "string" ? value : "";
+  }
+
+  private async enrichValuesWithMusicBrainz(values: AddFormValuesInput): Promise<{
+    values: AddFormValuesInput;
+    musicbrainzReleaseId?: string;
+    musicbrainzArtistId?: string;
+  }> {
+    let mbReleaseId: string | undefined;
+    let mbArtistId: string | undefined;
+
+    if (values.artist.trim() && values.title.trim()) {
+      try {
+        const enrichment = await this.api.lookupRelease(
+          values.artist.trim(),
+          values.title.trim(),
+          values.year.trim() || undefined,
+        );
+
+        if (enrichment.year != null && !values.year.trim()) {
+          values.year = String(enrichment.year);
+        }
+        if (enrichment.label && !values.label.trim()) {
+          values.label = enrichment.label;
+        }
+        if (enrichment.country && !values.country.trim()) {
+          values.country = enrichment.country;
+        }
+        if (enrichment.catalogueNumber && !values.catalogueNumber.trim()) {
+          values.catalogueNumber = enrichment.catalogueNumber;
+        }
+        if (enrichment.artworkUrl && !values.artworkUrl.trim()) {
+          values.artworkUrl = enrichment.artworkUrl;
+        }
+        if (enrichment.musicbrainzReleaseId) {
+          mbReleaseId = enrichment.musicbrainzReleaseId;
+        }
+        if (enrichment.musicbrainzArtistId) {
+          mbArtistId = enrichment.musicbrainzArtistId;
+        }
+      } catch {
+        // non-fatal: enrichment failure does not block saving
+      }
+    }
+
+    return {
+      values,
+      musicbrainzReleaseId: mbReleaseId,
+      musicbrainzArtistId: mbArtistId,
+    };
+  }
+
+  private async createItemFromValues(
+    rawValues: AddFormValuesInput,
+    form: HTMLFormElement,
+    options?: { selectedCandidateId?: string },
+  ): Promise<void> {
+    const values = { ...rawValues };
+    const enriched = await this.enrichValuesWithMusicBrainz(values);
+
+    try {
+      const item = await this.api.createMusicItem({
+        ...buildCreateMusicItemInputFromValues(enriched.values),
+        listenStatus: "to-listen",
+        musicbrainzReleaseId: enriched.musicbrainzReleaseId,
+        musicbrainzArtistId: enriched.musicbrainzArtistId,
+        selectedCandidateId: options?.selectedCandidateId,
+      });
+
+      await this.handleCreatedItem(item.id, form);
+      this.closeLinkPicker();
+    } catch (error) {
+      if (error instanceof AmbiguousLinkApiError) {
+        this.openLinkPicker(error.payload, rawValues);
+        return;
+      }
+
+      throw error;
+    }
+  }
+
+  private async handleCreatedItem(itemId: number, form: HTMLFormElement): Promise<void> {
+    if (this.addFormState.selectedStackIds.length > 0) {
+      await this.api.setItemStacks(itemId, this.addFormState.selectedStackIds);
+      this.addFormState = transitionAddFormState(this.addFormState, { type: "CLEAR_STACKS" });
+      this.renderAddFormStackChips();
+      await this.renderStackBar();
+    }
+
+    form.reset();
+    const secondary = form.querySelector<HTMLElement>(".add-form__secondary");
+    if (secondary) secondary.hidden = true;
+    if (this.shouldRefreshListAfterAdd()) {
+      await this.renderMusicList();
+    }
+  }
+
+  private setupLinkPicker(): void {
+    const modal = document.getElementById("link-picker-modal");
+    const list = document.getElementById("link-picker-list");
+    const submit = document.getElementById("link-picker-submit");
+    const manual = document.getElementById("link-picker-manual");
+    const cancel = document.getElementById("link-picker-cancel");
+
+    if (
+      !(modal instanceof HTMLElement) ||
+      !(list instanceof HTMLElement) ||
+      !(submit instanceof HTMLButtonElement) ||
+      !(manual instanceof HTMLButtonElement) ||
+      !(cancel instanceof HTMLButtonElement)
+    ) {
+      return;
+    }
+
+    list.addEventListener("click", (event) => {
+      const target = (event.target as HTMLElement).closest(
+        "[data-candidate-id]",
+      ) as HTMLElement | null;
+      if (!target || !this.linkPickerState) {
+        return;
+      }
+
+      this.linkPickerState = {
+        ...this.linkPickerState,
+        selectedCandidateId: target.dataset.candidateId ?? null,
+      };
+      this.renderLinkPicker();
+    });
+
+    submit.addEventListener("click", () => {
+      void this.submitSelectedLinkCandidate();
+    });
+
+    manual.addEventListener("click", () => {
+      this.enterSelectedCandidateManually();
+    });
+
+    cancel.addEventListener("click", () => {
+      this.closeLinkPicker();
+    });
+
+    modal.addEventListener("click", (event) => {
+      const target = event.target as HTMLElement;
+      if (target.dataset.linkPickerClose === "true") {
+        this.closeLinkPicker();
+      }
+    });
+
+    document.addEventListener("keydown", (event) => {
+      if (event.key === "Escape" && this.linkPickerState) {
+        this.closeLinkPicker();
+      }
+    });
+  }
+
+  private openLinkPicker(payload: AmbiguousLinkPayload, values: AddFormValuesInput): void {
+    this.linkPickerState = {
+      url: payload.url,
+      message: payload.message,
+      values: { ...values },
+      candidates: payload.candidates,
+      selectedCandidateId: null,
+    };
+    this.renderLinkPicker();
+  }
+
+  private closeLinkPicker(): void {
+    this.linkPickerState = null;
+    const modal = document.getElementById("link-picker-modal");
+    if (modal instanceof HTMLElement) {
+      modal.hidden = true;
+    }
+  }
+
+  private renderLinkPicker(): void {
+    const modal = document.getElementById("link-picker-modal");
+    const list = document.getElementById("link-picker-list");
+    const url = document.getElementById("link-picker-url");
+    const message = document.getElementById("link-picker-message");
+    const submit = document.getElementById("link-picker-submit");
+
+    if (
+      !(modal instanceof HTMLElement) ||
+      !(list instanceof HTMLElement) ||
+      !(url instanceof HTMLElement) ||
+      !(message instanceof HTMLElement) ||
+      !(submit instanceof HTMLButtonElement)
+    ) {
+      return;
+    }
+
+    if (!this.linkPickerState) {
+      modal.hidden = true;
+      return;
+    }
+
+    modal.hidden = false;
+    url.textContent = this.linkPickerState.url;
+    message.textContent = this.linkPickerState.message;
+    list.innerHTML = renderAmbiguousLinkCandidates(
+      this.linkPickerState.candidates,
+      this.linkPickerState.selectedCandidateId,
+    );
+    submit.disabled = !this.linkPickerState.selectedCandidateId;
+  }
+
+  private findSelectedLinkCandidate(): LinkReleaseCandidate | null {
+    if (!this.linkPickerState?.selectedCandidateId) {
+      return null;
+    }
+
+    return (
+      this.linkPickerState.candidates.find(
+        (candidate) => candidate.candidateId === this.linkPickerState?.selectedCandidateId,
+      ) ?? null
+    );
+  }
+
+  private buildValuesForSelectedCandidate(
+    values: AddFormValuesInput,
+    candidate: LinkReleaseCandidate,
+  ): AddFormValuesInput {
+    return {
+      ...values,
+      artist: candidate.artist ?? values.artist,
+      title: candidate.title || values.title,
+      itemType: candidate.itemType ?? values.itemType,
+    };
+  }
+
+  private enterSelectedCandidateManually(): void {
+    const form = document.getElementById("add-form");
+    if (!(form instanceof HTMLFormElement) || !this.linkPickerState) {
+      return;
+    }
+
+    const selectedCandidate = this.findSelectedLinkCandidate();
+    if (selectedCandidate) {
+      this.populateAddFormFromCandidate(selectedCandidate);
+    }
+
+    const secondary = form.querySelector<HTMLElement>(".add-form__secondary");
+    if (secondary) {
+      secondary.hidden = false;
+    }
+
+    this.closeLinkPicker();
+    form.querySelector<HTMLInputElement>('input[name="artist"]')?.focus();
+  }
+
+  private populateAddFormFromCandidate(candidate: LinkReleaseCandidate): void {
+    const artistInput = document.querySelector<HTMLInputElement>('#add-form input[name="artist"]');
+    const titleInput = document.querySelector<HTMLInputElement>('#add-form input[name="title"]');
+    const itemTypeInput = document.querySelector<HTMLSelectElement>(
+      '#add-form select[name="itemType"]',
+    );
+
+    if (artistInput && candidate.artist) {
+      artistInput.value = candidate.artist;
+    }
+
+    if (titleInput) {
+      titleInput.value = candidate.title;
+    }
+
+    if (itemTypeInput && candidate.itemType) {
+      itemTypeInput.value = candidate.itemType;
+    }
+  }
+
+  private async submitSelectedLinkCandidate(): Promise<void> {
+    const form = document.getElementById("add-form");
+    if (!(form instanceof HTMLFormElement) || !this.linkPickerState?.selectedCandidateId) {
+      return;
+    }
+
+    const selectedCandidate = this.findSelectedLinkCandidate();
+    if (!selectedCandidate) {
+      return;
+    }
+
+    const values = this.buildValuesForSelectedCandidate(
+      this.linkPickerState.values,
+      selectedCandidate,
+    );
+    await this.createItemFromValues(values, form, {
+      selectedCandidateId: selectedCandidate.candidateId,
+    });
   }
 
   private shouldRefreshListAfterAdd(): boolean {

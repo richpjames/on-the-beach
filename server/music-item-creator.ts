@@ -2,8 +2,15 @@ import { eq, and } from "drizzle-orm";
 import { db } from "./db/index";
 import { musicItems, artists, musicLinks, sources, musicItemStacks, stacks } from "./db/schema";
 import { parseUrl, isValidUrl, normalize, capitalize } from "./utils";
-import { scrapeUrl } from "./scraper";
-import type { CreateMusicItemInput, MusicItemFull } from "../src/types";
+import { scrapeUrl, UnsupportedMusicLinkError } from "./scraper";
+import { pickPrimaryReleaseCandidate } from "./link-extractor";
+import type {
+  AmbiguousLinkPayload,
+  CreateMusicItemInput,
+  ItemType,
+  LinkReleaseCandidate,
+  MusicItemFull,
+} from "../src/types";
 
 // ---------------------------------------------------------------------------
 // Helpers (moved from routes/music-items.ts for shared use)
@@ -115,6 +122,239 @@ export interface CreateResult {
   created: boolean;
 }
 
+interface ReleaseCandidateInput {
+  candidateId?: string;
+  title: string;
+  artistName?: string;
+  itemType: ItemType;
+  artworkUrl?: string | null;
+  confidence?: number;
+  evidence?: string;
+  isPrimary?: boolean;
+}
+
+export class AmbiguousLinkSelectionError extends Error {
+  payload: AmbiguousLinkPayload;
+
+  constructor(payload: AmbiguousLinkPayload) {
+    super(payload.message);
+    this.name = "AmbiguousLinkSelectionError";
+    this.payload = payload;
+  }
+}
+
+function toReleaseCandidate(input: ReleaseCandidateInput): LinkReleaseCandidate {
+  return {
+    candidateId: input.candidateId ?? `${normalize(input.title)}`,
+    artist: input.artistName,
+    title: input.title,
+    itemType: input.itemType,
+    confidence: input.confidence,
+    evidence: input.evidence,
+    isPrimary: input.isPrimary,
+  };
+}
+
+function matchExistingItem(
+  items: MusicItemFull[],
+  candidate: ReleaseCandidateInput,
+): MusicItemFull | null {
+  const normalizedTitle = normalize(candidate.title);
+  const normalizedArtist = candidate.artistName ? normalize(candidate.artistName) : null;
+
+  for (const item of items) {
+    if (item.normalized_title !== normalizedTitle) {
+      continue;
+    }
+
+    const itemArtist = item.artist_name ? normalize(item.artist_name) : null;
+    if (normalizedArtist !== itemArtist) {
+      continue;
+    }
+
+    return item;
+  }
+
+  return null;
+}
+
+async function fetchItemsByUrl(url: string): Promise<MusicItemFull[]> {
+  const rows = await db
+    .select({ musicItemId: musicLinks.musicItemId })
+    .from(musicLinks)
+    .where(eq(musicLinks.url, url));
+
+  const items = await Promise.all(rows.map((row) => fetchFullItem(row.musicItemId)));
+  return items.filter((item): item is MusicItemFull => item !== null);
+}
+
+async function insertMusicItemWithLink(
+  normalizedUrl: string,
+  sourceName: string,
+  candidate: ReleaseCandidateInput,
+  overrides?: Partial<CreateMusicItemInput>,
+): Promise<MusicItemFull> {
+  let artistId: number | null = null;
+  if (candidate.artistName) {
+    artistId = await getOrCreateArtist(candidate.artistName);
+  }
+
+  const sourceId = await getSourceId(sourceName);
+
+  const [inserted] = await db
+    .insert(musicItems)
+    .values({
+      title: capitalize(candidate.title),
+      normalizedTitle: normalize(candidate.title),
+      itemType: candidate.itemType,
+      artistId,
+      listenStatus: overrides?.listenStatus ?? "to-listen",
+      purchaseIntent: overrides?.purchaseIntent ?? "no",
+      notes: overrides?.notes ?? null,
+      artworkUrl: overrides?.artworkUrl ?? candidate.artworkUrl ?? null,
+      label: overrides?.label ?? null,
+      year: overrides?.year ?? null,
+      country: overrides?.country ?? null,
+      genre: overrides?.genre ?? null,
+      catalogueNumber: overrides?.catalogueNumber ?? null,
+      musicbrainzReleaseId: overrides?.musicbrainzReleaseId ?? null,
+      musicbrainzArtistId: overrides?.musicbrainzArtistId ?? null,
+    })
+    .returning({ id: musicItems.id });
+
+  await db.insert(musicLinks).values({
+    musicItemId: inserted.id,
+    sourceId,
+    url: normalizedUrl,
+    isPrimary: true,
+  });
+
+  const item = await fetchFullItem(inserted.id);
+  if (!item) {
+    throw new Error("Failed to fetch created item");
+  }
+
+  return item;
+}
+
+function resolveSelectedCandidate(
+  candidates: ReleaseCandidateInput[],
+  selectedCandidateId: string | undefined,
+): ReleaseCandidateInput | null {
+  if (!selectedCandidateId) {
+    return null;
+  }
+
+  return candidates.find((candidate) => candidate.candidateId === selectedCandidateId) ?? null;
+}
+
+async function resolveReleaseCandidates(
+  normalizedUrl: string,
+  overrides?: Partial<CreateMusicItemInput>,
+): Promise<{
+  normalizedUrl: string;
+  source: ReturnType<typeof parseUrl>["source"];
+  candidates: ReleaseCandidateInput[];
+}> {
+  const parsed = parseUrl(normalizedUrl);
+  const scraped = await scrapeUrl(parsed.normalizedUrl, parsed.source);
+
+  if (parsed.source !== "unknown") {
+    const title =
+      overrides?.title || scraped?.potentialTitle || parsed.potentialTitle || "Untitled";
+    const artistName = overrides?.artistName || scraped?.potentialArtist || parsed.potentialArtist;
+
+    return {
+      normalizedUrl: parsed.normalizedUrl,
+      source: parsed.source,
+      candidates: [
+        {
+          title,
+          artistName,
+          itemType: overrides?.itemType ?? scraped?.itemType ?? "album",
+          artworkUrl: overrides?.artworkUrl ?? scraped?.imageUrl ?? null,
+        },
+      ],
+    };
+  }
+
+  const extractedCandidates =
+    scraped?.releases?.map((release) => ({
+      candidateId: release.candidateId,
+      title: release.title || "Untitled",
+      artistName: release.artist,
+      itemType: release.itemType ?? "album",
+      artworkUrl: overrides?.artworkUrl ?? scraped?.imageUrl ?? null,
+      confidence: release.confidence,
+      evidence: release.evidence,
+      isPrimary: release.isPrimary,
+    })) ?? [];
+
+  if (extractedCandidates.length === 0) {
+    throw new UnsupportedMusicLinkError("Couldn't extract a release from this link");
+  }
+
+  const selectedCandidate = resolveSelectedCandidate(
+    extractedCandidates,
+    overrides?.selectedCandidateId,
+  );
+
+  if (selectedCandidate) {
+    return {
+      normalizedUrl: parsed.normalizedUrl,
+      source: parsed.source,
+      candidates: [
+        {
+          ...selectedCandidate,
+          title: overrides?.title || selectedCandidate.title,
+          artistName: overrides?.artistName || selectedCandidate.artistName,
+          itemType: overrides?.itemType ?? selectedCandidate.itemType,
+        },
+      ],
+    };
+  }
+
+  if (overrides?.title?.trim()) {
+    return {
+      normalizedUrl: parsed.normalizedUrl,
+      source: parsed.source,
+      candidates: [
+        {
+          title: overrides.title.trim(),
+          artistName: overrides.artistName?.trim() || undefined,
+          itemType: overrides.itemType ?? "album",
+          artworkUrl: overrides.artworkUrl ?? scraped?.imageUrl ?? null,
+        },
+      ],
+    };
+  }
+
+  const primaryCandidate = pickPrimaryReleaseCandidate(
+    parsed.normalizedUrl,
+    extractedCandidates.map(toReleaseCandidate),
+  );
+
+  if (primaryCandidate) {
+    const chosen = extractedCandidates.find(
+      (candidate) => candidate.candidateId === primaryCandidate.candidateId,
+    );
+    if (chosen) {
+      return {
+        normalizedUrl: parsed.normalizedUrl,
+        source: parsed.source,
+        candidates: [chosen],
+      };
+    }
+  }
+
+  throw new AmbiguousLinkSelectionError({
+    kind: "ambiguous_link",
+    url: parsed.normalizedUrl,
+    message: "This link mentions several releases. Pick one to add.",
+    candidates: extractedCandidates.map(toReleaseCandidate),
+  });
+}
+
 /**
  * Create a music item from a URL. Handles URL parsing, OG scraping,
  * artist resolution, and duplicate detection.
@@ -125,88 +365,54 @@ export async function createMusicItemFromUrl(
   url: string,
   overrides?: Partial<CreateMusicItemInput>,
 ): Promise<CreateResult> {
-  if (!isValidUrl(url)) {
-    throw new Error("Invalid URL");
+  const results = await createMusicItemsFromUrl(url, overrides);
+  const preferred = results.find((result) => result.created) ?? results[0];
+  if (!preferred) {
+    throw new Error("Failed to create music item");
   }
 
-  const parsed = parseUrl(url);
-
-  // Check for duplicate URL
-  const existing = await db
-    .select({ musicItemId: musicLinks.musicItemId })
-    .from(musicLinks)
-    .where(eq(musicLinks.url, parsed.normalizedUrl))
-    .limit(1);
-
-  if (existing[0]) {
-    const item = await fetchFullItem(existing[0].musicItemId);
-    if (item) {
-      return { item, created: false };
-    }
-  }
-
-  // Scrape OG metadata
-  const scraped = await scrapeUrl(parsed.normalizedUrl, parsed.source);
-
-  // Merge: overrides > scraped > regex-extracted > defaults
-  const title = overrides?.title || scraped?.potentialTitle || parsed.potentialTitle || "Untitled";
-  const artistName = overrides?.artistName || scraped?.potentialArtist || parsed.potentialArtist;
-
-  // Get or create artist
-  let artistId: number | null = null;
-  if (artistName) {
-    artistId = await getOrCreateArtist(artistName);
-  }
-
-  // Resolve source
-  const sourceId = await getSourceId(parsed.source);
-
-  // Insert music item
-  const [inserted] = await db
-    .insert(musicItems)
-    .values({
-      title: capitalize(title),
-      normalizedTitle: normalize(title),
-      itemType: overrides?.itemType ?? "album",
-      artistId,
-      listenStatus: overrides?.listenStatus ?? "to-listen",
-      purchaseIntent: overrides?.purchaseIntent ?? "no",
-      notes: overrides?.notes ?? null,
-      artworkUrl: overrides?.artworkUrl ?? scraped?.imageUrl ?? null,
-      label: overrides?.label ?? null,
-      year: overrides?.year ?? null,
-      country: overrides?.country ?? null,
-      genre: overrides?.genre ?? null,
-      catalogueNumber: overrides?.catalogueNumber ?? null,
-    })
-    .returning({ id: musicItems.id });
-
-  // Insert primary link
-  await db.insert(musicLinks).values({
-    musicItemId: inserted.id,
-    sourceId,
-    url: parsed.normalizedUrl,
-    isPrimary: true,
-  });
-
-  const item = await fetchFullItem(inserted.id);
-  if (!item) {
-    throw new Error("Failed to fetch created item");
-  }
-
-  return { item, created: true };
+  return preferred;
 }
 
 /**
  * Create music items from a URL, returning results as an array.
- * Wraps createMusicItemFromUrl for callers that expect multiple results.
  */
 export async function createMusicItemsFromUrl(
   url: string,
   overrides?: Partial<CreateMusicItemInput>,
 ): Promise<CreateResult[]> {
-  const result = await createMusicItemFromUrl(url, overrides);
-  return [result];
+  if (!isValidUrl(url)) {
+    throw new Error("Invalid URL");
+  }
+
+  const parsed = parseUrl(url);
+  const resolved = await resolveReleaseCandidates(parsed.normalizedUrl, overrides);
+  const existingItems = await fetchItemsByUrl(resolved.normalizedUrl);
+
+  if (resolved.source !== "unknown" && existingItems[0]) {
+    return [{ item: existingItems[0], created: false }];
+  }
+
+  const results: CreateResult[] = [];
+
+  for (const candidate of resolved.candidates) {
+    const existing = matchExistingItem(existingItems, candidate);
+    if (existing) {
+      results.push({ item: existing, created: false });
+      continue;
+    }
+
+    const item = await insertMusicItemWithLink(
+      resolved.normalizedUrl,
+      resolved.source,
+      candidate,
+      overrides,
+    );
+    existingItems.push(item);
+    results.push({ item, created: true });
+  }
+
+  return results;
 }
 
 /**
@@ -240,6 +446,8 @@ export async function createMusicItemDirect(
       country: overrides.country ?? null,
       genre: overrides.genre ?? null,
       catalogueNumber: overrides.catalogueNumber ?? null,
+      musicbrainzReleaseId: overrides.musicbrainzReleaseId ?? null,
+      musicbrainzArtistId: overrides.musicbrainzArtistId ?? null,
     })
     .returning({ id: musicItems.id });
 

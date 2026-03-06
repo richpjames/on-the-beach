@@ -1,4 +1,5 @@
 import type {
+  AmbiguousLinkPayload,
   CreateMusicItemInput,
   UpdateMusicItemInput,
   MusicItemFull,
@@ -11,6 +12,16 @@ import type {
   UploadImageResult,
   LookupReleaseResult,
 } from "../types";
+
+export class AmbiguousLinkApiError extends Error {
+  payload: AmbiguousLinkPayload;
+
+  constructor(payload: AmbiguousLinkPayload) {
+    super(payload.message);
+    this.name = "AmbiguousLinkApiError";
+    this.payload = payload;
+  }
+}
 
 export class ApiClient {
   constructor(private baseUrl: string = "") {}
@@ -66,11 +77,26 @@ export class ApiClient {
   // ── Music Items ──────────────────────────────────────────────
 
   async createMusicItem(input: CreateMusicItemInput): Promise<MusicItemFull> {
-    return this.requestJson<MusicItemFull>(
-      "/api/music-items",
-      "createMusicItem",
+    const response = await fetch(
+      this.buildUrl("/api/music-items"),
       this.jsonRequest("POST", input),
     );
+    if (response.status === 409) {
+      const body = (await response.json()) as Partial<AmbiguousLinkPayload>;
+      if (
+        body.kind === "ambiguous_link" &&
+        typeof body.url === "string" &&
+        Array.isArray(body.candidates)
+      ) {
+        throw new AmbiguousLinkApiError(body as AmbiguousLinkPayload);
+      }
+    }
+
+    if (!response.ok) {
+      throw new Error(`createMusicItem failed: ${response.status}`);
+    }
+
+    return (await response.json()) as MusicItemFull;
   }
 
   async getMusicItem(id: number): Promise<MusicItemFull | null> {

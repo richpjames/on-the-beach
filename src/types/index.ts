@@ -95,6 +95,7 @@ export interface CreateMusicItemInput {
   catalogueNumber?: string;
   musicbrainzReleaseId?: string;
   musicbrainzArtistId?: string;
+  selectedCandidateId?: string;
 }
 
 export interface UpdateMusicItemInput {
@@ -153,6 +154,23 @@ export interface LookupReleaseResult {
   musicbrainzReleaseId?: string | null;
   musicbrainzArtistId?: string | null;
   artworkUrl?: string;
+}
+
+export interface LinkReleaseCandidate {
+  candidateId: string;
+  artist?: string;
+  title: string;
+  itemType?: ItemType;
+  confidence?: number;
+  evidence?: string;
+  isPrimary?: boolean;
+}
+
+export interface AmbiguousLinkPayload {
+  kind: "ambiguous_link";
+  url: string;
+  message: string;
+  candidates: LinkReleaseCandidate[];
 }
 
 // Stacks

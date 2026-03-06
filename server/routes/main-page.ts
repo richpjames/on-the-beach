@@ -307,6 +307,33 @@ function renderMainPage(opts: {
           </div>
         </section>
       </main>
+      <div id="link-picker-modal" class="link-picker" hidden>
+        <div class="link-picker__backdrop" data-link-picker-close="true"></div>
+        <div
+          class="link-picker__dialog"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="link-picker-title"
+        >
+          <div class="link-picker__header">
+            <h2 id="link-picker-title">Pick a release</h2>
+            <p id="link-picker-message">
+              This link mentions several releases. Choose one to add.
+            </p>
+            <p id="link-picker-url" class="link-picker__url"></p>
+          </div>
+          <div id="link-picker-list" class="link-picker__list"></div>
+          <div class="link-picker__actions">
+            <button type="button" id="link-picker-cancel" class="btn btn--ghost">Cancel</button>
+            <button type="button" id="link-picker-manual" class="btn btn--ghost">
+              Enter manually
+            </button>
+            <button type="button" id="link-picker-submit" class="btn btn--primary" disabled>
+              Add selected
+            </button>
+          </div>
+        </div>
+      </div>
       <footer class="footer">
         <span id="app-version">v${escapeHtml(opts.appVersion)}</span>
       </footer>
