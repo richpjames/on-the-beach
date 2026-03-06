@@ -6,6 +6,8 @@ export interface MusicBrainzFields {
   label: string | null;
   country: string | null;
   catalogueNumber: string | null;
+  musicbrainzReleaseId: string | null;
+  musicbrainzArtistId: string | null;
 }
 
 interface MbLabelInfo {
@@ -13,10 +15,16 @@ interface MbLabelInfo {
   label?: { name?: unknown };
 }
 
+interface MbArtistCredit {
+  artist?: { id?: unknown };
+}
+
 interface MbRelease {
+  id?: unknown;
   date?: unknown;
   country?: unknown;
   "label-info"?: unknown;
+  "artist-credit"?: unknown;
 }
 
 interface MbSearchResponse {
@@ -48,8 +56,13 @@ function parseLabelInfo(labelInfo: unknown): {
 export async function lookupRelease(
   artist: string,
   title: string,
+  year?: string,
 ): Promise<MusicBrainzFields | null> {
-  const query = `artist:${artist} AND release:${title}`;
+  const queryParts = [`artist:${artist}`, `AND release:${title}`];
+  if (year) {
+    queryParts.push(`AND date:${year}`);
+  }
+  const query = queryParts.join(" ");
   const params = new URLSearchParams({ query, limit: "1", fmt: "json" });
   const url = `${MB_API_BASE}/release?${params}`;
 
@@ -75,12 +88,19 @@ export async function lookupRelease(
     const release = data.releases[0] as MbRelease;
     const { label, catalogueNumber } = parseLabelInfo(release["label-info"]);
     const country = typeof release.country === "string" ? release.country : null;
+    const artistCredit = Array.isArray(release["artist-credit"]) ? release["artist-credit"] : [];
+    const firstCredit = artistCredit[0] as MbArtistCredit | undefined;
 
     return {
       year: parseYear(release.date),
       label,
       country,
       catalogueNumber,
+      musicbrainzReleaseId: typeof release.id === "string" ? release.id : null,
+      musicbrainzArtistId:
+        firstCredit?.artist && typeof firstCredit.artist.id === "string"
+          ? firstCredit.artist.id
+          : null,
     };
   } catch (err) {
     console.error("[musicbrainz] Lookup failed:", err);
