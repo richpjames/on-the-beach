@@ -9,6 +9,7 @@ import type {
   StackWithCount,
   ScanResult,
   UploadImageResult,
+  LookupReleaseResult,
 } from "../types";
 
 export class ApiClient {
@@ -211,5 +212,20 @@ export class ApiClient {
       "uploadReleaseImage",
       this.jsonRequest("POST", { imageBase64 }),
     );
+  }
+
+  async lookupRelease(artist: string, title: string, year?: string): Promise<LookupReleaseResult> {
+    const body: Record<string, string> = { artist, title };
+    if (year) body.year = year;
+
+    try {
+      return await this.requestJson<LookupReleaseResult>(
+        "/api/release/lookup",
+        "lookupRelease",
+        this.jsonRequest("POST", body),
+      );
+    } catch {
+      return {};
+    }
   }
 }
