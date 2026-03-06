@@ -170,6 +170,15 @@ describe("parseAppleMusicOg", () => {
     expect(result.imageUrl).toBe("https://is1-ssl.mzstatic.com/image/cover.jpg");
   });
 
+  test("extracts title and artist from og:title byline format", () => {
+    const result = parseAppleMusicOg({
+      ogTitle: "It's a Beautiful Place by Water From Your Eyes on Apple Music",
+      ogDescription: "Album · 2025 · 10 Songs",
+    });
+    expect(result.potentialTitle).toBe("It's a Beautiful Place");
+    expect(result.potentialArtist).toBe("Water From Your Eyes");
+  });
+
   test("handles missing description", () => {
     const result = parseAppleMusicOg({
       ogTitle: "Some Album",
@@ -463,6 +472,42 @@ describe("scrapeUrl", () => {
     expect(result!.imageUrl).toBe(
       "https://thumbnailer.mixcloud.com/unsafe/800x800/extaudio/xyz.jpg",
     );
+    mock.restore();
+  });
+
+  test("uses Apple lookup metadata without scraping the full page", async () => {
+    const fetchSpy = spyOn(globalThis, "fetch");
+    fetchSpy.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          resultCount: 1,
+          results: [
+            {
+              collectionName: "It's a Beautiful Place",
+              artistName: "Water From Your Eyes",
+              artworkUrl100:
+                "https://is1-ssl.mzstatic.com/image/thumb/Music211/v4/example/100x100bb.jpg",
+            },
+          ],
+        }),
+        {
+          headers: { "content-type": "application/json; charset=utf-8" },
+        },
+      ),
+    );
+
+    const result = await scrapeUrl(
+      "https://music.apple.com/es/album/its-a-beautiful-place/1811583108?l=en-GB",
+      "apple_music",
+    );
+    expect(result).not.toBeNull();
+    expect(result!.potentialTitle).toBe("It's a Beautiful Place");
+    expect(result!.potentialArtist).toBe("Water From Your Eyes");
+    expect(result!.imageUrl).toBe(
+      "https://is1-ssl.mzstatic.com/image/thumb/Music211/v4/example/1200x1200bb.jpg",
+    );
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    expect(fetchSpy.mock.calls[0]?.[0]).toBe("https://itunes.apple.com/lookup?id=1811583108");
     mock.restore();
   });
 });

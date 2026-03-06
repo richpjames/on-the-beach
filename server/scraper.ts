@@ -103,16 +103,30 @@ export function parseSoundcloudOg(og: OgData): ScrapedMetadata {
 
 export function parseAppleMusicOg(og: OgData): ScrapedMetadata {
   const result: ScrapedMetadata = { imageUrl: og.ogImage };
-  if (og.ogTitle) {
-    result.potentialTitle = og.ogTitle;
-  }
-  // og:description on Apple Music often contains "Album · YEAR · N Songs" or artist info
-  if (og.ogDescription) {
-    const artistMatch = og.ogDescription.match(/^(.+?)\s+[·-]\s+/i);
-    if (artistMatch) {
-      result.potentialArtist = artistMatch[1].trim();
+  const title = og.ogTitle?.trim();
+
+  if (title) {
+    const byMatch = title.match(/^(.+?)\s+by\s+(.+?)\s+on\s+Apple Music$/i);
+    if (byMatch) {
+      result.potentialTitle = byMatch[1].trim();
+      result.potentialArtist = byMatch[2].trim();
+    } else {
+      result.potentialTitle = title;
     }
   }
+
+  // og:description is often "Artist · YEAR · N Songs", but may also be "Album · ...".
+  if (!result.potentialArtist && og.ogDescription) {
+    const artistMatch = og.ogDescription.match(/^(.+?)\s+[·-]\s+/i);
+    const candidateArtist = artistMatch?.[1]?.trim();
+    if (
+      candidateArtist &&
+      !/^(album|playlist|station|music video|single|ep)$/i.test(candidateArtist)
+    ) {
+      result.potentialArtist = candidateArtist;
+    }
+  }
+
   return result;
 }
 
@@ -438,6 +452,97 @@ async function scrapeYouTubeOEmbed(
   }
 }
 
+function extractAppleMusicLookupId(url: string): string | undefined {
+  try {
+    const parsed = new URL(url);
+    const trackId = parsed.searchParams.get("i");
+    if (trackId && /^\d+$/.test(trackId)) {
+      return trackId;
+    }
+
+    const segments = parsed.pathname.split("/").filter(Boolean);
+    for (let i = segments.length - 1; i >= 0; i -= 1) {
+      if (/^\d+$/.test(segments[i])) {
+        return segments[i];
+      }
+    }
+  } catch {
+    return undefined;
+  }
+
+  return undefined;
+}
+
+function normalizeAppleMusicImageUrl(url: string | undefined): string | undefined {
+  if (!url) {
+    return undefined;
+  }
+
+  return url.replace(/\/\d+x\d+(?:bb|sr)\./i, "/1200x1200bb.");
+}
+
+async function scrapeAppleMusicLookup(
+  url: string,
+  timeoutMs: number,
+): Promise<ScrapedMetadata | null> {
+  try {
+    const lookupId = extractAppleMusicLookupId(url);
+    if (!lookupId) {
+      return null;
+    }
+
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    const lookupUrl = `https://itunes.apple.com/lookup?id=${encodeURIComponent(lookupId)}`;
+
+    const response = await fetch(lookupUrl, {
+      signal: controller.signal,
+      headers: { Accept: "application/json" },
+    });
+
+    clearTimeout(timer);
+
+    if (!response.ok) {
+      return null;
+    }
+
+    const data = (await response.json()) as unknown;
+    if (!isRecord(data) || !Array.isArray(data.results)) {
+      return null;
+    }
+
+    const primary = data.results.find((entry) => isRecord(entry));
+    if (!primary) {
+      return null;
+    }
+
+    const potentialTitle = firstDefined(
+      getString(primary.collectionName),
+      getString(primary.trackName),
+      getString(primary.name),
+    );
+    const potentialArtist = firstDefined(
+      getString(primary.artistName),
+      getString(primary.collectionArtistName),
+    );
+    const imageUrl = normalizeAppleMusicImageUrl(
+      firstDefined(getString(primary.artworkUrl100), getString(primary.artworkUrl60)),
+    );
+
+    if (!potentialTitle && !potentialArtist && !imageUrl) {
+      return null;
+    }
+
+    return {
+      potentialTitle,
+      potentialArtist,
+      imageUrl,
+    };
+  } catch {
+    return null;
+  }
+}
+
 export function parseDefaultOg(og: OgData): ScrapedMetadata {
   return {
     potentialTitle: og.ogTitle || og.title || undefined,
@@ -458,9 +563,14 @@ export async function scrapeUrl(
   timeoutMs = 5000,
 ): Promise<ScrapedMetadata | null> {
   let mixcloudOEmbed: ScrapedMetadata | null = null;
+  let appleMusicLookup: ScrapedMetadata | null = null;
 
   if (source === "mixcloud") {
     mixcloudOEmbed = await scrapeMixcloudOEmbed(url, timeoutMs);
+  }
+
+  if (source === "apple_music") {
+    appleMusicLookup = await scrapeAppleMusicLookup(url, timeoutMs);
   }
 
   try {
@@ -474,6 +584,10 @@ export async function scrapeUrl(
       mixcloudOEmbed?.potentialTitle
     ) {
       return mixcloudOEmbed;
+    }
+
+    if (source === "apple_music" && hasScrapedMetadata(appleMusicLookup)) {
+      return appleMusicLookup;
     }
 
     const controller = new AbortController();
@@ -490,14 +604,17 @@ export async function scrapeUrl(
     clearTimeout(timer);
 
     const contentType = response.headers.get("content-type") || "";
+    const fallback =
+      source === "mixcloud" ? mixcloudOEmbed : source === "apple_music" ? appleMusicLookup : null;
+
     if (!contentType.includes("text/html")) {
-      return hasScrapedMetadata(mixcloudOEmbed) ? mixcloudOEmbed : null;
+      return hasScrapedMetadata(fallback) ? fallback : null;
     }
 
     // Read only up to the </head> or MAX_HEAD_BYTES
     const reader = response.body?.getReader();
     if (!reader) {
-      return hasScrapedMetadata(mixcloudOEmbed) ? mixcloudOEmbed : null;
+      return hasScrapedMetadata(fallback) ? fallback : null;
     }
 
     let html = "";
@@ -534,9 +651,25 @@ export async function scrapeUrl(
       return hasScrapedMetadata(merged) ? merged : null;
     }
 
+    if (source === "apple_music") {
+      const appleMusicOg = parseAppleMusicOg(og);
+      const merged: ScrapedMetadata = {
+        potentialArtist: firstDefined(
+          appleMusicLookup?.potentialArtist,
+          appleMusicOg.potentialArtist,
+        ),
+        potentialTitle: firstDefined(appleMusicLookup?.potentialTitle, appleMusicOg.potentialTitle),
+        imageUrl: firstDefined(appleMusicLookup?.imageUrl, appleMusicOg.imageUrl),
+      };
+
+      return hasScrapedMetadata(merged) ? merged : null;
+    }
+
     const parser = SOURCE_PARSERS[source] || parseDefaultOg;
     return parser(og);
   } catch {
-    return hasScrapedMetadata(mixcloudOEmbed) ? mixcloudOEmbed : null;
+    const fallback =
+      source === "mixcloud" ? mixcloudOEmbed : source === "apple_music" ? appleMusicLookup : null;
+    return hasScrapedMetadata(fallback) ? fallback : null;
   }
 }
