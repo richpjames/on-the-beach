@@ -2,18 +2,18 @@ import { beforeEach, describe, expect, mock, test } from "bun:test";
 import { Hono } from "hono";
 import { createReleaseRoutes } from "../../server/routes/release";
 
-const mockExtractAlbumInfo = mock();
+const mockExtractReleaseInfo = mock();
 const mockSaveImage = mock();
 
 function makeApp(): Hono {
   const app = new Hono();
-  app.route("/api/release", createReleaseRoutes(mockExtractAlbumInfo, mockSaveImage));
+  app.route("/api/release", createReleaseRoutes(mockExtractReleaseInfo, mockSaveImage));
   return app;
 }
 
 describe("POST /api/release/scan", () => {
   beforeEach(() => {
-    mockExtractAlbumInfo.mockReset();
+    mockExtractReleaseInfo.mockReset();
     mockSaveImage.mockReset();
     mockSaveImage.mockResolvedValue("/uploads/mock.jpg");
   });
@@ -30,7 +30,7 @@ describe("POST /api/release/scan", () => {
     expect(res.status).toBe(400);
     const body = await res.json();
     expect(body.error).toContain("imageBase64");
-    expect(mockExtractAlbumInfo).not.toHaveBeenCalled();
+    expect(mockExtractReleaseInfo).not.toHaveBeenCalled();
   });
 
   test("returns 400 for invalid JSON body", async () => {
@@ -45,11 +45,11 @@ describe("POST /api/release/scan", () => {
     expect(res.status).toBe(400);
     const body = await res.json();
     expect(body.error).toBe("Invalid JSON payload");
-    expect(mockExtractAlbumInfo).not.toHaveBeenCalled();
+    expect(mockExtractReleaseInfo).not.toHaveBeenCalled();
   });
 
   test("returns 200 with parsed fields on success", async () => {
-    mockExtractAlbumInfo.mockResolvedValueOnce({
+    mockExtractReleaseInfo.mockResolvedValueOnce({
       artist: "Boards of Canada",
       title: "Geogaddi",
     });
@@ -68,11 +68,11 @@ describe("POST /api/release/scan", () => {
       artist: "Boards of Canada",
       title: "Geogaddi",
     });
-    expect(mockExtractAlbumInfo).toHaveBeenCalledWith("YWJjZA==");
+    expect(mockExtractReleaseInfo).toHaveBeenCalledWith("YWJjZA==");
   });
 
   test("returns enriched fields when scan function returns them", async () => {
-    mockExtractAlbumInfo.mockResolvedValueOnce({
+    mockExtractReleaseInfo.mockResolvedValueOnce({
       artist: "Radiohead",
       title: "OK Computer",
       year: 1997,
@@ -102,7 +102,7 @@ describe("POST /api/release/scan", () => {
   });
 
   test("returns 503 when vision extraction fails", async () => {
-    mockExtractAlbumInfo.mockResolvedValueOnce(null);
+    mockExtractReleaseInfo.mockResolvedValueOnce(null);
 
     const app = makeApp();
 
@@ -120,7 +120,7 @@ describe("POST /api/release/scan", () => {
 
 describe("POST /api/release/image", () => {
   beforeEach(() => {
-    mockExtractAlbumInfo.mockReset();
+    mockExtractReleaseInfo.mockReset();
     mockSaveImage.mockReset();
     mockSaveImage.mockResolvedValue("/uploads/mock.jpg");
   });

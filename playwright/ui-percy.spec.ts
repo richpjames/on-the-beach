@@ -170,7 +170,7 @@ async function addItemViaCoverScan(
     await expect(details).toHaveAttribute("open", "");
   }
 
-  await page.getByRole("button", { name: "Scan album cover" }).click();
+  await page.getByRole("button", { name: "Scan release cover" }).click();
   await page.locator("#scan-file-input").setInputFiles(fixturePath);
 
   await expect(page.locator(".add-form__details")).toHaveAttribute("open", "");

@@ -25,7 +25,7 @@ describe("parseUrl - youtube", () => {
 });
 
 describe("parseUrl - apple music", () => {
-  test("identifies apple music album link and extracts title", () => {
+  test("identifies apple music release link and extracts title", () => {
     const result = parseUrl("https://music.apple.com/es/album/el-poder-verde/1810282984?l=en-GB");
 
     expect(result.source).toBe("apple_music");

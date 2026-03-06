@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, mock, spyOn, test } from "bun:test";
-import { extractAlbumInfo } from "../../server/vision";
+import { extractReleaseInfo } from "../../server/vision";
 
 function mockChatCompletionResponse(
   content: string | Array<{ type: string; text: string }>,
@@ -61,7 +61,7 @@ function mockOcrResponse(payload: {
   );
 }
 
-describe("extractAlbumInfo", () => {
+describe("extractReleaseInfo", () => {
   const originalEnv = { ...process.env };
 
   beforeEach(() => {
@@ -81,7 +81,7 @@ describe("extractAlbumInfo", () => {
       }),
     );
 
-    const result = await extractAlbumInfo("base64-image-data");
+    const result = await extractReleaseInfo("base64-image-data");
     expect(result).toEqual({ artist: "Radiohead", title: "OK Computer" });
   });
 
@@ -92,7 +92,7 @@ describe("extractAlbumInfo", () => {
       }),
     );
 
-    const result = await extractAlbumInfo("base64-image-data");
+    const result = await extractReleaseInfo("base64-image-data");
     expect(result).toEqual({ artist: "Bonobo", title: "Migration" });
   });
 
@@ -103,7 +103,7 @@ describe("extractAlbumInfo", () => {
       mockChatCompletionResponse('{"artist":"Massive Attack","title":"Mezzanine"}'),
     );
 
-    const result = await extractAlbumInfo("base64-image-data");
+    const result = await extractReleaseInfo("base64-image-data");
     expect(result).toEqual({ artist: "Massive Attack", title: "Mezzanine" });
   });
 
@@ -114,14 +114,14 @@ describe("extractAlbumInfo", () => {
       mockChatCompletionResponse("I can't identify this cover confidently."),
     );
 
-    const result = await extractAlbumInfo("base64-image-data");
+    const result = await extractReleaseInfo("base64-image-data");
     expect(result).toBeNull();
   });
 
   test("returns null when provider request fails", async () => {
     spyOn(globalThis, "fetch").mockRejectedValueOnce(new Error("network down"));
 
-    const result = await extractAlbumInfo("base64-image-data");
+    const result = await extractReleaseInfo("base64-image-data");
     expect(result).toBeNull();
   });
 });

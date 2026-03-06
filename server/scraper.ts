@@ -75,7 +75,7 @@ export function decodeHtmlEntities(text: string): string {
 
 export function parseBandcampOg(og: OgData): ScrapedMetadata {
   const title = og.ogTitle || og.title || "";
-  // Bandcamp format: "Album Title, by Artist Name"
+  // Bandcamp format: "Release Title, by Artist Name"
   const byMatch = title.match(/^(.+?),\s*by\s+(.+)$/i);
   if (byMatch) {
     return {
@@ -115,7 +115,7 @@ export function parseAppleMusicOg(og: OgData): ScrapedMetadata {
     }
   }
 
-  // og:description is often "Artist · YEAR · N Songs", but may also be "Album · ...".
+  // og:description is often "Artist · YEAR · N Songs", but may also be "Release · ...".
   if (!result.potentialArtist && og.ogDescription) {
     const artistMatch = og.ogDescription.match(/^(.+?)\s+[·-]\s+/i);
     const candidateArtist = artistMatch?.[1]?.trim();

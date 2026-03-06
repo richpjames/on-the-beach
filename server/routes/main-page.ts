@@ -163,7 +163,7 @@ function renderMainPage(opts: {
                 type="button"
                 id="add-form-scan-btn"
                 class="btn add-form__scan-btn"
-                aria-label="Scan album cover"
+                aria-label="Scan release cover"
               >
                 Scan
               </button>
@@ -172,9 +172,9 @@ function renderMainPage(opts: {
 
             <div class="add-form__secondary" hidden>
               <input type="text" name="artist" placeholder="Artist" class="input" />
-              <input type="text" name="title" placeholder="Album" class="input" />
+              <input type="text" name="title" placeholder="Release" class="input" />
               <select name="itemType" class="input">
-                <option value="album">Album</option>
+                <option value="album">Release</option>
                 <option value="ep">EP</option>
                 <option value="single">Single</option>
                 <option value="track">Track</option>

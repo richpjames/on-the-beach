@@ -106,7 +106,7 @@ describe("POST /api/ingest/email", () => {
     mockCreate.mockResolvedValue({
       item: {
         id: 1,
-        title: "Cool Album",
+        title: "Cool Release",
         primary_url: "https://artist.bandcamp.com/album/cool-album",
       } as any,
       created: true,
@@ -120,7 +120,7 @@ describe("POST /api/ingest/email", () => {
     expect(body.received).toBe(true);
     expect(body.items_created).toBe(1);
     expect(body.items_skipped).toBe(0);
-    expect(body.items[0].title).toBe("Cool Album");
+    expect(body.items[0].title).toBe("Cool Release");
     expect(mockCreate).toHaveBeenCalledWith("https://artist.bandcamp.com/album/cool-album", {
       notes: "Via email from noreply@bandcamp.com",
     });
@@ -166,7 +166,7 @@ describe("POST /api/ingest/email", () => {
     mockCreate.mockResolvedValue({
       item: {
         id: 2,
-        title: "SG Album",
+        title: "SG Release",
         primary_url: "https://artist.bandcamp.com/album/sg-test",
       } as any,
       created: true,

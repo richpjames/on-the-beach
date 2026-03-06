@@ -4,7 +4,7 @@ test.beforeEach(async ({ request }) => {
   await request.post("/api/__test__/reset");
 });
 
-test("initial form shows link input first, artist and album revealed after clicking Add", async ({
+test("initial form shows link input first, artist and release revealed after clicking Add", async ({
   page,
 }) => {
   await page.goto("/");
@@ -26,7 +26,7 @@ test("can manually add a release without link or artwork", async ({ page }) => {
 
   const addButton = page.getByRole("button", { name: "Add" });
   await expect(addButton).toBeEnabled();
-  await addButton.click(); // reveals artist/album fields
+  await addButton.click(); // reveals artist/release fields
   await addButton.click(); // submits with empty fields
 
   const card = page.locator(".music-card").first();
