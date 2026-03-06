@@ -2,7 +2,7 @@
 
 ## Overview
 
-When a user manually adds a release via the add form, automatically look up MusicBrainz to fill in missing metadata fields (year, label, country, catalogue number) and store the MB release and artist IDs.
+When a user manually adds a release via the add form, automatically look up MusicBrainz to fill in missing metadata fields (year, label, country, catalogue number), fetch and store cover artwork from the Cover Art Archive, and store the MB release and artist IDs.
 
 ## Decisions
 
@@ -10,6 +10,7 @@ When a user manually adds a release via the add form, automatically look up Musi
 - MB data only fills **empty** form fields — user-entered values are never overwritten
 - If the lookup fails or returns no results, the item is saved silently with whatever the user typed
 - MusicBrainz release UUID and artist UUID are stored on the item for future use
+- If a MB release ID is found and the form has no artwork, the server fetches the cover from the Cover Art Archive and saves it to `/uploads/`, returning the path as `artworkUrl`
 
 ## Architecture
 
@@ -30,13 +31,30 @@ Response (on match):
   "country": "GB",
   "catalogueNumber": "WARPCD100",
   "musicbrainzReleaseId": "b84ee12a-...",
-  "musicbrainzArtistId": "f59c5520-..."
+  "musicbrainzArtistId": "f59c5520-...",
+  "artworkUrl": "/uploads/uuid.jpg"
 }
 ```
+
+The `artworkUrl` field is only present if artwork was successfully fetched and saved. The client applies it with the same empty-field-only merge as all other fields.
 
 Response (on miss or failure): `{}`
 
 Validation: returns 400 if `artist` or `title` is missing/empty.
+
+### Cover Art Archive (`server/cover-art-archive.ts`, new file)
+
+A new module responsible for fetching cover art:
+
+```ts
+fetchAndSaveCoverArt(releaseId: string): Promise<string | null>
+```
+
+- Fetches `https://coverartarchive.org/release/{releaseId}/front-500`
+- On success (200), saves the image bytes to `/uploads/{uuid}.jpg` using the same `saveReleaseImage` pattern as the scan flow
+- Returns the public path (e.g. `/uploads/uuid.jpg`), or `null` on any failure
+
+The lookup endpoint calls this after a successful MB match, only if the response status is a redirect/200 and content-type is an image.
 
 ### `server/musicbrainz.ts`
 
@@ -96,6 +114,7 @@ On form submit:
 | File | Change |
 |---|---|
 | `server/musicbrainz.ts` | Extend `MusicBrainzFields`, add `year` hint to query, parse MB IDs |
+| `server/cover-art-archive.ts` | New module: fetch CAA image and save to `/uploads/` |
 | `server/routes/release.ts` | Add `POST /api/release/lookup` handler |
 | `server/db/schema.ts` | Add `musicbrainz_release_id`, `musicbrainz_artist_id` columns |
 | `drizzle/NNNN_*.sql` | New migration |
