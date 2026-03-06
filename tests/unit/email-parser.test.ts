@@ -25,7 +25,7 @@ describe("extractMusicUrls", () => {
   });
 
   it("extracts spotify URLs from HTML", () => {
-    const html = `<a href="https://open.spotify.com/album/4aawyAB9vmqN3uQ7FjRGTy">Album</a>`;
+    const html = `<a href="https://open.spotify.com/album/4aawyAB9vmqN3uQ7FjRGTy">Release</a>`;
     expect(extractMusicUrls({ html })).toEqual([
       "https://open.spotify.com/album/4aawyAB9vmqN3uQ7FjRGTy",
     ]);
