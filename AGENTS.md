@@ -5,4 +5,5 @@ This project uses Bun, not node.
 ### Before pushing
 - Ensure you have run all the tests locally 
 ### On pushing
+- Create a PR
 - check the the Github checks for the branch have passed. If they fail investigate and fix the error.
