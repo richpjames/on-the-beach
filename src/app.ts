@@ -199,11 +199,49 @@ export class App {
 
       const formData = new FormData(form);
       const values = this.readAddFormValues(formData);
+      let mbReleaseId: string | undefined;
+      let mbArtistId: string | undefined;
+
+      if (values.artist.trim() && values.title.trim()) {
+        try {
+          const enrichment = await this.api.lookupRelease(
+            values.artist.trim(),
+            values.title.trim(),
+            values.year.trim() || undefined,
+          );
+
+          if (enrichment.year != null && !values.year.trim()) {
+            values.year = String(enrichment.year);
+          }
+          if (enrichment.label && !values.label.trim()) {
+            values.label = enrichment.label;
+          }
+          if (enrichment.country && !values.country.trim()) {
+            values.country = enrichment.country;
+          }
+          if (enrichment.catalogueNumber && !values.catalogueNumber.trim()) {
+            values.catalogueNumber = enrichment.catalogueNumber;
+          }
+          if (enrichment.artworkUrl && !values.artworkUrl.trim()) {
+            values.artworkUrl = enrichment.artworkUrl;
+          }
+          if (enrichment.musicbrainzReleaseId) {
+            mbReleaseId = enrichment.musicbrainzReleaseId;
+          }
+          if (enrichment.musicbrainzArtistId) {
+            mbArtistId = enrichment.musicbrainzArtistId;
+          }
+        } catch {
+          // non-fatal: enrichment failure does not block saving
+        }
+      }
 
       try {
         const item = await this.api.createMusicItem({
           ...buildCreateMusicItemInputFromValues(values),
           listenStatus: "to-listen",
+          musicbrainzReleaseId: mbReleaseId,
+          musicbrainzArtistId: mbArtistId,
         });
 
         if (this.addFormState.selectedStackIds.length > 0) {
