@@ -65,8 +65,16 @@ export async function lookupRelease(
   const query = queryParts.join(" ");
   const params = new URLSearchParams({ query, limit: "1", fmt: "json" });
   const url = `${MB_API_BASE}/release?${params}`;
+  const searchLog = {
+    artist,
+    title,
+    year: year ?? null,
+    query,
+  };
 
   try {
+    console.info("[musicbrainz] Searching releases", searchLog);
+
     const response = await fetch(url, {
       headers: {
         "User-Agent": USER_AGENT,
@@ -75,23 +83,25 @@ export async function lookupRelease(
     });
 
     if (!response.ok) {
-      console.warn(`[musicbrainz] Search returned ${response.status}`);
+      console.warn(`[musicbrainz] Search returned ${response.status}`, searchLog);
       return null;
     }
 
     const data = (await response.json()) as MbSearchResponse;
+    const releaseCount = Array.isArray(data.releases) ? data.releases.length : 0;
 
-    if (!Array.isArray(data.releases) || data.releases.length === 0) {
+    if (releaseCount === 0) {
+      console.info("[musicbrainz] Search returned no releases", searchLog);
       return null;
     }
 
-    const release = data.releases[0] as MbRelease;
+    const release = data.releases![0] as MbRelease;
     const { label, catalogueNumber } = parseLabelInfo(release["label-info"]);
     const country = typeof release.country === "string" ? release.country : null;
     const artistCredit = Array.isArray(release["artist-credit"]) ? release["artist-credit"] : [];
     const firstCredit = artistCredit[0] as MbArtistCredit | undefined;
 
-    return {
+    const result = {
       year: parseYear(release.date),
       label,
       country,
@@ -102,6 +112,14 @@ export async function lookupRelease(
           ? firstCredit.artist.id
           : null,
     };
+
+    console.info("[musicbrainz] Search result", {
+      ...searchLog,
+      releaseCount,
+      result,
+    });
+
+    return result;
   } catch (err) {
     console.error("[musicbrainz] Lookup failed:", err);
     return null;
