@@ -3,8 +3,10 @@ import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { extractReleaseInfo } from "../vision";
 import { lookupRelease } from "../musicbrainz";
+import { fetchAndSaveCoverArt } from "../cover-art-archive";
 import { createScanEnricher } from "../scan-enricher";
 import type { ScanResult } from "../../src/types";
+import type { MusicBrainzFields } from "../musicbrainz";
 import { getUploadsDir, toUploadsPublicPath } from "../uploads";
 
 const MAX_IMAGE_BASE64_LENGTH = 2_000_000;
@@ -39,6 +41,16 @@ function validateImageBase64(
 
 export type ExtractReleaseInfoFn = (base64Image: string) => Promise<ScanResult | null>;
 export type SaveReleaseImageFn = (base64Image: string) => Promise<string>;
+export type LookupReleaseFn = (
+  artist: string,
+  title: string,
+  year?: string,
+) => Promise<MusicBrainzFields | null>;
+
+export type FetchCoverArtFn = (
+  releaseId: string,
+  saveImage: SaveReleaseImageFn,
+) => Promise<string | null>;
 
 async function saveReleaseImage(base64Image: string): Promise<string> {
   const uploadsDir = getUploadsDir();
@@ -55,6 +67,8 @@ async function saveReleaseImage(base64Image: string): Promise<string> {
 export function createReleaseRoutes(
   scanReleaseCover: ExtractReleaseInfoFn = createScanEnricher(extractReleaseInfo, lookupRelease),
   saveImage: SaveReleaseImageFn = saveReleaseImage,
+  lookupReleaseFn: LookupReleaseFn = lookupRelease,
+  fetchCoverArtFn: FetchCoverArtFn = fetchAndSaveCoverArt,
 ): Hono {
   const routes = new Hono();
 
@@ -109,6 +123,51 @@ export function createReleaseRoutes(
     }
 
     return c.json(scanResult, 200);
+  });
+
+  routes.post("/lookup", async (c) => {
+    let body: unknown;
+    try {
+      body = await c.req.json();
+    } catch {
+      return c.json({ error: "Invalid JSON payload" }, 400);
+    }
+
+    if (!body || typeof body !== "object") {
+      return c.json({ error: "Invalid JSON payload" }, 400);
+    }
+
+    const { artist, title, year } = body as Record<string, unknown>;
+
+    if (typeof artist !== "string" || !artist.trim()) {
+      return c.json({ error: "artist is required" }, 400);
+    }
+
+    if (typeof title !== "string" || !title.trim()) {
+      return c.json({ error: "title is required" }, 400);
+    }
+
+    const yearHint = typeof year === "string" && year.trim() ? year.trim() : undefined;
+
+    try {
+      const mbFields = await lookupReleaseFn(artist.trim(), title.trim(), yearHint);
+      if (!mbFields) {
+        return c.json({}, 200);
+      }
+
+      const result: Record<string, unknown> = { ...mbFields };
+
+      if (mbFields.musicbrainzReleaseId) {
+        const artworkUrl = await fetchCoverArtFn(mbFields.musicbrainzReleaseId, saveImage);
+        if (artworkUrl) {
+          result.artworkUrl = artworkUrl;
+        }
+      }
+
+      return c.json(result, 200);
+    } catch {
+      return c.json({}, 200);
+    }
   });
 
   return routes;
