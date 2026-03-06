@@ -49,6 +49,10 @@
 
     /* Typography */
     --font-mono: "Share Tech Mono", "Courier New", monospace;
+    --window-max-width: 720px;
+    --window-gutter: 12px;
+    --window-top-space: clamp(16px, 4vh, 32px);
+    --taskbar-height: 28px;
 }
 
 /* ═══════════════════════════════════════════════════
@@ -78,8 +82,10 @@ body {
     color: #000000;
     line-height: 1.3;
     font-size: 11px;
-    max-width: 680px;
-    margin: 0 auto;
+    width: min(calc(100% - (var(--window-gutter) * 2)), var(--window-max-width));
+    margin: var(--window-top-space) auto calc(var(--window-top-space) + var(--taskbar-height));
+    height: calc(100vh - (var(--window-top-space) * 2) - var(--taskbar-height));
+    max-height: calc(100vh - (var(--window-top-space) * 2) - var(--taskbar-height));
     background: var(--chrome);
     border-width: 2px;
     border-style: solid;
@@ -88,6 +94,9 @@ body {
     box-shadow:
         3px 3px 0 #000000,
         4px 4px 0 rgba(0, 0, 0, 0.3);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
 }
 
 /* ═══════════════════════════════════════════════════
@@ -170,10 +179,12 @@ body {
 ═══════════════════════════════════════════════════ */
 .main {
     background: var(--chrome);
-    padding: 4px;
+    padding: 4px 4px 0;
     display: flex;
     flex-direction: column;
     gap: 3px;
+    flex: 1;
+    min-height: 0;
 }
 
 /* ═══════════════════════════════════════════════════
@@ -662,6 +673,10 @@ select.input {
     border-style: solid;
     border-color: var(--chrome-dark) var(--chrome-white) var(--chrome-white)
         var(--chrome-dark);
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
 }
 
 .list-section::before {
@@ -679,11 +694,10 @@ select.input {
 .music-list {
     display: flex;
     flex-direction: column;
+    flex: 1;
     background: var(--playlist-bg);
     min-height: 120px;
-    max-height: 520px;
     overflow-y: auto;
-    counter-reset: track-num;
     -ms-overflow-style: none;
     scrollbar-width: none;
 }
@@ -699,6 +713,8 @@ select.input {
     grid-template-columns: minmax(0, 1fr) 19px;
     align-items: stretch;
     background: var(--playlist-bg);
+    flex: 1;
+    min-height: 0;
 }
 
 .music-list__parent-linker {
@@ -809,25 +825,12 @@ select.input {
     align-items: center;
     flex-shrink: 0;
     gap: 8px;
-    padding: 6px 8px;
+    padding: 8px 8px;
     background: var(--playlist-bg);
     border: none;
     border-bottom: 1px solid #0a0a1a;
     border-radius: 0;
-    min-height: 84px;
-    counter-increment: track-num;
-}
-
-.music-card::before {
-    content: counter(track-num) ".";
-    color: #4a6a9a;
-    font-size: 11px;
-    min-width: 28px;
-    flex-shrink: 0;
-    text-align: right;
-    font-family: "Tahoma", monospace;
-    align-self: flex-start;
-    padding-top: 5px;
+    min-height: 92px;
 }
 
 .music-card:nth-child(even) {
@@ -929,13 +932,13 @@ select.input {
 
     .music-card {
         padding: 8px 6px;
-        min-height: 74px;
+        min-height: 82px;
         gap: 8px;
         align-items: flex-start;
     }
 
     .music-card--no-artwork {
-        min-height: 84px;
+        min-height: 92px;
     }
 
     .music-card__artwork {
@@ -1580,6 +1583,13 @@ body::after {
 /* Widen the app window on the release page so artwork can be large */
 .release-page-body {
     max-width: 650px;
+}
+
+@media (min-width: 1180px) {
+    :root {
+        --window-max-width: 920px;
+        --window-gutter: 20px;
+    }
 }
 
 .release-page-body > :not(.release-page__backdrop),
