@@ -1491,6 +1491,124 @@ a:hover {
     font-size: 11px;
 }
 
+.link-picker {
+    position: fixed;
+    inset: 0;
+    z-index: 50;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 18px;
+}
+
+.link-picker[hidden] {
+    display: none;
+}
+
+.link-picker__backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgb(4 8 20 / 48%);
+}
+
+.link-picker__dialog {
+    position: relative;
+    z-index: 1;
+    width: min(640px, calc(100vw - 24px));
+    max-height: min(78vh, 720px);
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr) auto;
+    gap: 10px;
+    padding: 12px;
+    background: var(--chrome);
+    border-width: 2px;
+    border-style: solid;
+    border-color: var(--chrome-white) var(--chrome-darker) var(--chrome-darker)
+        var(--chrome-white);
+    box-shadow: 6px 6px 0 rgb(0 0 0 / 25%);
+}
+
+.link-picker__header {
+    display: grid;
+    gap: 6px;
+}
+
+.link-picker__header h2 {
+    margin: 0;
+    font-size: 18px;
+}
+
+.link-picker__header p {
+    margin: 0;
+    font-size: 11px;
+}
+
+.link-picker__url {
+    overflow-wrap: anywhere;
+    color: var(--chrome-darker);
+}
+
+.link-picker__list {
+    display: grid;
+    gap: 8px;
+    overflow: auto;
+    padding-right: 4px;
+}
+
+.link-picker__candidate {
+    width: 100%;
+    display: grid;
+    gap: 6px;
+    justify-items: start;
+    padding: 10px;
+    text-align: left;
+    background: #ffffff;
+    border-width: 2px;
+    border-style: solid;
+    border-color: var(--chrome-dark) var(--chrome-white) var(--chrome-white)
+        var(--chrome-dark);
+}
+
+.link-picker__candidate:hover {
+    background: #f6f7fc;
+}
+
+.link-picker__candidate.is-selected {
+    background: #dfe8ff;
+    border-color: #123a7a #6e99d8 #6e99d8 #123a7a;
+}
+
+.link-picker__candidate-main {
+    display: grid;
+    gap: 2px;
+}
+
+.link-picker__candidate-title {
+    font-size: 13px;
+    font-weight: 700;
+}
+
+.link-picker__candidate-artist {
+    font-size: 11px;
+}
+
+.link-picker__candidate-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.link-picker__candidate-evidence {
+    font-size: 10px;
+    color: var(--chrome-darker);
+}
+
+.link-picker__actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+}
+
 /* ═══════════════════════════════════════════════════
    FOOTER — Status bar (inside window)
 ═══════════════════════════════════════════════════ */
@@ -1583,6 +1701,9 @@ body::after {
 /* Widen the app window on the release page so artwork can be large */
 .release-page-body {
     max-width: 650px;
+    height: auto;
+    max-height: none;
+    overflow: visible;
 }
 
 @media (min-width: 1180px) {
@@ -1596,6 +1717,10 @@ body::after {
 .release-page-body .main {
     position: relative;
     z-index: 1;
+}
+
+.release-page-body .main {
+    flex: 0 0 auto;
 }
 
 .release-page {
@@ -1625,8 +1750,11 @@ body::after {
 
 .release-page__artwork {
     display: block;
-    width: 100%;
+    width: auto;
+    max-width: min(100%, clamp(250px, calc(100vh - 335px), 480px));
+    max-height: clamp(250px, calc(100vh - 335px), 480px);
     height: auto;
+    margin: 0 auto;
     border: 2px solid var(--chrome-dark);
     border-color: var(--chrome-dark) var(--chrome-white) var(--chrome-white)
         var(--chrome-dark);

@@ -12,6 +12,7 @@ import {
 import { isValidUrl, normalize } from "../utils";
 import { applyOrder, buildContextKey } from "../../shared/music-list-context";
 import {
+  AmbiguousLinkSelectionError,
   fullItemSelect,
   fetchFullItem,
   getOrCreateArtist,
@@ -276,6 +277,10 @@ musicItemRoutes.post("/", async (c) => {
     }
     return c.json(result.item, 201);
   } catch (err) {
+    if (err instanceof AmbiguousLinkSelectionError) {
+      return c.json(err.payload, 409);
+    }
+
     if (err instanceof UnsupportedMusicLinkError) {
       return c.json({ error: err.message }, 400);
     }
