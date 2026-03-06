@@ -1,4 +1,8 @@
-import type { SourceName } from "../src/types";
+import type { ItemType, SourceName } from "../src/types";
+import {
+  extractReleaseCandidatesFromWebText,
+  type ExtractedReleaseCandidate,
+} from "./link-extractor";
 
 export interface OgData {
   ogTitle?: string;
@@ -12,12 +16,54 @@ export interface OgData {
 export interface ScrapedMetadata {
   potentialArtist?: string;
   potentialTitle?: string;
+  itemType?: ItemType;
   imageUrl?: string;
+  releases?: ExtractedReleaseCandidate[];
 }
 
 type OgParser = (og: OgData) => ScrapedMetadata;
 
 const MAX_HEAD_BYTES = 100_000;
+const MAX_UNKNOWN_HTML_BYTES = 250_000;
+const UNKNOWN_TEXT_SNIPPET_CHARS = 24_000;
+
+const STRONG_MUSIC_TERMS = [
+  "album",
+  "release",
+  "track",
+  "tracks",
+  "single",
+  "vinyl",
+  "discography",
+  "ep",
+  "lp",
+  "cassette",
+  "catalog",
+  "catalogue",
+  "label",
+] as const;
+
+const WEAK_MUSIC_TERMS = [
+  "artist",
+  "music",
+  "listen",
+  "stream",
+  "playlist",
+  "song",
+  "songs",
+] as const;
+
+export class UnsupportedMusicLinkError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "UnsupportedMusicLinkError";
+  }
+}
+
+export interface MusicSignalResult {
+  isMusicRelated: boolean;
+  matchedTerms: string[];
+}
 
 export function parseOgTags(html: string): OgData {
   const data: OgData = {};
@@ -71,6 +117,87 @@ export function decodeHtmlEntities(text: string): string {
       const codePoint = Number.parseInt(num, 10);
       return Number.isFinite(codePoint) ? String.fromCodePoint(codePoint) : raw;
     });
+}
+
+function stripHtmlForAnalysis(html: string): string {
+  return decodeHtmlEntities(
+    html
+      .replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, " ")
+      .replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi, " ")
+      .replace(/<noscript\b[^>]*>[\s\S]*?<\/noscript>/gi, " ")
+      .replace(/<svg\b[^>]*>[\s\S]*?<\/svg>/gi, " ")
+      .replace(/<[^>]+>/g, " ")
+      .replace(/\s+/g, " "),
+  ).trim();
+}
+
+export function detectMusicRelatedHtml(html: string): MusicSignalResult {
+  const text = stripHtmlForAnalysis(html).toLowerCase();
+  const matchedTerms = new Set<string>();
+
+  for (const term of STRONG_MUSIC_TERMS) {
+    if (new RegExp(`\\b${term}\\b`, "i").test(text)) {
+      matchedTerms.add(term);
+    }
+  }
+
+  for (const term of WEAK_MUSIC_TERMS) {
+    if (new RegExp(`\\b${term}\\b`, "i").test(text)) {
+      matchedTerms.add(term);
+    }
+  }
+
+  const strongMatchCount = STRONG_MUSIC_TERMS.filter((term) => matchedTerms.has(term)).length;
+  const weakMatchCount = WEAK_MUSIC_TERMS.filter((term) => matchedTerms.has(term)).length;
+
+  return {
+    isMusicRelated: strongMatchCount > 0 || weakMatchCount >= 2,
+    matchedTerms: [...matchedTerms],
+  };
+}
+
+function buildUnknownPageSnippet(url: string, html: string): string {
+  const og = parseOgTags(html);
+  const text = stripHtmlForAnalysis(html).slice(0, UNKNOWN_TEXT_SNIPPET_CHARS);
+  const parts = [
+    `URL: ${url}`,
+    og.ogTitle || og.title ? `Title: ${og.ogTitle || og.title}` : "",
+    og.ogDescription ? `Description: ${og.ogDescription}` : "",
+    og.ogSiteName ? `Site: ${og.ogSiteName}` : "",
+    text ? `Visible text: ${text}` : "",
+  ].filter(Boolean);
+
+  return parts.join("\n");
+}
+
+async function scrapeUnknownUrl(url: string, html: string, og: OgData): Promise<ScrapedMetadata> {
+  const signal = detectMusicRelatedHtml(html);
+  if (!signal.isMusicRelated) {
+    throw new UnsupportedMusicLinkError("Link does not appear to be music-related");
+  }
+
+  const releases = await extractReleaseCandidatesFromWebText(
+    url,
+    buildUnknownPageSnippet(url, html),
+  );
+  if (releases === null) {
+    throw new UnsupportedMusicLinkError(
+      "Unsupported music-link extraction is unavailable on this server",
+    );
+  }
+
+  if (releases.length === 0) {
+    throw new UnsupportedMusicLinkError("Couldn't extract a release from this link");
+  }
+
+  const primary = releases[0];
+  return {
+    potentialArtist: primary?.artist,
+    potentialTitle: primary?.title,
+    itemType: primary?.itemType,
+    imageUrl: og.ogImage,
+    releases,
+  };
 }
 
 export function parseBandcampOg(og: OgData): ScrapedMetadata {
@@ -690,7 +817,7 @@ export async function scrapeUrl(
       return hasScrapedMetadata(fallback) ? fallback : null;
     }
 
-    // Read only up to the </head> or MAX_HEAD_BYTES
+    // Read only the head for known sources, but include part of the body for unknown pages.
     const reader = response.body?.getReader();
     if (!reader) {
       return hasScrapedMetadata(fallback) ? fallback : null;
@@ -698,17 +825,26 @@ export async function scrapeUrl(
 
     let html = "";
     const decoder = new TextDecoder();
+    const maxBytes = source === "unknown" ? MAX_UNKNOWN_HTML_BYTES : MAX_HEAD_BYTES;
 
-    while (html.length < MAX_HEAD_BYTES) {
+    while (html.length < maxBytes) {
       const { done, value } = await reader.read();
       if (done) break;
       html += decoder.decode(value, { stream: true });
-      if (html.includes("</head>")) break;
+      if (source === "unknown") {
+        if (html.includes("</body>")) break;
+      } else if (html.includes("</head>")) {
+        break;
+      }
     }
 
     reader.cancel();
 
     const og = parseOgTags(html);
+    if (source === "unknown") {
+      return await scrapeUnknownUrl(url, html, og);
+    }
+
     if (source === "mixcloud") {
       const mixcloudOg = parseMixcloudOg(og);
       const jsonLd = parseMixcloudJsonLd(html);
@@ -737,7 +873,11 @@ export async function scrapeUrl(
 
     const parser = SOURCE_PARSERS[source] || parseDefaultOg;
     return parser(og);
-  } catch {
+  } catch (err) {
+    if (err instanceof UnsupportedMusicLinkError) {
+      throw err;
+    }
+
     const fallback =
       source === "mixcloud" ? mixcloudOEmbed : source === "apple_music" ? appleMusicMetadata : null;
     return hasScrapedMetadata(fallback) ? fallback : null;

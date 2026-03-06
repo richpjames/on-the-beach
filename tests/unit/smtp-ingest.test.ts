@@ -2,11 +2,11 @@ import { describe, it, expect, mock, beforeEach, afterEach } from "bun:test";
 import { createTransport } from "nodemailer";
 import type { SMTPServer } from "smtp-server";
 
-const mockCreate = mock();
+const mockCreateMany = mock();
 
 // Mock createMusicItemFromUrl before importing
 mock.module("../../server/music-item-creator", () => ({
-  createMusicItemFromUrl: mockCreate,
+  createMusicItemsFromUrl: mockCreateMany,
   fetchFullItem: mock(),
 }));
 
@@ -17,7 +17,7 @@ let smtpPort: number;
 
 // Use a random high port for tests
 beforeEach(() => {
-  mockCreate.mockReset();
+  mockCreateMany.mockReset();
   smtpPort = 10025 + Math.floor(Math.random() * 50000);
   process.env.SMTP_PORT = String(smtpPort);
   delete process.env.SMTP_ALLOWED_FROM;
@@ -53,14 +53,16 @@ function wait(ms: number) {
 
 describe("SMTP ingest server", () => {
   it("receives an email and creates a music item from a bandcamp URL", async () => {
-    mockCreate.mockResolvedValue({
-      item: {
-        id: 1,
-        title: "Test Release",
-        primary_url: "https://artist.bandcamp.com/album/test",
-      } as any,
-      created: true,
-    });
+    mockCreateMany.mockResolvedValue([
+      {
+        item: {
+          id: 1,
+          title: "Test Release",
+          primary_url: "https://artist.bandcamp.com/album/test",
+        } as any,
+        created: true,
+      },
+    ]);
 
     server = startSmtpIngest();
     await wait(200);
@@ -74,7 +76,7 @@ describe("SMTP ingest server", () => {
 
     await wait(500);
 
-    expect(mockCreate).toHaveBeenCalledWith("https://artist.bandcamp.com/album/test", {
+    expect(mockCreateMany).toHaveBeenCalledWith("https://artist.bandcamp.com/album/test", {
       notes: "Via email from noreply@bandcamp.com",
     });
   });
@@ -92,16 +94,13 @@ describe("SMTP ingest server", () => {
 
     await wait(500);
 
-    expect(mockCreate).not.toHaveBeenCalled();
+    expect(mockCreateMany).not.toHaveBeenCalled();
   });
 
   it("filters senders when SMTP_ALLOWED_FROM is set", async () => {
     process.env.SMTP_ALLOWED_FROM = "noreply@bandcamp.com";
 
-    mockCreate.mockResolvedValue({
-      item: { id: 1, title: "Release" } as any,
-      created: true,
-    });
+    mockCreateMany.mockResolvedValue([{ item: { id: 1, title: "Release" } as any, created: true }]);
 
     server = startSmtpIngest();
     await wait(200);
@@ -116,16 +115,15 @@ describe("SMTP ingest server", () => {
 
     await wait(500);
 
-    expect(mockCreate).not.toHaveBeenCalled();
+    expect(mockCreateMany).not.toHaveBeenCalled();
   });
 
   it("accepts emails from allowed senders", async () => {
     process.env.SMTP_ALLOWED_FROM = "noreply@bandcamp.com,alerts@spotify.com";
 
-    mockCreate.mockResolvedValue({
-      item: { id: 2, title: "Allowed Release" } as any,
-      created: true,
-    });
+    mockCreateMany.mockResolvedValue([
+      { item: { id: 2, title: "Allowed Release" } as any, created: true },
+    ]);
 
     server = startSmtpIngest();
     await wait(200);
@@ -139,6 +137,6 @@ describe("SMTP ingest server", () => {
 
     await wait(500);
 
-    expect(mockCreate).toHaveBeenCalledTimes(1);
+    expect(mockCreateMany).toHaveBeenCalledTimes(1);
   });
 });

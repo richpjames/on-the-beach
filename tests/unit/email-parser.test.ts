@@ -53,6 +53,20 @@ describe("extractMusicUrls", () => {
     expect(extractMusicUrls({ html })).toEqual(["https://artist.bandcamp.com/album/yes"]);
   });
 
+  it("can include unknown URLs for downstream unsupported-link extraction", () => {
+    const html = `
+      <a href="https://artist.bandcamp.com/album/yes">Music</a>
+      <a href="https://obscuremusic.example/releases/spring-2026">Obscure</a>
+      <a href="https://www.google.com">Google</a>
+    `;
+
+    expect(extractMusicUrls({ html }, { includeUnknown: true })).toEqual([
+      "https://artist.bandcamp.com/album/yes",
+      "https://obscuremusic.example/releases/spring-2026",
+      "https://www.google.com",
+    ]);
+  });
+
   it("deduplicates URLs", () => {
     const html = `
       <a href="https://artist.bandcamp.com/album/dupe">Link 1</a>

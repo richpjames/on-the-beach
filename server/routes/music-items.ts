@@ -19,6 +19,7 @@ import {
   createMusicItemDirect,
   hydrateItemStacks,
 } from "../music-item-creator";
+import { UnsupportedMusicLinkError } from "../scraper";
 import type {
   CreateMusicItemInput,
   UpdateMusicItemInput,
@@ -42,6 +43,8 @@ const DIRECT_UPDATE_FIELDS: ReadonlyArray<
   | "country"
   | "genre"
   | "catalogueNumber"
+  | "musicbrainzReleaseId"
+  | "musicbrainzArtistId"
 > = [
   "itemType",
   "purchaseIntent",
@@ -54,6 +57,8 @@ const DIRECT_UPDATE_FIELDS: ReadonlyArray<
   "country",
   "genre",
   "catalogueNumber",
+  "musicbrainzReleaseId",
+  "musicbrainzArtistId",
 ];
 
 async function collectDescendantStackIds(rootStackId: number): Promise<number[]> {
@@ -271,6 +276,10 @@ musicItemRoutes.post("/", async (c) => {
     }
     return c.json(result.item, 201);
   } catch (err) {
+    if (err instanceof UnsupportedMusicLinkError) {
+      return c.json({ error: err.message }, 400);
+    }
+
     console.error("[api] POST /api/music-items error:", err);
     return c.json({ error: "Failed to create music item" }, 500);
   }

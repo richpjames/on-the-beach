@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { extractMusicUrls } from "../email-parser";
-import { createMusicItemFromUrl } from "../music-item-creator";
+import { createMusicItemsFromUrl } from "../music-item-creator";
 
 interface EmailEnvelope {
   from: string;
@@ -55,7 +55,10 @@ ingestRoutes.post("/email", async (c) => {
   const envelope = adapter(body);
 
   // Extract music URLs from email content
-  const urls = extractMusicUrls({ html: envelope.html, text: envelope.text });
+  const urls = extractMusicUrls(
+    { html: envelope.html, text: envelope.text },
+    { includeUnknown: true },
+  );
 
   // Create items for each URL
   const items: Array<{ id: number; title: string; url: string }> = [];
@@ -63,18 +66,20 @@ ingestRoutes.post("/email", async (c) => {
 
   for (const url of urls) {
     try {
-      const result = await createMusicItemFromUrl(url, {
+      const results = await createMusicItemsFromUrl(url, {
         notes: `Via email from ${envelope.from}`,
       });
 
-      if (result.created) {
-        items.push({
-          id: result.item.id,
-          title: result.item.title,
-          url: result.item.primary_url || url,
-        });
-      } else {
-        skipped.push({ url, reason: "duplicate" });
+      for (const result of results) {
+        if (result.created) {
+          items.push({
+            id: result.item.id,
+            title: result.item.title,
+            url: result.item.primary_url || url,
+          });
+        } else {
+          skipped.push({ url, reason: "duplicate" });
+        }
       }
     } catch (err) {
       console.error(`[api] POST /api/ingest/email failed to create item for ${url}:`, err);

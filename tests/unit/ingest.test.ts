@@ -1,11 +1,11 @@
 import { describe, it, expect, mock, beforeEach, afterEach } from "bun:test";
 import { Hono } from "hono";
 
-const mockCreate = mock();
+const mockCreateMany = mock();
 
 // Mock createMusicItemFromUrl before importing the route
 mock.module("../../server/music-item-creator", () => ({
-  createMusicItemFromUrl: mockCreate,
+  createMusicItemsFromUrl: mockCreateMany,
   fetchFullItem: mock(),
 }));
 
@@ -54,7 +54,7 @@ describe("POST /api/ingest/email", () => {
   beforeEach(() => {
     process.env.INGEST_API_KEY = "test-secret";
     delete process.env.INGEST_ENABLED;
-    mockCreate.mockReset();
+    mockCreateMany.mockReset();
   });
 
   afterEach(() => {
@@ -103,14 +103,16 @@ describe("POST /api/ingest/email", () => {
   });
 
   it("creates items from email with music URLs", async () => {
-    mockCreate.mockResolvedValue({
-      item: {
-        id: 1,
-        title: "Cool Release",
-        primary_url: "https://artist.bandcamp.com/album/cool-album",
-      } as any,
-      created: true,
-    });
+    mockCreateMany.mockResolvedValue([
+      {
+        item: {
+          id: 1,
+          title: "Cool Release",
+          primary_url: "https://artist.bandcamp.com/album/cool-album",
+        } as any,
+        created: true,
+      },
+    ]);
 
     const app = makeApp();
     const res = await makeRequest(app, sampleEnvelope, { apiKey: "test-secret" });
@@ -121,16 +123,18 @@ describe("POST /api/ingest/email", () => {
     expect(body.items_created).toBe(1);
     expect(body.items_skipped).toBe(0);
     expect(body.items[0].title).toBe("Cool Release");
-    expect(mockCreate).toHaveBeenCalledWith("https://artist.bandcamp.com/album/cool-album", {
+    expect(mockCreateMany).toHaveBeenCalledWith("https://artist.bandcamp.com/album/cool-album", {
       notes: "Via email from noreply@bandcamp.com",
     });
   });
 
   it("reports duplicates when URL already exists", async () => {
-    mockCreate.mockResolvedValue({
-      item: { id: 1, title: "Existing" } as any,
-      created: false,
-    });
+    mockCreateMany.mockResolvedValue([
+      {
+        item: { id: 1, title: "Existing" } as any,
+        created: false,
+      },
+    ]);
 
     const app = makeApp();
     const res = await makeRequest(app, sampleEnvelope, { apiKey: "test-secret" });
@@ -159,18 +163,20 @@ describe("POST /api/ingest/email", () => {
     const body = await res.json();
     expect(body.items_created).toBe(0);
     expect(body.items_skipped).toBe(0);
-    expect(mockCreate).not.toHaveBeenCalled();
+    expect(mockCreateMany).not.toHaveBeenCalled();
   });
 
   it("works with sendgrid provider adapter", async () => {
-    mockCreate.mockResolvedValue({
-      item: {
-        id: 2,
-        title: "SG Release",
-        primary_url: "https://artist.bandcamp.com/album/sg-test",
-      } as any,
-      created: true,
-    });
+    mockCreateMany.mockResolvedValue([
+      {
+        item: {
+          id: 2,
+          title: "SG Release",
+          primary_url: "https://artist.bandcamp.com/album/sg-test",
+        } as any,
+        created: true,
+      },
+    ]);
 
     const app = makeApp();
     const res = await makeRequest(
@@ -190,7 +196,7 @@ describe("POST /api/ingest/email", () => {
   });
 
   it("handles creation failures gracefully", async () => {
-    mockCreate.mockRejectedValue(new Error("DB error"));
+    mockCreateMany.mockRejectedValue(new Error("DB error"));
 
     const app = makeApp();
     const res = await makeRequest(app, sampleEnvelope, { apiKey: "test-secret" });
@@ -200,5 +206,43 @@ describe("POST /api/ingest/email", () => {
     expect(body.items_created).toBe(0);
     expect(body.items_skipped).toBe(1);
     expect(body.skipped[0].reason).toBe("creation_failed");
+  });
+
+  it("creates multiple items when one unsupported link resolves to several releases", async () => {
+    mockCreateMany.mockResolvedValue([
+      {
+        item: {
+          id: 10,
+          title: "First Release",
+          primary_url: "https://obscuremusic.example/releases",
+        } as any,
+        created: true,
+      },
+      {
+        item: {
+          id: 11,
+          title: "Second Release",
+          primary_url: "https://obscuremusic.example/releases",
+        } as any,
+        created: true,
+      },
+    ]);
+
+    const app = makeApp();
+    const res = await makeRequest(
+      app,
+      {
+        from: "noreply@example.com",
+        to: "music@example.com",
+        subject: "Roundup",
+        html: '<a href="https://obscuremusic.example/releases">Read more</a>',
+      },
+      { apiKey: "test-secret" },
+    );
+
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.items_created).toBe(2);
+    expect(body.items).toHaveLength(2);
   });
 });
