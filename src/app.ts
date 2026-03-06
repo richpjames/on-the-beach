@@ -31,6 +31,7 @@ import {
   renderStackManageList,
   renderStackRenameEditor,
 } from "./ui/view/templates";
+import { buildStackFeedHref, buildStackFeedTitle } from "../shared/rss";
 
 interface ItemContext {
   card: HTMLElement;
@@ -115,6 +116,7 @@ export class App {
     this.setupCustomListScrollbar();
 
     if (hasServerData) {
+      this.syncStackFeedLinks();
       requestAnimationFrame(() => {
         this.syncCustomListScrollbar();
       });
@@ -708,6 +710,27 @@ export class App {
     const list = document.getElementById("music-list");
     if (list instanceof HTMLElement) {
       this.renderStackParentLinker(list);
+    }
+
+    this.syncStackFeedLinks();
+  }
+
+  private syncStackFeedLinks(): void {
+    document.head.querySelectorAll("link[data-rss-feed-link]").forEach((element) => {
+      element.remove();
+    });
+
+    for (const stack of this.appState.stacks) {
+      const link = document.createElement("link");
+      link.rel = "alternate";
+      link.type = "application/rss+xml";
+      link.title = buildStackFeedTitle(stack.name);
+      link.href = buildStackFeedHref(stack.id);
+      link.dataset.rssFeedLink = String(stack.id);
+      if (this.appState.currentStack === stack.id) {
+        link.dataset.rssActiveFeed = "true";
+      }
+      document.head.appendChild(link);
     }
   }
 

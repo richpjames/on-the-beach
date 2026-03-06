@@ -2,6 +2,7 @@ import { describe, expect, mock, test } from "bun:test";
 import { Hono } from "hono";
 import { createRssRoutes } from "../../server/routes/rss";
 import type { MusicItemFull } from "../../src/types";
+import type { PrimaryFeedKey } from "../../shared/rss";
 
 type StackInfo = { id: number; name: string };
 
@@ -40,17 +41,74 @@ function makeItem(overrides: Partial<MusicItemFull> = {}): MusicItemFull {
 function makeApp(
   fetchStack: (stackId: number) => Promise<StackInfo | null>,
   fetchStackItems: (stackId: number) => Promise<MusicItemFull[]>,
+  fetchPrimaryFeedItems: (feed: PrimaryFeedKey) => Promise<MusicItemFull[]>,
 ): Hono {
   const app = new Hono();
-  app.route("/feed", createRssRoutes(fetchStack, fetchStackItems));
+  app.route("/feed", createRssRoutes(fetchStack, fetchStackItems, fetchPrimaryFeedItems));
   return app;
 }
+
+describe("GET /feed/:filter.rss", () => {
+  test("returns 200 with RSS content type for the all feed", async () => {
+    const fetchStack = mock(async (_id: number) => null);
+    const fetchStackItems = mock(async (_id: number) => []);
+    const fetchPrimaryFeedItems = mock(async (_feed: PrimaryFeedKey) => []);
+    const app = makeApp(fetchStack, fetchStackItems, fetchPrimaryFeedItems);
+
+    const res = await app.request("http://localhost/feed/all.rss");
+
+    expect(res.status).toBe(200);
+    expect(res.headers.get("Content-Type")).toContain("application/rss+xml");
+    expect(fetchPrimaryFeedItems).toHaveBeenCalledWith("all");
+  });
+
+  test("renders the to-listen feed title", async () => {
+    const fetchStack = mock(async (_id: number) => null);
+    const fetchStackItems = mock(async (_id: number) => []);
+    const fetchPrimaryFeedItems = mock(async (_feed: PrimaryFeedKey) => []);
+    const app = makeApp(fetchStack, fetchStackItems, fetchPrimaryFeedItems);
+
+    const res = await app.request("http://localhost/feed/to-listen.rss");
+    const body = await res.text();
+
+    expect(body).toContain("<title>To Listen</title>");
+    expect(fetchPrimaryFeedItems).toHaveBeenCalledWith("to-listen");
+  });
+
+  test("renders the listened feed title", async () => {
+    const fetchStack = mock(async (_id: number) => null);
+    const fetchStackItems = mock(async (_id: number) => []);
+    const fetchPrimaryFeedItems = mock(async (_feed: PrimaryFeedKey) => []);
+    const app = makeApp(fetchStack, fetchStackItems, fetchPrimaryFeedItems);
+
+    const res = await app.request("http://localhost/feed/listened.rss");
+    const body = await res.text();
+
+    expect(body).toContain("<title>Listened</title>");
+    expect(fetchPrimaryFeedItems).toHaveBeenCalledWith("listened");
+  });
+
+  test("includes RSS items in the all feed", async () => {
+    const fetchStack = mock(async (_id: number) => null);
+    const fetchStackItems = mock(async (_id: number) => []);
+    const fetchPrimaryFeedItems = mock(async (_feed: PrimaryFeedKey) => [
+      makeItem({ title: "Rounds", artist_name: "Four Tet" }),
+    ]);
+    const app = makeApp(fetchStack, fetchStackItems, fetchPrimaryFeedItems);
+
+    const res = await app.request("http://localhost/feed/all.rss");
+    const body = await res.text();
+
+    expect(body).toContain("<title>Four Tet — Rounds</title>");
+  });
+});
 
 describe("GET /feed/stacks/:stackId.rss", () => {
   test("returns 404 when stack does not exist", async () => {
     const fetchStack = mock(async (_id: number) => null);
     const fetchItems = mock(async (_id: number) => []);
-    const app = makeApp(fetchStack, fetchItems);
+    const fetchPrimaryFeedItems = mock(async (_feed: PrimaryFeedKey) => []);
+    const app = makeApp(fetchStack, fetchItems, fetchPrimaryFeedItems);
 
     const res = await app.request("http://localhost/feed/stacks/99.rss");
 
@@ -61,7 +119,8 @@ describe("GET /feed/stacks/:stackId.rss", () => {
   test("returns 400 for a non-numeric stack ID", async () => {
     const fetchStack = mock(async (_id: number) => null);
     const fetchItems = mock(async (_id: number) => []);
-    const app = makeApp(fetchStack, fetchItems);
+    const fetchPrimaryFeedItems = mock(async (_feed: PrimaryFeedKey) => []);
+    const app = makeApp(fetchStack, fetchItems, fetchPrimaryFeedItems);
 
     const res = await app.request("http://localhost/feed/stacks/abc.rss");
 
@@ -72,7 +131,8 @@ describe("GET /feed/stacks/:stackId.rss", () => {
   test("returns 200 with RSS content type when stack exists", async () => {
     const fetchStack = mock(async (_id: number) => ({ id: 1, name: "Ambient" }));
     const fetchItems = mock(async (_id: number) => []);
-    const app = makeApp(fetchStack, fetchItems);
+    const fetchPrimaryFeedItems = mock(async (_feed: PrimaryFeedKey) => []);
+    const app = makeApp(fetchStack, fetchItems, fetchPrimaryFeedItems);
 
     const res = await app.request("http://localhost/feed/stacks/1.rss");
 
@@ -83,7 +143,8 @@ describe("GET /feed/stacks/:stackId.rss", () => {
   test("feed title is the stack name", async () => {
     const fetchStack = mock(async (_id: number) => ({ id: 5, name: "Jazz" }));
     const fetchItems = mock(async (_id: number) => []);
-    const app = makeApp(fetchStack, fetchItems);
+    const fetchPrimaryFeedItems = mock(async (_feed: PrimaryFeedKey) => []);
+    const app = makeApp(fetchStack, fetchItems, fetchPrimaryFeedItems);
 
     const res = await app.request("http://localhost/feed/stacks/5.rss");
     const body = await res.text();
@@ -94,7 +155,8 @@ describe("GET /feed/stacks/:stackId.rss", () => {
   test("returns valid RSS envelope", async () => {
     const fetchStack = mock(async (_id: number) => ({ id: 1, name: "Ambient" }));
     const fetchItems = mock(async (_id: number) => []);
-    const app = makeApp(fetchStack, fetchItems);
+    const fetchPrimaryFeedItems = mock(async (_feed: PrimaryFeedKey) => []);
+    const app = makeApp(fetchStack, fetchItems, fetchPrimaryFeedItems);
 
     const res = await app.request("http://localhost/feed/stacks/1.rss");
     const body = await res.text();
@@ -113,7 +175,8 @@ describe("GET /feed/stacks/:stackId.rss", () => {
       makeItem({ id: 2, title: "Ambient 1: Music for Airports", artist_name: "Brian Eno" }),
     ];
     const fetchItems = mock(async (_id: number) => items);
-    const app = makeApp(fetchStack, fetchItems);
+    const fetchPrimaryFeedItems = mock(async (_feed: PrimaryFeedKey) => []);
+    const app = makeApp(fetchStack, fetchItems, fetchPrimaryFeedItems);
 
     const res = await app.request("http://localhost/feed/stacks/1.rss");
     const body = await res.text();
@@ -129,7 +192,8 @@ describe("GET /feed/stacks/:stackId.rss", () => {
     const fetchItems = mock(async (_id: number) => [
       makeItem({ title: "Geogaddi", artist_name: "Boards of Canada" }),
     ]);
-    const app = makeApp(fetchStack, fetchItems);
+    const fetchPrimaryFeedItems = mock(async (_feed: PrimaryFeedKey) => []);
+    const app = makeApp(fetchStack, fetchItems, fetchPrimaryFeedItems);
 
     const res = await app.request("http://localhost/feed/stacks/1.rss");
     const body = await res.text();
@@ -142,7 +206,8 @@ describe("GET /feed/stacks/:stackId.rss", () => {
     const fetchItems = mock(async (_id: number) => [
       makeItem({ title: "Untitled Mix", artist_name: null }),
     ]);
-    const app = makeApp(fetchStack, fetchItems);
+    const fetchPrimaryFeedItems = mock(async (_feed: PrimaryFeedKey) => []);
+    const app = makeApp(fetchStack, fetchItems, fetchPrimaryFeedItems);
 
     const res = await app.request("http://localhost/feed/stacks/1.rss");
     const body = await res.text();
@@ -155,7 +220,8 @@ describe("GET /feed/stacks/:stackId.rss", () => {
     const fetchItems = mock(async (_id: number) => [
       makeItem({ primary_url: "https://bandcamp.com/album/geogaddi" }),
     ]);
-    const app = makeApp(fetchStack, fetchItems);
+    const fetchPrimaryFeedItems = mock(async (_feed: PrimaryFeedKey) => []);
+    const app = makeApp(fetchStack, fetchItems, fetchPrimaryFeedItems);
 
     const res = await app.request("http://localhost/feed/stacks/1.rss");
     const body = await res.text();
@@ -168,7 +234,8 @@ describe("GET /feed/stacks/:stackId.rss", () => {
     const fetchItems = mock(async (_id: number) => [
       makeItem({ created_at: "2024-01-15T10:00:00.000Z" }),
     ]);
-    const app = makeApp(fetchStack, fetchItems);
+    const fetchPrimaryFeedItems = mock(async (_feed: PrimaryFeedKey) => []);
+    const app = makeApp(fetchStack, fetchItems, fetchPrimaryFeedItems);
 
     const res = await app.request("http://localhost/feed/stacks/1.rss");
     const body = await res.text();
@@ -179,7 +246,8 @@ describe("GET /feed/stacks/:stackId.rss", () => {
   test("empty stack returns a feed with no items", async () => {
     const fetchStack = mock(async (_id: number) => ({ id: 1, name: "Ambient" }));
     const fetchItems = mock(async (_id: number) => []);
-    const app = makeApp(fetchStack, fetchItems);
+    const fetchPrimaryFeedItems = mock(async (_feed: PrimaryFeedKey) => []);
+    const app = makeApp(fetchStack, fetchItems, fetchPrimaryFeedItems);
 
     const res = await app.request("http://localhost/feed/stacks/1.rss");
     const body = await res.text();
@@ -191,7 +259,8 @@ describe("GET /feed/stacks/:stackId.rss", () => {
   test("passes the correct stack ID to both fetch functions", async () => {
     const fetchStack = mock(async (id: number) => ({ id, name: "Electronic" }));
     const fetchItems = mock(async (_id: number) => []);
-    const app = makeApp(fetchStack, fetchItems);
+    const fetchPrimaryFeedItems = mock(async (_feed: PrimaryFeedKey) => []);
+    const app = makeApp(fetchStack, fetchItems, fetchPrimaryFeedItems);
 
     await app.request("http://localhost/feed/stacks/7.rss");
 

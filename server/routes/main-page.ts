@@ -4,6 +4,13 @@ import { db } from "../db/index";
 import { musicItems, musicItemStacks, stacks, musicItemOrder, stackParents } from "../db/schema";
 import { fullItemSelect, hydrateItemStacks } from "../music-item-creator";
 import { applyOrder, buildContextKey } from "../../shared/music-list-context";
+import {
+  buildPrimaryFeedHref,
+  buildPrimaryFeedTitle,
+  buildStackFeedHref,
+  buildStackFeedTitle,
+  PRIMARY_FEEDS,
+} from "../../shared/rss";
 import { renderMusicList } from "../../src/ui/view/templates";
 import type { MusicItemFull, StackWithCount } from "../../src/types";
 import { getPageAssets } from "../page-assets";
@@ -29,6 +36,24 @@ function safeJson(obj: unknown): string {
 
 function renderStackTab(stack: StackWithCount): string {
   return `<button class="stack-tab" data-stack-id="${stack.id}">${escapeHtml(stack.name)}</button>`;
+}
+
+export function renderPrimaryFeedAlternateLinks(): string {
+  return PRIMARY_FEEDS.map(
+    (feed) =>
+      `<link rel="alternate" type="application/rss+xml" title="${escapeHtml(buildPrimaryFeedTitle(feed.key))}" href="${escapeHtml(buildPrimaryFeedHref(feed.key))}" />`,
+  ).join("\n    ");
+}
+
+export function renderStackFeedAlternateLinks(
+  stacks: Pick<StackWithCount, "id" | "name">[],
+): string {
+  return stacks
+    .map(
+      (stack) =>
+        `<link rel="alternate" type="application/rss+xml" title="${escapeHtml(buildStackFeedTitle(stack.name))}" href="${escapeHtml(buildStackFeedHref(stack.id))}" data-rss-feed-link="${stack.id}" />`,
+    )
+    .join("\n    ");
 }
 
 async function fetchInitialStacks(): Promise<StackWithCount[]> {
@@ -104,6 +129,8 @@ function renderMainPage(opts: {
   stacksJson: string;
   cssHref: string;
   scriptSrc: string;
+  primaryRssAlternateLinksHtml: string;
+  rssAlternateLinksHtml: string;
   isDev: boolean;
   appVersion: string;
 }): string {
@@ -127,6 +154,8 @@ function renderMainPage(opts: {
     <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <link rel="manifest" href="/site.webmanifest" />
+    ${opts.primaryRssAlternateLinksHtml}
+    ${opts.rssAlternateLinksHtml}
     <link rel="stylesheet" href="${escapeHtml(opts.cssHref)}" />
   </head>
   <body>
@@ -358,6 +387,8 @@ export function createMainPageRoutes(): Hono {
     const musicListHtml = renderMusicList(initialItems, DEFAULT_FILTER);
     const stackBarTabsHtml = initialStacks.map((s) => renderStackTab(s)).join("");
     const stacksJson = safeJson({ stacks: initialStacks });
+    const primaryRssAlternateLinksHtml = renderPrimaryFeedAlternateLinks();
+    const rssAlternateLinksHtml = renderStackFeedAlternateLinks(initialStacks);
 
     return c.html(
       renderMainPage({
@@ -366,6 +397,8 @@ export function createMainPageRoutes(): Hono {
         stacksJson,
         cssHref,
         scriptSrc,
+        primaryRssAlternateLinksHtml,
+        rssAlternateLinksHtml,
         isDev,
         appVersion: pkg.version,
       }),
