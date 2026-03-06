@@ -12,6 +12,50 @@ describe("lookupRelease", () => {
     mock.restore();
   });
 
+  test("logs the search terms and parsed result", async () => {
+    const infoSpy = spyOn(console, "info").mockImplementation(() => {});
+    spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      makeMbResponse([
+        {
+          id: "release-uuid-123",
+          date: "1997-05-21",
+          country: "GB",
+          "artist-credit": [{ artist: { id: "artist-uuid-456" } }],
+          "label-info": [
+            {
+              "catalog-number": "CDPUSH45",
+              label: { name: "Parlophone" },
+            },
+          ],
+        },
+      ]),
+    );
+
+    await lookupRelease("Radiohead", "OK Computer", "1997");
+
+    expect(infoSpy).toHaveBeenCalledWith("[musicbrainz] Searching releases", {
+      artist: "Radiohead",
+      title: "OK Computer",
+      year: "1997",
+      query: "artist:Radiohead AND release:OK Computer AND date:1997",
+    });
+    expect(infoSpy).toHaveBeenCalledWith("[musicbrainz] Search result", {
+      artist: "Radiohead",
+      title: "OK Computer",
+      year: "1997",
+      query: "artist:Radiohead AND release:OK Computer AND date:1997",
+      releaseCount: 1,
+      result: {
+        year: 1997,
+        label: "Parlophone",
+        country: "GB",
+        catalogueNumber: "CDPUSH45",
+        musicbrainzReleaseId: "release-uuid-123",
+        musicbrainzArtistId: "artist-uuid-456",
+      },
+    });
+  });
+
   test("returns parsed fields from the first matching release", async () => {
     spyOn(globalThis, "fetch").mockResolvedValueOnce(
       makeMbResponse([
@@ -41,10 +85,17 @@ describe("lookupRelease", () => {
   });
 
   test("returns null when releases array is empty", async () => {
+    const infoSpy = spyOn(console, "info").mockImplementation(() => {});
     spyOn(globalThis, "fetch").mockResolvedValueOnce(makeMbResponse([]));
 
     const result = await lookupRelease("Unknown", "Unknown");
     expect(result).toBeNull();
+    expect(infoSpy).toHaveBeenCalledWith("[musicbrainz] Search returned no releases", {
+      artist: "Unknown",
+      title: "Unknown",
+      year: null,
+      query: "artist:Unknown AND release:Unknown",
+    });
   });
 
   test("returns null on non-200 response", async () => {
