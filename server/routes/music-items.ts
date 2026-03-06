@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { eq, and, inArray, sql } from "drizzle-orm";
+import { eq, and, inArray, sql, desc } from "drizzle-orm";
 import { db } from "../db/index";
 import {
   musicItems,
@@ -207,7 +207,8 @@ musicItemRoutes.get("/", async (c) => {
     query = query.where(and(...conditions));
   }
 
-  query = query.orderBy(sql`${musicItems.createdAt} DESC`);
+  // created_at is only second-resolution in SQLite, so break ties by id.
+  query = query.orderBy(desc(musicItems.createdAt), desc(musicItems.id));
 
   const items = await query;
 

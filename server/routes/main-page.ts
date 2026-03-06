@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { eq, inArray, count, asc, sql } from "drizzle-orm";
+import { eq, inArray, count, asc, desc } from "drizzle-orm";
 import { db } from "../db/index";
 import { musicItems, musicItemStacks, stacks, musicItemOrder, stackParents } from "../db/schema";
 import { fullItemSelect, hydrateItemStacks } from "../music-item-creator";
@@ -62,7 +62,7 @@ async function fetchInitialStacks(): Promise<StackWithCount[]> {
 async function fetchInitialItems(): Promise<MusicItemFull[]> {
   const items = await fullItemSelect()
     .where(eq(musicItems.listenStatus, DEFAULT_FILTER))
-    .orderBy(sql`${musicItems.createdAt} DESC`);
+    .orderBy(desc(musicItems.createdAt), desc(musicItems.id));
 
   if (items.length === 0) return [];
 
