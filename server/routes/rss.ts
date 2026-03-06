@@ -3,11 +3,14 @@ import { db } from "../db/index";
 import { musicItems, artists, musicLinks, sources, stacks, musicItemStacks } from "../db/schema";
 import { eq, and, inArray } from "drizzle-orm";
 import type { MusicItemFull } from "../../src/types";
+import type { PrimaryFeedKey } from "../../shared/rss";
 
 type StackInfo = { id: number; name: string };
+type FeedInfo = { title: string; description: string };
 
 export type FetchStackFn = (stackId: number) => Promise<StackInfo | null>;
 export type FetchStackItemsFn = (stackId: number) => Promise<MusicItemFull[]>;
+export type FetchPrimaryFeedItemsFn = (feed: PrimaryFeedKey) => Promise<MusicItemFull[]>;
 
 // ---------------------------------------------------------------------------
 // XML helpers
@@ -34,7 +37,7 @@ function itemTitle(item: MusicItemFull): string {
   return item.artist_name ? `${item.artist_name} — ${item.title}` : item.title;
 }
 
-function renderRss(stack: StackInfo, items: MusicItemFull[]): string {
+function renderRss(feed: FeedInfo, items: MusicItemFull[]): string {
   const itemsXml = items
     .map((item) => {
       const title = escapeXml(itemTitle(item));
@@ -54,8 +57,8 @@ function renderRss(stack: StackInfo, items: MusicItemFull[]): string {
   return `<?xml version="1.0" encoding="UTF-8"?>
 <rss version="2.0">
   <channel>
-    <title>${escapeXml(stack.name)}</title>
-    <description>Items in the ${escapeXml(stack.name)} stack</description>
+    <title>${escapeXml(feed.title)}</title>
+    <description>${escapeXml(feed.description)}</description>
 ${itemsXml}
   </channel>
 </rss>`;
@@ -139,6 +142,100 @@ async function defaultFetchStackItems(stackId: number): Promise<MusicItemFull[]>
   }));
 }
 
+async function defaultFetchPrimaryFeedItems(feed: PrimaryFeedKey): Promise<MusicItemFull[]> {
+  const rows =
+    feed === "all"
+      ? await db
+          .select({
+            id: musicItems.id,
+            title: musicItems.title,
+            normalized_title: musicItems.normalizedTitle,
+            item_type: musicItems.itemType,
+            artist_id: musicItems.artistId,
+            artist_name: artists.name,
+            listen_status: musicItems.listenStatus,
+            purchase_intent: musicItems.purchaseIntent,
+            price_cents: musicItems.priceCents,
+            currency: musicItems.currency,
+            notes: musicItems.notes,
+            rating: musicItems.rating,
+            created_at: musicItems.createdAt,
+            updated_at: musicItems.updatedAt,
+            listened_at: musicItems.listenedAt,
+            artwork_url: musicItems.artworkUrl,
+            is_physical: musicItems.isPhysical,
+            physical_format: musicItems.physicalFormat,
+            label: musicItems.label,
+            year: musicItems.year,
+            country: musicItems.country,
+            genre: musicItems.genre,
+            catalogue_number: musicItems.catalogueNumber,
+            primary_url: musicLinks.url,
+            primary_source: sources.name,
+          })
+          .from(musicItems)
+          .leftJoin(artists, eq(artists.id, musicItems.artistId))
+          .leftJoin(
+            musicLinks,
+            and(eq(musicLinks.musicItemId, musicItems.id), eq(musicLinks.isPrimary, 1)),
+          )
+          .leftJoin(sources, eq(sources.id, musicLinks.sourceId))
+          .orderBy(musicItems.createdAt)
+      : await db
+          .select({
+            id: musicItems.id,
+            title: musicItems.title,
+            normalized_title: musicItems.normalizedTitle,
+            item_type: musicItems.itemType,
+            artist_id: musicItems.artistId,
+            artist_name: artists.name,
+            listen_status: musicItems.listenStatus,
+            purchase_intent: musicItems.purchaseIntent,
+            price_cents: musicItems.priceCents,
+            currency: musicItems.currency,
+            notes: musicItems.notes,
+            rating: musicItems.rating,
+            created_at: musicItems.createdAt,
+            updated_at: musicItems.updatedAt,
+            listened_at: musicItems.listenedAt,
+            artwork_url: musicItems.artworkUrl,
+            is_physical: musicItems.isPhysical,
+            physical_format: musicItems.physicalFormat,
+            label: musicItems.label,
+            year: musicItems.year,
+            country: musicItems.country,
+            genre: musicItems.genre,
+            catalogue_number: musicItems.catalogueNumber,
+            primary_url: musicLinks.url,
+            primary_source: sources.name,
+          })
+          .from(musicItems)
+          .leftJoin(artists, eq(artists.id, musicItems.artistId))
+          .leftJoin(
+            musicLinks,
+            and(eq(musicLinks.musicItemId, musicItems.id), eq(musicLinks.isPrimary, 1)),
+          )
+          .leftJoin(sources, eq(sources.id, musicLinks.sourceId))
+          .where(eq(musicItems.listenStatus, feed))
+          .orderBy(musicItems.createdAt);
+
+  return rows.map((row) => ({
+    ...row,
+    id: row.id as number,
+    created_at:
+      row.created_at instanceof Date ? row.created_at.toISOString() : String(row.created_at),
+    updated_at:
+      row.updated_at instanceof Date ? row.updated_at.toISOString() : String(row.updated_at),
+    listened_at:
+      row.listened_at instanceof Date
+        ? row.listened_at.toISOString()
+        : row.listened_at
+          ? String(row.listened_at)
+          : null,
+    stacks: [],
+  }));
+}
+
 // ---------------------------------------------------------------------------
 // Route factory
 // ---------------------------------------------------------------------------
@@ -146,8 +243,54 @@ async function defaultFetchStackItems(stackId: number): Promise<MusicItemFull[]>
 export function createRssRoutes(
   fetchStack: FetchStackFn = defaultFetchStack,
   fetchStackItems: FetchStackItemsFn = defaultFetchStackItems,
+  fetchPrimaryFeedItems: FetchPrimaryFeedItemsFn = defaultFetchPrimaryFeedItems,
 ): Hono {
   const routes = new Hono();
+
+  routes.get("/all.rss", async (c) => {
+    const items = await fetchPrimaryFeedItems("all");
+    const xml = renderRss(
+      {
+        title: "All",
+        description: "All items in On The Beach",
+      },
+      items,
+    );
+
+    return c.body(xml, 200, {
+      "Content-Type": "application/rss+xml; charset=utf-8",
+    });
+  });
+
+  routes.get("/to-listen.rss", async (c) => {
+    const items = await fetchPrimaryFeedItems("to-listen");
+    const xml = renderRss(
+      {
+        title: "To Listen",
+        description: 'Items with status "To Listen" in On The Beach',
+      },
+      items,
+    );
+
+    return c.body(xml, 200, {
+      "Content-Type": "application/rss+xml; charset=utf-8",
+    });
+  });
+
+  routes.get("/listened.rss", async (c) => {
+    const items = await fetchPrimaryFeedItems("listened");
+    const xml = renderRss(
+      {
+        title: "Listened",
+        description: 'Items with status "Listened" in On The Beach',
+      },
+      items,
+    );
+
+    return c.body(xml, 200, {
+      "Content-Type": "application/rss+xml; charset=utf-8",
+    });
+  });
 
   routes.get("/stacks/:stackId.rss", async (c) => {
     // Hono v4 includes the ".rss" literal in the param name
@@ -163,7 +306,13 @@ export function createRssRoutes(
     }
 
     const items = await fetchStackItems(stackId);
-    const xml = renderRss(stack, items);
+    const xml = renderRss(
+      {
+        title: stack.name,
+        description: `Items in the ${stack.name} stack`,
+      },
+      items,
+    );
 
     return c.body(xml, 200, {
       "Content-Type": "application/rss+xml; charset=utf-8",
