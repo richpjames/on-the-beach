@@ -51,6 +51,8 @@ export const musicItems = sqliteTable(
     country: text("country"),
     genre: text("genre"),
     catalogueNumber: text("catalogue_number"),
+    musicbrainzReleaseId: text("musicbrainz_release_id"),
+    musicbrainzArtistId: text("musicbrainz_artist_id"),
   },
   (table) => [
     index("idx_music_items_listen_status").on(table.listenStatus),
