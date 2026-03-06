@@ -475,8 +475,42 @@ describe("scrapeUrl", () => {
     mock.restore();
   });
 
-  test("uses Apple lookup metadata without scraping the full page", async () => {
+  test("prefers Apple oEmbed metadata for square artwork without scraping the full page", async () => {
     const fetchSpy = spyOn(globalThis, "fetch");
+    fetchSpy.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          title: "It's a Beautiful Place",
+          author_name: "Water From Your Eyes",
+          thumbnail_url:
+            "https://is1-ssl.mzstatic.com/image/thumb/Music211/v4/example/300x300bb.jpg",
+        }),
+        {
+          headers: { "content-type": "application/json; charset=utf-8" },
+        },
+      ),
+    );
+
+    const result = await scrapeUrl(
+      "https://music.apple.com/es/album/its-a-beautiful-place/1811583108?l=en-GB",
+      "apple_music",
+    );
+    expect(result).not.toBeNull();
+    expect(result!.potentialTitle).toBe("It's a Beautiful Place");
+    expect(result!.potentialArtist).toBe("Water From Your Eyes");
+    expect(result!.imageUrl).toBe(
+      "https://is1-ssl.mzstatic.com/image/thumb/Music211/v4/example/1200x1200bb.jpg",
+    );
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    expect(fetchSpy.mock.calls[0]?.[0]).toBe(
+      "https://music.apple.com/api/oembed?url=https%3A%2F%2Fmusic.apple.com%2Fes%2Falbum%2Fits-a-beautiful-place%2F1811583108%3Fl%3Den-GB",
+    );
+    mock.restore();
+  });
+
+  test("falls back to Apple lookup metadata when oEmbed is unavailable", async () => {
+    const fetchSpy = spyOn(globalThis, "fetch");
+    fetchSpy.mockResolvedValueOnce(new Response(null, { status: 500 }));
     fetchSpy.mockResolvedValueOnce(
       new Response(
         JSON.stringify({
@@ -500,14 +534,15 @@ describe("scrapeUrl", () => {
       "https://music.apple.com/es/album/its-a-beautiful-place/1811583108?l=en-GB",
       "apple_music",
     );
+
     expect(result).not.toBeNull();
     expect(result!.potentialTitle).toBe("It's a Beautiful Place");
     expect(result!.potentialArtist).toBe("Water From Your Eyes");
     expect(result!.imageUrl).toBe(
       "https://is1-ssl.mzstatic.com/image/thumb/Music211/v4/example/1200x1200bb.jpg",
     );
-    expect(fetchSpy).toHaveBeenCalledTimes(1);
-    expect(fetchSpy.mock.calls[0]?.[0]).toBe("https://itunes.apple.com/lookup?id=1811583108");
+    expect(fetchSpy).toHaveBeenCalledTimes(2);
+    expect(fetchSpy.mock.calls[1]?.[0]).toBe("https://itunes.apple.com/lookup?id=1811583108");
     mock.restore();
   });
 });

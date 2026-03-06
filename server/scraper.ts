@@ -75,7 +75,7 @@ export function decodeHtmlEntities(text: string): string {
 
 export function parseBandcampOg(og: OgData): ScrapedMetadata {
   const title = og.ogTitle || og.title || "";
-  // Bandcamp format: "Album Title, by Artist Name"
+  // Bandcamp format: "Release Title, by Artist Name"
   const byMatch = title.match(/^(.+?),\s*by\s+(.+)$/i);
   if (byMatch) {
     return {
@@ -115,7 +115,7 @@ export function parseAppleMusicOg(og: OgData): ScrapedMetadata {
     }
   }
 
-  // og:description is often "Artist · YEAR · N Songs", but may also be "Album · ...".
+  // og:description is often "Artist · YEAR · N Songs", but may also be "Release · ...".
   if (!result.potentialArtist && og.ogDescription) {
     const artistMatch = og.ogDescription.match(/^(.+?)\s+[·-]\s+/i);
     const candidateArtist = artistMatch?.[1]?.trim();
@@ -142,6 +142,24 @@ function hasScrapedMetadata(
   metadata: ScrapedMetadata | null | undefined,
 ): metadata is ScrapedMetadata {
   return Boolean(metadata?.potentialArtist || metadata?.potentialTitle || metadata?.imageUrl);
+}
+
+function hasCompleteAppleMusicMetadata(
+  metadata: ScrapedMetadata | null | undefined,
+): metadata is ScrapedMetadata {
+  return Boolean(metadata?.potentialArtist && metadata?.potentialTitle && metadata?.imageUrl);
+}
+
+function mergeScrapedMetadata(
+  ...entries: Array<ScrapedMetadata | null | undefined>
+): ScrapedMetadata | null {
+  const merged: ScrapedMetadata = {
+    potentialArtist: firstDefined(...entries.map((entry) => entry?.potentialArtist)),
+    potentialTitle: firstDefined(...entries.map((entry) => entry?.potentialTitle)),
+    imageUrl: firstDefined(...entries.map((entry) => entry?.imageUrl)),
+  };
+
+  return hasScrapedMetadata(merged) ? merged : null;
 }
 
 function normalizeMixcloudImageUrl(url: string | undefined): string | undefined {
@@ -452,6 +470,55 @@ async function scrapeYouTubeOEmbed(
   }
 }
 
+async function scrapeAppleMusicOEmbed(
+  url: string,
+  timeoutMs: number,
+): Promise<ScrapedMetadata | null> {
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    const oembedUrl = `https://music.apple.com/api/oembed?url=${encodeURIComponent(url)}`;
+
+    const response = await fetch(oembedUrl, {
+      signal: controller.signal,
+      headers: { Accept: "application/json" },
+    });
+
+    clearTimeout(timer);
+
+    if (!response.ok) {
+      return null;
+    }
+
+    const data = (await response.json()) as unknown;
+    if (!isRecord(data)) {
+      return null;
+    }
+
+    const potentialTitle = firstDefined(getString(data.title), getString(data.name));
+    const potentialArtist = firstDefined(
+      getString(data.author_name),
+      getString(data.author),
+      getString(data.uploader),
+    );
+    const imageUrl = normalizeAppleMusicImageUrl(
+      firstDefined(getString(data.thumbnail_url), getString(data.thumbnail), getString(data.image)),
+    );
+
+    if (!potentialTitle && !potentialArtist && !imageUrl) {
+      return null;
+    }
+
+    return {
+      potentialTitle,
+      potentialArtist,
+      imageUrl,
+    };
+  } catch {
+    return null;
+  }
+}
+
 function extractAppleMusicLookupId(url: string): string | undefined {
   try {
     const parsed = new URL(url);
@@ -563,14 +630,26 @@ export async function scrapeUrl(
   timeoutMs = 5000,
 ): Promise<ScrapedMetadata | null> {
   let mixcloudOEmbed: ScrapedMetadata | null = null;
+  let appleMusicOEmbed: ScrapedMetadata | null = null;
   let appleMusicLookup: ScrapedMetadata | null = null;
+  let appleMusicMetadata: ScrapedMetadata | null = null;
 
   if (source === "mixcloud") {
     mixcloudOEmbed = await scrapeMixcloudOEmbed(url, timeoutMs);
   }
 
   if (source === "apple_music") {
+    appleMusicOEmbed = await scrapeAppleMusicOEmbed(url, timeoutMs);
+    appleMusicMetadata = mergeScrapedMetadata(appleMusicOEmbed);
+    if (hasCompleteAppleMusicMetadata(appleMusicMetadata)) {
+      return appleMusicMetadata;
+    }
+
     appleMusicLookup = await scrapeAppleMusicLookup(url, timeoutMs);
+    appleMusicMetadata = mergeScrapedMetadata(appleMusicOEmbed, appleMusicLookup);
+    if (hasCompleteAppleMusicMetadata(appleMusicMetadata)) {
+      return appleMusicMetadata;
+    }
   }
 
   try {
@@ -586,8 +665,8 @@ export async function scrapeUrl(
       return mixcloudOEmbed;
     }
 
-    if (source === "apple_music" && hasScrapedMetadata(appleMusicLookup)) {
-      return appleMusicLookup;
+    if (source === "apple_music" && hasScrapedMetadata(appleMusicMetadata)) {
+      return appleMusicMetadata;
     }
 
     const controller = new AbortController();
@@ -605,7 +684,7 @@ export async function scrapeUrl(
 
     const contentType = response.headers.get("content-type") || "";
     const fallback =
-      source === "mixcloud" ? mixcloudOEmbed : source === "apple_music" ? appleMusicLookup : null;
+      source === "mixcloud" ? mixcloudOEmbed : source === "apple_music" ? appleMusicMetadata : null;
 
     if (!contentType.includes("text/html")) {
       return hasScrapedMetadata(fallback) ? fallback : null;
@@ -653,23 +732,14 @@ export async function scrapeUrl(
 
     if (source === "apple_music") {
       const appleMusicOg = parseAppleMusicOg(og);
-      const merged: ScrapedMetadata = {
-        potentialArtist: firstDefined(
-          appleMusicLookup?.potentialArtist,
-          appleMusicOg.potentialArtist,
-        ),
-        potentialTitle: firstDefined(appleMusicLookup?.potentialTitle, appleMusicOg.potentialTitle),
-        imageUrl: firstDefined(appleMusicLookup?.imageUrl, appleMusicOg.imageUrl),
-      };
-
-      return hasScrapedMetadata(merged) ? merged : null;
+      return mergeScrapedMetadata(appleMusicOEmbed, appleMusicLookup, appleMusicOg);
     }
 
     const parser = SOURCE_PARSERS[source] || parseDefaultOg;
     return parser(og);
   } catch {
     const fallback =
-      source === "mixcloud" ? mixcloudOEmbed : source === "apple_music" ? appleMusicLookup : null;
+      source === "mixcloud" ? mixcloudOEmbed : source === "apple_music" ? appleMusicMetadata : null;
     return hasScrapedMetadata(fallback) ? fallback : null;
   }
 }

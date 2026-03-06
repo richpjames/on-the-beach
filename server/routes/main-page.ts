@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { eq, inArray, count, asc, sql } from "drizzle-orm";
+import { eq, inArray, count, asc, desc } from "drizzle-orm";
 import { db } from "../db/index";
 import { musicItems, musicItemStacks, stacks, musicItemOrder, stackParents } from "../db/schema";
 import { fullItemSelect, hydrateItemStacks } from "../music-item-creator";
@@ -62,7 +62,7 @@ async function fetchInitialStacks(): Promise<StackWithCount[]> {
 async function fetchInitialItems(): Promise<MusicItemFull[]> {
   const items = await fullItemSelect()
     .where(eq(musicItems.listenStatus, DEFAULT_FILTER))
-    .orderBy(sql`${musicItems.createdAt} DESC`);
+    .orderBy(desc(musicItems.createdAt), desc(musicItems.id));
 
   if (items.length === 0) return [];
 
@@ -163,7 +163,7 @@ function renderMainPage(opts: {
                 type="button"
                 id="add-form-scan-btn"
                 class="btn add-form__scan-btn"
-                aria-label="Scan album cover"
+                aria-label="Scan release cover"
               >
                 Scan
               </button>
@@ -172,9 +172,9 @@ function renderMainPage(opts: {
 
             <div class="add-form__secondary" hidden>
               <input type="text" name="artist" placeholder="Artist" class="input" />
-              <input type="text" name="title" placeholder="Album" class="input" />
+              <input type="text" name="title" placeholder="Release" class="input" />
               <select name="itemType" class="input">
-                <option value="album">Album</option>
+                <option value="album">Release</option>
                 <option value="ep">EP</option>
                 <option value="single">Single</option>
                 <option value="track">Track</option>

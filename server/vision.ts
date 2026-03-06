@@ -145,7 +145,7 @@ async function extractWithOcr(
   return parseOcrResponse(response);
 }
 
-export async function extractAlbumInfo(base64Image: string): Promise<ScanResult | null> {
+export async function extractReleaseInfo(base64Image: string): Promise<ScanResult | null> {
   const apiKey = process.env.MISTRAL_API_KEY;
   if (!apiKey) {
     return null;

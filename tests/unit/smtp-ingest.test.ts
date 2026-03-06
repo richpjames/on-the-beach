@@ -56,7 +56,7 @@ describe("SMTP ingest server", () => {
     mockCreate.mockResolvedValue({
       item: {
         id: 1,
-        title: "Test Album",
+        title: "Test Release",
         primary_url: "https://artist.bandcamp.com/album/test",
       } as any,
       created: true,
@@ -99,7 +99,7 @@ describe("SMTP ingest server", () => {
     process.env.SMTP_ALLOWED_FROM = "noreply@bandcamp.com";
 
     mockCreate.mockResolvedValue({
-      item: { id: 1, title: "Album" } as any,
+      item: { id: 1, title: "Release" } as any,
       created: true,
     });
 
@@ -123,7 +123,7 @@ describe("SMTP ingest server", () => {
     process.env.SMTP_ALLOWED_FROM = "noreply@bandcamp.com,alerts@spotify.com";
 
     mockCreate.mockResolvedValue({
-      item: { id: 2, title: "Allowed Album" } as any,
+      item: { id: 2, title: "Allowed Release" } as any,
       created: true,
     });
 

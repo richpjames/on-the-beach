@@ -65,14 +65,14 @@ describe("lookupRelease", () => {
     spyOn(globalThis, "fetch").mockResolvedValueOnce(
       makeMbResponse([
         {
-          title: "Some Album",
+          title: "Some Release",
           date: "2010",
           country: "US",
         },
       ]),
     );
 
-    const result = await lookupRelease("Some Artist", "Some Album");
+    const result = await lookupRelease("Some Artist", "Some Release");
     expect(result).toEqual({
       year: 2010,
       label: null,

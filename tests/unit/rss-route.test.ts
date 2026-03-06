@@ -124,7 +124,7 @@ describe("GET /feed/stacks/:stackId.rss", () => {
     expect(body).toContain("Brian Eno");
   });
 
-  test("item title combines artist and album name", async () => {
+  test("item title combines artist and release name", async () => {
     const fetchStack = mock(async (_id: number) => ({ id: 1, name: "Ambient" }));
     const fetchItems = mock(async (_id: number) => [
       makeItem({ title: "Geogaddi", artist_name: "Boards of Canada" }),
@@ -137,7 +137,7 @@ describe("GET /feed/stacks/:stackId.rss", () => {
     expect(body).toContain("<title>Boards of Canada — Geogaddi</title>");
   });
 
-  test("item title uses only album name when artist is unknown", async () => {
+  test("item title uses only release name when artist is unknown", async () => {
     const fetchStack = mock(async (_id: number) => ({ id: 1, name: "Ambient" }));
     const fetchItems = mock(async (_id: number) => [
       makeItem({ title: "Untitled Mix", artist_name: null }),
