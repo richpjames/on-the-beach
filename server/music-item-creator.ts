@@ -198,6 +198,18 @@ export async function createMusicItemFromUrl(
 }
 
 /**
+ * Create music items from a URL, returning results as an array.
+ * Wraps createMusicItemFromUrl for callers that expect multiple results.
+ */
+export async function createMusicItemsFromUrl(
+  url: string,
+  overrides?: Partial<CreateMusicItemInput>,
+): Promise<CreateResult[]> {
+  const result = await createMusicItemFromUrl(url, overrides);
+  return [result];
+}
+
+/**
  * Create a music item without a URL — no scraping, no link inserted.
  * Used for physical records or items known only from memory.
  */
