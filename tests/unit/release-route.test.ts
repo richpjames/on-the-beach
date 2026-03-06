@@ -4,10 +4,20 @@ import { createReleaseRoutes } from "../../server/routes/release";
 
 const mockExtractReleaseInfo = mock();
 const mockSaveImage = mock();
+const mockLookupRelease = mock();
+const mockFetchCoverArt = mock();
 
 function makeApp(): Hono {
   const app = new Hono();
-  app.route("/api/release", createReleaseRoutes(mockExtractReleaseInfo, mockSaveImage));
+  app.route(
+    "/api/release",
+    createReleaseRoutes(
+      mockExtractReleaseInfo,
+      mockSaveImage,
+      mockLookupRelease,
+      mockFetchCoverArt,
+    ),
+  );
   return app;
 }
 
@@ -16,6 +26,9 @@ describe("POST /api/release/scan", () => {
     mockExtractReleaseInfo.mockReset();
     mockSaveImage.mockReset();
     mockSaveImage.mockResolvedValue("/uploads/mock.jpg");
+    mockLookupRelease.mockReset();
+    mockFetchCoverArt.mockReset();
+    mockFetchCoverArt.mockResolvedValue(null);
   });
 
   test("returns 400 when imageBase64 is missing", async () => {
@@ -123,6 +136,9 @@ describe("POST /api/release/image", () => {
     mockExtractReleaseInfo.mockReset();
     mockSaveImage.mockReset();
     mockSaveImage.mockResolvedValue("/uploads/mock.jpg");
+    mockLookupRelease.mockReset();
+    mockFetchCoverArt.mockReset();
+    mockFetchCoverArt.mockResolvedValue(null);
   });
 
   test("returns 400 when imageBase64 is missing", async () => {
@@ -168,5 +184,112 @@ describe("POST /api/release/image", () => {
     expect(res.status).toBe(500);
     const body = await res.json();
     expect(body.error).toBe("Failed to save image");
+  });
+});
+
+describe("POST /api/release/lookup", () => {
+  beforeEach(() => {
+    mockExtractReleaseInfo.mockReset();
+    mockSaveImage.mockReset();
+    mockLookupRelease.mockReset();
+    mockFetchCoverArt.mockReset();
+    mockFetchCoverArt.mockResolvedValue(null);
+  });
+
+  test("returns 400 when artist is missing", async () => {
+    const app = makeApp();
+    const res = await app.request("http://localhost/api/release/lookup", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ title: "OK Computer" }),
+    });
+    expect(res.status).toBe(400);
+  });
+
+  test("returns 400 when title is missing", async () => {
+    const app = makeApp();
+    const res = await app.request("http://localhost/api/release/lookup", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ artist: "Radiohead" }),
+    });
+    expect(res.status).toBe(400);
+  });
+
+  test("returns empty object when lookup returns null", async () => {
+    mockLookupRelease.mockResolvedValueOnce(null);
+    const app = makeApp();
+    const res = await app.request("http://localhost/api/release/lookup", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ artist: "Unknown", title: "Unknown" }),
+    });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({});
+  });
+
+  test("returns enriched fields on successful lookup", async () => {
+    mockLookupRelease.mockResolvedValueOnce({
+      year: 1997,
+      label: "Parlophone",
+      country: "GB",
+      catalogueNumber: "CDPUSH45",
+      musicbrainzReleaseId: "release-uuid",
+      musicbrainzArtistId: "artist-uuid",
+    });
+    const app = makeApp();
+    const res = await app.request("http://localhost/api/release/lookup", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ artist: "Radiohead", title: "OK Computer" }),
+    });
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.year).toBe(1997);
+    expect(body.label).toBe("Parlophone");
+    expect(body.musicbrainzReleaseId).toBe("release-uuid");
+  });
+
+  test("includes artworkUrl when cover art is found", async () => {
+    mockLookupRelease.mockResolvedValueOnce({
+      year: 2001,
+      label: null,
+      country: null,
+      catalogueNumber: null,
+      musicbrainzReleaseId: "release-uuid",
+      musicbrainzArtistId: null,
+    });
+    mockFetchCoverArt.mockResolvedValueOnce("/uploads/cover.jpg");
+    const app = makeApp();
+    const res = await app.request("http://localhost/api/release/lookup", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ artist: "Some Artist", title: "Some Title" }),
+    });
+    const body = await res.json();
+    expect(body.artworkUrl).toBe("/uploads/cover.jpg");
+  });
+
+  test("passes year hint to lookupRelease when provided", async () => {
+    mockLookupRelease.mockResolvedValueOnce(null);
+    const app = makeApp();
+    await app.request("http://localhost/api/release/lookup", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ artist: "Radiohead", title: "OK Computer", year: "1997" }),
+    });
+    expect(mockLookupRelease).toHaveBeenCalledWith("Radiohead", "OK Computer", "1997");
+  });
+
+  test("returns empty object when lookup throws", async () => {
+    mockLookupRelease.mockRejectedValueOnce(new Error("timeout"));
+    const app = makeApp();
+    const res = await app.request("http://localhost/api/release/lookup", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ artist: "Radiohead", title: "OK Computer" }),
+    });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({});
   });
 });
