@@ -41,7 +41,8 @@ Open http://localhost:3000.
 | `DATABASE_PATH`      | No       | `on_the_beach.db`    | Path to the SQLite database file                                            |
 | `PORT`               | No       | `3000`               | HTTP server port                                                            |
 | `UPLOADS_DIR`        | No       | `uploads`            | Directory for uploaded cover images                                         |
-| `MISTRAL_API_KEY`    | No       | —                    | Enables AI cover scanning                                                   |
+| `MISTRAL_API_KEY`    | No       | —                    | Enables AI cover scanning and unsupported music-link extraction             |
+| `MISTRAL_LINK_MODEL` | No       | `mistral-small-latest` | Model for unsupported music-link extraction via chat completions.         |
 | `MISTRAL_SCAN_MODEL` | No       | `mistral-ocr-latest` | Model for cover scanning. Non-OCR models use chat-completions mode.         |
 | `SMTP_ENABLED`       | No       | `false`              | Set to `true` to start the embedded SMTP server                             |
 | `SMTP_PORT`          | No       | `2525`               | Port for the embedded SMTP server                                           |

@@ -5,6 +5,10 @@ export interface EmailContent {
   text?: string;
 }
 
+export interface ExtractMusicUrlOptions {
+  includeUnknown?: boolean;
+}
+
 /**
  * Extract music platform URLs from an email's HTML or plain-text body.
  *
@@ -14,7 +18,10 @@ export interface EmailContent {
  *  3. Run each URL through parseUrl() and keep only known music sources
  *  4. Deduplicate by normalised URL
  */
-export function extractMusicUrls(email: EmailContent): string[] {
+export function extractMusicUrls(
+  email: EmailContent,
+  options: ExtractMusicUrlOptions = {},
+): string[] {
   const rawUrls: string[] = [];
 
   // Extract from HTML <a href="..."> tags
@@ -41,7 +48,7 @@ export function extractMusicUrls(email: EmailContent): string[] {
 
   for (const url of rawUrls) {
     const parsed = parseUrl(url);
-    if (parsed.source === "unknown") continue;
+    if (parsed.source === "unknown" && !options.includeUnknown) continue;
 
     const normalized = parsed.normalizedUrl;
     if (seen.has(normalized)) continue;

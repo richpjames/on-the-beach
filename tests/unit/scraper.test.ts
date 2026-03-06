@@ -8,8 +8,41 @@ import {
   parseMixcloudOg,
   parseMixcloudJsonLd,
   parseDefaultOg,
+  detectMusicRelatedHtml,
   scrapeUrl,
+  UnsupportedMusicLinkError,
 } from "../../server/scraper";
+
+function mockChatCompletionResponse(
+  content: string | Array<{ type: string; text: string }>,
+): Response {
+  return new Response(
+    JSON.stringify({
+      id: "cmpl_test_1",
+      object: "chat.completion",
+      created: 1,
+      model: "mistral-small-latest",
+      usage: {
+        prompt_tokens: 10,
+        completion_tokens: 5,
+        total_tokens: 15,
+      },
+      choices: [
+        {
+          index: 0,
+          finish_reason: "stop",
+          message: {
+            role: "assistant",
+            content,
+          },
+        },
+      ],
+    }),
+    {
+      headers: { "content-type": "application/json" },
+    },
+  );
+}
 
 describe("decodeHtmlEntities", () => {
   test("decodes common HTML entities", () => {
@@ -291,7 +324,53 @@ describe("parseDefaultOg", () => {
   });
 });
 
+describe("detectMusicRelatedHtml", () => {
+  test("treats album metadata as music-related", () => {
+    const result = detectMusicRelatedHtml(`
+      <html><body>
+        <h1>New album release</h1>
+        <p>Artist: Theo Parrish</p>
+      </body></html>
+    `);
+
+    expect(result.isMusicRelated).toBe(true);
+    expect(result.matchedTerms).toContain("album");
+  });
+
+  test("rejects generic pages without music vocabulary", () => {
+    const result = detectMusicRelatedHtml(`
+      <html><body>
+        <h1>Spring sale</h1>
+        <p>Read our privacy policy and shipping FAQ.</p>
+      </body></html>
+    `);
+
+    expect(result.isMusicRelated).toBe(false);
+  });
+});
+
 describe("scrapeUrl", () => {
+  const originalEnv = { ...process.env };
+
+  test("throws for unknown pages with no music-related terms", async () => {
+    spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      new Response("<html><body><h1>Welcome</h1><p>Contact us</p></body></html>", {
+        headers: { "content-type": "text/html" },
+      }),
+    );
+
+    let thrown: unknown;
+    try {
+      await scrapeUrl("https://example.com", "unknown");
+    } catch (error) {
+      thrown = error;
+    }
+
+    expect(thrown).toBeInstanceOf(UnsupportedMusicLinkError);
+    expect((thrown as Error).message).toBe("Link does not appear to be music-related");
+    mock.restore();
+  });
+
   test("returns null on fetch failure", async () => {
     spyOn(globalThis, "fetch").mockRejectedValueOnce(new Error("Network error"));
     const result = await scrapeUrl("https://example.com", "unknown");
@@ -331,20 +410,40 @@ describe("scrapeUrl", () => {
   });
 
   test("uses default parser for unknown sources", async () => {
+    process.env.MISTRAL_API_KEY = "test-key";
+
     const html = `
       <html><head>
-        <meta property="og:title" content="Some Music" />
-      </head></html>
+        <meta property="og:title" content="Spring 2026 release roundup" />
+        <meta property="og:image" content="https://example.com/cover.jpg" />
+      </head><body>
+        <h1>New releases</h1>
+        <p>Artist Theo Parrish album In Motion now available on vinyl.</p>
+      </body></html>
     `;
-    spyOn(globalThis, "fetch").mockResolvedValueOnce(
+
+    const fetchSpy = spyOn(globalThis, "fetch");
+    fetchSpy.mockResolvedValueOnce(
       new Response(html, {
         headers: { "content-type": "text/html" },
       }),
     );
+    fetchSpy.mockResolvedValueOnce(
+      mockChatCompletionResponse(
+        '{"releases":[{"artist":"Theo Parrish","title":"In Motion","itemType":"album"}]}',
+      ),
+    );
+
     const result = await scrapeUrl("https://example.com/music", "unknown");
     expect(result).not.toBeNull();
-    expect(result!.potentialTitle).toBe("Some Music");
+    expect(result!.potentialTitle).toBe("In Motion");
+    expect(result!.potentialArtist).toBe("Theo Parrish");
+    expect(result!.itemType).toBe("album");
+    expect(result!.releases).toEqual([
+      { artist: "Theo Parrish", title: "In Motion", itemType: "album" },
+    ]);
     mock.restore();
+    process.env = { ...originalEnv };
   });
 
   test("respects timeout", async () => {
@@ -544,5 +643,41 @@ describe("scrapeUrl", () => {
     expect(fetchSpy).toHaveBeenCalledTimes(2);
     expect(fetchSpy.mock.calls[1]?.[0]).toBe("https://itunes.apple.com/lookup?id=1811583108");
     mock.restore();
+  });
+
+  test("returns multiple releases for unsupported music pages when Mistral extracts them", async () => {
+    process.env.MISTRAL_API_KEY = "test-key";
+
+    const html = `
+      <html><body>
+        <h1>Label release page</h1>
+        <p>New album release from Artist One and Artist Two.</p>
+        <p>Track listings and vinyl details below.</p>
+      </body></html>
+    `;
+
+    const fetchSpy = spyOn(globalThis, "fetch");
+    fetchSpy.mockResolvedValueOnce(
+      new Response(html, {
+        headers: { "content-type": "text/html; charset=utf-8" },
+      }),
+    );
+    fetchSpy.mockResolvedValueOnce(
+      mockChatCompletionResponse(
+        '{"releases":[{"artist":"Artist One","title":"First Album","itemType":"album"},{"artist":"Artist Two","title":"Second EP","itemType":"ep"}]}',
+      ),
+    );
+
+    const result = await scrapeUrl("https://obscuremusic.example/releases", "unknown");
+    expect(result).not.toBeNull();
+    expect(result!.releases).toEqual([
+      { artist: "Artist One", title: "First Album", itemType: "album" },
+      { artist: "Artist Two", title: "Second EP", itemType: "ep" },
+    ]);
+    expect(result!.potentialTitle).toBe("First Album");
+    expect(result!.potentialArtist).toBe("Artist One");
+
+    mock.restore();
+    process.env = { ...originalEnv };
   });
 });

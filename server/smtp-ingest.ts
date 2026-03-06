@@ -1,7 +1,7 @@
 import { SMTPServer } from "smtp-server";
 import { simpleParser } from "mailparser";
 import { extractMusicUrls } from "./email-parser";
-import { createMusicItemFromUrl } from "./music-item-creator";
+import { createMusicItemsFromUrl } from "./music-item-creator";
 
 /**
  * Start an embedded SMTP server that receives emails, extracts music URLs,
@@ -61,10 +61,13 @@ async function processEmail(
     return;
   }
 
-  const urls = extractMusicUrls({
-    html: parsed.html || undefined,
-    text: parsed.text || undefined,
-  });
+  const urls = extractMusicUrls(
+    {
+      html: parsed.html || undefined,
+      text: parsed.text || undefined,
+    },
+    { includeUnknown: true },
+  );
 
   if (urls.length === 0) {
     console.log(`[smtp-ingest] No music URLs found in email from ${from}: "${parsed.subject}"`);
@@ -76,14 +79,17 @@ async function processEmail(
 
   for (const url of urls) {
     try {
-      const result = await createMusicItemFromUrl(url, {
+      const results = await createMusicItemsFromUrl(url, {
         notes: `Via email from ${from}`,
       });
-      if (result.created) {
-        created++;
-        console.log(`[smtp-ingest] Created: ${result.item.title} (${url})`);
-      } else {
-        skipped++;
+
+      for (const result of results) {
+        if (result.created) {
+          created++;
+          console.log(`[smtp-ingest] Created: ${result.item.title} (${url})`);
+        } else {
+          skipped++;
+        }
       }
     } catch (err) {
       console.error(`[smtp-ingest] Failed to create item for ${url}:`, err);
