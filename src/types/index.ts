@@ -57,6 +57,8 @@ export interface MusicItem {
   country: string | null;
   genre: string | null;
   catalogue_number: string | null;
+  musicbrainz_release_id: string | null;
+  musicbrainz_artist_id: string | null;
 }
 
 export interface MusicLink {
@@ -91,6 +93,8 @@ export interface CreateMusicItemInput {
   country?: string;
   genre?: string;
   catalogueNumber?: string;
+  musicbrainzReleaseId?: string;
+  musicbrainzArtistId?: string;
 }
 
 export interface UpdateMusicItemInput {
@@ -109,6 +113,8 @@ export interface UpdateMusicItemInput {
   country?: string | null;
   genre?: string | null;
   catalogueNumber?: string | null;
+  musicbrainzReleaseId?: string | null;
+  musicbrainzArtistId?: string | null;
 }
 
 // Query/filter types
@@ -137,6 +143,16 @@ export interface ScanResult {
 
 export interface UploadImageResult {
   artworkUrl: string;
+}
+
+export interface LookupReleaseResult {
+  year?: number | null;
+  label?: string | null;
+  country?: string | null;
+  catalogueNumber?: string | null;
+  musicbrainzReleaseId?: string | null;
+  musicbrainzArtistId?: string | null;
+  artworkUrl?: string;
 }
 
 // Stacks
