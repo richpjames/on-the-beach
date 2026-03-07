@@ -4,7 +4,13 @@ import { db } from "../db/index";
 import { musicItems, musicItemStacks, stacks, musicItemOrder, stackParents } from "../db/schema";
 import { fullItemSelect, hydrateItemStacks } from "../music-item-creator";
 import { applyOrder, buildContextKey } from "../../shared/music-list-context";
-import { renderPrimaryFeedAlternateLinks, renderStackFeedAlternateLinks } from "../../shared/rss";
+import {
+  buildPrimaryFeedHref,
+  buildPrimaryFeedTitle,
+  buildStackFeedHref,
+  buildStackFeedTitle,
+  PRIMARY_FEEDS,
+} from "../../shared/rss";
 import { renderMusicList } from "../../src/ui/view/templates";
 import type { MusicItemFull, StackWithCount } from "../../src/types";
 import { getPageAssets } from "../page-assets";
@@ -30,6 +36,24 @@ function safeJson(obj: unknown): string {
 
 function renderStackTab(stack: StackWithCount): string {
   return `<button class="stack-tab" data-stack-id="${stack.id}">${escapeHtml(stack.name)}</button>`;
+}
+
+export function renderStackFeedAlternateLinks(
+  stacks: Pick<StackWithCount, "id" | "name">[],
+): string {
+  return stacks
+    .map(
+      (stack) =>
+        `<link rel="alternate" type="application/rss+xml" title="${escapeHtml(buildStackFeedTitle(stack.name))}" href="${escapeHtml(buildStackFeedHref(stack.id))}" data-rss-feed-link="${stack.id}" />`,
+    )
+    .join("\n    ");
+}
+
+export function renderPrimaryFeedAlternateLinks(): string {
+  return PRIMARY_FEEDS.map(
+    (feed) =>
+      `<link rel="alternate" type="application/rss+xml" title="${escapeHtml(buildPrimaryFeedTitle(feed.key))}" href="${escapeHtml(buildPrimaryFeedHref(feed.key))}" />`,
+  ).join("\n    ");
 }
 
 async function fetchInitialStacks(): Promise<StackWithCount[]> {
@@ -225,37 +249,60 @@ function renderMainPage(opts: {
         </section>
 
         <section class="stack-section">
-          <div id="stack-bar" class="stack-bar">
-            <button class="stack-tab active" data-stack="all">All</button>
-            ${opts.stackBarTabsHtml}
-            <button
-              class="stack-tab stack-tab--manage"
-              id="manage-stacks-btn"
-              title="Manage stacks"
-            >
-              <svg
-                width="14"
-                height="14"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
+          <div class="stack-bar-shell">
+            <div id="stack-bar" class="stack-bar">
+              <button class="stack-tab active" data-stack="all">All</button>
+              ${opts.stackBarTabsHtml}
+              <button
+                class="stack-tab stack-tab--manage"
+                id="manage-stacks-btn"
+                title="Manage stacks"
               >
-                <circle cx="12" cy="12" r="3"></circle>
-                <path
-                  d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"
-                ></path>
-              </svg>
-            </button>
-            <button
-              class="stack-tab stack-tab--delete"
-              id="delete-stack-btn"
-              title="Delete selected stack"
-              hidden
-              aria-label="Delete selected stack"
-            >
-              🗑
-            </button>
+                <svg
+                  width="14"
+                  height="14"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                >
+                  <circle cx="12" cy="12" r="3"></circle>
+                  <path
+                    d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"
+                  ></path>
+                </svg>
+              </button>
+              <button
+                class="stack-tab stack-tab--delete"
+                id="delete-stack-btn"
+                title="Delete selected stack"
+                hidden
+                aria-label="Delete selected stack"
+              >
+                🗑
+              </button>
+            </div>
+            <div id="stack-bar-scrollbar" class="stack-scrollbar" aria-hidden="true">
+              <button
+                type="button"
+                class="stack-scrollbar__button"
+                data-stack-scroll-btn="left"
+                tabindex="-1"
+              >
+                ◀
+              </button>
+              <div id="stack-bar-scroll-track" class="stack-scrollbar__track">
+                <div id="stack-bar-scroll-thumb" class="stack-scrollbar__thumb"></div>
+              </div>
+              <button
+                type="button"
+                class="stack-scrollbar__button"
+                data-stack-scroll-btn="right"
+                tabindex="-1"
+              >
+                ▶
+              </button>
+            </div>
           </div>
           <div id="stack-manage" class="stack-manage" hidden>
             <div id="stack-manage-list"></div>

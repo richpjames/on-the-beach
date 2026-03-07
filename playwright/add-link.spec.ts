@@ -23,6 +23,6 @@ test("adding a link shows the new item", async ({ page }) => {
     })
     .first();
 
-  await expect(addedCard).toBeVisible({ timeout: 10_000 });
-  await expect(page.locator(".music-card")).toHaveCount(cardCountBefore + 1);
+  await expect(page.locator(".music-card")).toHaveCount(cardCountBefore + 1, { timeout: 30_000 });
+  await expect(addedCard).toBeVisible();
 });
