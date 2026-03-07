@@ -101,10 +101,18 @@ describe("app domain helpers", () => {
     expect(buildMusicItemFilters("all", null)).toBeUndefined();
     expect(buildMusicItemFilters("listened", null)).toEqual({ listenStatus: "listened" });
     expect(buildMusicItemFilters("all", 7)).toEqual({ stackId: 7 });
+    expect(buildMusicItemFilters("all", null, "  dub  ", "artist-name")).toEqual({
+      search: "dub",
+      sort: "artist-name",
+    });
+    expect(buildMusicItemFilters("all", null, "", "star-rating")).toEqual({
+      sort: "star-rating",
+    });
   });
 
   it("builds the same empty-state messages used by the UI", () => {
     expect(getEmptyStateMessage("all")).toContain("No music tracked yet");
+    expect(getEmptyStateMessage("all", " ambient ")).toContain('No matches for "ambient"');
   });
 
   it("returns scan alert messages for known error types", () => {

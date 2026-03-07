@@ -3,6 +3,7 @@ export type ListenStatus = "to-listen" | "listening" | "listened" | "done";
 export type PurchaseIntent = "no" | "maybe" | "want" | "owned";
 export type ItemType = "album" | "ep" | "single" | "track" | "mix" | "compilation";
 export type PhysicalFormat = "vinyl" | "cd" | "cassette" | "minidisc" | "other";
+export type MusicItemSort = "default" | "artist-name" | "release-name" | "star-rating";
 
 export type SourceName =
   | "bandcamp"
@@ -124,6 +125,7 @@ export interface MusicItemFilters {
   purchaseIntent?: PurchaseIntent | PurchaseIntent[];
   search?: string;
   stackId?: number;
+  sort?: MusicItemSort;
 }
 
 export interface PaginatedResult<T> {

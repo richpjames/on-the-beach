@@ -1,8 +1,10 @@
-import type { ListenStatus, StackWithCount } from "../../types";
+import type { ListenStatus, MusicItemSort, StackWithCount } from "../../types";
 
 export interface AppState {
   currentFilter: ListenStatus | "all";
   currentStack: number | null;
+  searchQuery: string;
+  currentSort: MusicItemSort;
   stacks: StackWithCount[];
   isReady: boolean;
   stackManageOpen: boolean;
@@ -13,6 +15,8 @@ export type AppEvent =
   | { type: "FILTER_SELECTED"; filter: ListenStatus | "all" }
   | { type: "STACK_SELECTED"; stackId: number }
   | { type: "STACK_SELECTED_ALL" }
+  | { type: "SEARCH_UPDATED"; query: string }
+  | { type: "SORT_UPDATED"; sort: MusicItemSort }
   | { type: "STACKS_LOADED"; stacks: StackWithCount[] }
   | { type: "STACK_MANAGE_TOGGLED" }
   | { type: "STACK_DELETED"; stackId: number };
@@ -20,6 +24,8 @@ export type AppEvent =
 export const initialAppState: AppState = {
   currentFilter: "to-listen",
   currentStack: null,
+  searchQuery: "",
+  currentSort: "default",
   stacks: [],
   isReady: false,
   stackManageOpen: false,
@@ -46,6 +52,16 @@ export function transitionAppState(state: AppState, event: AppEvent): AppState {
       return {
         ...state,
         currentStack: null,
+      };
+    case "SEARCH_UPDATED":
+      return {
+        ...state,
+        searchQuery: event.query,
+      };
+    case "SORT_UPDATED":
+      return {
+        ...state,
+        currentSort: event.sort,
       };
     case "STACKS_LOADED":
       return {

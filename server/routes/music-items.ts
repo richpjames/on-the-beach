@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { eq, and, inArray, sql, desc } from "drizzle-orm";
+import { eq, and, inArray, sql, desc, asc } from "drizzle-orm";
 import { db } from "../db/index";
 import {
   musicItems,
@@ -25,6 +25,7 @@ import type {
   CreateMusicItemInput,
   UpdateMusicItemInput,
   ListenStatus,
+  MusicItemSort,
   PurchaseIntent,
 } from "../../src/types";
 
@@ -166,10 +167,16 @@ async function applyArtistUpdate(
 // ---------------------------------------------------------------------------
 
 musicItemRoutes.get("/", async (c) => {
-  const { listenStatus, purchaseIntent, search, stackId } = c.req.query();
+  const { listenStatus, purchaseIntent, search, sort, stackId } = c.req.query();
   const parsedStackId = stackId ? Number(stackId) : null;
   if (parsedStackId !== null && (!Number.isInteger(parsedStackId) || parsedStackId <= 0)) {
     return c.json({ error: "Invalid stack ID" }, 400);
+  }
+
+  const requestedSort: MusicItemSort =
+    sort === "artist-name" || sort === "release-name" || sort === "star-rating" ? sort : "default";
+  if (sort && sort !== "artist-name" && sort !== "release-name" && sort !== "star-rating") {
+    return c.json({ error: "Invalid sort" }, 400);
   }
 
   // Start building conditions
@@ -188,7 +195,17 @@ musicItemRoutes.get("/", async (c) => {
   if (search) {
     const term = `%${normalize(search)}%`;
     conditions.push(
-      sql`(${musicItems.normalizedTitle} LIKE ${term} OR LOWER(${artists.name}) LIKE ${term})`,
+      sql`(
+        ${musicItems.normalizedTitle} LIKE ${term}
+        OR ${artists.normalizedName} LIKE ${term}
+        OR EXISTS (
+          SELECT 1
+          FROM ${musicItemStacks}
+          INNER JOIN ${stacks} ON ${stacks.id} = ${musicItemStacks.stackId}
+          WHERE ${musicItemStacks.musicItemId} = ${musicItems.id}
+            AND LOWER(${stacks.name}) LIKE ${term}
+        )
+      )`,
     );
   }
 
@@ -213,8 +230,33 @@ musicItemRoutes.get("/", async (c) => {
     query = query.where(and(...conditions));
   }
 
-  // created_at is only second-resolution in SQLite, so break ties by id.
-  query = query.orderBy(desc(musicItems.createdAt), desc(musicItems.id));
+  if (requestedSort === "artist-name") {
+    query = query.orderBy(
+      sql`CASE WHEN ${artists.normalizedName} IS NULL OR ${artists.normalizedName} = '' THEN 1 ELSE 0 END`,
+      asc(artists.normalizedName),
+      asc(musicItems.normalizedTitle),
+      desc(musicItems.id),
+    );
+  } else if (requestedSort === "release-name") {
+    query = query.orderBy(
+      asc(musicItems.normalizedTitle),
+      sql`CASE WHEN ${artists.normalizedName} IS NULL OR ${artists.normalizedName} = '' THEN 1 ELSE 0 END`,
+      asc(artists.normalizedName),
+      desc(musicItems.id),
+    );
+  } else if (requestedSort === "star-rating") {
+    query = query.orderBy(
+      sql`CASE WHEN ${musicItems.rating} IS NULL THEN 1 ELSE 0 END`,
+      desc(musicItems.rating),
+      sql`CASE WHEN ${artists.normalizedName} IS NULL OR ${artists.normalizedName} = '' THEN 1 ELSE 0 END`,
+      asc(artists.normalizedName),
+      asc(musicItems.normalizedTitle),
+      desc(musicItems.id),
+    );
+  } else {
+    // created_at is only second-resolution in SQLite, so break ties by id.
+    query = query.orderBy(desc(musicItems.createdAt), desc(musicItems.id));
+  }
 
   const items = await query;
 
@@ -248,7 +290,7 @@ musicItemRoutes.get("/", async (c) => {
     .get();
 
   let finalItems: typeof enriched = enriched;
-  if (orderRow) {
+  if (orderRow && requestedSort === "default" && !search) {
     const orderedIds = JSON.parse(orderRow.itemIds) as number[];
     finalItems = applyOrder(enriched, orderedIds);
   }

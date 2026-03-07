@@ -4,9 +4,13 @@ import type { FilterSelection } from "../domain/music-list";
 import { getEmptyStateMessage } from "../domain/music-list";
 import { STATUS_LABELS } from "../domain/status";
 
-export function renderMusicList(items: MusicItemFull[], currentFilter: FilterSelection): string {
+export function renderMusicList(
+  items: MusicItemFull[],
+  currentFilter: FilterSelection,
+  searchQuery = "",
+): string {
   if (items.length === 0) {
-    const message = getEmptyStateMessage(currentFilter);
+    const message = escapeHtml(getEmptyStateMessage(currentFilter, searchQuery));
     return `
       <div class="empty-state">
         <p>${message}</p>
@@ -132,6 +136,10 @@ export function renderMusicCard(item: MusicItemFull): string {
 }
 
 export function renderStackManageList(stacks: StackWithCount[]): string {
+  if (stacks.length === 0) {
+    return '<p class="stack-manage__empty">No matching lists.</p>';
+  }
+
   return stacks
     .map(
       (stack) => `

@@ -54,3 +54,31 @@ describe("ApiClient.createMusicItem", () => {
     });
   });
 });
+
+describe("ApiClient.listMusicItems", () => {
+  afterEach(() => {
+    mock.restore();
+  });
+
+  test("includes search, stack, and sort query params", async () => {
+    const fetchSpy = spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      new Response(JSON.stringify({ items: [], total: 0 }), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      }),
+    );
+
+    const client = new ApiClient("https://example.com");
+    await client.listMusicItems({
+      listenStatus: "listened",
+      search: "dub",
+      stackId: 7,
+      sort: "star-rating",
+    });
+
+    expect(fetchSpy).toHaveBeenCalledWith(
+      "https://example.com/api/music-items?listenStatus=listened&search=dub&stackId=7&sort=star-rating",
+      undefined,
+    );
+  });
+});
