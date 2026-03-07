@@ -121,6 +121,33 @@ async function mockCoverScanRoutes(
   fixturePath: string,
   uploadedArtworkUrl: string,
 ): Promise<void> {
+  await page.route("**/api/release/lookup", async (route) => {
+    const request = route.request();
+    const body = request.postDataJSON();
+    const isSallyOldfieldLookup =
+      body &&
+      typeof body === "object" &&
+      body.artist === "Sally Oldfield" &&
+      body.title === "Water Bearer";
+
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify(
+        isSallyOldfieldLookup
+          ? {
+              year: 1978,
+              label: "Bronze",
+              country: "GB",
+              catalogueNumber: "BRON 511",
+              musicbrainzReleaseId: "b4ff2378-f836-4d22-be42-35b6bf168784",
+              musicbrainzArtistId: "d0b8d24f-a6c6-4428-b7b8-f131561d1a91",
+            }
+          : {},
+      ),
+    });
+  });
+
   await page.route("**/api/release/image", async (route) => {
     await route.fulfill({
       status: 201,
