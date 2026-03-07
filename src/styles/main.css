@@ -967,6 +967,25 @@ select.input {
 }
 
 @media (max-width: 520px) {
+  .stack-bar {
+    display: grid;
+    grid-template-rows: repeat(2, auto);
+    grid-auto-flow: column;
+    grid-auto-columns: max-content;
+    align-items: end;
+    align-content: end;
+    justify-content: start;
+    overflow-x: auto;
+    overflow-y: hidden;
+    overscroll-behavior-x: contain;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+  }
+
+  .stack-tab--manage {
+    margin-left: 0;
+  }
+
   .add-form__primary {
     grid-template-columns: 1fr 1fr;
   }
@@ -1122,6 +1141,8 @@ select.input {
   .stack-tab {
     padding: 4px 12px 5px;
     font-size: 12px;
+    top: 0;
+    white-space: nowrap;
   }
 
   .btn {
