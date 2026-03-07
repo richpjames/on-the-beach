@@ -164,4 +164,51 @@ test.describe("Stacks", () => {
       page.locator(".music-card").first().locator(".music-card__stack-chip"),
     ).toContainText("Drum and Bass");
   });
+
+  test("keeps the stack bar to two rows and scrolls on mobile when many stacks exist", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto("/");
+    await expect(page.getByPlaceholder("Paste a music link...")).toBeVisible();
+
+    await page.locator("#manage-stacks-btn").click();
+    await expect(page.locator(".stack-manage")).toBeVisible();
+
+    for (let index = 1; index <= 12; index += 1) {
+      await page.locator("#stack-manage-input").fill(`Long Stack ${index}`);
+      await page.locator("#stack-manage-create-btn").click();
+    }
+
+    await expect(page.locator(".stack-tab", { hasText: "Long Stack 12" })).toBeVisible();
+
+    const stackBarMetrics = await page.locator("#stack-bar").evaluate((element) => {
+      const tabs = Array.from(element.querySelectorAll(".stack-tab")).filter((tab) => {
+        const htmlTab = tab as HTMLElement;
+        return !htmlTab.hidden;
+      });
+
+      const topPositions = tabs.map((tab) => Math.round((tab as HTMLElement).getBoundingClientRect().top));
+      const rowPositions: number[] = [];
+      const rowTolerance = 4;
+
+      for (const top of topPositions.sort((left, right) => left - right)) {
+        const matchesExistingRow = rowPositions.some(
+          (rowTop) => Math.abs(rowTop - top) <= rowTolerance,
+        );
+
+        if (!matchesExistingRow) {
+          rowPositions.push(top);
+        }
+      }
+
+      return {
+        rowCount: rowPositions.length,
+        scrollsHorizontally: element.scrollWidth > element.clientWidth,
+      };
+    });
+
+    expect(stackBarMetrics.rowCount).toBeLessThanOrEqual(2);
+    expect(stackBarMetrics.scrollsHorizontally).toBe(true);
+  });
 });
