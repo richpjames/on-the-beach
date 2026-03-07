@@ -1,4 +1,4 @@
-import type { ListenStatus, MusicItemFilters } from "../../types";
+import type { ListenStatus, MusicItemFilters, MusicItemSort } from "../../types";
 import { applyOrder, buildContextKey } from "../../../shared/music-list-context";
 import { STATUS_LABELS } from "./status";
 
@@ -7,8 +7,11 @@ export type FilterSelection = ListenStatus | "all";
 export function buildMusicItemFilters(
   currentFilter: FilterSelection,
   currentStack: number | null,
+  searchQuery = "",
+  currentSort: MusicItemSort = "default",
 ): MusicItemFilters | undefined {
   const filters: MusicItemFilters = {};
+  const trimmedSearch = searchQuery.trim();
 
   if (currentFilter !== "all") {
     filters.listenStatus = currentFilter;
@@ -18,12 +21,25 @@ export function buildMusicItemFilters(
     filters.stackId = currentStack;
   }
 
+  if (trimmedSearch) {
+    filters.search = trimmedSearch;
+  }
+
+  if (currentSort !== "default") {
+    filters.sort = currentSort;
+  }
+
   return Object.keys(filters).length > 0 ? filters : undefined;
 }
 
 export { applyOrder, buildContextKey };
 
-export function getEmptyStateMessage(currentFilter: FilterSelection): string {
+export function getEmptyStateMessage(currentFilter: FilterSelection, searchQuery = ""): string {
+  const trimmedSearch = searchQuery.trim();
+  if (trimmedSearch) {
+    return `No matches for "${trimmedSearch}"`;
+  }
+
   if (currentFilter === "all") {
     return "No music tracked yet. Paste a link above to get started!";
   }

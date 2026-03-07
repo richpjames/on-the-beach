@@ -142,6 +142,10 @@ export class ApiClient {
       params.set("stackId", String(filters.stackId));
     }
 
+    if (filters?.sort && filters.sort !== "default") {
+      params.set("sort", filters.sort);
+    }
+
     const qs = params.toString();
     return this.requestJson<PaginatedResult<MusicItemFull>>(
       `/api/music-items${qs ? `?${qs}` : ""}`,

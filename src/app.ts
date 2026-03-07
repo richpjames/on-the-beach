@@ -5,6 +5,7 @@ import type {
   AmbiguousLinkPayload,
   LinkReleaseCandidate,
   ListenStatus,
+  MusicItemSort,
   StackWithCount,
 } from "./types";
 import {
@@ -107,6 +108,7 @@ export class App {
 
   private initializeUI(hasServerData: boolean): void {
     this.setupFilterBar();
+    this.setupBrowseControls();
     this.setupStackBar();
     this.setupStackManagePanel();
     this.setupStackParentLinker();
@@ -665,6 +667,45 @@ export class App {
     });
   }
 
+  private setupBrowseControls(): void {
+    const searchInput = document.getElementById("browse-search");
+    const sortSelect = document.getElementById("browse-sort");
+
+    if (searchInput instanceof HTMLInputElement) {
+      searchInput.addEventListener("input", () => {
+        this.appState = transitionAppState(this.appState, {
+          type: "SEARCH_UPDATED",
+          query: searchInput.value,
+        });
+
+        void this.renderStackBar();
+        if (this.appState.stackManageOpen) {
+          void this.renderStackManagePanel();
+        }
+        void this.renderMusicList();
+      });
+    }
+
+    if (sortSelect instanceof HTMLSelectElement) {
+      sortSelect.addEventListener("change", () => {
+        this.appState = transitionAppState(this.appState, {
+          type: "SORT_UPDATED",
+          sort: sortSelect.value as MusicItemSort,
+        });
+
+        void this.renderMusicList();
+      });
+    }
+  }
+
+  private getNormalizedSearchQuery(): string {
+    return this.appState.searchQuery.trim().toLowerCase();
+  }
+
+  private isBrowseOrderLocked(): boolean {
+    return this.getNormalizedSearchQuery().length > 0 || this.appState.currentSort !== "default";
+  }
+
   private async renderStackBar(): Promise<void> {
     const stacks = await this.api.listStacks();
     this.appState = transitionAppState(this.appState, {
@@ -685,7 +726,16 @@ export class App {
       element.remove();
     });
 
-    for (const stack of this.appState.stacks) {
+    const searchQuery = this.getNormalizedSearchQuery();
+    const visibleStacks = searchQuery
+      ? this.appState.stacks.filter(
+          (stack) =>
+            stack.id === this.appState.currentStack ||
+            stack.name.toLowerCase().includes(searchQuery),
+        )
+      : this.appState.stacks;
+
+    for (const stack of visibleStacks) {
       const button = document.createElement("button");
       button.className = `stack-tab${this.appState.currentStack === stack.id ? " active" : ""}`;
       button.dataset.stackId = String(stack.id);
@@ -964,6 +1014,10 @@ export class App {
   }
 
   private async persistMusicListOrder(): Promise<void> {
+    if (this.isBrowseOrderLocked()) {
+      return;
+    }
+
     const list = document.getElementById("music-list");
     if (!(list instanceof HTMLElement)) {
       return;
@@ -1172,11 +1226,21 @@ export class App {
     }
 
     this.closeItemActionMenu();
-    const filters = buildMusicItemFilters(this.appState.currentFilter, this.appState.currentStack);
+    const filters = buildMusicItemFilters(
+      this.appState.currentFilter,
+      this.appState.currentStack,
+      this.appState.searchQuery,
+      this.appState.currentSort,
+    );
     const result = await this.api.listMusicItems(filters);
 
-    container.innerHTML = renderMusicList(result.items, this.appState.currentFilter);
+    container.innerHTML = renderMusicList(
+      result.items,
+      this.appState.currentFilter,
+      this.appState.searchQuery,
+    );
     this.setupMusicListReorder();
+    this.musicListSortable?.option("disabled", this.isBrowseOrderLocked());
     this.renderStackParentLinker(container);
     this.syncCustomListScrollbar();
     requestAnimationFrame(() => {
@@ -1191,7 +1255,12 @@ export class App {
       return;
     }
 
-    list.innerHTML = renderStackManageList(stacks);
+    const searchQuery = this.getNormalizedSearchQuery();
+    const visibleStacks = searchQuery
+      ? stacks.filter((stack) => stack.name.toLowerCase().includes(searchQuery))
+      : stacks;
+
+    list.innerHTML = renderStackManageList(visibleStacks);
   }
 
   private setupStackManagePanel(): void {

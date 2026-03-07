@@ -274,10 +274,30 @@ function renderMainPage(opts: {
         </section>
 
         <section class="filter-section">
-          <div id="filter-bar" class="filter-bar">
-            <button class="filter-btn" data-filter="all">All</button>
-            <button class="filter-btn active" data-filter="to-listen">To Listen</button>
-            <button class="filter-btn" data-filter="listened">Listened</button>
+          <div class="browse-controls">
+            <div id="filter-bar" class="filter-bar">
+              <button class="filter-btn" data-filter="all">All</button>
+              <button class="filter-btn active" data-filter="to-listen">To Listen</button>
+              <button class="filter-btn" data-filter="listened">Listened</button>
+            </div>
+            <div class="browse-tools">
+              <input
+                type="search"
+                id="browse-search"
+                class="input browse-tools__search"
+                placeholder="Search releases or lists..."
+                aria-label="Search releases or lists"
+              />
+              <label class="browse-tools__sort" for="browse-sort">
+                <span>Sort</span>
+                <select id="browse-sort" class="input">
+                  <option value="default">Default</option>
+                  <option value="artist-name">Artist A-Z</option>
+                  <option value="release-name">Release A-Z</option>
+                  <option value="star-rating">Star Rating</option>
+                </select>
+              </label>
+            </div>
           </div>
         </section>
 
@@ -360,7 +380,7 @@ export function createMainPageRoutes(): Hono {
       getPageAssets(),
     ]);
 
-    const musicListHtml = renderMusicList(initialItems, DEFAULT_FILTER);
+    const musicListHtml = renderMusicList(initialItems, DEFAULT_FILTER, "");
     const stackBarTabsHtml = initialStacks.map((s) => renderStackTab(s)).join("");
     const stacksJson = safeJson({ stacks: initialStacks });
     const primaryRssAlternateLinksHtml = renderPrimaryFeedAlternateLinks();

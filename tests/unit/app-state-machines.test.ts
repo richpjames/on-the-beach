@@ -13,10 +13,14 @@ describe("app state machine", () => {
     let state = transitionAppState(initialAppState, { type: "APP_READY" });
     state = transitionAppState(state, { type: "FILTER_SELECTED", filter: "listened" });
     state = transitionAppState(state, { type: "STACK_SELECTED", stackId: 4 });
+    state = transitionAppState(state, { type: "SEARCH_UPDATED", query: "dub" });
+    state = transitionAppState(state, { type: "SORT_UPDATED", sort: "star-rating" });
 
     expect(state.isReady).toBe(true);
     expect(state.currentFilter).toBe("listened");
     expect(state.currentStack).toBe(4);
+    expect(state.searchQuery).toBe("dub");
+    expect(state.currentSort).toBe("star-rating");
 
     state = transitionAppState(state, { type: "STACK_SELECTED_ALL" });
     expect(state.currentStack).toBeNull();

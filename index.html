@@ -91,7 +91,11 @@
                 <textarea name="notes" placeholder="Notes" class="input"></textarea>
                 <div class="stack-picker" id="add-form-stacks">
                   <div class="stack-picker__chips" id="add-form-stack-chips"></div>
-                  <button type="button" class="stack-picker__add btn btn--ghost" id="add-form-stack-btn">
+                  <button
+                    type="button"
+                    class="stack-picker__add btn btn--ghost"
+                    id="add-form-stack-btn"
+                  >
                     + Stack
                   </button>
                 </div>
@@ -132,17 +136,44 @@
         <div id="stack-manage" class="stack-manage" hidden>
           <div id="stack-manage-list"></div>
           <div class="stack-manage__create">
-            <input type="text" id="stack-manage-input" class="input" placeholder="New stack name..." />
-            <button type="button" id="stack-manage-create-btn" class="btn btn--primary">Create</button>
+            <input
+              type="text"
+              id="stack-manage-input"
+              class="input"
+              placeholder="New stack name..."
+            />
+            <button type="button" id="stack-manage-create-btn" class="btn btn--primary">
+              Create
+            </button>
           </div>
         </div>
       </section>
 
       <section class="filter-section">
-        <div id="filter-bar" class="filter-bar">
-          <button class="filter-btn" data-filter="all">All</button>
-          <button class="filter-btn active" data-filter="to-listen">To Listen</button>
-          <button class="filter-btn" data-filter="listened">Listened</button>
+        <div class="browse-controls">
+          <div id="filter-bar" class="filter-bar">
+            <button class="filter-btn" data-filter="all">All</button>
+            <button class="filter-btn active" data-filter="to-listen">To Listen</button>
+            <button class="filter-btn" data-filter="listened">Listened</button>
+          </div>
+          <div class="browse-tools">
+            <input
+              type="search"
+              id="browse-search"
+              class="input browse-tools__search"
+              placeholder="Search releases or lists..."
+              aria-label="Search releases or lists"
+            />
+            <label class="browse-tools__sort" for="browse-sort">
+              <span>Sort</span>
+              <select id="browse-sort" class="input">
+                <option value="default">Default</option>
+                <option value="artist-name">Artist A-Z</option>
+                <option value="release-name">Release A-Z</option>
+                <option value="star-rating">Star Rating</option>
+              </select>
+            </label>
+          </div>
         </div>
       </section>
 
