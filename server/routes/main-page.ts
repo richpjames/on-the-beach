@@ -281,22 +281,58 @@ function renderMainPage(opts: {
               <button class="filter-btn" data-filter="listened">Listened</button>
             </div>
             <div class="browse-tools">
-              <input
-                type="search"
-                id="browse-search"
-                class="input browse-tools__search"
-                placeholder="Search releases or lists..."
-                aria-label="Search releases or lists"
-              />
-              <label class="browse-tools__sort" for="browse-sort">
-                <span>Sort</span>
-                <select id="browse-sort" class="input">
-                  <option value="default">Default</option>
-                  <option value="artist-name">Artist A-Z</option>
-                  <option value="release-name">Release A-Z</option>
-                  <option value="star-rating">Star Rating</option>
-                </select>
-              </label>
+              <div class="browse-tools__mobile-actions">
+                <button
+                  type="button"
+                  id="browse-search-toggle"
+                  class="browse-tools__icon-btn"
+                  aria-label="Toggle search"
+                  aria-controls="browse-search-panel"
+                  aria-expanded="false"
+                >
+                  <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <circle cx="10" cy="10" r="5.5"></circle>
+                    <path d="M14.5 14.5L20 20"></path>
+                    <path d="M7.5 10H12.5"></path>
+                    <path d="M10 7.5V12.5"></path>
+                  </svg>
+                </button>
+                <button
+                  type="button"
+                  id="browse-sort-toggle"
+                  class="browse-tools__icon-btn"
+                  aria-label="Toggle sort"
+                  aria-controls="browse-sort-panel"
+                  aria-expanded="false"
+                >
+                  <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M8 4V20"></path>
+                    <path d="M5 7L8 4L11 7"></path>
+                    <path d="M16 20V4"></path>
+                    <path d="M13 17L16 20L19 17"></path>
+                  </svg>
+                </button>
+              </div>
+              <div id="browse-search-panel" class="browse-tools__panel browse-tools__panel--search">
+                <input
+                  type="search"
+                  id="browse-search"
+                  class="input browse-tools__search"
+                  placeholder="Search releases or lists..."
+                  aria-label="Search releases or lists"
+                />
+              </div>
+              <div id="browse-sort-panel" class="browse-tools__panel browse-tools__panel--sort">
+                <label class="browse-tools__sort" for="browse-sort">
+                  <span>Sort</span>
+                  <select id="browse-sort" class="input">
+                    <option value="default">Default</option>
+                    <option value="artist-name">Artist A-Z</option>
+                    <option value="release-name">Release A-Z</option>
+                    <option value="star-rating">Star Rating</option>
+                  </select>
+                </label>
+              </div>
             </div>
           </div>
         </section>
