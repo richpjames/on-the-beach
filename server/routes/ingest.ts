@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { extractMusicUrls } from "../email-parser";
 import { createMusicItemsFromUrl } from "../music-item-creator";
+import { isValidUrl } from "../utils";
 
 interface EmailEnvelope {
   from: string;
@@ -94,4 +95,60 @@ ingestRoutes.post("/email", async (c) => {
     items,
     skipped,
   });
+});
+
+ingestRoutes.post("/link", async (c) => {
+  // Check if ingest is configured
+  const apiKey = process.env.INGEST_API_KEY;
+  if (!apiKey) {
+    return c.json({ error: "Ingest not configured" }, 503);
+  }
+
+  // Check if ingest is enabled
+  if (process.env.INGEST_ENABLED === "false") {
+    return c.json({ error: "Ingest disabled" }, 503);
+  }
+
+  // Authenticate
+  const auth = c.req.header("Authorization");
+  if (auth !== `Bearer ${apiKey}`) {
+    return c.json({ error: "Unauthorized" }, 401);
+  }
+
+  const body = await c.req.json();
+  const url = typeof body?.url === "string" ? body.url.trim() : "";
+
+  if (!url || !isValidUrl(url)) {
+    return c.json({ error: "Missing or invalid url" }, 400);
+  }
+
+  try {
+    const results = await createMusicItemsFromUrl(url);
+
+    const items: Array<{ id: number; title: string; url: string }> = [];
+    const skipped: Array<{ url: string; reason: string }> = [];
+
+    for (const result of results) {
+      if (result.created) {
+        items.push({
+          id: result.item.id,
+          title: result.item.title,
+          url: result.item.primary_url || url,
+        });
+      } else {
+        skipped.push({ url, reason: "duplicate" });
+      }
+    }
+
+    return c.json({
+      received: true,
+      items_created: items.length,
+      items_skipped: skipped.length,
+      items,
+      skipped,
+    });
+  } catch (err) {
+    console.error(`[api] POST /api/ingest/link failed for ${url}:`, err);
+    return c.json({ error: "Failed to create item" }, 422);
+  }
 });

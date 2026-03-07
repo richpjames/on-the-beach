@@ -48,6 +48,148 @@ const sampleEnvelope = {
   html: '<a href="https://artist.bandcamp.com/album/cool-album">Listen</a>',
 };
 
+function makeLinkRequest(app: Hono, body: Record<string, unknown>, opts?: { apiKey?: string }) {
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+  };
+  if (opts?.apiKey) {
+    headers.Authorization = `Bearer ${opts.apiKey}`;
+  }
+
+  return app.request("http://localhost/api/ingest/link", {
+    method: "POST",
+    headers,
+    body: JSON.stringify(body),
+  });
+}
+
+describe("POST /api/ingest/link", () => {
+  const originalEnv = { ...process.env };
+
+  beforeEach(() => {
+    process.env.INGEST_API_KEY = "test-secret";
+    delete process.env.INGEST_ENABLED;
+    mockCreateMany.mockReset();
+  });
+
+  afterEach(() => {
+    process.env = { ...originalEnv };
+  });
+
+  it("returns 503 when INGEST_API_KEY is not set", async () => {
+    delete process.env.INGEST_API_KEY;
+    const app = makeApp();
+    const res = await makeLinkRequest(
+      app,
+      { url: "https://artist.bandcamp.com/album/test" },
+      { apiKey: "anything" },
+    );
+    expect(res.status).toBe(503);
+    const body = await res.json();
+    expect(body.error).toBe("Ingest not configured");
+  });
+
+  it("returns 503 when INGEST_ENABLED is false", async () => {
+    process.env.INGEST_ENABLED = "false";
+    const app = makeApp();
+    const res = await makeLinkRequest(
+      app,
+      { url: "https://artist.bandcamp.com/album/test" },
+      { apiKey: "test-secret" },
+    );
+    expect(res.status).toBe(503);
+    const body = await res.json();
+    expect(body.error).toBe("Ingest disabled");
+  });
+
+  it("returns 401 when no Authorization header is provided", async () => {
+    const app = makeApp();
+    const res = await makeLinkRequest(app, { url: "https://artist.bandcamp.com/album/test" });
+    expect(res.status).toBe(401);
+  });
+
+  it("returns 401 when wrong API key is provided", async () => {
+    const app = makeApp();
+    const res = await makeLinkRequest(
+      app,
+      { url: "https://artist.bandcamp.com/album/test" },
+      { apiKey: "wrong-key" },
+    );
+    expect(res.status).toBe(401);
+  });
+
+  it("returns 400 when url is missing", async () => {
+    const app = makeApp();
+    const res = await makeLinkRequest(app, {}, { apiKey: "test-secret" });
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.error).toContain("url");
+  });
+
+  it("returns 400 when url is invalid", async () => {
+    const app = makeApp();
+    const res = await makeLinkRequest(app, { url: "not-a-url" }, { apiKey: "test-secret" });
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.error).toContain("url");
+  });
+
+  it("creates an item from a valid URL", async () => {
+    const url = "https://artist.bandcamp.com/album/cool-album";
+    mockCreateMany.mockResolvedValue([
+      {
+        item: { id: 1, title: "Cool Album", primary_url: url } as any,
+        created: true,
+      },
+    ]);
+
+    const app = makeApp();
+    const res = await makeLinkRequest(app, { url }, { apiKey: "test-secret" });
+
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.received).toBe(true);
+    expect(body.items_created).toBe(1);
+    expect(body.items_skipped).toBe(0);
+    expect(body.items[0].title).toBe("Cool Album");
+    expect(mockCreateMany).toHaveBeenCalledWith(url);
+  });
+
+  it("reports duplicate when URL already exists", async () => {
+    const url = "https://artist.bandcamp.com/album/cool-album";
+    mockCreateMany.mockResolvedValue([
+      {
+        item: { id: 1, title: "Cool Album" } as any,
+        created: false,
+      },
+    ]);
+
+    const app = makeApp();
+    const res = await makeLinkRequest(app, { url }, { apiKey: "test-secret" });
+
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.items_created).toBe(0);
+    expect(body.items_skipped).toBe(1);
+    expect(body.skipped[0].reason).toBe("duplicate");
+  });
+
+  it("returns 422 when item creation fails", async () => {
+    mockCreateMany.mockRejectedValue(new Error("Scrape failed"));
+
+    const app = makeApp();
+    const res = await makeLinkRequest(
+      app,
+      { url: "https://artist.bandcamp.com/album/cool-album" },
+      { apiKey: "test-secret" },
+    );
+
+    expect(res.status).toBe(422);
+    const body = await res.json();
+    expect(body.error).toBeDefined();
+  });
+});
+
 describe("POST /api/ingest/email", () => {
   const originalEnv = { ...process.env };
 
