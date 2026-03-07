@@ -1,5 +1,8 @@
 import { describe, expect, test } from "bun:test";
-import { renderPrimaryFeedAlternateLinks, renderStackFeedAlternateLinks } from "../../shared/rss";
+import {
+  renderPrimaryFeedAlternateLinks,
+  renderStackFeedAlternateLinks,
+} from "../../server/routes/main-page";
 
 describe("renderPrimaryFeedAlternateLinks", () => {
   test("renders alternate RSS links for the main filters", () => {

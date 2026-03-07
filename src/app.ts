@@ -64,8 +64,13 @@ export class App {
   private musicListScrollbarEl: HTMLElement | null = null;
   private musicListTrackEl: HTMLElement | null = null;
   private musicListThumbEl: HTMLElement | null = null;
+  private stackBarEl: HTMLElement | null = null;
+  private stackBarScrollbarEl: HTMLElement | null = null;
+  private stackBarTrackEl: HTMLElement | null = null;
+  private stackBarThumbEl: HTMLElement | null = null;
   private activeStarRatingPreviewEl: HTMLElement | null = null;
   private listThumbDrag: { startY: number; startTop: number } | null = null;
+  private stackThumbDrag: { startX: number; startLeft: number } | null = null;
   private activeItemActionMenuCleanup: (() => void) | null = null;
   private activeStackDropdownCleanup: ((skipOnClose?: boolean) => void) | null = null;
   private musicListSortable: Sortable | null = null;
@@ -120,11 +125,13 @@ export class App {
     this.setupEventDelegation();
     this.setupMusicListReorder();
     this.setupCustomListScrollbar();
+    this.setupCustomStackScrollbar();
 
     if (hasServerData) {
       this.syncStackFeedLinks();
       requestAnimationFrame(() => {
         this.syncCustomListScrollbar();
+        this.syncCustomStackScrollbar();
       });
     } else {
       void this.renderStackBar();
@@ -735,7 +742,6 @@ export class App {
         void this.renderMusicList();
       });
     }
-
     searchToggle?.addEventListener("click", () => {
       toggleBrowsePanel(
         searchPanel instanceof HTMLElement ? searchPanel : null,
@@ -839,6 +845,7 @@ export class App {
     }
 
     this.syncStackFeedLinks();
+    this.syncCustomStackScrollbar();
   }
 
   private syncStackFeedLinks(): void {
@@ -893,6 +900,182 @@ export class App {
       void this.renderStackBar();
       void this.renderMusicList();
     });
+  }
+
+  private setupCustomStackScrollbar(): void {
+    const bar = document.getElementById("stack-bar");
+    const scrollbar = document.getElementById("stack-bar-scrollbar");
+    const track = document.getElementById("stack-bar-scroll-track");
+    const thumb = document.getElementById("stack-bar-scroll-thumb");
+    if (
+      !(bar instanceof HTMLElement) ||
+      !(scrollbar instanceof HTMLElement) ||
+      !(track instanceof HTMLElement) ||
+      !(thumb instanceof HTMLElement)
+    ) {
+      return;
+    }
+
+    this.stackBarEl = bar;
+    this.stackBarScrollbarEl = scrollbar;
+    this.stackBarTrackEl = track;
+    this.stackBarThumbEl = thumb;
+
+    const leftButton = scrollbar.querySelector('[data-stack-scroll-btn="left"]');
+    const rightButton = scrollbar.querySelector('[data-stack-scroll-btn="right"]');
+
+    const scrollByStep = (delta: number): void => {
+      bar.scrollBy({ left: delta, behavior: "auto" });
+    };
+
+    let repeatTimer: ReturnType<typeof setInterval> | null = null;
+    const startRepeatScroll = (delta: number): void => {
+      if (repeatTimer) {
+        clearInterval(repeatTimer);
+      }
+
+      repeatTimer = setInterval(() => {
+        scrollByStep(delta);
+      }, 60);
+    };
+
+    const stopRepeatScroll = (): void => {
+      if (!repeatTimer) {
+        return;
+      }
+
+      clearInterval(repeatTimer);
+      repeatTimer = null;
+    };
+
+    const bindScrollButton = (button: Element | null, delta: number): void => {
+      if (!(button instanceof HTMLButtonElement)) {
+        return;
+      }
+
+      button.addEventListener("click", () => {
+        scrollByStep(delta);
+      });
+      button.addEventListener("mousedown", () => {
+        startRepeatScroll(delta);
+      });
+      button.addEventListener("mouseup", stopRepeatScroll);
+      button.addEventListener("mouseleave", stopRepeatScroll);
+    };
+
+    bindScrollButton(leftButton, -80);
+    bindScrollButton(rightButton, 80);
+    document.addEventListener("mouseup", stopRepeatScroll);
+    window.addEventListener("blur", stopRepeatScroll);
+
+    track.addEventListener("mousedown", (event) => {
+      if (event.target === thumb) {
+        return;
+      }
+
+      const trackRect = track.getBoundingClientRect();
+      const thumbRect = thumb.getBoundingClientRect();
+      const clickOffset = event.clientX - trackRect.left;
+      const thumbLeft = thumbRect.left - trackRect.left;
+      const direction = clickOffset < thumbLeft ? -1 : 1;
+
+      bar.scrollBy({ left: direction * Math.max(80, bar.clientWidth * 0.8), behavior: "auto" });
+    });
+
+    const onDragMove = (event: MouseEvent): void => {
+      if (
+        !this.stackThumbDrag ||
+        !this.stackBarEl ||
+        !this.stackBarTrackEl ||
+        !this.stackBarThumbEl
+      ) {
+        return;
+      }
+
+      const scrollRange = this.stackBarEl.scrollWidth - this.stackBarEl.clientWidth;
+      if (scrollRange <= 0) {
+        return;
+      }
+
+      const trackWidth = this.stackBarTrackEl.clientWidth;
+      const thumbWidth = this.stackBarThumbEl.offsetWidth;
+      const maxThumbLeft = Math.max(trackWidth - thumbWidth, 0);
+      if (maxThumbLeft <= 0) {
+        return;
+      }
+
+      const nextLeft = Math.max(
+        0,
+        Math.min(
+          maxThumbLeft,
+          this.stackThumbDrag.startLeft + (event.clientX - this.stackThumbDrag.startX),
+        ),
+      );
+      const ratio = nextLeft / maxThumbLeft;
+      this.stackBarEl.scrollLeft = ratio * scrollRange;
+    };
+
+    const onDragEnd = (): void => {
+      this.stackThumbDrag = null;
+      document.removeEventListener("mousemove", onDragMove);
+    };
+
+    thumb.addEventListener("mousedown", (event) => {
+      event.preventDefault();
+      const trackRect = track.getBoundingClientRect();
+      const thumbRect = thumb.getBoundingClientRect();
+      this.stackThumbDrag = {
+        startX: event.clientX,
+        startLeft: thumbRect.left - trackRect.left,
+      };
+      document.addEventListener("mousemove", onDragMove);
+      document.addEventListener("mouseup", onDragEnd, { once: true });
+    });
+
+    bar.addEventListener("scroll", () => {
+      this.syncCustomStackScrollbar();
+    });
+    window.addEventListener("resize", () => {
+      this.syncCustomStackScrollbar();
+    });
+
+    this.syncCustomStackScrollbar();
+  }
+
+  private syncCustomStackScrollbar(): void {
+    if (
+      !this.stackBarEl ||
+      !this.stackBarScrollbarEl ||
+      !this.stackBarTrackEl ||
+      !this.stackBarThumbEl
+    ) {
+      return;
+    }
+
+    const isMobile = window.matchMedia("(max-width: 520px)").matches;
+    const scrollRange = this.stackBarEl.scrollWidth - this.stackBarEl.clientWidth;
+    const hasOverflow = isMobile && scrollRange > 0;
+
+    this.stackBarScrollbarEl.classList.toggle("is-disabled", !hasOverflow);
+
+    const trackWidth = this.stackBarTrackEl.clientWidth;
+    if (!hasOverflow || trackWidth <= 0) {
+      this.stackBarThumbEl.style.width = `${trackWidth}px`;
+      this.stackBarThumbEl.style.left = "0px";
+      return;
+    }
+
+    const minThumbWidth = 42;
+    const thumbWidth = Math.max(
+      minThumbWidth,
+      Math.floor((this.stackBarEl.clientWidth / this.stackBarEl.scrollWidth) * trackWidth),
+    );
+    const maxThumbLeft = Math.max(trackWidth - thumbWidth, 0);
+    const scrollRatio = scrollRange <= 0 ? 0 : this.stackBarEl.scrollLeft / scrollRange;
+    const thumbLeft = Math.round(maxThumbLeft * scrollRatio);
+
+    this.stackBarThumbEl.style.width = `${thumbWidth}px`;
+    this.stackBarThumbEl.style.left = `${thumbLeft}px`;
   }
 
   private async deleteStackById(stackId: number): Promise<void> {

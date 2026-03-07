@@ -1,6 +1,8 @@
 import { spawn, type ChildProcess } from "node:child_process";
-import { rmSync } from "node:fs";
+import { mkdtempSync, rmSync } from "node:fs";
 import { once } from "node:events";
+import { join } from "node:path";
+import { tmpdir } from "node:os";
 import { test as base, expect } from "@playwright/test";
 
 const SERVER_BASE_PORT = Number(process.env.PLAYWRIGHT_SERVER_BASE_PORT ?? "47000");
@@ -14,8 +16,14 @@ export const test = base.extend<{}, WorkerFixtures>({
   workerBaseURL: [
     async ({ playwright }, use, workerInfo) => {
       void playwright;
-      const port = SERVER_BASE_PORT + workerInfo.parallelIndex;
-      const databasePath = `/tmp/on_the_beach.playwright.parallel-${workerInfo.parallelIndex}.worker-${workerInfo.workerIndex}.db`;
+      const port = SERVER_BASE_PORT + workerInfo.workerIndex;
+      const workerTempDir = mkdtempSync(
+        join(
+          tmpdir(),
+          `on-the-beach-playwright-${workerInfo.parallelIndex}-${workerInfo.workerIndex}-`,
+        ),
+      );
+      const databasePath = join(workerTempDir, "worker.db");
       const env = {
         ...process.env,
         PORT: String(port),
@@ -46,6 +54,7 @@ export const test = base.extend<{}, WorkerFixtures>({
       } finally {
         await stopServer(server);
         clearDatabaseFiles(databasePath);
+        rmSync(workerTempDir, { recursive: true, force: true });
       }
     },
     { scope: "worker", timeout: 120_000 },

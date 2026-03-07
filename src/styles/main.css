@@ -196,14 +196,7 @@ body {
 }
 
 .add-section::before {
-  content: "ADD TRACK";
-  display: block;
-  font-size: 9px;
-  font-weight: bold;
-  color: var(--chrome-dark);
-  letter-spacing: 0.12em;
-  margin-bottom: 5px;
-  font-family: "Tahoma", sans-serif;
+  content: none;
 }
 
 .add-form__primary {
@@ -539,6 +532,12 @@ select.input {
   margin-bottom: 0;
 }
 
+.stack-bar-shell {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
 .stack-bar {
   display: flex;
   gap: 2px;
@@ -594,6 +593,10 @@ select.input {
 .stack-tab--delete:disabled {
   cursor: not-allowed;
   opacity: 0.5;
+}
+
+.stack-scrollbar {
+  display: none;
 }
 
 /* ═══════════════════════════════════════════════════
@@ -712,7 +715,6 @@ select.input {
 .browse-tools__panel {
   display: contents;
 }
-
 .browse-tools__search {
   width: min(240px, 42vw);
 }
@@ -979,24 +981,97 @@ select.input {
     overflow-y: hidden;
     overscroll-behavior-x: contain;
     -webkit-overflow-scrolling: touch;
-    scrollbar-width: thin;
+    scrollbar-width: none;
+  }
+
+  .stack-bar::-webkit-scrollbar {
+    display: none;
+  }
+
+  .stack-bar > [data-stack="all"] {
+    grid-column: 1;
+    grid-row: 1;
   }
 
   .stack-tab--manage {
+    grid-column: 1;
+    grid-row: 2;
     margin-left: 0;
   }
 
-  .add-form__primary {
-    grid-template-columns: 1fr 1fr;
+  .stack-scrollbar {
+    display: grid;
+    grid-template-columns: 19px minmax(0, 1fr) 19px;
+    align-items: stretch;
+    background: #d4d4d4;
+    border-top: 1px solid #7b7b7b;
   }
 
-  .add-form__primary #url-input {
-    grid-column: 1 / -1;
+  .stack-scrollbar__button {
+    width: 19px;
+    height: 19px;
+    border-width: 2px;
+    border-style: solid;
+    border-color: #ffffff #565656 #111111 #ffffff;
+    background: #c6c6c6;
+    color: #111111;
+    font-size: 9px;
+    line-height: 1;
+    font-family: "Tahoma", sans-serif;
+    padding: 0;
+    cursor: pointer;
+  }
+
+  .stack-scrollbar__button:active {
+    border-color: #565656 #ffffff #ffffff #565656;
+  }
+
+  .stack-scrollbar__track {
+    position: relative;
+    min-width: 0;
+    background-color: #d9d9d9;
+    background-image:
+      radial-gradient(#b5b5b5 0.75px, transparent 0.85px),
+      radial-gradient(#f1f1f1 0.75px, transparent 0.85px);
+    background-size: 2px 2px;
+    background-position:
+      0 0,
+      1px 1px;
+  }
+
+  .stack-scrollbar__thumb {
+    position: absolute;
+    top: 1px;
+    bottom: 1px;
+    left: 0;
+    min-width: 42px;
+    background: #c4c4c4;
+    border-width: 2px;
+    border-style: solid;
+    border-color: #ffffff #4d4d4d #222222 #ffffff;
+    box-shadow:
+      inset 1px 1px 0 #d9d9d9,
+      inset -1px -1px 0 #9a9a9a;
+    cursor: grab;
+  }
+
+  .stack-scrollbar__thumb:active {
+    cursor: grabbing;
+  }
+
+  .stack-scrollbar.is-disabled .stack-scrollbar__thumb,
+  .stack-scrollbar.is-disabled .stack-scrollbar__button {
+    opacity: 0.45;
+    cursor: default;
+  }
+
+  .add-form__primary {
+    grid-template-columns: minmax(0, 1fr) auto auto;
   }
 
   .add-form__primary #add-form-scan-btn,
   .add-form__primary #add-form-submit {
-    width: 100%;
+    width: auto;
   }
 
   .add-form__extra {
@@ -1087,11 +1162,14 @@ select.input {
   .filter-bar {
     padding: 4px;
     gap: 4px;
+    flex-wrap: nowrap;
+    align-items: center;
   }
 
   .filter-bar::before {
     font-size: 10px;
     padding: 0 8px 0 2px;
+    flex-shrink: 0;
   }
 
   .browse-controls {
@@ -1100,12 +1178,21 @@ select.input {
   }
 
   .browse-tools {
-    min-height: 40px;
-    padding: 4px;
+    min-height: 0;
+    padding: 4px 3px;
   }
 
   .browse-tools__mobile-actions {
     display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 3px;
+  }
+
+  .browse-tools__icon-btn {
+    width: 30px;
+    min-width: 30px;
+    height: 30px;
   }
 
   .browse-tools__panel {

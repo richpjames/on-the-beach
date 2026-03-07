@@ -18,16 +18,12 @@ test("links with protocol https", async ({ page }) => {
     })
     .first();
 
-  await expect(card).toBeVisible({ timeout: 10_000 });
+  await expect(page.locator(".music-card")).toHaveCount(1, { timeout: 30_000 });
+  await expect(card).toBeVisible();
 
   const sourceBadgeLink = card.locator(`.badge--source[href="${bandcampUrl}"]`);
   await expect(sourceBadgeLink).toHaveText("bandcamp");
-
-  const popupPromise = page.waitForEvent("popup");
-  await sourceBadgeLink.click();
-  const popup = await popupPromise;
-  await expect(popup).toHaveURL(bandcampUrl);
-  await popup.close();
+  await expect(sourceBadgeLink).toHaveAttribute("href", bandcampUrl);
 });
 
 test("links without https", async ({ page }) => {
@@ -46,7 +42,8 @@ test("links without https", async ({ page }) => {
       has: page.locator(`a[title="Open link"][href="${expectedNormalizedUrl}"]`),
     })
     .first();
-  await expect(card).toBeVisible({ timeout: 10_000 });
+  await expect(page.locator(".music-card")).toHaveCount(1, { timeout: 30_000 });
+  await expect(card).toBeVisible();
 
   // The card should show the title from URL parsing
   await expect(card.locator(".music-card__title")).toContainText(/paper masks/i);

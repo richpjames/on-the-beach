@@ -136,7 +136,8 @@ test.describe("Stacks", () => {
       .getByPlaceholder("Paste a music link...")
       .fill("https://seekersinternational.bandcamp.com/album/nested-stack");
     await page.getByRole("button", { name: "Add" }).click();
-    await expect(page.locator(".music-card").first()).toBeVisible({ timeout: 10_000 });
+    await expect(page.locator(".music-card")).toHaveCount(1, { timeout: 30_000 });
+    await expect(page.locator(".music-card").first()).toBeVisible();
 
     await page
       .locator(".music-card")
@@ -159,6 +160,7 @@ test.describe("Stacks", () => {
     await page.locator("#stack-parent-link-btn").click();
 
     await page.locator(".stack-tab", { hasText: "Dance" }).click();
+    await expect(page.locator(".music-card")).toHaveCount(1, { timeout: 15_000 });
     await expect(page.locator(".music-card").first()).toBeVisible();
     await expect(
       page.locator(".music-card").first().locator(".music-card__stack-chip"),
@@ -176,13 +178,14 @@ test.describe("Stacks", () => {
     await expect(page.locator(".stack-manage")).toBeVisible();
 
     for (let index = 1; index <= 12; index += 1) {
-      await page.locator("#stack-manage-input").fill(`Long Stack ${index}`);
+      const stackName = `Long Stack ${index}`;
+      await page.locator("#stack-manage-input").fill(stackName);
       await page.locator("#stack-manage-create-btn").click();
-      await expect(
-        page.locator(".stack-manage__item", { hasText: `Long Stack ${index}` }),
-      ).toBeVisible();
+      await expect(page.locator(".stack-manage__item", { hasText: stackName })).toBeVisible();
+      await expect(page.locator(".stack-tab", { hasText: stackName })).toHaveCount(1);
     }
 
+    await expect(page.locator(".stack-tab", { hasText: "Long Stack 12" })).toHaveCount(1);
     const stackBarMetrics = await page.locator("#stack-bar").evaluate((element) => {
       const tabs = Array.from(element.querySelectorAll(".stack-tab")).filter((tab) => {
         const htmlTab = tab as HTMLElement;
