@@ -4,13 +4,7 @@ import { db } from "../db/index";
 import { musicItems, musicItemStacks, stacks, musicItemOrder, stackParents } from "../db/schema";
 import { fullItemSelect, hydrateItemStacks } from "../music-item-creator";
 import { applyOrder, buildContextKey } from "../../shared/music-list-context";
-import {
-  buildPrimaryFeedHref,
-  buildPrimaryFeedTitle,
-  buildStackFeedHref,
-  buildStackFeedTitle,
-  PRIMARY_FEEDS,
-} from "../../shared/rss";
+import { renderPrimaryFeedAlternateLinks, renderStackFeedAlternateLinks } from "../../shared/rss";
 import { renderMusicList } from "../../src/ui/view/templates";
 import type { MusicItemFull, StackWithCount } from "../../src/types";
 import { getPageAssets } from "../page-assets";
@@ -36,24 +30,6 @@ function safeJson(obj: unknown): string {
 
 function renderStackTab(stack: StackWithCount): string {
   return `<button class="stack-tab" data-stack-id="${stack.id}">${escapeHtml(stack.name)}</button>`;
-}
-
-export function renderStackFeedAlternateLinks(
-  stacks: Pick<StackWithCount, "id" | "name">[],
-): string {
-  return stacks
-    .map(
-      (stack) =>
-        `<link rel="alternate" type="application/rss+xml" title="${escapeHtml(buildStackFeedTitle(stack.name))}" href="${escapeHtml(buildStackFeedHref(stack.id))}" data-rss-feed-link="${stack.id}" />`,
-    )
-    .join("\n    ");
-}
-
-export function renderPrimaryFeedAlternateLinks(): string {
-  return PRIMARY_FEEDS.map(
-    (feed) =>
-      `<link rel="alternate" type="application/rss+xml" title="${escapeHtml(buildPrimaryFeedTitle(feed.key))}" href="${escapeHtml(buildPrimaryFeedHref(feed.key))}" />`,
-  ).join("\n    ");
 }
 
 async function fetchInitialStacks(): Promise<StackWithCount[]> {
