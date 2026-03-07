@@ -23,6 +23,8 @@ export function renderMusicList(
 
 export function renderMusicCard(item: MusicItemFull): string {
   const hasArtwork = Boolean(item.artwork_url);
+  const escapedTitle = escapeHtml(item.title);
+  const releaseHref = `/r/${item.id}`;
   const statusOptions = Object.entries(STATUS_LABELS)
     .map(
       ([value, label]) =>
@@ -32,16 +34,16 @@ export function renderMusicCard(item: MusicItemFull): string {
 
   return `
     <article class="music-card${hasArtwork ? "" : " music-card--no-artwork"}" data-item-id="${item.id}">
-      <a href="/r/${item.id}">
+      <a href="${releaseHref}">
         ${
           item.artwork_url
-            ? `<img class="music-card__artwork music-card__artwork--link" src="${escapeHtml(item.artwork_url)}" alt="Artwork for ${escapeHtml(item.title)}">`
+            ? `<img class="music-card__artwork music-card__artwork--link" src="${escapeHtml(item.artwork_url)}" alt="Artwork for ${escapedTitle}">`
             : `<img class="music-card__artwork music-card__artwork--placeholder" src="/favicon-32x32.png" alt="No artwork available">`
         }
       </a>
       <div class="music-card__content">
-        <a href="/r/${item.id}" class="music-card__link">
-          <div class="music-card__title">${escapeHtml(item.title)}</div>
+        <a href="${releaseHref}" class="music-card__link">
+          <div class="music-card__title">${escapedTitle}</div>
           ${item.artist_name ? `<div class="music-card__artist">${escapeHtml(item.artist_name)}</div>` : ""}
           ${
             item.stacks.length > 0
@@ -67,6 +69,21 @@ export function renderMusicCard(item: MusicItemFull): string {
         </div>
       </div>
       <div class="music-card__actions">
+        <button
+          type="button"
+          class="btn btn--ghost music-card__reorder-handle"
+          title="Reorder ${escapedTitle}"
+          aria-label="Reorder ${escapedTitle}"
+        >
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor" aria-hidden="true">
+            <rect x="2" y="2" width="2" height="2"></rect>
+            <rect x="2" y="6" width="2" height="2"></rect>
+            <rect x="2" y="10" width="2" height="2"></rect>
+            <rect x="8" y="2" width="2" height="2"></rect>
+            <rect x="8" y="6" width="2" height="2"></rect>
+            <rect x="8" y="10" width="2" height="2"></rect>
+          </svg>
+        </button>
         ${
           item.primary_url
             ? `
@@ -86,7 +103,7 @@ export function renderMusicCard(item: MusicItemFull): string {
             <line x1="5" y1="12" x2="19" y2="12"></line>
           </svg>
         </button>
-        <a href="/r/${item.id}" class="btn btn--ghost music-card__action-btn" title="View release page">
+        <a href="${releaseHref}" class="btn btn--ghost music-card__action-btn" title="View release page">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path>
             <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path>
@@ -121,7 +138,7 @@ export function renderMusicCard(item: MusicItemFull): string {
           <button type="button" class="music-card__menu-item" data-action="stack-menu">
             Manage stacks
           </button>
-          <a href="/r/${item.id}" class="music-card__menu-item">View release page</a>
+          <a href="${releaseHref}" class="music-card__menu-item">View release page</a>
           <button
             type="button"
             class="music-card__menu-item music-card__menu-item--danger"

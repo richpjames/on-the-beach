@@ -1049,10 +1049,14 @@ select.input {
 
   .music-card .music-card__actions {
     position: relative;
-    gap: 0;
+    gap: 4px;
     align-self: flex-start;
     padding-top: 0;
     margin-top: 1px;
+  }
+
+  .music-card .music-card__reorder-handle {
+    display: inline-flex;
   }
 
   .music-card .music-card__action-btn {
@@ -1218,6 +1222,22 @@ select.input {
 
 .music-card__action-btn {
   display: inline-flex;
+}
+
+.music-card__reorder-handle {
+  display: none;
+  min-width: 30px;
+  min-height: 30px;
+  padding: 0;
+  align-items: center;
+  justify-content: center;
+  color: var(--chrome-darker);
+  cursor: grab;
+  touch-action: none;
+}
+
+.music-card__reorder-handle:active {
+  cursor: grabbing;
 }
 
 .music-card__menu-toggle {

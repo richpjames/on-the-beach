@@ -74,15 +74,17 @@ test.describe("Reorder (touch)", () => {
     expect(initialTitles).toHaveLength(3);
     const expectedTitles = [initialTitles[1], initialTitles[2], initialTitles[0]];
 
-    await dragCardByIndexWithTouch(page, 2, 1, "before");
+    await expect(page.locator(".music-card__reorder-handle")).toHaveCount(3);
+
+    await dragCardByIndexWithTouchHandle(page, 2, 1, "before");
     await expect
       .poll(() => getCardTitles(page))
       .toEqual([initialTitles[0], initialTitles[2], initialTitles[1]]);
 
-    await dragCardByIndexWithTouch(page, 2, 1, "before");
+    await dragCardByIndexWithTouchHandle(page, 2, 1, "before");
     await expect.poll(() => getCardTitles(page)).toEqual(initialTitles);
 
-    await dragCardByIndexWithTouch(page, 0, 2, "after");
+    await dragCardByIndexWithTouchHandle(page, 0, 2, "after");
     await expect.poll(() => getCardTitles(page)).toEqual(expectedTitles);
 
     await page.reload();
@@ -122,11 +124,29 @@ async function dragCardByIndexWithMouse(
   });
 }
 
-async function dragCardByIndexWithTouch(
+async function dragCardByIndexWithTouchHandle(
   page: Page,
   fromIndex: number,
   toIndex: number,
   position: "before" | "after",
 ): Promise<void> {
-  await dragCardByIndexWithMouse(page, fromIndex, toIndex, position);
+  const cards = page.locator(".music-card");
+  const sourceHandle = cards.nth(fromIndex).locator(".music-card__reorder-handle");
+  const targetCard = cards.nth(toIndex);
+
+  const sourceBox = await sourceHandle.boundingBox();
+  const targetBox = await targetCard.boundingBox();
+  if (!sourceBox || !targetBox) {
+    throw new Error("Missing drag source handle or target bounding box");
+  }
+
+  const startX = sourceBox.width / 2;
+  const startY = sourceBox.height / 2;
+  const targetY = position === "before" ? 4 : Math.max(4, targetBox.height - 4);
+
+  await sourceHandle.hover({ position: { x: startX, y: startY } });
+  await sourceHandle.dragTo(targetCard, {
+    sourcePosition: { x: startX, y: startY },
+    targetPosition: { x: 12, y: targetY },
+  });
 }

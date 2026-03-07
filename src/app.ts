@@ -69,8 +69,12 @@ export class App {
   private activeItemActionMenuCleanup: (() => void) | null = null;
   private activeStackDropdownCleanup: ((skipOnClose?: boolean) => void) | null = null;
   private musicListSortable: Sortable | null = null;
+  private musicListReorderMediaQuery: MediaQueryList | null = null;
   private isReordering = false;
   private linkPickerState: LinkPickerState | null = null;
+  private readonly handleMusicListReorderMediaChange = (): void => {
+    this.syncMusicListReorderMode();
+  };
 
   constructor() {
     this.api = new ApiClient();
@@ -1064,7 +1068,8 @@ export class App {
       invertSwap: true,
       swapThreshold: 0.35,
       // Keep interactive controls clickable while making the card body draggable.
-      filter: "button,input,select,textarea,[data-action],.music-card__menu-item",
+      filter:
+        "button:not(.music-card__reorder-handle),input,select,textarea,[data-action],.music-card__menu-item",
       preventOnFilter: false,
       ghostClass: "music-card--drag-ghost",
       chosenClass: "music-card--drag-chosen",
@@ -1083,6 +1088,24 @@ export class App {
         void this.persistMusicListOrder();
       },
     });
+
+    this.musicListReorderMediaQuery = window.matchMedia("(max-width: 520px)");
+    this.musicListReorderMediaQuery.addEventListener(
+      "change",
+      this.handleMusicListReorderMediaChange,
+    );
+    this.syncMusicListReorderMode();
+  }
+
+  private syncMusicListReorderMode(): void {
+    if (!this.musicListSortable) {
+      return;
+    }
+
+    const handleSelector = this.musicListReorderMediaQuery?.matches
+      ? ".music-card__reorder-handle"
+      : undefined;
+    this.musicListSortable.option("handle", handleSelector);
   }
 
   private async persistMusicListOrder(): Promise<void> {

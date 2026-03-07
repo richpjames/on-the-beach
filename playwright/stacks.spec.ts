@@ -178,9 +178,10 @@ test.describe("Stacks", () => {
     for (let index = 1; index <= 12; index += 1) {
       await page.locator("#stack-manage-input").fill(`Long Stack ${index}`);
       await page.locator("#stack-manage-create-btn").click();
+      await expect(
+        page.locator(".stack-manage__item", { hasText: `Long Stack ${index}` }),
+      ).toBeVisible();
     }
-
-    await expect(page.locator(".stack-tab", { hasText: "Long Stack 12" })).toBeVisible();
 
     const stackBarMetrics = await page.locator("#stack-bar").evaluate((element) => {
       const tabs = Array.from(element.querySelectorAll(".stack-tab")).filter((tab) => {
@@ -188,7 +189,9 @@ test.describe("Stacks", () => {
         return !htmlTab.hidden;
       });
 
-      const topPositions = tabs.map((tab) => Math.round((tab as HTMLElement).getBoundingClientRect().top));
+      const topPositions = tabs.map((tab) =>
+        Math.round((tab as HTMLElement).getBoundingClientRect().top),
+      );
       const rowPositions: number[] = [];
       const rowTolerance = 4;
 
