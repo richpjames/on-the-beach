@@ -668,8 +668,43 @@ export class App {
   }
 
   private setupBrowseControls(): void {
+    const browseTools = document.querySelector(".browse-tools");
     const searchInput = document.getElementById("browse-search");
     const sortSelect = document.getElementById("browse-sort");
+    const searchToggle = document.getElementById("browse-search-toggle");
+    const sortToggle = document.getElementById("browse-sort-toggle");
+    const searchPanel = document.getElementById("browse-search-panel");
+    const sortPanel = document.getElementById("browse-sort-panel");
+
+    const closeBrowsePanels = (): void => {
+      searchPanel?.classList.remove("is-open");
+      sortPanel?.classList.remove("is-open");
+      searchToggle?.setAttribute("aria-expanded", "false");
+      sortToggle?.setAttribute("aria-expanded", "false");
+    };
+
+    const toggleBrowsePanel = (
+      panel: HTMLElement | null,
+      button: HTMLElement | null,
+      sibling: HTMLElement | null,
+      siblingButton: HTMLElement | null,
+    ): void => {
+      if (!panel || !button) {
+        return;
+      }
+
+      const willOpen = !panel.classList.contains("is-open");
+      sibling?.classList.remove("is-open");
+      siblingButton?.setAttribute("aria-expanded", "false");
+      panel.classList.toggle("is-open", willOpen);
+      button.setAttribute("aria-expanded", String(willOpen));
+
+      if (willOpen && panel === searchPanel && searchInput instanceof HTMLInputElement) {
+        requestAnimationFrame(() => {
+          searchInput.focus();
+        });
+      }
+    };
 
     if (searchInput instanceof HTMLInputElement) {
       searchInput.addEventListener("input", () => {
@@ -696,6 +731,43 @@ export class App {
         void this.renderMusicList();
       });
     }
+
+    searchToggle?.addEventListener("click", () => {
+      toggleBrowsePanel(
+        searchPanel instanceof HTMLElement ? searchPanel : null,
+        searchToggle instanceof HTMLElement ? searchToggle : null,
+        sortPanel instanceof HTMLElement ? sortPanel : null,
+        sortToggle instanceof HTMLElement ? sortToggle : null,
+      );
+    });
+
+    sortToggle?.addEventListener("click", () => {
+      toggleBrowsePanel(
+        sortPanel instanceof HTMLElement ? sortPanel : null,
+        sortToggle instanceof HTMLElement ? sortToggle : null,
+        searchPanel instanceof HTMLElement ? searchPanel : null,
+        searchToggle instanceof HTMLElement ? searchToggle : null,
+      );
+    });
+
+    document.addEventListener("click", (event) => {
+      const target = event.target;
+      if (!(target instanceof HTMLElement) || !(browseTools instanceof HTMLElement)) {
+        return;
+      }
+
+      if (browseTools.contains(target)) {
+        return;
+      }
+
+      closeBrowsePanels();
+    });
+
+    document.addEventListener("keydown", (event) => {
+      if (event.key === "Escape") {
+        closeBrowsePanels();
+      }
+    });
   }
 
   private getNormalizedSearchQuery(): string {
