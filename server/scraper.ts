@@ -229,9 +229,10 @@ export function extractBandcampEmbedMetadata(html: string): Record<string, strin
         const obj = parsed as Record<string, unknown>;
         const id = obj.item_id;
         const type = obj.item_type;
-        if (typeof id === "number" && Number.isFinite(id)) {
+        const idNum = typeof id === "number" ? id : typeof id === "string" ? Number(id) : NaN;
+        if (Number.isFinite(idNum) && idNum > 0) {
           return {
-            album_id: String(id),
+            album_id: String(idNum),
             ...(typeof type === "string" ? { item_type: type } : {}),
           };
         }
@@ -239,16 +240,16 @@ export function extractBandcampEmbedMetadata(html: string): Record<string, strin
     } catch {
       // fall through to TralbumData
     }
-  }
-
-  // Fallback: TralbumData = { "id" : 123, "item_type" : "album" }
-  const tralbumIdMatch = html.match(/TralbumData\s*=\s*\{[^}]*"id"\s*:\s*(\d+)/);
-  const tralbumTypeMatch = html.match(/TralbumData\s*=\s*\{[^}]*"item_type"\s*:\s*"([^"]+)"/);
-  if (tralbumIdMatch) {
-    return {
-      album_id: tralbumIdMatch[1],
-      ...(tralbumTypeMatch ? { item_type: tralbumTypeMatch[1] } : {}),
-    };
+  } else {
+    // Fallback: TralbumData = { "id" : 123, "item_type" : "album" }
+    const tralbumIdMatch = html.match(/TralbumData\s*=\s*\{[\s\S]*?"id"\s*:\s*(\d+)/);
+    const tralbumTypeMatch = html.match(/TralbumData\s*=\s*\{[\s\S]*?"item_type"\s*:\s*"([^"]+)"/);
+    if (tralbumIdMatch) {
+      return {
+        album_id: tralbumIdMatch[1],
+        ...(tralbumTypeMatch ? { item_type: tralbumTypeMatch[1] } : {}),
+      };
+    }
   }
 
   return null;
