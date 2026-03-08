@@ -11,6 +11,7 @@ import {
   detectMusicRelatedHtml,
   scrapeUrl,
   UnsupportedMusicLinkError,
+  extractBandcampEmbedMetadata,
 } from "../../server/scraper";
 
 function mockChatCompletionResponse(
@@ -694,5 +695,53 @@ describe("scrapeUrl", () => {
 
     mock.restore();
     process.env = { ...originalEnv };
+  });
+});
+
+describe("extractBandcampEmbedMetadata", () => {
+  test("extracts album_id from bc-page-properties meta tag", () => {
+    const html = `<meta name="bc-page-properties" content='{"item_type":"album","item_id":1536701931}'>`;
+    expect(extractBandcampEmbedMetadata(html)).toEqual({
+      album_id: "1536701931",
+      item_type: "album",
+    });
+  });
+
+  test("extracts album_id from TralbumData JS block as fallback", () => {
+    const html = `<script>TralbumData = {"id" : 9876543, "item_type" : "track"}</script>`;
+    expect(extractBandcampEmbedMetadata(html)).toEqual({
+      album_id: "9876543",
+      item_type: "track",
+    });
+  });
+
+  test("returns null when no ID found", () => {
+    expect(extractBandcampEmbedMetadata("<html><body>no id here</body></html>")).toBeNull();
+  });
+
+  test("prefers bc-page-properties over TralbumData", () => {
+    const html = `
+      <meta name="bc-page-properties" content='{"item_type":"album","item_id":111}'>
+      <script>TralbumData = {"id" : 999}</script>
+    `;
+    expect(extractBandcampEmbedMetadata(html)).toEqual({
+      album_id: "111",
+      item_type: "album",
+    });
+  });
+});
+
+describe("scrapeUrl bandcamp embedMetadata", () => {
+  test("populates embedMetadata when bc-page-properties is present", async () => {
+    const html = `<head>
+      <meta property="og:title" content="My Album, by Artist" />
+      <meta name="bc-page-properties" content='{"item_type":"album","item_id":1234567}'>
+    </head>`;
+    spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      new Response(html, { headers: { "content-type": "text/html" } }),
+    );
+    const result = await scrapeUrl("https://artist.bandcamp.com/album/my-album", "bandcamp");
+    expect(result?.embedMetadata).toEqual({ album_id: "1234567", item_type: "album" });
+    mock.restore();
   });
 });
