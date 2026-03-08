@@ -559,6 +559,10 @@ export class App {
     this.addFormActor.send({ type: isLoading ? "SUBMIT_STARTED" : "SUBMIT_FINISHED" });
     button.disabled = isLoading;
     button.textContent = isLoading ? "Adding..." : "Add";
+
+    const overlay = document.getElementById("add-loading-overlay");
+    overlay?.classList.toggle("is-visible", isLoading);
+    overlay?.setAttribute("aria-hidden", isLoading ? "false" : "true");
   }
 
   private setScanButtonState(button: HTMLButtonElement, isLoading: boolean): void {
