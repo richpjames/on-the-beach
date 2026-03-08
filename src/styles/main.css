@@ -2028,6 +2028,7 @@ body::after {
 }
 
 .release-page-body .main {
+  display: block;
   flex: 0 0 auto;
 }
 
@@ -2036,6 +2037,7 @@ body::after {
   flex-direction: column;
   gap: 8px;
   padding: 12px;
+  width: 100%;
 }
 
 .release-page__nav {
