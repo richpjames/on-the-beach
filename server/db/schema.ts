@@ -72,6 +72,7 @@ export const musicLinks = sqliteTable(
     sourceId: integer("source_id").references(() => sources.id, { onDelete: "set null" }),
     url: text("url").notNull(),
     isPrimary: integer("is_primary", { mode: "boolean" }).notNull().default(false),
+    // Source-specific embed metadata as JSON (e.g. { album_id, item_type } for Bandcamp)
     metadata: text("metadata"),
     createdAt: integer("created_at", { mode: "timestamp" })
       .notNull()
