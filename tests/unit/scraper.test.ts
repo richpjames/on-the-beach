@@ -729,6 +729,27 @@ describe("extractBandcampEmbedMetadata", () => {
       item_type: "album",
     });
   });
+
+  test("handles string item_id in bc-page-properties", () => {
+    const html = `<meta name="bc-page-properties" content='{"item_type":"album","item_id":"1536701931"}'>`;
+    expect(extractBandcampEmbedMetadata(html)).toEqual({
+      album_id: "1536701931",
+      item_type: "album",
+    });
+  });
+
+  test("returns null when JSON parses but item_id is absent", () => {
+    const html = `<meta name="bc-page-properties" content='{"item_type":"album"}'>`;
+    expect(extractBandcampEmbedMetadata(html)).toBeNull();
+  });
+
+  test("TralbumData fallback works with nested objects", () => {
+    const html = `<script>TralbumData = {"nested": {"foo": "bar"}, "id" : 5551234, "item_type" : "album"}</script>`;
+    expect(extractBandcampEmbedMetadata(html)).toEqual({
+      album_id: "5551234",
+      item_type: "album",
+    });
+  });
 });
 
 describe("scrapeUrl bandcamp embedMetadata", () => {
