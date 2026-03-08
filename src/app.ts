@@ -60,6 +60,10 @@ export class App {
   private api: ApiClient;
   private appState = initialAppState;
   private addFormState = initialAddFormState;
+  private mainScrollEl: HTMLElement | null = null;
+  private mainScrollbarEl: HTMLElement | null = null;
+  private mainScrollTrackEl: HTMLElement | null = null;
+  private mainScrollThumbEl: HTMLElement | null = null;
   private musicListEl: HTMLElement | null = null;
   private musicListScrollbarEl: HTMLElement | null = null;
   private musicListTrackEl: HTMLElement | null = null;
@@ -69,12 +73,15 @@ export class App {
   private stackBarTrackEl: HTMLElement | null = null;
   private stackBarThumbEl: HTMLElement | null = null;
   private activeStarRatingPreviewEl: HTMLElement | null = null;
+  private mainThumbDrag: { startY: number; startTop: number } | null = null;
   private listThumbDrag: { startY: number; startTop: number } | null = null;
   private stackThumbDrag: { startX: number; startLeft: number } | null = null;
   private activeItemActionMenuCleanup: (() => void) | null = null;
   private activeStackDropdownCleanup: ((skipOnClose?: boolean) => void) | null = null;
   private musicListSortable: Sortable | null = null;
   private musicListReorderMediaQuery: MediaQueryList | null = null;
+  private mainScrollResizeObserver: ResizeObserver | null = null;
+  private mainScrollSyncScheduled = false;
   private isReordering = false;
   private linkPickerState: LinkPickerState | null = null;
   private readonly handleMusicListReorderMediaChange = (): void => {
@@ -124,12 +131,14 @@ export class App {
     this.setupLinkPicker();
     this.setupEventDelegation();
     this.setupMusicListReorder();
+    this.setupCustomMainScrollbar();
     this.setupCustomListScrollbar();
     this.setupCustomStackScrollbar();
 
     if (hasServerData) {
       this.syncStackFeedLinks();
       requestAnimationFrame(() => {
+        this.syncCustomMainScrollbar();
         this.syncCustomListScrollbar();
         this.syncCustomStackScrollbar();
       });
@@ -161,6 +170,12 @@ export class App {
 
     submitButton.disabled = false;
 
+    if (detailsEl instanceof HTMLDetailsElement) {
+      detailsEl.addEventListener("toggle", () => {
+        this.scheduleMainScrollbarSync();
+      });
+    }
+
     if (scanButton instanceof HTMLButtonElement && scanInput instanceof HTMLInputElement) {
       scanButton.addEventListener("click", () => {
         if (this.addFormState.scanState === "scanning") {
@@ -177,7 +192,10 @@ export class App {
         }
 
         const secondary = form.querySelector<HTMLElement>(".add-form__secondary");
-        if (secondary?.hidden) secondary.hidden = false;
+        if (secondary?.hidden) {
+          secondary.hidden = false;
+          this.scheduleMainScrollbarSync();
+        }
 
         await this.handleCoverScan(
           file,
@@ -217,10 +235,12 @@ export class App {
         secondary.hidden = false;
         const artistInput = form.querySelector<HTMLInputElement>('input[name="artist"]');
         artistInput?.focus();
+        this.scheduleMainScrollbarSync();
         return;
       }
       if (secondary?.hidden) {
         secondary.hidden = false;
+        this.scheduleMainScrollbarSync();
       }
 
       if (!this.appState.isReady) {
@@ -347,6 +367,7 @@ export class App {
     form.reset();
     const secondary = form.querySelector<HTMLElement>(".add-form__secondary");
     if (secondary) secondary.hidden = true;
+    this.scheduleMainScrollbarSync();
     if (this.shouldRefreshListAfterAdd()) {
       await this.renderMusicList();
     }
@@ -501,6 +522,8 @@ export class App {
       secondary.hidden = false;
     }
 
+    this.scheduleMainScrollbarSync();
+
     this.closeLinkPicker();
     form.querySelector<HTMLInputElement>('input[name="artist"]')?.focus();
   }
@@ -595,6 +618,7 @@ export class App {
       alert(getCoverScanErrorMessage(error));
     } finally {
       this.setScanButtonState(scanButton, false);
+      this.scheduleMainScrollbarSync();
     }
   }
 
@@ -709,6 +733,7 @@ export class App {
       siblingButton?.setAttribute("aria-expanded", "false");
       panel.classList.toggle("is-open", willOpen);
       button.setAttribute("aria-expanded", String(willOpen));
+      this.scheduleMainScrollbarSync();
 
       if (willOpen && panel === searchPanel && searchInput instanceof HTMLInputElement) {
         requestAnimationFrame(() => {
@@ -771,11 +796,13 @@ export class App {
       }
 
       closeBrowsePanels();
+      this.scheduleMainScrollbarSync();
     });
 
     document.addEventListener("keydown", (event) => {
       if (event.key === "Escape") {
         closeBrowsePanels();
+        this.scheduleMainScrollbarSync();
       }
     });
   }
@@ -846,6 +873,7 @@ export class App {
 
     this.syncStackFeedLinks();
     this.syncCustomStackScrollbar();
+    this.scheduleMainScrollbarSync();
   }
 
   private syncStackFeedLinks(): void {
@@ -1459,6 +1487,206 @@ export class App {
     this.syncCustomListScrollbar();
   }
 
+  private setupCustomMainScrollbar(): void {
+    const scroll = document.getElementById("main-scroll");
+    const scrollbar = document.getElementById("main-scrollbar");
+    const track = document.getElementById("main-scroll-track");
+    const thumb = document.getElementById("main-scroll-thumb");
+    if (
+      !(scroll instanceof HTMLElement) ||
+      !(scrollbar instanceof HTMLElement) ||
+      !(track instanceof HTMLElement) ||
+      !(thumb instanceof HTMLElement)
+    ) {
+      return;
+    }
+
+    this.mainScrollEl = scroll;
+    this.mainScrollbarEl = scrollbar;
+    this.mainScrollTrackEl = track;
+    this.mainScrollThumbEl = thumb;
+
+    const upButton = scrollbar.querySelector('[data-main-scroll-btn="up"]');
+    const downButton = scrollbar.querySelector('[data-main-scroll-btn="down"]');
+
+    const scrollByStep = (delta: number): void => {
+      scroll.scrollBy({ top: delta, behavior: "auto" });
+    };
+
+    let repeatTimer: ReturnType<typeof setInterval> | null = null;
+    const startRepeatScroll = (delta: number): void => {
+      if (repeatTimer) {
+        clearInterval(repeatTimer);
+      }
+
+      repeatTimer = setInterval(() => {
+        scrollByStep(delta);
+      }, 60);
+    };
+
+    const stopRepeatScroll = (): void => {
+      if (!repeatTimer) {
+        return;
+      }
+
+      clearInterval(repeatTimer);
+      repeatTimer = null;
+    };
+
+    const bindScrollButton = (button: Element | null, delta: number): void => {
+      if (!(button instanceof HTMLButtonElement)) {
+        return;
+      }
+
+      button.addEventListener("click", () => {
+        scrollByStep(delta);
+      });
+      button.addEventListener("mousedown", () => {
+        startRepeatScroll(delta);
+      });
+      button.addEventListener("mouseup", stopRepeatScroll);
+      button.addEventListener("mouseleave", stopRepeatScroll);
+    };
+
+    bindScrollButton(upButton, -40);
+    bindScrollButton(downButton, 40);
+    document.addEventListener("mouseup", stopRepeatScroll);
+    window.addEventListener("blur", stopRepeatScroll);
+
+    track.addEventListener("mousedown", (event) => {
+      if (event.target === thumb) {
+        return;
+      }
+
+      const trackRect = track.getBoundingClientRect();
+      const thumbRect = thumb.getBoundingClientRect();
+      const clickOffset = event.clientY - trackRect.top;
+      const thumbTop = thumbRect.top - trackRect.top;
+      const direction = clickOffset < thumbTop ? -1 : 1;
+
+      scroll.scrollBy({
+        top: direction * Math.max(80, scroll.clientHeight * 0.8),
+        behavior: "auto",
+      });
+    });
+
+    const onDragMove = (event: MouseEvent): void => {
+      if (
+        !this.mainThumbDrag ||
+        !this.mainScrollEl ||
+        !this.mainScrollTrackEl ||
+        !this.mainScrollThumbEl
+      ) {
+        return;
+      }
+
+      const scrollRange = this.mainScrollEl.scrollHeight - this.mainScrollEl.clientHeight;
+      if (scrollRange <= 0) {
+        return;
+      }
+
+      const trackHeight = this.mainScrollTrackEl.clientHeight;
+      const thumbHeight = this.mainScrollThumbEl.offsetHeight;
+      const maxThumbTop = Math.max(trackHeight - thumbHeight, 0);
+      if (maxThumbTop <= 0) {
+        return;
+      }
+
+      const nextTop = Math.max(
+        0,
+        Math.min(
+          maxThumbTop,
+          this.mainThumbDrag.startTop + (event.clientY - this.mainThumbDrag.startY),
+        ),
+      );
+      const ratio = nextTop / maxThumbTop;
+      this.mainScrollEl.scrollTop = ratio * scrollRange;
+    };
+
+    const onDragEnd = (): void => {
+      this.mainThumbDrag = null;
+      document.removeEventListener("mousemove", onDragMove);
+    };
+
+    thumb.addEventListener("mousedown", (event) => {
+      event.preventDefault();
+      const trackRect = track.getBoundingClientRect();
+      const thumbRect = thumb.getBoundingClientRect();
+      this.mainThumbDrag = {
+        startY: event.clientY,
+        startTop: thumbRect.top - trackRect.top,
+      };
+      document.addEventListener("mousemove", onDragMove);
+      document.addEventListener("mouseup", onDragEnd, { once: true });
+    });
+
+    scroll.addEventListener("scroll", () => {
+      this.syncCustomMainScrollbar();
+    });
+    window.addEventListener("resize", () => {
+      this.syncCustomMainScrollbar();
+    });
+
+    this.mainScrollResizeObserver = new ResizeObserver(() => {
+      this.scheduleMainScrollbarSync();
+    });
+    this.mainScrollResizeObserver.observe(scroll);
+    Array.from(scroll.children).forEach((child) => {
+      if (child instanceof HTMLElement) {
+        this.mainScrollResizeObserver?.observe(child);
+      }
+    });
+
+    this.syncCustomMainScrollbar();
+  }
+
+  private scheduleMainScrollbarSync(): void {
+    if (this.mainScrollSyncScheduled) {
+      return;
+    }
+
+    this.mainScrollSyncScheduled = true;
+    requestAnimationFrame(() => {
+      this.mainScrollSyncScheduled = false;
+      this.syncCustomMainScrollbar();
+    });
+  }
+
+  private syncCustomMainScrollbar(): void {
+    if (
+      !this.mainScrollEl ||
+      !this.mainScrollbarEl ||
+      !this.mainScrollTrackEl ||
+      !this.mainScrollThumbEl
+    ) {
+      return;
+    }
+
+    const isMobile = window.matchMedia("(max-width: 520px)").matches;
+    const scrollRange = this.mainScrollEl.scrollHeight - this.mainScrollEl.clientHeight;
+    const hasOverflow = isMobile && scrollRange > 0;
+    this.mainScrollbarEl.classList.toggle("is-disabled", !hasOverflow);
+
+    const trackHeight = this.mainScrollTrackEl.clientHeight;
+    if (!hasOverflow || trackHeight <= 0) {
+      this.mainScrollThumbEl.style.height = `${trackHeight}px`;
+      this.mainScrollThumbEl.style.top = "0px";
+      return;
+    }
+
+    const minThumbHeight = 56;
+    const thumbHeight = Math.max(
+      minThumbHeight,
+      Math.floor((this.mainScrollEl.clientHeight / this.mainScrollEl.scrollHeight) * trackHeight),
+    );
+    const maxThumbTop = Math.max(trackHeight - thumbHeight, 0);
+    const scrollRatio = scrollRange <= 0 ? 0 : this.mainScrollEl.scrollTop / scrollRange;
+    const thumbTop = Math.round(maxThumbTop * scrollRatio);
+
+    this.mainScrollThumbEl.style.height = `${thumbHeight}px`;
+    this.mainScrollThumbEl.style.top = `${thumbTop}px`;
+  }
+
   private syncCustomListScrollbar(): void {
     if (
       !this.musicListEl ||
@@ -1521,8 +1749,10 @@ export class App {
     this.musicListSortable?.option("disabled", this.isBrowseOrderLocked());
     this.renderStackParentLinker(container);
     this.syncCustomListScrollbar();
+    this.scheduleMainScrollbarSync();
     requestAnimationFrame(() => {
       this.syncCustomListScrollbar();
+      this.syncCustomMainScrollbar();
     });
   }
 
@@ -1539,6 +1769,7 @@ export class App {
       : stacks;
 
     list.innerHTML = renderStackManageList(visibleStacks);
+    this.scheduleMainScrollbarSync();
   }
 
   private setupStackManagePanel(): void {
@@ -1551,6 +1782,7 @@ export class App {
     manageButton.addEventListener("click", () => {
       this.appState = transitionAppState(this.appState, { type: "STACK_MANAGE_TOGGLED" });
       panel.hidden = !this.appState.stackManageOpen;
+      this.scheduleMainScrollbarSync();
 
       if (!panel.hidden) {
         void this.renderStackManagePanel();
