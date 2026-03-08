@@ -178,31 +178,10 @@ body {
   background: var(--chrome);
   padding: 4px 4px 0;
   display: flex;
-  flex: 1;
-  min-height: 0;
-}
-
-.main-shell {
-  display: flex;
-  flex: 1;
-  min-height: 0;
-}
-
-.main-scroll {
-  display: flex;
   flex-direction: column;
   gap: 3px;
   flex: 1;
   min-height: 0;
-}
-
-.main-scrollbar {
-  display: none;
-}
-
-.main-scroll::-webkit-scrollbar {
-  width: 0;
-  height: 0;
 }
 
 /* ═══════════════════════════════════════════════════
@@ -1007,31 +986,15 @@ select.input {
 }
 
 @media (max-width: 520px) {
-  .main-shell {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr);
-    align-items: stretch;
-  }
-
-  .main-shell.main-shell--with-scrollbar {
-    grid-template-columns: minmax(0, 1fr) 19px;
-  }
-
-  .main-scroll {
+  body:not(.release-page-body) {
+    height: auto;
+    max-height: none;
     overflow-y: auto;
     overflow-x: hidden;
-    -ms-overflow-style: none;
-    scrollbar-width: none;
-    -webkit-overflow-scrolling: touch;
-    overscroll-behavior-y: contain;
   }
 
-  .main-scrollbar {
-    display: none;
-  }
-
-  .main-scrollbar.has-overflow {
-    display: grid;
+  body:not(.release-page-body) .main {
+    flex: 0 0 auto;
   }
 
   .stack-bar {
