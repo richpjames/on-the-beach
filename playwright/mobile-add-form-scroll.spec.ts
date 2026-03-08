@@ -30,6 +30,8 @@ test("mobile add form can scroll when manual entry is expanded", async ({ page }
   expect(beforeScroll.overflowY).toBe("auto");
   expect(beforeScroll.scrollHeight).toBeGreaterThan(beforeScroll.clientHeight);
 
+  await expect(page.locator("#main-scrollbar")).toBeVisible();
+
   await page.evaluate(() => {
     const scroll = document.getElementById("main-scroll");
     if (scroll) {

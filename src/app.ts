@@ -59,6 +59,7 @@ interface LinkPickerState {
 export class App {
   private api: ApiClient;
   private appState = initialAppState;
+  private mainShellEl: HTMLElement | null = null;
   private addFormState = initialAddFormState;
   private mainScrollEl: HTMLElement | null = null;
   private mainScrollbarEl: HTMLElement | null = null;
@@ -1488,11 +1489,13 @@ export class App {
   }
 
   private setupCustomMainScrollbar(): void {
+    const shell = document.querySelector(".main-shell");
     const scroll = document.getElementById("main-scroll");
     const scrollbar = document.getElementById("main-scrollbar");
     const track = document.getElementById("main-scroll-track");
     const thumb = document.getElementById("main-scroll-thumb");
     if (
+      !(shell instanceof HTMLElement) ||
       !(scroll instanceof HTMLElement) ||
       !(scrollbar instanceof HTMLElement) ||
       !(track instanceof HTMLElement) ||
@@ -1501,6 +1504,7 @@ export class App {
       return;
     }
 
+    this.mainShellEl = shell;
     this.mainScrollEl = scroll;
     this.mainScrollbarEl = scrollbar;
     this.mainScrollTrackEl = track;
@@ -1665,6 +1669,9 @@ export class App {
     const isMobile = window.matchMedia("(max-width: 520px)").matches;
     const scrollRange = this.mainScrollEl.scrollHeight - this.mainScrollEl.clientHeight;
     const hasOverflow = isMobile && scrollRange > 0;
+
+    this.mainShellEl?.classList.toggle("main-shell--with-scrollbar", hasOverflow);
+    this.mainScrollbarEl.classList.toggle("has-overflow", hasOverflow);
     this.mainScrollbarEl.classList.toggle("is-disabled", !hasOverflow);
 
     const trackHeight = this.mainScrollTrackEl.clientHeight;
