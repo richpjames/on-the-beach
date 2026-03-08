@@ -85,6 +85,20 @@ test("captures main and release views", async ({ page }, testInfo) => {
   await captureSnapshot(page, testInfo, "release-page-view");
 });
 
+test("captures add loading dialog", async ({ page }, testInfo) => {
+  await page.goto("/");
+  await expect(page.getByPlaceholder("Paste a music link...")).toBeVisible();
+
+  await page.evaluate(() => {
+    const overlay = document.getElementById("add-loading-overlay");
+    overlay?.classList.add("is-visible");
+    overlay?.setAttribute("aria-hidden", "false");
+  });
+
+  await expect(page.locator(".add-loading-dialog")).toBeVisible();
+  await captureSnapshot(page, testInfo, "add-loading-dialog");
+});
+
 test("captures main long-list view", async ({ page, request }, testInfo) => {
   await seedLongList(request);
 

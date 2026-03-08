@@ -2204,3 +2204,166 @@ body::after {
   justify-content: flex-end;
   gap: 8px;
 }
+
+/* ═══════════════════════════════════════════════════
+   ADD LOADING DIALOG — Windows 98 Progress Dialog
+═══════════════════════════════════════════════════ */
+
+.add-loading-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  background: rgba(0, 0, 0, 0.25);
+  align-items: center;
+  justify-content: center;
+}
+
+.add-loading-overlay.is-visible {
+  display: flex;
+}
+
+.add-loading-dialog {
+  width: 320px;
+  background: var(--chrome);
+  border-width: 2px;
+  border-style: solid;
+  border-color: var(--chrome-white) var(--chrome-darker) var(--chrome-darker) var(--chrome-white);
+  box-shadow:
+    3px 3px 0 #000000,
+    4px 4px 0 rgba(0, 0, 0, 0.3);
+}
+
+.add-loading-dialog__titlebar {
+  background: var(--title-bar);
+  padding: 3px 4px 3px 6px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  user-select: none;
+}
+
+.add-loading-dialog__titlebar-icon {
+  font-size: 13px;
+  line-height: 1;
+  animation: dialog-disc-spin 2s linear infinite;
+}
+
+@keyframes dialog-disc-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.add-loading-dialog__title {
+  color: #ffffff;
+  font-family: "Tahoma", "MS Sans Serif", sans-serif;
+  font-size: 11px;
+  font-weight: bold;
+  flex: 1;
+}
+
+.add-loading-dialog__winbtns {
+  display: flex;
+  gap: 2px;
+}
+
+.add-loading-dialog__winbtn {
+  width: 16px;
+  height: 14px;
+  background: var(--chrome);
+  border: 2px solid;
+  border-color: var(--chrome-white) var(--chrome-darker) var(--chrome-darker) var(--chrome-white);
+  color: #000000;
+  font-size: 9px;
+  font-family: Tahoma, sans-serif;
+  cursor: default;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  opacity: 0.45;
+}
+
+.add-loading-dialog__body {
+  padding: 16px 16px 10px;
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+}
+
+/* CSS-art vinyl disc */
+.add-loading-dialog__disc {
+  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at center, #111 0px, #111 5px, transparent 5px),
+    radial-gradient(circle at center, #1a1a1a 0px, #1a1a1a 8px, #333 8px, #333 13px, #222 13px, #222 18px, #444 18px, #444 19px, #111 19px);
+  border: 2px solid #000;
+  animation: dialog-disc-spin 2s linear infinite;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+}
+
+.add-loading-dialog__content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.add-loading-dialog__status {
+  font-family: "Tahoma", "MS Sans Serif", sans-serif;
+  font-size: 11px;
+  color: #000000;
+}
+
+.add-loading-dialog__progress {
+  height: 16px;
+  background: #ffffff;
+  border-width: 2px;
+  border-style: solid;
+  border-color: var(--chrome-dark) var(--chrome-white) var(--chrome-white) var(--chrome-dark);
+  overflow: hidden;
+  position: relative;
+}
+
+.add-loading-dialog__progress-fill {
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(
+    90deg,
+    var(--win-blue) 0px,
+    #1a6ed4 14px,
+    var(--win-blue) 16px,
+    transparent 16px,
+    transparent 18px
+  );
+  background-size: 18px 100%;
+  animation: win98-progress-marquee 0.45s linear infinite;
+}
+
+@keyframes win98-progress-marquee {
+  from {
+    background-position: 0 0;
+  }
+  to {
+    background-position: 18px 0;
+  }
+}
+
+.add-loading-dialog__substatus {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--chrome-darker);
+}
+
+.add-loading-dialog__footer {
+  padding: 0 16px 12px;
+  display: flex;
+  justify-content: flex-end;
+}
