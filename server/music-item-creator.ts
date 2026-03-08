@@ -131,6 +131,7 @@ interface ReleaseCandidateInput {
   confidence?: number;
   evidence?: string;
   isPrimary?: boolean;
+  embedMetadata?: Record<string, string>;
 }
 
 export class AmbiguousLinkSelectionError extends Error {
@@ -227,6 +228,7 @@ async function insertMusicItemWithLink(
     sourceId,
     url: normalizedUrl,
     isPrimary: true,
+    metadata: candidate.embedMetadata ? JSON.stringify(candidate.embedMetadata) : null,
   });
 
   const item = await fetchFullItem(inserted.id);
@@ -273,6 +275,7 @@ async function resolveReleaseCandidates(
           artistName,
           itemType: overrides?.itemType ?? scraped?.itemType ?? "album",
           artworkUrl: overrides?.artworkUrl ?? scraped?.imageUrl ?? null,
+          embedMetadata: scraped?.embedMetadata,
         },
       ],
     };
