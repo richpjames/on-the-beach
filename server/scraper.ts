@@ -19,6 +19,7 @@ export interface ScrapedMetadata {
   itemType?: ItemType;
   imageUrl?: string;
   releases?: ExtractedReleaseCandidate[];
+  embedMetadata?: Record<string, string>;
 }
 
 type OgParser = (og: OgData) => ScrapedMetadata;
@@ -212,6 +213,45 @@ export function parseBandcampOg(og: OgData): ScrapedMetadata {
     };
   }
   return { potentialTitle: title || undefined, imageUrl: og.ogImage };
+}
+
+export function extractBandcampEmbedMetadata(html: string): Record<string, string> | null {
+  // Primary: <meta name="bc-page-properties" content='{"item_type":"album","item_id":123}'>
+  const metaMatch =
+    html.match(/<meta\s+name="bc-page-properties"\s+content='([^']+)'/i) ??
+    html.match(/<meta\s+name='bc-page-properties'\s+content="([^"]+)"/i) ??
+    html.match(/<meta\s+name="bc-page-properties"\s+content="([^"]+)"/i) ??
+    html.match(/<meta\s+name='bc-page-properties'\s+content='([^']+)'/i);
+  if (metaMatch) {
+    try {
+      const parsed = JSON.parse(metaMatch[1]) as unknown;
+      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+        const obj = parsed as Record<string, unknown>;
+        const id = obj.item_id;
+        const type = obj.item_type;
+        if (typeof id === "number" && Number.isFinite(id)) {
+          return {
+            album_id: String(id),
+            ...(typeof type === "string" ? { item_type: type } : {}),
+          };
+        }
+      }
+    } catch {
+      // fall through to TralbumData
+    }
+  }
+
+  // Fallback: TralbumData = { "id" : 123, "item_type" : "album" }
+  const tralbumIdMatch = html.match(/TralbumData\s*=\s*\{[^}]*"id"\s*:\s*(\d+)/);
+  const tralbumTypeMatch = html.match(/TralbumData\s*=\s*\{[^}]*"item_type"\s*:\s*"([^"]+)"/);
+  if (tralbumIdMatch) {
+    return {
+      album_id: tralbumIdMatch[1],
+      ...(tralbumTypeMatch ? { item_type: tralbumTypeMatch[1] } : {}),
+    };
+  }
+
+  return null;
 }
 
 export function parseSoundcloudOg(og: OgData): ScrapedMetadata {
@@ -872,7 +912,11 @@ export async function scrapeUrl(
     }
 
     const parser = SOURCE_PARSERS[source] || parseDefaultOg;
-    return parser(og);
+    const result = parser(og);
+    if (source === "bandcamp" && result) {
+      result.embedMetadata = extractBandcampEmbedMetadata(html) ?? undefined;
+    }
+    return result;
   } catch (err) {
     if (err instanceof UnsupportedMusicLinkError) {
       throw err;
