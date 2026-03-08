@@ -313,10 +313,11 @@ export class App {
     form: HTMLFormElement,
     options?: { selectedCandidateId?: string },
   ): Promise<void> {
-    const values = { ...rawValues };
-    const enriched = await this.enrichValuesWithMusicBrainz(values);
-
+    this.setSubmitButtonState(true);
     try {
+      const values = { ...rawValues };
+      const enriched = await this.enrichValuesWithMusicBrainz(values);
+
       const item = await this.api.createMusicItem({
         ...buildCreateMusicItemInputFromValues(enriched.values),
         listenStatus: "to-listen",
@@ -332,8 +333,9 @@ export class App {
         this.openLinkPicker(error.payload, rawValues);
         return;
       }
-
       throw error;
+    } finally {
+      this.setSubmitButtonState(false);
     }
   }
 
@@ -548,6 +550,15 @@ export class App {
 
   private shouldRefreshListAfterAdd(): boolean {
     return this.appCtx.currentFilter === "all" || this.appCtx.currentFilter === "to-listen";
+  }
+
+  private setSubmitButtonState(isLoading: boolean): void {
+    const button = document.getElementById("add-form-submit");
+    if (!(button instanceof HTMLButtonElement)) return;
+
+    this.addFormActor.send({ type: isLoading ? "SUBMIT_STARTED" : "SUBMIT_FINISHED" });
+    button.disabled = isLoading;
+    button.textContent = isLoading ? "Adding..." : "Add";
   }
 
   private setScanButtonState(button: HTMLButtonElement, isLoading: boolean): void {
