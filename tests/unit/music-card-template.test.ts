@@ -30,6 +30,7 @@ const ITEM: MusicItemFull = {
   artist_name: "Example Artist",
   primary_url: "https://example.com/release",
   primary_source: "bandcamp",
+  primary_link_metadata: null,
   stacks: [{ id: 3, name: "Ambient" }],
 };
 

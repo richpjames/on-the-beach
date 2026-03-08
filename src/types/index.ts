@@ -76,6 +76,7 @@ export interface MusicItemFull extends MusicItem {
   artist_name: string | null;
   primary_url: string | null;
   primary_source: SourceName | null;
+  primary_link_metadata: string | null;
   stacks: Array<{ id: number; name: string }>;
 }
 

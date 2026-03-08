@@ -33,6 +33,7 @@ function makeItem(overrides: Partial<MusicItemFull> = {}): MusicItemFull {
     catalogue_number: null,
     primary_url: "https://music.example.com/boards-of-canada",
     primary_source: "bandcamp",
+    primary_link_metadata: null,
     stacks: [],
     ...overrides,
   };
