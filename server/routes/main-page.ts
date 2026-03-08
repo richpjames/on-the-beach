@@ -148,6 +148,8 @@ function renderMainPage(opts: {
       </header>
 
       <main class="main">
+        <div class="main-shell">
+          <div id="main-scroll" class="main-scroll">
         <section class="add-section">
           <form id="add-form" class="add-form" method="post">
             <div class="add-form__primary">
@@ -390,6 +392,29 @@ function renderMainPage(opts: {
             </div>
           </div>
         </section>
+          </div>
+          <div id="main-scrollbar" class="main-scrollbar music-scrollbar" aria-hidden="true">
+            <button
+              type="button"
+              class="music-scrollbar__button"
+              data-main-scroll-btn="up"
+              tabindex="-1"
+            >
+              ▲
+            </button>
+            <div id="main-scroll-track" class="music-scrollbar__track">
+              <div id="main-scroll-thumb" class="music-scrollbar__thumb"></div>
+            </div>
+            <button
+              type="button"
+              class="music-scrollbar__button"
+              data-main-scroll-btn="down"
+              tabindex="-1"
+            >
+              ▼
+            </button>
+          </div>
+        </div>
       </main>
       <div id="link-picker-modal" class="link-picker" hidden>
         <div class="link-picker__backdrop" data-link-picker-close="true"></div>
