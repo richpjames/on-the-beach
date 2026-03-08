@@ -986,7 +986,7 @@ select.input {
 }
 
 @media (max-width: 520px) {
-  body {
+  body:not(.release-page-body) {
     min-height: calc(100dvh - (var(--window-top-space) * 2) - var(--taskbar-height));
     height: auto;
     max-height: none;
@@ -994,7 +994,7 @@ select.input {
     overflow-x: hidden;
   }
 
-  .main {
+  body:not(.release-page-body) .main {
     flex: 0 0 auto;
   }
 
