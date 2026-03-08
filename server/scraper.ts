@@ -224,7 +224,7 @@ export function extractBandcampEmbedMetadata(html: string): Record<string, strin
     html.match(/<meta\s+name='bc-page-properties'\s+content='([^']+)'/i);
   if (metaMatch) {
     try {
-      const parsed = JSON.parse(metaMatch[1]) as unknown;
+      const parsed = JSON.parse(decodeHtmlEntities(metaMatch[1])) as unknown;
       if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
         const obj = parsed as Record<string, unknown>;
         const id = obj.item_id;

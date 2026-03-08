@@ -738,6 +738,14 @@ describe("extractBandcampEmbedMetadata", () => {
     });
   });
 
+  test("decodes HTML entities in bc-page-properties content", () => {
+    const html = `<meta name="bc-page-properties" content="{&quot;item_type&quot;:&quot;album&quot;,&quot;item_id&quot;:1536701931}">`;
+    expect(extractBandcampEmbedMetadata(html)).toEqual({
+      album_id: "1536701931",
+      item_type: "album",
+    });
+  });
+
   test("returns null when JSON parses but item_id is absent", () => {
     const html = `<meta name="bc-page-properties" content='{"item_type":"album"}'>`;
     expect(extractBandcampEmbedMetadata(html)).toBeNull();
