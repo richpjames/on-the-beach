@@ -22,8 +22,9 @@ import {
   setStarRatingPreview,
   setStarRatingValue,
 } from "./ui/components/star-rating";
-import { initialAddFormState, transitionAddFormState } from "./ui/state/add-form-machine";
-import { initialAppState, transitionAppState } from "./ui/state/app-machine";
+import { createActor } from "xstate";
+import { addFormMachine } from "./ui/state/add-form-machine";
+import { appMachine } from "./ui/state/app-machine";
 import {
   renderAddFormStackChips,
   renderAmbiguousLinkCandidates,
@@ -58,8 +59,8 @@ interface LinkPickerState {
 
 export class App {
   private api: ApiClient;
-  private appState = initialAppState;
-  private addFormState = initialAddFormState;
+  private appActor = createActor(appMachine).start();
+  private addFormActor = createActor(addFormMachine).start();
   private musicListEl: HTMLElement | null = null;
   private musicListScrollbarEl: HTMLElement | null = null;
   private musicListTrackEl: HTMLElement | null = null;
@@ -87,11 +88,11 @@ export class App {
 
   async initialize(): Promise<void> {
     this.setupAddForm();
-    this.appState = transitionAppState(this.appState, { type: "APP_READY" });
+    this.appActor.send({ type: "APP_READY" });
 
     const serverState = this.readServerState();
     if (serverState) {
-      this.appState = transitionAppState(this.appState, {
+      this.appActor.send({
         type: "STACKS_LOADED",
         stacks: serverState.stacks,
       });
@@ -140,7 +141,7 @@ export class App {
   }
 
   private setupAddForm(): void {
-    if (this.addFormState.initialized) {
+    if (this.formCtx.initialized) {
       return;
     }
 
@@ -150,7 +151,7 @@ export class App {
       return;
     }
 
-    this.addFormState = transitionAddFormState(this.addFormState, { type: "INITIALIZED" });
+    this.addFormActor.send({ type: "INITIALIZED" });
 
     const detailsEl = form.querySelector(".add-form__details");
     const titleInput = form.querySelector('input[name="title"]');
@@ -163,7 +164,7 @@ export class App {
 
     if (scanButton instanceof HTMLButtonElement && scanInput instanceof HTMLInputElement) {
       scanButton.addEventListener("click", () => {
-        if (this.addFormState.scanState === "scanning") {
+        if (this.formCtx.scanState === "scanning") {
           return;
         }
 
@@ -201,7 +202,7 @@ export class App {
         return;
       }
 
-      this.addFormState = transitionAddFormState(this.addFormState, {
+      this.addFormActor.send({
         type: "STACK_REMOVED",
         stackId: Number(target.dataset.removeStack),
       });
@@ -223,7 +224,7 @@ export class App {
         secondary.hidden = false;
       }
 
-      if (!this.appState.isReady) {
+      if (!this.appCtx.isReady) {
         alert("App is still loading. Please try again in a moment.");
         return;
       }
@@ -337,9 +338,9 @@ export class App {
   }
 
   private async handleCreatedItem(itemId: number, form: HTMLFormElement): Promise<void> {
-    if (this.addFormState.selectedStackIds.length > 0) {
-      await this.api.setItemStacks(itemId, this.addFormState.selectedStackIds);
-      this.addFormState = transitionAddFormState(this.addFormState, { type: "CLEAR_STACKS" });
+    if (this.formCtx.selectedStackIds.length > 0) {
+      await this.api.setItemStacks(itemId, this.formCtx.selectedStackIds);
+      this.addFormActor.send({ type: "CLEAR_STACKS" });
       this.renderAddFormStackChips();
       await this.renderStackBar();
     }
@@ -546,11 +547,11 @@ export class App {
   }
 
   private shouldRefreshListAfterAdd(): boolean {
-    return this.appState.currentFilter === "all" || this.appState.currentFilter === "to-listen";
+    return this.appCtx.currentFilter === "all" || this.appCtx.currentFilter === "to-listen";
   }
 
   private setScanButtonState(button: HTMLButtonElement, isLoading: boolean): void {
-    this.addFormState = transitionAddFormState(this.addFormState, {
+    this.addFormActor.send({
       type: isLoading ? "SCAN_STARTED" : "SCAN_FINISHED",
     });
 
@@ -664,7 +665,7 @@ export class App {
         return;
       }
 
-      this.appState = transitionAppState(this.appState, {
+      this.appActor.send({
         type: "FILTER_SELECTED",
         filter: target.dataset.filter as ListenStatus | "all",
       });
@@ -719,13 +720,13 @@ export class App {
 
     if (searchInput instanceof HTMLInputElement) {
       searchInput.addEventListener("input", () => {
-        this.appState = transitionAppState(this.appState, {
+        this.appActor.send({
           type: "SEARCH_UPDATED",
           query: searchInput.value,
         });
 
         void this.renderStackBar();
-        if (this.appState.stackManageOpen) {
+        if (this.appCtx.stackManageOpen) {
           void this.renderStackManagePanel();
         }
         void this.renderMusicList();
@@ -734,7 +735,7 @@ export class App {
 
     if (sortSelect instanceof HTMLSelectElement) {
       sortSelect.addEventListener("change", () => {
-        this.appState = transitionAppState(this.appState, {
+        this.appActor.send({
           type: "SORT_UPDATED",
           sort: sortSelect.value as MusicItemSort,
         });
@@ -781,16 +782,16 @@ export class App {
   }
 
   private getNormalizedSearchQuery(): string {
-    return this.appState.searchQuery.trim().toLowerCase();
+    return this.appCtx.searchQuery.trim().toLowerCase();
   }
 
   private isBrowseOrderLocked(): boolean {
-    return this.getNormalizedSearchQuery().length > 0 || this.appState.currentSort !== "default";
+    return this.getNormalizedSearchQuery().length > 0 || this.appCtx.currentSort !== "default";
   }
 
   private async renderStackBar(): Promise<void> {
     const stacks = await this.api.listStacks();
-    this.appState = transitionAppState(this.appState, {
+    this.appActor.send({
       type: "STACKS_LOADED",
       stacks,
     });
@@ -810,28 +811,27 @@ export class App {
 
     const searchQuery = this.getNormalizedSearchQuery();
     const visibleStacks = searchQuery
-      ? this.appState.stacks.filter(
+      ? this.appCtx.stacks.filter(
           (stack) =>
-            stack.id === this.appState.currentStack ||
-            stack.name.toLowerCase().includes(searchQuery),
+            stack.id === this.appCtx.currentStack || stack.name.toLowerCase().includes(searchQuery),
         )
-      : this.appState.stacks;
+      : this.appCtx.stacks;
 
     for (const stack of visibleStacks) {
       const button = document.createElement("button");
-      button.className = `stack-tab${this.appState.currentStack === stack.id ? " active" : ""}`;
+      button.className = `stack-tab${this.appCtx.currentStack === stack.id ? " active" : ""}`;
       button.dataset.stackId = String(stack.id);
       button.textContent = stack.name;
       bar.insertBefore(button, manageBtn);
     }
 
     if (allBtn) {
-      allBtn.className = `stack-tab${this.appState.currentStack === null ? " active" : ""}`;
+      allBtn.className = `stack-tab${this.appCtx.currentStack === null ? " active" : ""}`;
     }
 
     if (deleteBtn instanceof HTMLButtonElement) {
-      const selectedStack = this.appState.stacks.find(
-        (stack) => stack.id === this.appState.currentStack,
+      const selectedStack = this.appCtx.stacks.find(
+        (stack) => stack.id === this.appCtx.currentStack,
       );
       const hasSelection = selectedStack !== undefined;
       deleteBtn.hidden = !hasSelection;
@@ -853,14 +853,14 @@ export class App {
       element.remove();
     });
 
-    for (const stack of this.appState.stacks) {
+    for (const stack of this.appCtx.stacks) {
       const link = document.createElement("link");
       link.rel = "alternate";
       link.type = "application/rss+xml";
       link.title = buildStackFeedTitle(stack.name);
       link.href = buildStackFeedHref(stack.id);
       link.dataset.rssFeedLink = String(stack.id);
-      if (this.appState.currentStack === stack.id) {
+      if (this.appCtx.currentStack === stack.id) {
         link.dataset.rssActiveFeed = "true";
       }
       document.head.appendChild(link);
@@ -877,8 +877,8 @@ export class App {
       const target = event.target as HTMLElement;
       const deleteBtn = target.closest("#delete-stack-btn");
       if (deleteBtn) {
-        if (this.appState.currentStack !== null) {
-          await this.deleteStackById(this.appState.currentStack);
+        if (this.appCtx.currentStack !== null) {
+          await this.deleteStackById(this.appCtx.currentStack);
         }
         return;
       }
@@ -889,9 +889,9 @@ export class App {
       }
 
       if (tab.dataset.stack === "all") {
-        this.appState = transitionAppState(this.appState, { type: "STACK_SELECTED_ALL" });
+        this.appActor.send({ type: "STACK_SELECTED_ALL" });
       } else if (tab.dataset.stackId) {
-        this.appState = transitionAppState(this.appState, {
+        this.appActor.send({
           type: "STACK_SELECTED",
           stackId: Number(tab.dataset.stackId),
         });
@@ -1079,14 +1079,14 @@ export class App {
   }
 
   private async deleteStackById(stackId: number): Promise<void> {
-    const stack = this.appState.stacks.find((candidate) => candidate.id === stackId);
+    const stack = this.appCtx.stacks.find((candidate) => candidate.id === stackId);
     const stackName = stack?.name ?? "this stack";
     if (!confirm(`Delete "${stackName}"? Links won't be deleted, just untagged.`)) {
       return;
     }
 
     await this.api.deleteStack(stackId);
-    this.appState = transitionAppState(this.appState, {
+    this.appActor.send({
       type: "STACK_DELETED",
       stackId,
     });
@@ -1309,7 +1309,7 @@ export class App {
       return;
     }
 
-    const contextKey = buildContextKey(this.appState.currentFilter, this.appState.currentStack);
+    const contextKey = buildContextKey(this.appCtx.currentFilter, this.appCtx.currentStack);
     try {
       await this.api.saveOrder(contextKey, itemIds);
     } catch (error) {
@@ -1505,17 +1505,17 @@ export class App {
 
     this.closeItemActionMenu();
     const filters = buildMusicItemFilters(
-      this.appState.currentFilter,
-      this.appState.currentStack,
-      this.appState.searchQuery,
-      this.appState.currentSort,
+      this.appCtx.currentFilter,
+      this.appCtx.currentStack,
+      this.appCtx.searchQuery,
+      this.appCtx.currentSort,
     );
     const result = await this.api.listMusicItems(filters);
 
     container.innerHTML = renderMusicList(
       result.items,
-      this.appState.currentFilter,
-      this.appState.searchQuery,
+      this.appCtx.currentFilter,
+      this.appCtx.searchQuery,
     );
     this.setupMusicListReorder();
     this.musicListSortable?.option("disabled", this.isBrowseOrderLocked());
@@ -1549,8 +1549,8 @@ export class App {
     }
 
     manageButton.addEventListener("click", () => {
-      this.appState = transitionAppState(this.appState, { type: "STACK_MANAGE_TOGGLED" });
-      panel.hidden = !this.appState.stackManageOpen;
+      this.appActor.send({ type: "STACK_MANAGE_TOGGLED" });
+      panel.hidden = !this.appCtx.stackManageOpen;
 
       if (!panel.hidden) {
         void this.renderStackManagePanel();
@@ -1626,7 +1626,7 @@ export class App {
       }
 
       const parentSelect = document.getElementById("stack-parent-select");
-      if (!(parentSelect instanceof HTMLSelectElement) || this.appState.currentStack === null) {
+      if (!(parentSelect instanceof HTMLSelectElement) || this.appCtx.currentStack === null) {
         return;
       }
 
@@ -1636,10 +1636,10 @@ export class App {
       }
 
       try {
-        await this.api.setStackParent(this.appState.currentStack, parentStackId);
+        await this.api.setStackParent(this.appCtx.currentStack, parentStackId);
         parentSelect.value = "";
         await this.renderStackBar();
-        if (this.appState.stackManageOpen) {
+        if (this.appCtx.stackManageOpen) {
           await this.renderStackManagePanel();
         }
         await this.renderMusicList();
@@ -1656,19 +1656,17 @@ export class App {
       existing.remove();
     }
 
-    if (this.appState.currentStack === null) {
+    if (this.appCtx.currentStack === null) {
       return;
     }
 
-    const currentStack = this.appState.stacks.find(
-      (stack) => stack.id === this.appState.currentStack,
-    );
+    const currentStack = this.appCtx.stacks.find((stack) => stack.id === this.appCtx.currentStack);
     if (!currentStack) {
       return;
     }
 
-    const parentCandidates = this.appState.stacks.filter(
-      (stack) => stack.id !== this.appState.currentStack,
+    const parentCandidates = this.appCtx.stacks.filter(
+      (stack) => stack.id !== this.appCtx.currentStack,
     );
 
     const options =
@@ -1722,8 +1720,8 @@ export class App {
     }
 
     container.innerHTML = renderAddFormStackChips(
-      this.addFormState.selectedStackIds,
-      this.appState.stacks,
+      this.formCtx.selectedStackIds,
+      this.appCtx.stacks,
     );
   }
 
@@ -1735,9 +1733,9 @@ export class App {
 
     await this.openStackDropdown({
       container: picker,
-      selectedStackIds: new Set(this.addFormState.selectedStackIds),
+      selectedStackIds: new Set(this.formCtx.selectedStackIds),
       onToggle: (stackId, checked) => {
-        this.addFormState = transitionAddFormState(this.addFormState, {
+        this.addFormActor.send({
           type: "STACK_TOGGLED",
           stackId,
           checked,
@@ -1746,7 +1744,7 @@ export class App {
       },
       onCreate: async (name) => {
         const stack = await this.api.createStack(name);
-        this.addFormState = transitionAddFormState(this.addFormState, {
+        this.addFormActor.send({
           type: "STACK_ADDED",
           stackId: stack.id,
         });
@@ -1954,5 +1952,13 @@ export class App {
         await options.onCreate(name);
       });
     }
+  }
+
+  private get appCtx() {
+    return this.appActor.getSnapshot().context;
+  }
+
+  private get formCtx() {
+    return this.addFormActor.getSnapshot().context;
   }
 }
