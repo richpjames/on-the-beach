@@ -40,6 +40,36 @@ function safeArtworkUrl(url: string): string | null {
   return SAFE_ARTWORK_URL.test(url) ? url : null;
 }
 
+function parseLinkMetadata(raw: string | null): Record<string, string> | null {
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw) as unknown;
+    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+      return parsed as Record<string, string>;
+    }
+  } catch {
+    // ignore malformed JSON
+  }
+  return null;
+}
+
+function renderBandcampEmbed(item: MusicItemFull): string {
+  const meta = parseLinkMetadata(item.primary_link_metadata);
+  const albumId = meta?.album_id;
+  if (!albumId) return "";
+
+  const embedType = meta.item_type === "track" ? "track" : "album";
+  const src = `https://bandcamp.com/EmbeddedPlayer/${embedType}=${escapeHtml(albumId)}/size=large/bgcol=ffffff/linkcol=0687f5/tracklist=false/transparent=true/`;
+
+  return `<iframe
+    class="release-page__bandcamp-embed"
+    src="${src}"
+    seamless
+    style="border:0;width:100%;height:472px;"
+    title="Bandcamp player"
+  ></iframe>`;
+}
+
 function renderNotFoundPage(): string {
   return `<!doctype html>
 <html lang="en">
@@ -120,6 +150,7 @@ function renderReleasePage(item: MusicItemFull, cssHref: string): string {
                 ${renderStarRating(item.id, item.rating, "star-rating--large")}
                 <div id="stack-chips" class="release-page__stacks"></div>
                 ${item.primary_url ? `<a class="release-page__source-link" href="${escapeHtml(item.primary_url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(sourceDisplayName(item.primary_source ?? parseUrl(item.primary_url).source))}</a>` : ""}
+                ${item.primary_source === "bandcamp" ? renderBandcampEmbed(item) : ""}
               </div>
 
               <div id="edit-mode" hidden>
