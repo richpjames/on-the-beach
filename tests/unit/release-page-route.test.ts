@@ -136,3 +136,76 @@ describe("GET /r/:id", () => {
     expect(html).toContain("const ITEM_ID = 42");
   });
 });
+
+describe("Bandcamp embed", () => {
+  test("renders embed iframe when primary_source is bandcamp and metadata has album_id", async () => {
+    const item = {
+      ...baseItem,
+      primary_url: "https://artist.bandcamp.com/album/my-album",
+      primary_source: "bandcamp" as const,
+      primary_link_metadata: JSON.stringify({ album_id: "1536701931", item_type: "album" }),
+    };
+    mockFetchItem.mockResolvedValue(item);
+    const app = makeApp();
+    const res = await app.request("http://localhost/r/42");
+    const html = await res.text();
+    expect(html).toContain("bandcamp.com/EmbeddedPlayer/album=1536701931");
+    expect(html).toContain("<iframe");
+  });
+
+  test("does not render embed when primary_source is not bandcamp", async () => {
+    const item = {
+      ...baseItem,
+      primary_url: "https://open.spotify.com/album/abc",
+      primary_source: "spotify" as const,
+      primary_link_metadata: null,
+    };
+    mockFetchItem.mockResolvedValue(item);
+    const app = makeApp();
+    const res = await app.request("http://localhost/r/42");
+    const html = await res.text();
+    expect(html).not.toContain("bandcamp.com/EmbeddedPlayer");
+  });
+
+  test("does not render embed when metadata is null", async () => {
+    const item = {
+      ...baseItem,
+      primary_url: "https://artist.bandcamp.com/album/my-album",
+      primary_source: "bandcamp" as const,
+      primary_link_metadata: null,
+    };
+    mockFetchItem.mockResolvedValue(item);
+    const app = makeApp();
+    const res = await app.request("http://localhost/r/42");
+    const html = await res.text();
+    expect(html).not.toContain("bandcamp.com/EmbeddedPlayer");
+  });
+
+  test("uses track type when item_type is track", async () => {
+    const item = {
+      ...baseItem,
+      primary_url: "https://artist.bandcamp.com/track/my-track",
+      primary_source: "bandcamp" as const,
+      primary_link_metadata: JSON.stringify({ album_id: "9999", item_type: "track" }),
+    };
+    mockFetchItem.mockResolvedValue(item);
+    const app = makeApp();
+    const res = await app.request("http://localhost/r/42");
+    const html = await res.text();
+    expect(html).toContain("bandcamp.com/EmbeddedPlayer/track=9999");
+  });
+
+  test("falls back to album type when item_type not in metadata", async () => {
+    const item = {
+      ...baseItem,
+      primary_url: "https://artist.bandcamp.com/album/my-album",
+      primary_source: "bandcamp" as const,
+      primary_link_metadata: JSON.stringify({ album_id: "9999" }),
+    };
+    mockFetchItem.mockResolvedValue(item);
+    const app = makeApp();
+    const res = await app.request("http://localhost/r/42");
+    const html = await res.text();
+    expect(html).toContain("bandcamp.com/EmbeddedPlayer/album=9999");
+  });
+});
