@@ -1,6 +1,6 @@
 import percySnapshot from "@percy/playwright";
 import path from "node:path";
-import type { Page, TestInfo } from "@playwright/test";
+import type { APIRequestContext, Page, TestInfo } from "@playwright/test";
 import { expect, test } from "./fixtures/parallel-test";
 
 const PERCY_CSS = `
@@ -31,6 +31,21 @@ type ManualItemInput = {
   genre: string;
   notes: string;
 };
+
+const LONG_LIST_FIXTURES = [
+  { title: "Waterline Dub", artist: "Current Ritual" },
+  { title: "Moon Pool", artist: "Shore Unit" },
+  { title: "Glass Harbour", artist: "Nera Coast" },
+  { title: "Wire Garden", artist: "Parallel Park" },
+  { title: "Sleep Dealer", artist: "Delta Static" },
+  { title: "Signal Bloom", artist: "Ana Sequence" },
+  { title: "Cloud Relay", artist: "Marble Phase" },
+  { title: "Night Ferry", artist: "Kite Array" },
+  { title: "Blue Static", artist: "Harbor Tone" },
+  { title: "Slow Current", artist: "Ari Loop" },
+  { title: "Channel Glass", artist: "North Index" },
+  { title: "Tape Horizon", artist: "Soft Relay" },
+];
 
 test.beforeEach(async ({ request }) => {
   await request.post("/api/__test__/reset");
@@ -70,6 +85,18 @@ test("captures main and release views", async ({ page }, testInfo) => {
   await captureSnapshot(page, testInfo, "release-page-view");
 });
 
+test("captures main long-list view", async ({ page, request }, testInfo) => {
+  await seedLongList(request);
+
+  await page.goto("/");
+  await expect(page.locator(".music-card")).toHaveCount(LONG_LIST_FIXTURES.length);
+  await expect(page.locator(".music-card__title").first()).toHaveText(
+    LONG_LIST_FIXTURES.at(-1)!.title,
+  );
+
+  await captureSnapshot(page, testInfo, "main-app-long-list-view");
+});
+
 async function captureSnapshot(page: Page, testInfo: TestInfo, viewName: string): Promise<void> {
   const viewport = page.viewportSize();
   const widths = viewport ? [viewport.width] : undefined;
@@ -80,6 +107,21 @@ async function captureSnapshot(page: Page, testInfo: TestInfo, viewName: string)
     widths,
     minHeight,
   });
+}
+
+async function seedLongList(request: APIRequestContext): Promise<void> {
+  for (const item of LONG_LIST_FIXTURES) {
+    const response = await request.post("/api/music-items", {
+      data: {
+        title: item.title,
+        artistName: item.artist,
+        itemType: "album",
+        listenStatus: "to-listen",
+      },
+    });
+
+    expect(response.ok()).toBe(true);
+  }
 }
 
 async function ensureSecondaryVisible(page: Page): Promise<void> {
