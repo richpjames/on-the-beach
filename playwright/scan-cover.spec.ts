@@ -40,9 +40,34 @@ test("scan prefill opens details and fills artist/release title", async ({ page 
   await expect(page.locator('input[name="title"]')).toHaveValue("Music Has the Right to Children");
   await expect(page.locator('input[name="artworkUrl"]')).toHaveValue("/uploads/mock-cover.jpg");
 
+  const createRequest = page.waitForResponse((response) => {
+    return (
+      response.url().includes("/api/music-items") &&
+      response.request().method() === "POST" &&
+      response.status() === 201
+    );
+  });
+  const refreshRequest = page.waitForResponse((response) => {
+    return (
+      response.url().includes("/api/music-items") &&
+      response.request().method() === "GET" &&
+      response.status() === 200
+    );
+  });
+
   await page.getByRole("button", { name: "Add" }).click();
-  await expect(page.locator(".music-card").first()).toBeVisible({ timeout: 10_000 });
-  await expect(page.locator(".music-card__artwork").first()).toHaveAttribute(
+  await createRequest;
+  await refreshRequest;
+
+  const card = page
+    .locator(".music-card", {
+      has: page.locator(".music-card__title", {
+        hasText: "Music Has the Right to Children",
+      }),
+    })
+    .first();
+  await expect(card).toBeVisible({ timeout: 10_000 });
+  await expect(card.locator(".music-card__artwork")).toHaveAttribute(
     "src",
     "/uploads/mock-cover.jpg",
   );
