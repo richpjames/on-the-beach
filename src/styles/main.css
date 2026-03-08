@@ -1009,8 +1009,12 @@ select.input {
 @media (max-width: 520px) {
   .main-shell {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) 19px;
+    grid-template-columns: minmax(0, 1fr);
     align-items: stretch;
+  }
+
+  .main-shell.main-shell--with-scrollbar {
+    grid-template-columns: minmax(0, 1fr) 19px;
   }
 
   .main-scroll {
@@ -1023,6 +1027,10 @@ select.input {
   }
 
   .main-scrollbar {
+    display: none;
+  }
+
+  .main-scrollbar.has-overflow {
     display: grid;
   }
 
