@@ -19,32 +19,23 @@ test("mobile add form can scroll when manual entry is expanded", async ({ page }
   await page.locator(".add-form__details summary").click();
   await expect(page.locator('textarea[name="notes"]')).toBeVisible();
 
-  const mainScroll = page.locator("#main-scroll");
-
   const beforeScroll = await page.evaluate(() => ({
-    overflowY: window.getComputedStyle(document.getElementById("main-scroll")!).overflowY,
-    scrollHeight: document.getElementById("main-scroll")!.scrollHeight,
-    clientHeight: document.getElementById("main-scroll")!.clientHeight,
+    scrollHeight: document.documentElement.scrollHeight,
+    clientHeight: window.innerHeight,
+    mainScrollbarCount: document.querySelectorAll("#main-scrollbar").length,
   }));
 
-  expect(beforeScroll.overflowY).toBe("auto");
   expect(beforeScroll.scrollHeight).toBeGreaterThan(beforeScroll.clientHeight);
-
-  await expect(page.locator("#main-scrollbar")).toBeVisible();
+  expect(beforeScroll.mainScrollbarCount).toBe(0);
 
   await page.evaluate(() => {
-    const scroll = document.getElementById("main-scroll");
-    if (scroll) {
-      scroll.scrollTo({ top: scroll.scrollHeight, behavior: "auto" });
-    }
+    window.scrollTo({ top: document.documentElement.scrollHeight, behavior: "auto" });
   });
 
   await page.waitForFunction(() => {
-    const scroll = document.getElementById("main-scroll");
-    return scroll ? scroll.scrollTop > 0 : false;
+    return window.scrollY > 0;
   });
 
-  await expect(mainScroll).toBeVisible();
   await expect(page.locator(".list-section")).toBeInViewport();
   await expect(page.locator(".footer")).toBeInViewport();
 });
