@@ -48,6 +48,7 @@ export function fullItemSelect() {
       artist_name: artists.name,
       primary_url: musicLinks.url,
       primary_source: sources.name,
+      primary_link_metadata: musicLinks.metadata,
     })
     .from(musicItems)
     .leftJoin(artists, eq(musicItems.artistId, artists.id))

@@ -37,6 +37,7 @@ const baseItem = {
   catalogue_number: "WBRX 1",
   primary_url: null,
   primary_source: null,
+  primary_link_metadata: null,
   stacks: [{ id: 1, name: "favourites" }],
 };
 
