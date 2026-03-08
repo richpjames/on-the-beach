@@ -59,13 +59,13 @@ function renderBandcampEmbed(item: MusicItemFull): string {
   if (!albumId) return "";
 
   const embedType = meta.item_type === "track" ? "track" : "album";
-  const src = `https://bandcamp.com/EmbeddedPlayer/${embedType}=${escapeHtml(albumId)}/size=small/bgcol=ffffff/linkcol=0687f5/transparent=true/`;
+  const src = `https://bandcamp.com/EmbeddedPlayer/${embedType}=${escapeHtml(albumId)}/size=large/bgcol=ffffff/linkcol=0687f5/artwork=none/transparent=true/`;
 
   return `<iframe
     class="release-page__bandcamp-embed"
     src="${src}"
     seamless
-    style="border:0;width:100%;height:42px;"
+    style="border:0;width:100%;height:300px;"
     title="Bandcamp player"
   ></iframe>`;
 }
