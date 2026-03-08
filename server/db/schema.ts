@@ -72,6 +72,7 @@ export const musicLinks = sqliteTable(
     sourceId: integer("source_id").references(() => sources.id, { onDelete: "set null" }),
     url: text("url").notNull(),
     isPrimary: integer("is_primary", { mode: "boolean" }).notNull().default(false),
+    metadata: text("metadata"),
     createdAt: integer("created_at", { mode: "timestamp" })
       .notNull()
       .$defaultFn(() => new Date()),
