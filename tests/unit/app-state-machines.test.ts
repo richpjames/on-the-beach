@@ -1,7 +1,8 @@
+import { createActor } from "xstate";
 import { describe, expect, it } from "bun:test";
 
-import { initialAddFormState, transitionAddFormState } from "../../src/ui/state/add-form-machine";
-import { initialAppState, transitionAppState } from "../../src/ui/state/app-machine";
+import { addFormMachine } from "../../src/ui/state/add-form-machine";
+import { appMachine } from "../../src/ui/state/app-machine";
 import {
   initialRatingState,
   resolveRatingClick,
@@ -10,25 +11,30 @@ import {
 
 describe("app state machine", () => {
   it("tracks filter and stack selection", () => {
-    let state = transitionAppState(initialAppState, { type: "APP_READY" });
-    state = transitionAppState(state, { type: "FILTER_SELECTED", filter: "listened" });
-    state = transitionAppState(state, { type: "STACK_SELECTED", stackId: 4 });
-    state = transitionAppState(state, { type: "SEARCH_UPDATED", query: "dub" });
-    state = transitionAppState(state, { type: "SORT_UPDATED", sort: "star-rating" });
+    const actor = createActor(appMachine).start();
 
-    expect(state.isReady).toBe(true);
-    expect(state.currentFilter).toBe("listened");
-    expect(state.currentStack).toBe(4);
-    expect(state.searchQuery).toBe("dub");
-    expect(state.currentSort).toBe("star-rating");
+    actor.send({ type: "APP_READY" });
+    actor.send({ type: "FILTER_SELECTED", filter: "listened" });
+    actor.send({ type: "STACK_SELECTED", stackId: 4 });
+    actor.send({ type: "SEARCH_UPDATED", query: "dub" });
+    actor.send({ type: "SORT_UPDATED", sort: "star-rating" });
 
-    state = transitionAppState(state, { type: "STACK_SELECTED_ALL" });
-    expect(state.currentStack).toBeNull();
+    const ctx = actor.getSnapshot().context;
+    expect(ctx.isReady).toBe(true);
+    expect(ctx.currentFilter).toBe("listened");
+    expect(ctx.currentStack).toBe(4);
+    expect(ctx.searchQuery).toBe("dub");
+    expect(ctx.currentSort).toBe("star-rating");
+
+    actor.send({ type: "STACK_SELECTED_ALL" });
+    expect(actor.getSnapshot().context.currentStack).toBeNull();
   });
 
   it("resets active stack when deleted", () => {
-    let state = transitionAppState(initialAppState, { type: "STACK_SELECTED", stackId: 2 });
-    state = transitionAppState(state, {
+    const actor = createActor(appMachine).start();
+
+    actor.send({ type: "STACK_SELECTED", stackId: 2 });
+    actor.send({
       type: "STACKS_LOADED",
       stacks: [
         { id: 2, name: "Dub", created_at: "", parent_stack_id: null, item_count: 1 },
@@ -36,33 +42,62 @@ describe("app state machine", () => {
       ],
     });
 
-    state = transitionAppState(state, { type: "STACK_DELETED", stackId: 2 });
-    expect(state.currentStack).toBeNull();
-    expect(state.stacks.map((stack) => stack.id)).toEqual([3]);
+    actor.send({ type: "STACK_DELETED", stackId: 2 });
+    const ctx = actor.getSnapshot().context;
+    expect(ctx.currentStack).toBeNull();
+    expect(ctx.stacks.map((stack) => stack.id)).toEqual([3]);
   });
 });
 
 describe("add form state machine", () => {
   it("adds, toggles, and clears selected stacks", () => {
-    let state = transitionAddFormState(initialAddFormState, { type: "INITIALIZED" });
-    state = transitionAddFormState(state, { type: "STACK_ADDED", stackId: 5 });
-    state = transitionAddFormState(state, { type: "STACK_ADDED", stackId: 5 });
-    state = transitionAddFormState(state, { type: "STACK_TOGGLED", stackId: 7, checked: true });
-    state = transitionAddFormState(state, { type: "STACK_REMOVED", stackId: 5 });
+    const actor = createActor(addFormMachine).start();
 
-    expect(state.initialized).toBe(true);
-    expect(state.selectedStackIds).toEqual([7]);
+    actor.send({ type: "INITIALIZED" });
+    actor.send({ type: "STACK_ADDED", stackId: 5 });
+    actor.send({ type: "STACK_ADDED", stackId: 5 }); // duplicate — should be ignored
+    actor.send({ type: "STACK_TOGGLED", stackId: 7, checked: true });
+    actor.send({ type: "STACK_REMOVED", stackId: 5 });
 
-    state = transitionAddFormState(state, { type: "CLEAR_STACKS" });
-    expect(state.selectedStackIds).toEqual([]);
+    const ctx = actor.getSnapshot().context;
+    expect(ctx.initialized).toBe(true);
+    expect(ctx.selectedStackIds).toEqual([7]);
+
+    actor.send({ type: "CLEAR_STACKS" });
+    expect(actor.getSnapshot().context.selectedStackIds).toEqual([]);
   });
 
   it("tracks scan idle/scanning states", () => {
-    let state = transitionAddFormState(initialAddFormState, { type: "SCAN_STARTED" });
-    expect(state.scanState).toBe("scanning");
+    const actor = createActor(addFormMachine).start();
 
-    state = transitionAddFormState(state, { type: "SCAN_FINISHED" });
-    expect(state.scanState).toBe("idle");
+    actor.send({ type: "SCAN_STARTED" });
+    expect(actor.getSnapshot().context.scanState).toBe("scanning");
+
+    actor.send({ type: "SCAN_FINISHED" });
+    expect(actor.getSnapshot().context.scanState).toBe("idle");
+  });
+
+  it("tracks submit loading state", () => {
+    const actor = createActor(addFormMachine).start();
+
+    expect(actor.getSnapshot().context.submitState).toBe("idle");
+
+    actor.send({ type: "SUBMIT_STARTED" });
+    expect(actor.getSnapshot().context.submitState).toBe("submitting");
+
+    actor.send({ type: "SUBMIT_FINISHED" });
+    expect(actor.getSnapshot().context.submitState).toBe("idle");
+  });
+
+  it("tracks submit error state", () => {
+    const actor = createActor(addFormMachine).start();
+
+    actor.send({ type: "SUBMIT_STARTED" });
+    actor.send({ type: "SUBMIT_ERROR" });
+    expect(actor.getSnapshot().context.submitState).toBe("error");
+
+    actor.send({ type: "SUBMIT_FINISHED" });
+    expect(actor.getSnapshot().context.submitState).toBe("idle");
   });
 });
 

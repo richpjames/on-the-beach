@@ -1,6 +1,7 @@
+import { assign, createMachine } from "xstate";
 import type { ListenStatus, MusicItemSort, StackWithCount } from "../../types";
 
-export interface AppState {
+export interface AppContext {
   currentFilter: ListenStatus | "all";
   currentStack: number | null;
   searchQuery: string;
@@ -21,65 +22,47 @@ export type AppEvent =
   | { type: "STACK_MANAGE_TOGGLED" }
   | { type: "STACK_DELETED"; stackId: number };
 
-export const initialAppState: AppState = {
-  currentFilter: "to-listen",
-  currentStack: null,
-  searchQuery: "",
-  currentSort: "default",
-  stacks: [],
-  isReady: false,
-  stackManageOpen: false,
-};
-
-export function transitionAppState(state: AppState, event: AppEvent): AppState {
-  switch (event.type) {
-    case "APP_READY":
-      return {
-        ...state,
-        isReady: true,
-      };
-    case "FILTER_SELECTED":
-      return {
-        ...state,
-        currentFilter: event.filter,
-      };
-    case "STACK_SELECTED":
-      return {
-        ...state,
-        currentStack: event.stackId,
-      };
-    case "STACK_SELECTED_ALL":
-      return {
-        ...state,
-        currentStack: null,
-      };
-    case "SEARCH_UPDATED":
-      return {
-        ...state,
-        searchQuery: event.query,
-      };
-    case "SORT_UPDATED":
-      return {
-        ...state,
-        currentSort: event.sort,
-      };
-    case "STACKS_LOADED":
-      return {
-        ...state,
-        stacks: event.stacks,
-      };
-    case "STACK_MANAGE_TOGGLED":
-      return {
-        ...state,
-        stackManageOpen: !state.stackManageOpen,
-      };
-    case "STACK_DELETED":
-      return {
-        ...state,
-        currentStack: state.currentStack === event.stackId ? null : state.currentStack,
-        stacks: state.stacks.filter((stack) => stack.id !== event.stackId),
-      };
-    default:
-      return state;
-  }
-}
+export const appMachine = createMachine({
+  types: {} as { context: AppContext; events: AppEvent },
+  context: {
+    currentFilter: "to-listen",
+    currentStack: null,
+    searchQuery: "",
+    currentSort: "default",
+    stacks: [],
+    isReady: false,
+    stackManageOpen: false,
+  },
+  on: {
+    APP_READY: {
+      actions: assign({ isReady: true }),
+    },
+    FILTER_SELECTED: {
+      actions: assign(({ event }) => ({ currentFilter: event.filter })),
+    },
+    STACK_SELECTED: {
+      actions: assign(({ event }) => ({ currentStack: event.stackId })),
+    },
+    STACK_SELECTED_ALL: {
+      actions: assign({ currentStack: null }),
+    },
+    SEARCH_UPDATED: {
+      actions: assign(({ event }) => ({ searchQuery: event.query })),
+    },
+    SORT_UPDATED: {
+      actions: assign(({ event }) => ({ currentSort: event.sort })),
+    },
+    STACKS_LOADED: {
+      actions: assign(({ event }) => ({ stacks: event.stacks })),
+    },
+    STACK_MANAGE_TOGGLED: {
+      actions: assign(({ context }) => ({ stackManageOpen: !context.stackManageOpen })),
+    },
+    STACK_DELETED: {
+      actions: assign(({ context, event }) => ({
+        currentStack: context.currentStack === event.stackId ? null : context.currentStack,
+        stacks: context.stacks.filter((stack) => stack.id !== event.stackId),
+      })),
+    },
+  },
+});
