@@ -11,6 +11,8 @@ export interface AppContext {
   stackManageOpen: boolean;
   searchPanelOpen: boolean;
   sortPanelOpen: boolean;
+  listVersion: number;
+  stackBarVersion: number;
 }
 
 export type AppEvent =
@@ -25,7 +27,8 @@ export type AppEvent =
   | { type: "STACK_DELETED"; stackId: number }
   | { type: "SEARCH_PANEL_TOGGLED" }
   | { type: "SORT_PANEL_TOGGLED" }
-  | { type: "BROWSE_PANELS_CLOSED" };
+  | { type: "BROWSE_PANELS_CLOSED" }
+  | { type: "ITEM_CREATED" };
 
 export const appMachine = createMachine({
   types: {} as { context: AppContext; events: AppEvent },
@@ -39,25 +42,45 @@ export const appMachine = createMachine({
     stackManageOpen: false,
     searchPanelOpen: false,
     sortPanelOpen: false,
+    listVersion: 0,
+    stackBarVersion: 0,
   },
   on: {
     APP_READY: {
       actions: assign({ isReady: true }),
     },
     FILTER_SELECTED: {
-      actions: assign(({ event }) => ({ currentFilter: event.filter })),
+      actions: assign(({ context, event }) => ({
+        currentFilter: event.filter,
+        listVersion: context.listVersion + 1,
+      })),
     },
     STACK_SELECTED: {
-      actions: assign(({ event }) => ({ currentStack: event.stackId })),
+      actions: assign(({ context, event }) => ({
+        currentStack: event.stackId,
+        listVersion: context.listVersion + 1,
+        stackBarVersion: context.stackBarVersion + 1,
+      })),
     },
     STACK_SELECTED_ALL: {
-      actions: assign({ currentStack: null }),
+      actions: assign(({ context }) => ({
+        currentStack: null,
+        listVersion: context.listVersion + 1,
+        stackBarVersion: context.stackBarVersion + 1,
+      })),
     },
     SEARCH_UPDATED: {
-      actions: assign(({ event }) => ({ searchQuery: event.query })),
+      actions: assign(({ context, event }) => ({
+        searchQuery: event.query,
+        listVersion: context.listVersion + 1,
+        stackBarVersion: context.stackBarVersion + 1,
+      })),
     },
     SORT_UPDATED: {
-      actions: assign(({ event }) => ({ currentSort: event.sort })),
+      actions: assign(({ context, event }) => ({
+        currentSort: event.sort,
+        listVersion: context.listVersion + 1,
+      })),
     },
     STACKS_LOADED: {
       actions: assign(({ event }) => ({ stacks: event.stacks })),
@@ -69,6 +92,14 @@ export const appMachine = createMachine({
       actions: assign(({ context, event }) => ({
         currentStack: context.currentStack === event.stackId ? null : context.currentStack,
         stacks: context.stacks.filter((stack) => stack.id !== event.stackId),
+        listVersion: context.listVersion + 1,
+        stackBarVersion: context.stackBarVersion + 1,
+      })),
+    },
+    ITEM_CREATED: {
+      actions: assign(({ context }) => ({
+        listVersion: context.listVersion + 1,
+        stackBarVersion: context.stackBarVersion + 1,
       })),
     },
     SEARCH_PANEL_TOGGLED: {
