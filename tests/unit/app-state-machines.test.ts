@@ -226,6 +226,46 @@ describe("add form machine — secondary fields and link picker", () => {
     expect(actor.getSnapshot().context.linkPicker).toBeNull();
   });
 
+  it("FORM_RESET resets submitState to idle", () => {
+    const actor = createActor(addFormMachine).start();
+    actor.send({ type: "SUBMIT_ERROR" });
+    expect(actor.getSnapshot().context.submitState).toBe("error");
+    actor.send({ type: "FORM_RESET" });
+    expect(actor.getSnapshot().context.submitState).toBe("idle");
+  });
+
+  it("LINK_PICKER_CANCELLED from enteringManually path returns to idle (by design)", () => {
+    const actor = createActor(addFormMachine).start();
+    const pendingValues = {
+      url: "https://example.com",
+      title: "",
+      artist: "",
+      itemType: "album",
+      label: "",
+      year: "",
+      country: "",
+      genre: "",
+      catalogueNumber: "",
+      notes: "",
+      artworkUrl: "",
+    };
+    // Enter manually first
+    actor.send({ type: "SUBMIT_CLICKED", url: "" });
+    expect(actor.getSnapshot().value).toBe("enteringManually");
+    // Then open link picker
+    actor.send({
+      type: "LINK_PICKER_OPENED",
+      url: "https://example.com",
+      message: "Pick one",
+      candidates: [],
+      pendingValues,
+    });
+    expect(actor.getSnapshot().value).toBe("linkPickerOpen");
+    // Cancel always goes to idle (by design)
+    actor.send({ type: "LINK_PICKER_CANCELLED" });
+    expect(actor.getSnapshot().value).toBe("idle");
+  });
+
   it("FORM_RESET returns to idle and clears fields", () => {
     const actor = createActor(addFormMachine).start();
     actor.send({ type: "SUBMIT_CLICKED", url: "" });
