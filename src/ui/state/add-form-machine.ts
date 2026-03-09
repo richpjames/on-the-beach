@@ -4,6 +4,8 @@ import type { AddFormValues } from "../domain/add-form";
 import { buildCreateMusicItemInputFromValues } from "../domain/add-form";
 import { AmbiguousLinkApiError, type ApiClient } from "../../services/api-client";
 
+type ScanResultData = { artist?: string; title?: string; artworkUrl?: string };
+
 type AddFormValuesInput = AddFormValues;
 
 export interface AddFormContext {
@@ -22,6 +24,9 @@ export interface AddFormContext {
     selectedCandidateId: string | null;
     pendingValues: AddFormValuesInput;
   } | null;
+  pendingScanBase64: string | null;
+  scanResult: ScanResultData | null;
+  scanError: string | null;
 }
 
 export type AddFormEvent =
@@ -48,7 +53,9 @@ export type AddFormEvent =
   | { type: "LINK_PICKER_CANCELLED" }
   | { type: "ENTER_MANUALLY" }
   | { type: "CLEAR_CREATED_ITEM" }
-  | { type: "FORM_RESET" };
+  | { type: "FORM_RESET" }
+  | { type: "SCAN_FILE_SELECTED"; imageBase64: string }
+  | { type: "SCAN_RESULT_CONSUMED" };
 
 export const addFormMachine = setup({
   types: {} as {
@@ -57,6 +64,20 @@ export const addFormMachine = setup({
     input: { api: ApiClient };
   },
   actors: {
+    scanCover: fromPromise<ScanResultData, { api: ApiClient; imageBase64: string }>(
+      async ({ input }) => {
+        const { api, imageBase64 } = input;
+        const [uploadResult, scanResult] = await Promise.all([
+          api.uploadReleaseImage(imageBase64),
+          api.scanCover(imageBase64),
+        ]);
+        return {
+          artworkUrl: uploadResult.artworkUrl,
+          artist: scanResult.artist ?? undefined,
+          title: scanResult.title ?? undefined,
+        };
+      },
+    ),
     submitItem: fromPromise<
       { itemId: number },
       { api: ApiClient; values: AddFormValuesInput; selectedStackIds: number[] }
@@ -117,6 +138,9 @@ export const addFormMachine = setup({
     pendingValues: null,
     createdItemId: null,
     linkPicker: null,
+    pendingScanBase64: null,
+    scanResult: null,
+    scanError: null,
   }),
   initial: "idle",
   on: {
@@ -177,7 +201,20 @@ export const addFormMachine = setup({
         submitState: "idle" as const,
         pendingValues: null,
         createdItemId: null,
+        pendingScanBase64: null,
+        scanResult: null,
+        scanError: null,
       }),
+    },
+    SCAN_FILE_SELECTED: {
+      target: ".scanning",
+      actions: assign(({ event }) => ({
+        pendingScanBase64: event.imageBase64,
+        scanState: "scanning" as const,
+      })),
+    },
+    SCAN_RESULT_CONSUMED: {
+      actions: assign({ scanResult: null, scanError: null }),
     },
   },
   states: {
@@ -274,6 +311,33 @@ export const addFormMachine = setup({
         ENTER_MANUALLY: {
           target: "enteringManually",
           actions: assign({ showSecondaryFields: true, linkPicker: null }),
+        },
+      },
+    },
+    scanning: {
+      invoke: {
+        src: "scanCover",
+        input: ({ context }) => ({
+          api: context.api,
+          imageBase64: context.pendingScanBase64!,
+        }),
+        onDone: {
+          target: "idle",
+          actions: assign(({ event }) => ({
+            scanState: "idle" as const,
+            scanResult: event.output,
+            pendingScanBase64: null,
+            scanError: null,
+          })),
+        },
+        onError: {
+          target: "idle",
+          actions: assign(({ event }) => ({
+            scanState: "idle" as const,
+            scanError: String(event.error),
+            pendingScanBase64: null,
+            scanResult: null,
+          })),
         },
       },
     },

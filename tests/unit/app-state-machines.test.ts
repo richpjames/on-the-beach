@@ -430,6 +430,77 @@ describe("add form machine — async submit flow", () => {
   });
 });
 
+describe("add form machine — scan flow", () => {
+  it("transitions to scanning state on SCAN_FILE_SELECTED", async () => {
+    const api = makeMockApi({
+      uploadReleaseImage: async () => ({ artworkUrl: "https://cdn.example.com/art.jpg" }),
+      scanCover: async () => ({ artist: "Scanned Artist", title: "Scanned Title" }),
+    }) as any;
+    const actor = createActor(addFormMachine, { input: { api } }).start();
+
+    actor.send({ type: "SCAN_FILE_SELECTED", imageBase64: "base64data" });
+    expect(actor.getSnapshot().value).toBe("scanning");
+    expect(actor.getSnapshot().context.scanState).toBe("scanning");
+  });
+
+  it("returns to idle with scan results on success", async () => {
+    const { waitFor } = await import("xstate");
+    const api = makeMockApi({
+      uploadReleaseImage: async () => ({ artworkUrl: "https://cdn.example.com/art.jpg" }),
+      scanCover: async () => ({ artist: "Scanned Artist", title: "Scanned Title" }),
+    }) as any;
+    const actor = createActor(addFormMachine, { input: { api } }).start();
+
+    actor.send({ type: "SCAN_FILE_SELECTED", imageBase64: "base64data" });
+    await waitFor(actor, (s) => s.value !== "scanning", { timeout: 5000 });
+
+    const ctx = actor.getSnapshot().context;
+    expect(actor.getSnapshot().value).toBe("idle");
+    expect(ctx.scanState).toBe("idle");
+    expect(ctx.scanResult?.artist).toBe("Scanned Artist");
+    expect(ctx.scanResult?.title).toBe("Scanned Title");
+    expect(ctx.scanResult?.artworkUrl).toBe("https://cdn.example.com/art.jpg");
+  });
+
+  it("returns to idle with scanError on failure", async () => {
+    const { waitFor } = await import("xstate");
+    const api = makeMockApi({
+      uploadReleaseImage: async () => {
+        throw new Error("Upload failed");
+      },
+      scanCover: async () => {
+        throw new Error("Scan failed");
+      },
+    }) as any;
+    const actor = createActor(addFormMachine, { input: { api } }).start();
+
+    actor.send({ type: "SCAN_FILE_SELECTED", imageBase64: "base64data" });
+    await waitFor(actor, (s) => s.value !== "scanning", { timeout: 5000 });
+
+    const ctx = actor.getSnapshot().context;
+    expect(actor.getSnapshot().value).toBe("idle");
+    expect(ctx.scanState).toBe("idle");
+    expect(ctx.scanResult).toBeNull();
+    expect(ctx.scanError).toBeTruthy();
+  });
+
+  it("clears scan result on SCAN_RESULT_CONSUMED", async () => {
+    const { waitFor } = await import("xstate");
+    const api = makeMockApi({
+      uploadReleaseImage: async () => ({ artworkUrl: "https://cdn.example.com/art.jpg" }),
+      scanCover: async () => ({ artist: "Scanned Artist", title: "Scanned Title" }),
+    }) as any;
+    const actor = createActor(addFormMachine, { input: { api } }).start();
+
+    actor.send({ type: "SCAN_FILE_SELECTED", imageBase64: "base64data" });
+    await waitFor(actor, (s) => s.value !== "scanning", { timeout: 5000 });
+
+    expect(actor.getSnapshot().context.scanResult).not.toBeNull();
+    actor.send({ type: "SCAN_RESULT_CONSUMED" });
+    expect(actor.getSnapshot().context.scanResult).toBeNull();
+  });
+});
+
 describe("rating state machine", () => {
   it("marks a checked star as clearable when clicked again", () => {
     const state = transitionRatingState(initialRatingState, {
