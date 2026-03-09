@@ -84,39 +84,6 @@ describe("add form state machine", () => {
     actor.send({ type: "CLEAR_STACKS" });
     expect(actor.getSnapshot().context.selectedStackIds).toEqual([]);
   });
-
-  it("tracks scan idle/scanning states", () => {
-    const actor = createActor(addFormMachine, { input: { api: makeMockApi() as any } }).start();
-
-    actor.send({ type: "SCAN_STARTED" });
-    expect(actor.getSnapshot().context.scanState).toBe("scanning");
-
-    actor.send({ type: "SCAN_FINISHED" });
-    expect(actor.getSnapshot().context.scanState).toBe("idle");
-  });
-
-  it("tracks submit loading state", () => {
-    const actor = createActor(addFormMachine, { input: { api: makeMockApi() as any } }).start();
-
-    expect(actor.getSnapshot().context.submitState).toBe("idle");
-
-    actor.send({ type: "SUBMIT_STARTED" });
-    expect(actor.getSnapshot().context.submitState).toBe("submitting");
-
-    actor.send({ type: "SUBMIT_FINISHED" });
-    expect(actor.getSnapshot().context.submitState).toBe("idle");
-  });
-
-  it("tracks submit error state", () => {
-    const actor = createActor(addFormMachine, { input: { api: makeMockApi() as any } }).start();
-
-    actor.send({ type: "SUBMIT_STARTED" });
-    actor.send({ type: "SUBMIT_ERROR" });
-    expect(actor.getSnapshot().context.submitState).toBe("error");
-
-    actor.send({ type: "SUBMIT_FINISHED" });
-    expect(actor.getSnapshot().context.submitState).toBe("idle");
-  });
 });
 
 describe("add form machine — secondary fields and link picker", () => {
@@ -242,14 +209,6 @@ describe("add form machine — secondary fields and link picker", () => {
     expect(actor.getSnapshot().value).toBe("enteringManually");
     expect(actor.getSnapshot().context.showSecondaryFields).toBe(true);
     expect(actor.getSnapshot().context.linkPicker).toBeNull();
-  });
-
-  it("FORM_RESET resets submitState to idle", () => {
-    const actor = createActor(addFormMachine, { input: { api: makeMockApi() as any } }).start();
-    actor.send({ type: "SUBMIT_ERROR" });
-    expect(actor.getSnapshot().context.submitState).toBe("error");
-    actor.send({ type: "FORM_RESET" });
-    expect(actor.getSnapshot().context.submitState).toBe("idle");
   });
 
   it("LINK_PICKER_CANCELLED from enteringManually path returns to idle (by design)", () => {

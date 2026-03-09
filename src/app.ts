@@ -442,10 +442,6 @@ function populateAddFormFromCandidate(candidate: LinkReleaseCandidate): void {
   }
 }
 
-function shouldRefreshListAfterAdd(): boolean {
-  return appCtx().currentFilter === "all" || appCtx().currentFilter === "to-listen";
-}
-
 async function encodeScanImage(file: File): Promise<string> {
   const imageDataUrl = await readFileAsDataUrl(file);
   const image = await loadImage(imageDataUrl);
