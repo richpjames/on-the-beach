@@ -1,9 +1,8 @@
-import { App } from "./app";
+import { initialize } from "./app";
 
 async function bootstrap() {
-  const app = new App();
   try {
-    await app.initialize();
+    await initialize();
     console.log("[App] Initialized successfully");
   } catch (error) {
     console.error("[App] Failed to initialize:", error);
