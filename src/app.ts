@@ -116,10 +116,44 @@ export class App {
         this.syncCustomListScrollbar();
         this.syncCustomStackScrollbar();
       });
-    } else {
-      void this.renderStackBar();
-      void this.renderMusicList();
     }
+
+    // If server data exists, skip initial render by pretending versions already matched
+    let prevListVersion = hasServerData ? 0 : -1;
+    let prevStackBarVersion = hasServerData ? 0 : -1;
+
+    this.appActor.subscribe((snapshot) => {
+      const ctx = snapshot.context;
+
+      // Browse panels
+      const searchPanel = document.getElementById("browse-search-panel");
+      const sortPanel = document.getElementById("browse-sort-panel");
+      const searchToggle = document.getElementById("browse-search-toggle");
+      const sortToggle = document.getElementById("browse-sort-toggle");
+      searchPanel?.classList.toggle("is-open", ctx.searchPanelOpen);
+      sortPanel?.classList.toggle("is-open", ctx.sortPanelOpen);
+      searchToggle?.setAttribute("aria-expanded", String(ctx.searchPanelOpen));
+      sortToggle?.setAttribute("aria-expanded", String(ctx.sortPanelOpen));
+
+      // Filter bar active state
+      const filterBar = document.getElementById("filter-bar");
+      if (filterBar) {
+        filterBar.querySelectorAll(".filter-btn").forEach((btn) => {
+          const btnFilter = (btn as HTMLElement).dataset.filter;
+          btn.classList.toggle("active", btnFilter === ctx.currentFilter);
+        });
+      }
+
+      // Re-render when versions increment
+      if (ctx.listVersion !== prevListVersion) {
+        prevListVersion = ctx.listVersion;
+        void this.renderMusicList();
+      }
+      if (ctx.stackBarVersion !== prevStackBarVersion) {
+        prevStackBarVersion = ctx.stackBarVersion;
+        void this.renderStackBar();
+      }
+    });
   }
 
   private setupAddForm(): void {
@@ -479,13 +513,6 @@ export class App {
         type: "FILTER_SELECTED",
         filter: target.dataset.filter as ListenStatus | "all",
       });
-
-      filterBar.querySelectorAll(".filter-btn").forEach((button) => {
-        button.classList.remove("active");
-      });
-      target.classList.add("active");
-
-      void this.renderMusicList();
     });
   }
 
@@ -495,38 +522,6 @@ export class App {
     const sortSelect = document.getElementById("browse-sort");
     const searchToggle = document.getElementById("browse-search-toggle");
     const sortToggle = document.getElementById("browse-sort-toggle");
-    const searchPanel = document.getElementById("browse-search-panel");
-    const sortPanel = document.getElementById("browse-sort-panel");
-
-    const closeBrowsePanels = (): void => {
-      searchPanel?.classList.remove("is-open");
-      sortPanel?.classList.remove("is-open");
-      searchToggle?.setAttribute("aria-expanded", "false");
-      sortToggle?.setAttribute("aria-expanded", "false");
-    };
-
-    const toggleBrowsePanel = (
-      panel: HTMLElement | null,
-      button: HTMLElement | null,
-      sibling: HTMLElement | null,
-      siblingButton: HTMLElement | null,
-    ): void => {
-      if (!panel || !button) {
-        return;
-      }
-
-      const willOpen = !panel.classList.contains("is-open");
-      sibling?.classList.remove("is-open");
-      siblingButton?.setAttribute("aria-expanded", "false");
-      panel.classList.toggle("is-open", willOpen);
-      button.setAttribute("aria-expanded", String(willOpen));
-
-      if (willOpen && panel === searchPanel && searchInput instanceof HTMLInputElement) {
-        requestAnimationFrame(() => {
-          searchInput.focus();
-        });
-      }
-    };
 
     if (searchInput instanceof HTMLInputElement) {
       searchInput.addEventListener("input", () => {
@@ -535,11 +530,9 @@ export class App {
           query: searchInput.value,
         });
 
-        void this.renderStackBar();
         if (this.appCtx.stackManageOpen) {
           void this.renderStackManagePanel();
         }
-        void this.renderMusicList();
       });
     }
 
@@ -549,44 +542,33 @@ export class App {
           type: "SORT_UPDATED",
           sort: sortSelect.value as MusicItemSort,
         });
-
-        void this.renderMusicList();
       });
     }
+
     searchToggle?.addEventListener("click", () => {
-      toggleBrowsePanel(
-        searchPanel instanceof HTMLElement ? searchPanel : null,
-        searchToggle instanceof HTMLElement ? searchToggle : null,
-        sortPanel instanceof HTMLElement ? sortPanel : null,
-        sortToggle instanceof HTMLElement ? sortToggle : null,
-      );
+      this.appActor.send({ type: "SEARCH_PANEL_TOGGLED" });
+      if (this.appCtx.searchPanelOpen) {
+        requestAnimationFrame(() => {
+          if (searchInput instanceof HTMLInputElement) searchInput.focus();
+        });
+      }
     });
 
     sortToggle?.addEventListener("click", () => {
-      toggleBrowsePanel(
-        sortPanel instanceof HTMLElement ? sortPanel : null,
-        sortToggle instanceof HTMLElement ? sortToggle : null,
-        searchPanel instanceof HTMLElement ? searchPanel : null,
-        searchToggle instanceof HTMLElement ? searchToggle : null,
-      );
+      this.appActor.send({ type: "SORT_PANEL_TOGGLED" });
     });
 
     document.addEventListener("click", (event) => {
       const target = event.target;
-      if (!(target instanceof HTMLElement) || !(browseTools instanceof HTMLElement)) {
-        return;
+      if (!(target instanceof HTMLElement) || !(browseTools instanceof HTMLElement)) return;
+      if (!browseTools.contains(target)) {
+        this.appActor.send({ type: "BROWSE_PANELS_CLOSED" });
       }
-
-      if (browseTools.contains(target)) {
-        return;
-      }
-
-      closeBrowsePanels();
     });
 
     document.addEventListener("keydown", (event) => {
       if (event.key === "Escape") {
-        closeBrowsePanels();
+        this.appActor.send({ type: "BROWSE_PANELS_CLOSED" });
       }
     });
   }
@@ -706,9 +688,6 @@ export class App {
           stackId: Number(tab.dataset.stackId),
         });
       }
-
-      void this.renderStackBar();
-      void this.renderMusicList();
     });
   }
 
@@ -900,9 +879,7 @@ export class App {
       type: "STACK_DELETED",
       stackId,
     });
-    await this.renderStackBar();
     await this.renderStackManagePanel();
-    await this.renderMusicList();
   }
 
   private setupEventDelegation(): void {
