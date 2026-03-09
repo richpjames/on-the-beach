@@ -6,6 +6,9 @@ services:
     volumes:
       - ..:/workspace:cached
       - node_modules:/workspace/node_modules
+      - ${HOME}/.config/gh:/root/.config/gh:cached
+    environment:
+      - IS_SANDBOX=1
     command: sleep infinity
 
 volumes:
