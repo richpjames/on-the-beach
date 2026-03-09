@@ -9,6 +9,8 @@ export interface AppContext {
   stacks: StackWithCount[];
   isReady: boolean;
   stackManageOpen: boolean;
+  searchPanelOpen: boolean;
+  sortPanelOpen: boolean;
 }
 
 export type AppEvent =
@@ -20,7 +22,10 @@ export type AppEvent =
   | { type: "SORT_UPDATED"; sort: MusicItemSort }
   | { type: "STACKS_LOADED"; stacks: StackWithCount[] }
   | { type: "STACK_MANAGE_TOGGLED" }
-  | { type: "STACK_DELETED"; stackId: number };
+  | { type: "STACK_DELETED"; stackId: number }
+  | { type: "SEARCH_PANEL_TOGGLED" }
+  | { type: "SORT_PANEL_TOGGLED" }
+  | { type: "BROWSE_PANELS_CLOSED" };
 
 export const appMachine = createMachine({
   types: {} as { context: AppContext; events: AppEvent },
@@ -32,6 +37,8 @@ export const appMachine = createMachine({
     stacks: [],
     isReady: false,
     stackManageOpen: false,
+    searchPanelOpen: false,
+    sortPanelOpen: false,
   },
   on: {
     APP_READY: {
@@ -63,6 +70,21 @@ export const appMachine = createMachine({
         currentStack: context.currentStack === event.stackId ? null : context.currentStack,
         stacks: context.stacks.filter((stack) => stack.id !== event.stackId),
       })),
+    },
+    SEARCH_PANEL_TOGGLED: {
+      actions: assign(({ context }) => ({
+        searchPanelOpen: !context.searchPanelOpen,
+        sortPanelOpen: false,
+      })),
+    },
+    SORT_PANEL_TOGGLED: {
+      actions: assign(({ context }) => ({
+        sortPanelOpen: !context.sortPanelOpen,
+        searchPanelOpen: false,
+      })),
+    },
+    BROWSE_PANELS_CLOSED: {
+      actions: assign({ searchPanelOpen: false, sortPanelOpen: false }),
     },
   },
 });
