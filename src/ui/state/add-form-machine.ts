@@ -104,7 +104,11 @@ export const addFormMachine = setup({
     },
     FORM_RESET: {
       target: ".idle",
-      actions: assign({ showSecondaryFields: false, linkPicker: null }),
+      actions: assign({
+        showSecondaryFields: false,
+        linkPicker: null,
+        submitState: "idle" as const,
+      }),
     },
   },
   states: {
