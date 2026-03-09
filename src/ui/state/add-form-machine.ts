@@ -43,11 +43,6 @@ export type AddFormEvent =
   | { type: "STACK_ADDED"; stackId: number }
   | { type: "STACK_REMOVED"; stackId: number }
   | { type: "CLEAR_STACKS" }
-  | { type: "SCAN_STARTED" }
-  | { type: "SCAN_FINISHED" }
-  | { type: "SUBMIT_STARTED" }
-  | { type: "SUBMIT_FINISHED" }
-  | { type: "SUBMIT_ERROR" }
   | { type: "SUBMIT_CLICKED"; url: string; pendingValues?: AddFormValuesInput }
   | {
       type: "LINK_PICKER_OPENED";
@@ -187,21 +182,7 @@ export const addFormMachine = setup({
     CLEAR_STACKS: {
       actions: assign({ selectedStackIds: [] }),
     },
-    SCAN_STARTED: {
-      actions: assign({ scanState: "scanning" as const }),
-    },
-    SCAN_FINISHED: {
-      actions: assign({ scanState: "idle" as const }),
-    },
-    SUBMIT_STARTED: {
-      actions: assign({ submitState: "submitting" as const }),
-    },
-    SUBMIT_FINISHED: {
-      actions: assign({ submitState: "idle" as const }),
-    },
-    SUBMIT_ERROR: {
-      actions: assign({ submitState: "error" as const }),
-    },
+
     CLEAR_CREATED_ITEM: {
       actions: assign({ createdItemId: null }),
     },
