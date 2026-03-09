@@ -498,6 +498,52 @@ describe("add form machine — scan flow", () => {
     expect(actor.getSnapshot().context.scanResult).not.toBeNull();
     actor.send({ type: "SCAN_RESULT_CONSUMED" });
     expect(actor.getSnapshot().context.scanResult).toBeNull();
+    expect(actor.getSnapshot().context.scanError).toBeNull(); // ADD THIS
+  });
+
+  it("ignores SCAN_FILE_SELECTED while submitting", () => {
+    const api = makeMockApi() as any;
+    const actor = createActor(addFormMachine, { input: { api } }).start();
+    // Drive to submitting state
+    actor.send({
+      type: "SUBMIT_CLICKED",
+      url: "https://example.com",
+      pendingValues: {
+        url: "https://example.com",
+        title: "Test",
+        artist: "Artist",
+        itemType: "album",
+        label: "",
+        year: "",
+        country: "",
+        genre: "",
+        catalogueNumber: "",
+        notes: "",
+        artworkUrl: "",
+      },
+    });
+    expect(actor.getSnapshot().value).toBe("submitting");
+    // Scanning should be ignored while submitting
+    actor.send({ type: "SCAN_FILE_SELECTED", imageBase64: "base64" });
+    expect(actor.getSnapshot().value).toBe("submitting"); // still submitting, not scanning
+  });
+
+  it("FORM_RESET clears scan-related fields", async () => {
+    const api = makeMockApi({
+      uploadReleaseImage: async () => ({ artworkUrl: "https://cdn.example.com/art.jpg" }),
+      scanCover: async () => ({ artist: "Scanned Artist", title: "Scanned Title" }),
+    }) as any;
+    const actor = createActor(addFormMachine, { input: { api } }).start();
+
+    actor.send({ type: "SCAN_FILE_SELECTED", imageBase64: "base64data" });
+    await waitFor(actor, (s) => s.value !== "scanning", { timeout: 5000 });
+    expect(actor.getSnapshot().context.scanResult).not.toBeNull();
+
+    actor.send({ type: "FORM_RESET" });
+    const ctx = actor.getSnapshot().context;
+    expect(ctx.scanResult).toBeNull();
+    expect(ctx.scanError).toBeNull();
+    expect(ctx.pendingScanBase64).toBeNull();
   });
 });
 

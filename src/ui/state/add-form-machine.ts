@@ -4,7 +4,15 @@ import type { AddFormValues } from "../domain/add-form";
 import { buildCreateMusicItemInputFromValues } from "../domain/add-form";
 import { AmbiguousLinkApiError, type ApiClient } from "../../services/api-client";
 
-type ScanResultData = { artist?: string; title?: string; artworkUrl?: string };
+type ScanResultData = {
+  artist?: string;
+  title?: string;
+  artworkUrl?: string;
+  year?: string;
+  label?: string;
+  country?: string;
+  catalogueNumber?: string;
+};
 
 type AddFormValuesInput = AddFormValues;
 
@@ -75,6 +83,10 @@ export const addFormMachine = setup({
           artworkUrl: uploadResult.artworkUrl,
           artist: scanResult.artist ?? undefined,
           title: scanResult.title ?? undefined,
+          year: scanResult.year != null ? String(scanResult.year) : undefined,
+          label: scanResult.label ?? undefined,
+          country: scanResult.country ?? undefined,
+          catalogueNumber: scanResult.catalogueNumber ?? undefined,
         };
       },
     ),
@@ -207,6 +219,7 @@ export const addFormMachine = setup({
       }),
     },
     SCAN_FILE_SELECTED: {
+      guard: ({ context }) => context.submitState !== "submitting",
       target: ".scanning",
       actions: assign(({ event }) => ({
         pendingScanBase64: event.imageBase64,
