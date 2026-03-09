@@ -581,6 +581,53 @@ describe("app machine — browse panels", () => {
   });
 });
 
+describe("app machine — version counters", () => {
+  it("increments listVersion on FILTER_SELECTED", () => {
+    const actor = createActor(appMachine).start();
+    const v0 = actor.getSnapshot().context.listVersion;
+    actor.send({ type: "FILTER_SELECTED", filter: "listened" });
+    expect(actor.getSnapshot().context.listVersion).toBe(v0 + 1);
+    expect(actor.getSnapshot().context.stackBarVersion).toBe(0); // unchanged
+  });
+
+  it("increments both versions on STACK_SELECTED", () => {
+    const actor = createActor(appMachine).start();
+    const v0 = actor.getSnapshot().context.listVersion;
+    const s0 = actor.getSnapshot().context.stackBarVersion;
+    actor.send({ type: "STACK_SELECTED", stackId: 1 });
+    expect(actor.getSnapshot().context.listVersion).toBe(v0 + 1);
+    expect(actor.getSnapshot().context.stackBarVersion).toBe(s0 + 1);
+  });
+
+  it("increments listVersion on SORT_UPDATED", () => {
+    const actor = createActor(appMachine).start();
+    const v0 = actor.getSnapshot().context.listVersion;
+    actor.send({ type: "SORT_UPDATED", sort: "star-rating" });
+    expect(actor.getSnapshot().context.listVersion).toBe(v0 + 1);
+  });
+
+  it("increments both versions on SEARCH_UPDATED", () => {
+    const actor = createActor(appMachine).start();
+    actor.send({ type: "SEARCH_UPDATED", query: "dub" });
+    expect(actor.getSnapshot().context.listVersion).toBe(1);
+    expect(actor.getSnapshot().context.stackBarVersion).toBe(1);
+  });
+
+  it("increments both versions on ITEM_CREATED", () => {
+    const actor = createActor(appMachine).start();
+    actor.send({ type: "ITEM_CREATED" });
+    expect(actor.getSnapshot().context.listVersion).toBe(1);
+    expect(actor.getSnapshot().context.stackBarVersion).toBe(1);
+  });
+
+  it("increments both versions on STACK_DELETED", () => {
+    const actor = createActor(appMachine).start();
+    actor.send({ type: "STACK_DELETED", stackId: 1 });
+    expect(actor.getSnapshot().context.listVersion).toBe(1);
+    expect(actor.getSnapshot().context.stackBarVersion).toBe(1);
+  });
+});
+
 describe("rating state machine", () => {
   it("marks a checked star as clearable when clicked again", () => {
     const state = transitionRatingState(initialRatingState, {
