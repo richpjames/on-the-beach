@@ -96,7 +96,6 @@ function renderNotFoundPage(): string {
 function renderReleasePage(item: MusicItemFull, cssHref: string): string {
   const statusOptions = [
     { value: "to-listen", label: "To Listen" },
-    { value: "listening", label: "Listening" },
     { value: "listened", label: "Listened" },
     { value: "done", label: "Done" },
   ]
