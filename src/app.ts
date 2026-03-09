@@ -220,9 +220,6 @@ export class App {
         artistInput?.focus();
         return;
       }
-      if (secondary?.hidden) {
-        secondary.hidden = false;
-      }
 
       if (!this.appCtx.isReady) {
         alert("App is still loading. Please try again in a moment.");
