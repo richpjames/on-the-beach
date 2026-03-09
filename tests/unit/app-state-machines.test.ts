@@ -101,6 +101,141 @@ describe("add form state machine", () => {
   });
 });
 
+describe("add form machine — secondary fields and link picker", () => {
+  it("reveals secondary fields when SUBMIT_CLICKED with no url", () => {
+    const actor = createActor(addFormMachine).start();
+    actor.send({ type: "SUBMIT_CLICKED", url: "" });
+    expect(actor.getSnapshot().context.showSecondaryFields).toBe(true);
+    expect(actor.getSnapshot().value).toBe("enteringManually");
+  });
+
+  it("does not change state when SUBMIT_CLICKED with a url", () => {
+    const actor = createActor(addFormMachine).start();
+    actor.send({ type: "SUBMIT_CLICKED", url: "https://example.com/release" });
+    expect(actor.getSnapshot().context.showSecondaryFields).toBe(false);
+    // Still in idle (submit flow is Task 2)
+    expect(actor.getSnapshot().value).toBe("idle");
+  });
+
+  it("opens link picker with candidates", () => {
+    const actor = createActor(addFormMachine).start();
+    const pendingValues = {
+      url: "https://example.com",
+      title: "",
+      artist: "",
+      itemType: "album",
+      label: "",
+      year: "",
+      country: "",
+      genre: "",
+      catalogueNumber: "",
+      notes: "",
+      artworkUrl: "",
+    };
+    actor.send({
+      type: "LINK_PICKER_OPENED",
+      url: "https://example.com",
+      message: "Pick one",
+      candidates: [{ candidateId: "a", title: "Release A", artist: "Artist", itemType: "album" }],
+      pendingValues,
+    });
+    const ctx = actor.getSnapshot().context;
+    expect(actor.getSnapshot().value).toBe("linkPickerOpen");
+    expect(ctx.linkPicker?.candidates).toHaveLength(1);
+    expect(ctx.linkPicker?.selectedCandidateId).toBeNull();
+  });
+
+  it("selects a link picker candidate", () => {
+    const actor = createActor(addFormMachine).start();
+    const pendingValues = {
+      url: "https://example.com",
+      title: "",
+      artist: "",
+      itemType: "album",
+      label: "",
+      year: "",
+      country: "",
+      genre: "",
+      catalogueNumber: "",
+      notes: "",
+      artworkUrl: "",
+    };
+    actor.send({
+      type: "LINK_PICKER_OPENED",
+      url: "https://example.com",
+      message: "Pick one",
+      candidates: [{ candidateId: "a", title: "Release A", artist: "Artist", itemType: "album" }],
+      pendingValues,
+    });
+    actor.send({ type: "CANDIDATE_SELECTED", candidateId: "a" });
+    expect(actor.getSnapshot().context.linkPicker?.selectedCandidateId).toBe("a");
+  });
+
+  it("cancels link picker and returns to idle", () => {
+    const actor = createActor(addFormMachine).start();
+    const pendingValues = {
+      url: "https://example.com",
+      title: "",
+      artist: "",
+      itemType: "album",
+      label: "",
+      year: "",
+      country: "",
+      genre: "",
+      catalogueNumber: "",
+      notes: "",
+      artworkUrl: "",
+    };
+    actor.send({
+      type: "LINK_PICKER_OPENED",
+      url: "https://example.com",
+      message: "Pick one",
+      candidates: [],
+      pendingValues,
+    });
+    actor.send({ type: "LINK_PICKER_CANCELLED" });
+    expect(actor.getSnapshot().value).toBe("idle");
+    expect(actor.getSnapshot().context.linkPicker).toBeNull();
+  });
+
+  it("enter manually from link picker sets showSecondaryFields and goes to enteringManually", () => {
+    const actor = createActor(addFormMachine).start();
+    const pendingValues = {
+      url: "https://example.com",
+      title: "",
+      artist: "",
+      itemType: "album",
+      label: "",
+      year: "",
+      country: "",
+      genre: "",
+      catalogueNumber: "",
+      notes: "",
+      artworkUrl: "",
+    };
+    actor.send({
+      type: "LINK_PICKER_OPENED",
+      url: "https://example.com",
+      message: "Pick one",
+      candidates: [],
+      pendingValues,
+    });
+    actor.send({ type: "ENTER_MANUALLY" });
+    expect(actor.getSnapshot().value).toBe("enteringManually");
+    expect(actor.getSnapshot().context.showSecondaryFields).toBe(true);
+    expect(actor.getSnapshot().context.linkPicker).toBeNull();
+  });
+
+  it("FORM_RESET returns to idle and clears fields", () => {
+    const actor = createActor(addFormMachine).start();
+    actor.send({ type: "SUBMIT_CLICKED", url: "" });
+    expect(actor.getSnapshot().value).toBe("enteringManually");
+    actor.send({ type: "FORM_RESET" });
+    expect(actor.getSnapshot().value).toBe("idle");
+    expect(actor.getSnapshot().context.showSecondaryFields).toBe(false);
+  });
+});
+
 describe("rating state machine", () => {
   it("marks a checked star as clearable when clicked again", () => {
     const state = transitionRatingState(initialRatingState, {
