@@ -1,15 +1,20 @@
-import { assign, setup } from "xstate";
+import { assign, fromPromise, setup } from "xstate";
 import type { LinkReleaseCandidate } from "../../types";
 import type { AddFormValues } from "../domain/add-form";
+import { buildCreateMusicItemInputFromValues } from "../domain/add-form";
+import { AmbiguousLinkApiError, type ApiClient } from "../../services/api-client";
 
 type AddFormValuesInput = AddFormValues;
 
 export interface AddFormContext {
+  api: ApiClient;
   initialized: boolean;
   selectedStackIds: number[];
   scanState: "idle" | "scanning";
   submitState: "idle" | "submitting" | "error";
   showSecondaryFields: boolean;
+  pendingValues: AddFormValuesInput | null;
+  createdItemId: number | null;
   linkPicker: {
     url: string;
     message: string;
@@ -30,7 +35,7 @@ export type AddFormEvent =
   | { type: "SUBMIT_STARTED" }
   | { type: "SUBMIT_FINISHED" }
   | { type: "SUBMIT_ERROR" }
-  | { type: "SUBMIT_CLICKED"; url: string }
+  | { type: "SUBMIT_CLICKED"; url: string; pendingValues?: AddFormValuesInput }
   | {
       type: "LINK_PICKER_OPENED";
       url: string;
@@ -39,21 +44,80 @@ export type AddFormEvent =
       pendingValues: AddFormValuesInput;
     }
   | { type: "CANDIDATE_SELECTED"; candidateId: string }
+  | { type: "CANDIDATE_SUBMITTED" }
   | { type: "LINK_PICKER_CANCELLED" }
   | { type: "ENTER_MANUALLY" }
+  | { type: "CLEAR_CREATED_ITEM" }
   | { type: "FORM_RESET" };
 
 export const addFormMachine = setup({
-  types: {} as { context: AddFormContext; events: AddFormEvent },
+  types: {} as {
+    context: AddFormContext;
+    events: AddFormEvent;
+    input: { api: ApiClient };
+  },
+  actors: {
+    submitItem: fromPromise<
+      { itemId: number },
+      { api: ApiClient; values: AddFormValuesInput; selectedStackIds: number[] }
+    >(async ({ input }) => {
+      const { api, values, selectedStackIds } = input;
+
+      // Enrich with MusicBrainz (non-fatal)
+      let enrichedValues = { ...values };
+      let musicbrainzReleaseId: string | undefined;
+      let musicbrainzArtistId: string | undefined;
+
+      if (values.artist.trim() && values.title.trim()) {
+        try {
+          const enrichment = await api.lookupRelease(
+            values.artist.trim(),
+            values.title.trim(),
+            values.year.trim() || undefined,
+          );
+          if (enrichment.year != null && !values.year.trim())
+            enrichedValues.year = String(enrichment.year);
+          if (enrichment.label && !values.label.trim()) enrichedValues.label = enrichment.label;
+          if (enrichment.country && !values.country.trim())
+            enrichedValues.country = enrichment.country;
+          if (enrichment.catalogueNumber && !values.catalogueNumber.trim())
+            enrichedValues.catalogueNumber = enrichment.catalogueNumber;
+          if (enrichment.artworkUrl && !values.artworkUrl.trim())
+            enrichedValues.artworkUrl = enrichment.artworkUrl;
+          if (enrichment.musicbrainzReleaseId)
+            musicbrainzReleaseId = enrichment.musicbrainzReleaseId;
+          if (enrichment.musicbrainzArtistId) musicbrainzArtistId = enrichment.musicbrainzArtistId;
+        } catch {
+          // non-fatal
+        }
+      }
+
+      const item = await api.createMusicItem({
+        ...buildCreateMusicItemInputFromValues(enrichedValues),
+        listenStatus: "to-listen",
+        musicbrainzReleaseId,
+        musicbrainzArtistId,
+      });
+
+      if (selectedStackIds.length > 0) {
+        await api.setItemStacks(item.id, selectedStackIds);
+      }
+
+      return { itemId: item.id };
+    }),
+  },
 }).createMachine({
-  context: {
+  context: ({ input }) => ({
+    api: input.api,
     initialized: false,
     selectedStackIds: [],
     scanState: "idle",
     submitState: "idle",
     showSecondaryFields: false,
+    pendingValues: null,
+    createdItemId: null,
     linkPicker: null,
-  },
+  }),
   initial: "idle",
   on: {
     INITIALIZED: {
@@ -102,12 +166,17 @@ export const addFormMachine = setup({
     SUBMIT_ERROR: {
       actions: assign({ submitState: "error" as const }),
     },
+    CLEAR_CREATED_ITEM: {
+      actions: assign({ createdItemId: null }),
+    },
     FORM_RESET: {
       target: ".idle",
       actions: assign({
         showSecondaryFields: false,
         linkPicker: null,
         submitState: "idle" as const,
+        pendingValues: null,
+        createdItemId: null,
       }),
     },
   },
@@ -116,11 +185,18 @@ export const addFormMachine = setup({
       on: {
         SUBMIT_CLICKED: [
           {
-            guard: ({ event }) => event.url === "",
+            guard: ({ event }) => !event.url.trim(),
             target: "enteringManually",
             actions: assign({ showSecondaryFields: true }),
           },
-          // url is not empty — no-op for now (Task 2 will handle async submit)
+          {
+            // url is present — go to submitting
+            target: "submitting",
+            actions: assign(({ event }) => ({
+              pendingValues: event.pendingValues ?? null,
+              submitState: "submitting" as const,
+            })),
+          },
         ],
         LINK_PICKER_OPENED: {
           target: "linkPickerOpen",
@@ -138,6 +214,13 @@ export const addFormMachine = setup({
     },
     enteringManually: {
       on: {
+        SUBMIT_CLICKED: {
+          target: "submitting",
+          actions: assign(({ event }) => ({
+            pendingValues: event.pendingValues ?? null,
+            submitState: "submitting" as const,
+          })),
+        },
         LINK_PICKER_OPENED: {
           target: "linkPickerOpen",
           actions: assign(({ event }) => ({
@@ -161,6 +244,28 @@ export const addFormMachine = setup({
               : null,
           })),
         },
+        CANDIDATE_SUBMITTED: {
+          guard: ({ context }) => context.linkPicker?.selectedCandidateId != null,
+          target: "submitting",
+          actions: assign(({ context }) => {
+            const candidate = context.linkPicker!.candidates.find(
+              (c) => c.candidateId === context.linkPicker!.selectedCandidateId,
+            );
+            const base = context.linkPicker!.pendingValues;
+            return {
+              pendingValues: candidate
+                ? {
+                    ...base,
+                    artist: candidate.artist ?? base.artist,
+                    title: candidate.title || base.title,
+                    itemType: candidate.itemType ?? base.itemType,
+                  }
+                : base,
+              submitState: "submitting" as const,
+              linkPicker: null,
+            };
+          }),
+        },
         LINK_PICKER_CANCELLED: {
           target: "idle",
           actions: assign({ linkPicker: null }),
@@ -169,6 +274,46 @@ export const addFormMachine = setup({
           target: "enteringManually",
           actions: assign({ showSecondaryFields: true, linkPicker: null }),
         },
+      },
+    },
+    submitting: {
+      invoke: {
+        src: "submitItem",
+        input: ({ context }) => ({
+          api: context.api,
+          values: context.pendingValues!,
+          selectedStackIds: context.selectedStackIds,
+        }),
+        onDone: {
+          target: "idle",
+          actions: assign(({ event }) => ({
+            submitState: "idle" as const,
+            createdItemId: event.output.itemId,
+            pendingValues: null,
+            showSecondaryFields: false,
+            selectedStackIds: [],
+          })),
+        },
+        onError: [
+          {
+            guard: ({ event }) => event.error instanceof AmbiguousLinkApiError,
+            target: "linkPickerOpen",
+            actions: assign(({ event, context }) => ({
+              submitState: "idle" as const,
+              linkPicker: {
+                url: (event.error as AmbiguousLinkApiError).payload.url,
+                message: (event.error as AmbiguousLinkApiError).payload.message,
+                candidates: (event.error as AmbiguousLinkApiError).payload.candidates,
+                selectedCandidateId: null,
+                pendingValues: context.pendingValues!,
+              },
+            })),
+          },
+          {
+            target: "idle",
+            actions: assign({ submitState: "error" as const }),
+          },
+        ],
       },
     },
   },

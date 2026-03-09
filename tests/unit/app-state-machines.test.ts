@@ -9,6 +9,24 @@ import {
   transitionRatingState,
 } from "../../src/ui/state/rating-machine";
 
+function makeMockApi(overrides: Partial<Record<string, unknown>> = {}) {
+  return {
+    createMusicItem: async () => ({
+      id: 42,
+      title: "Test",
+      artist: "Artist",
+      itemType: "album",
+      listenStatus: "to-listen",
+      createdAt: "",
+      updatedAt: "",
+    }),
+    lookupRelease: async () => ({}),
+    setItemStacks: async () => {},
+    listStacks: async () => [],
+    ...overrides,
+  };
+}
+
 describe("app state machine", () => {
   it("tracks filter and stack selection", () => {
     const actor = createActor(appMachine).start();
@@ -51,7 +69,7 @@ describe("app state machine", () => {
 
 describe("add form state machine", () => {
   it("adds, toggles, and clears selected stacks", () => {
-    const actor = createActor(addFormMachine).start();
+    const actor = createActor(addFormMachine, { input: { api: makeMockApi() as any } }).start();
 
     actor.send({ type: "INITIALIZED" });
     actor.send({ type: "STACK_ADDED", stackId: 5 });
@@ -68,7 +86,7 @@ describe("add form state machine", () => {
   });
 
   it("tracks scan idle/scanning states", () => {
-    const actor = createActor(addFormMachine).start();
+    const actor = createActor(addFormMachine, { input: { api: makeMockApi() as any } }).start();
 
     actor.send({ type: "SCAN_STARTED" });
     expect(actor.getSnapshot().context.scanState).toBe("scanning");
@@ -78,7 +96,7 @@ describe("add form state machine", () => {
   });
 
   it("tracks submit loading state", () => {
-    const actor = createActor(addFormMachine).start();
+    const actor = createActor(addFormMachine, { input: { api: makeMockApi() as any } }).start();
 
     expect(actor.getSnapshot().context.submitState).toBe("idle");
 
@@ -90,7 +108,7 @@ describe("add form state machine", () => {
   });
 
   it("tracks submit error state", () => {
-    const actor = createActor(addFormMachine).start();
+    const actor = createActor(addFormMachine, { input: { api: makeMockApi() as any } }).start();
 
     actor.send({ type: "SUBMIT_STARTED" });
     actor.send({ type: "SUBMIT_ERROR" });
@@ -103,22 +121,22 @@ describe("add form state machine", () => {
 
 describe("add form machine — secondary fields and link picker", () => {
   it("reveals secondary fields when SUBMIT_CLICKED with no url", () => {
-    const actor = createActor(addFormMachine).start();
+    const actor = createActor(addFormMachine, { input: { api: makeMockApi() as any } }).start();
     actor.send({ type: "SUBMIT_CLICKED", url: "" });
     expect(actor.getSnapshot().context.showSecondaryFields).toBe(true);
     expect(actor.getSnapshot().value).toBe("enteringManually");
   });
 
-  it("does not change state when SUBMIT_CLICKED with a url", () => {
-    const actor = createActor(addFormMachine).start();
+  it("transitions to submitting when SUBMIT_CLICKED with a url", () => {
+    const actor = createActor(addFormMachine, { input: { api: makeMockApi() as any } }).start();
     actor.send({ type: "SUBMIT_CLICKED", url: "https://example.com/release" });
     expect(actor.getSnapshot().context.showSecondaryFields).toBe(false);
-    // Still in idle (submit flow is Task 2)
-    expect(actor.getSnapshot().value).toBe("idle");
+    // Now transitions to submitting (Task 2 implemented)
+    expect(actor.getSnapshot().value).toBe("submitting");
   });
 
   it("opens link picker with candidates", () => {
-    const actor = createActor(addFormMachine).start();
+    const actor = createActor(addFormMachine, { input: { api: makeMockApi() as any } }).start();
     const pendingValues = {
       url: "https://example.com",
       title: "",
@@ -146,7 +164,7 @@ describe("add form machine — secondary fields and link picker", () => {
   });
 
   it("selects a link picker candidate", () => {
-    const actor = createActor(addFormMachine).start();
+    const actor = createActor(addFormMachine, { input: { api: makeMockApi() as any } }).start();
     const pendingValues = {
       url: "https://example.com",
       title: "",
@@ -172,7 +190,7 @@ describe("add form machine — secondary fields and link picker", () => {
   });
 
   it("cancels link picker and returns to idle", () => {
-    const actor = createActor(addFormMachine).start();
+    const actor = createActor(addFormMachine, { input: { api: makeMockApi() as any } }).start();
     const pendingValues = {
       url: "https://example.com",
       title: "",
@@ -199,7 +217,7 @@ describe("add form machine — secondary fields and link picker", () => {
   });
 
   it("enter manually from link picker sets showSecondaryFields and goes to enteringManually", () => {
-    const actor = createActor(addFormMachine).start();
+    const actor = createActor(addFormMachine, { input: { api: makeMockApi() as any } }).start();
     const pendingValues = {
       url: "https://example.com",
       title: "",
@@ -227,7 +245,7 @@ describe("add form machine — secondary fields and link picker", () => {
   });
 
   it("FORM_RESET resets submitState to idle", () => {
-    const actor = createActor(addFormMachine).start();
+    const actor = createActor(addFormMachine, { input: { api: makeMockApi() as any } }).start();
     actor.send({ type: "SUBMIT_ERROR" });
     expect(actor.getSnapshot().context.submitState).toBe("error");
     actor.send({ type: "FORM_RESET" });
@@ -235,7 +253,7 @@ describe("add form machine — secondary fields and link picker", () => {
   });
 
   it("LINK_PICKER_CANCELLED from enteringManually path returns to idle (by design)", () => {
-    const actor = createActor(addFormMachine).start();
+    const actor = createActor(addFormMachine, { input: { api: makeMockApi() as any } }).start();
     const pendingValues = {
       url: "https://example.com",
       title: "",
@@ -267,12 +285,139 @@ describe("add form machine — secondary fields and link picker", () => {
   });
 
   it("FORM_RESET returns to idle and clears fields", () => {
-    const actor = createActor(addFormMachine).start();
+    const actor = createActor(addFormMachine, { input: { api: makeMockApi() as any } }).start();
     actor.send({ type: "SUBMIT_CLICKED", url: "" });
     expect(actor.getSnapshot().value).toBe("enteringManually");
     actor.send({ type: "FORM_RESET" });
     expect(actor.getSnapshot().value).toBe("idle");
     expect(actor.getSnapshot().context.showSecondaryFields).toBe(false);
+  });
+});
+
+describe("add form machine — async submit flow", () => {
+  const pendingValues = {
+    url: "https://example.com",
+    title: "Test Album",
+    artist: "Test Artist",
+    itemType: "album",
+    label: "",
+    year: "",
+    country: "",
+    genre: "",
+    catalogueNumber: "",
+    notes: "",
+    artworkUrl: "",
+  };
+
+  it("transitions through submitting to idle on success, sets createdItemId", async () => {
+    const api = makeMockApi() as any;
+    const actor = createActor(addFormMachine, { input: { api } }).start();
+
+    actor.send({ type: "SUBMIT_CLICKED", url: "https://example.com", pendingValues });
+
+    expect(actor.getSnapshot().value).toBe("submitting");
+
+    await new Promise((resolve) => setTimeout(resolve, 100));
+
+    expect(actor.getSnapshot().value).toBe("idle");
+    expect(actor.getSnapshot().context.createdItemId).toBe(42);
+    expect(actor.getSnapshot().context.submitState).toBe("idle");
+    expect(actor.getSnapshot().context.showSecondaryFields).toBe(false);
+    expect(actor.getSnapshot().context.selectedStackIds).toEqual([]);
+  });
+
+  it("transitions to linkPickerOpen on AmbiguousLinkApiError", async () => {
+    const { AmbiguousLinkApiError } = await import("../../src/services/api-client");
+    const api = makeMockApi({
+      createMusicItem: async () => {
+        throw new AmbiguousLinkApiError({
+          url: "https://x.com",
+          message: "Pick one",
+          candidates: [
+            { candidateId: "a", title: "Release A", artist: "Artist", itemType: "album" },
+          ],
+        });
+      },
+    }) as any;
+    const actor = createActor(addFormMachine, { input: { api } }).start();
+
+    actor.send({ type: "SUBMIT_CLICKED", url: "https://example.com", pendingValues });
+    await new Promise((resolve) => setTimeout(resolve, 100));
+
+    expect(actor.getSnapshot().value).toBe("linkPickerOpen");
+    expect(actor.getSnapshot().context.linkPicker?.message).toBe("Pick one");
+    expect(actor.getSnapshot().context.linkPicker?.candidates).toHaveLength(1);
+  });
+
+  it("transitions to idle with error submitState on unexpected error", async () => {
+    const api = makeMockApi({
+      createMusicItem: async () => {
+        throw new Error("Network error");
+      },
+    }) as any;
+    const actor = createActor(addFormMachine, { input: { api } }).start();
+
+    actor.send({ type: "SUBMIT_CLICKED", url: "https://example.com", pendingValues });
+    await new Promise((resolve) => setTimeout(resolve, 100));
+
+    expect(actor.getSnapshot().value).toBe("idle");
+    expect(actor.getSnapshot().context.submitState).toBe("error");
+  });
+
+  it("submits from enteringManually state", async () => {
+    const api = makeMockApi() as any;
+    const actor = createActor(addFormMachine, { input: { api } }).start();
+
+    actor.send({ type: "SUBMIT_CLICKED", url: "" });
+    expect(actor.getSnapshot().value).toBe("enteringManually");
+
+    actor.send({ type: "SUBMIT_CLICKED", url: "", pendingValues });
+    expect(actor.getSnapshot().value).toBe("submitting");
+
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    expect(actor.getSnapshot().value).toBe("idle");
+    expect(actor.getSnapshot().context.createdItemId).toBe(42);
+  });
+
+  it("submits selected candidate from link picker", async () => {
+    const { AmbiguousLinkApiError } = await import("../../src/services/api-client");
+    let callCount = 0;
+    const api = makeMockApi({
+      createMusicItem: async () => {
+        callCount++;
+        if (callCount === 1) {
+          throw new AmbiguousLinkApiError({
+            url: "https://x.com",
+            message: "Pick one",
+            candidates: [
+              { candidateId: "a", title: "Release A", artist: "Artist", itemType: "album" },
+            ],
+          });
+        }
+        return {
+          id: 99,
+          title: "Release A",
+          artist: "Artist",
+          itemType: "album",
+          listenStatus: "to-listen",
+          createdAt: "",
+          updatedAt: "",
+        };
+      },
+    }) as any;
+    const actor = createActor(addFormMachine, { input: { api } }).start();
+
+    actor.send({ type: "SUBMIT_CLICKED", url: "https://example.com", pendingValues });
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    expect(actor.getSnapshot().value).toBe("linkPickerOpen");
+
+    actor.send({ type: "CANDIDATE_SELECTED", candidateId: "a" });
+    actor.send({ type: "CANDIDATE_SUBMITTED" });
+    expect(actor.getSnapshot().value).toBe("submitting");
+
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    expect(actor.getSnapshot().value).toBe("idle");
+    expect(actor.getSnapshot().context.createdItemId).toBe(99);
   });
 });
 
