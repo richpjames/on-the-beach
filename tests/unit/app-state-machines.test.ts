@@ -1,4 +1,4 @@
-import { createActor } from "xstate";
+import { createActor, waitFor } from "xstate";
 import { describe, expect, it } from "bun:test";
 
 import { addFormMachine } from "../../src/ui/state/add-form-machine";
@@ -317,7 +317,7 @@ describe("add form machine — async submit flow", () => {
 
     expect(actor.getSnapshot().value).toBe("submitting");
 
-    await new Promise((resolve) => setTimeout(resolve, 100));
+    await waitFor(actor, (snapshot) => snapshot.value !== "submitting", { timeout: 5000 });
 
     expect(actor.getSnapshot().value).toBe("idle");
     expect(actor.getSnapshot().context.createdItemId).toBe(42);
@@ -342,7 +342,7 @@ describe("add form machine — async submit flow", () => {
     const actor = createActor(addFormMachine, { input: { api } }).start();
 
     actor.send({ type: "SUBMIT_CLICKED", url: "https://example.com", pendingValues });
-    await new Promise((resolve) => setTimeout(resolve, 100));
+    await waitFor(actor, (snapshot) => snapshot.value !== "submitting", { timeout: 5000 });
 
     expect(actor.getSnapshot().value).toBe("linkPickerOpen");
     expect(actor.getSnapshot().context.linkPicker?.message).toBe("Pick one");
@@ -358,7 +358,7 @@ describe("add form machine — async submit flow", () => {
     const actor = createActor(addFormMachine, { input: { api } }).start();
 
     actor.send({ type: "SUBMIT_CLICKED", url: "https://example.com", pendingValues });
-    await new Promise((resolve) => setTimeout(resolve, 100));
+    await waitFor(actor, (snapshot) => snapshot.value !== "submitting", { timeout: 5000 });
 
     expect(actor.getSnapshot().value).toBe("idle");
     expect(actor.getSnapshot().context.submitState).toBe("error");
@@ -374,9 +374,18 @@ describe("add form machine — async submit flow", () => {
     actor.send({ type: "SUBMIT_CLICKED", url: "", pendingValues });
     expect(actor.getSnapshot().value).toBe("submitting");
 
-    await new Promise((resolve) => setTimeout(resolve, 100));
+    await waitFor(actor, (snapshot) => snapshot.value !== "submitting", { timeout: 5000 });
     expect(actor.getSnapshot().value).toBe("idle");
     expect(actor.getSnapshot().context.createdItemId).toBe(42);
+  });
+
+  it("ignores SUBMIT_CLICKED from enteringManually when pendingValues is absent", () => {
+    const api = makeMockApi() as any;
+    const actor = createActor(addFormMachine, { input: { api } }).start();
+    actor.send({ type: "SUBMIT_CLICKED", url: "" }); // go to enteringManually
+    expect(actor.getSnapshot().value).toBe("enteringManually");
+    actor.send({ type: "SUBMIT_CLICKED", url: "" }); // no pendingValues — should be ignored
+    expect(actor.getSnapshot().value).toBe("enteringManually"); // stays in enteringManually
   });
 
   it("submits selected candidate from link picker", async () => {
@@ -408,14 +417,14 @@ describe("add form machine — async submit flow", () => {
     const actor = createActor(addFormMachine, { input: { api } }).start();
 
     actor.send({ type: "SUBMIT_CLICKED", url: "https://example.com", pendingValues });
-    await new Promise((resolve) => setTimeout(resolve, 100));
+    await waitFor(actor, (snapshot) => snapshot.value !== "submitting", { timeout: 5000 });
     expect(actor.getSnapshot().value).toBe("linkPickerOpen");
 
     actor.send({ type: "CANDIDATE_SELECTED", candidateId: "a" });
     actor.send({ type: "CANDIDATE_SUBMITTED" });
     expect(actor.getSnapshot().value).toBe("submitting");
 
-    await new Promise((resolve) => setTimeout(resolve, 100));
+    await waitFor(actor, (snapshot) => snapshot.value !== "submitting", { timeout: 5000 });
     expect(actor.getSnapshot().value).toBe("idle");
     expect(actor.getSnapshot().context.createdItemId).toBe(99);
   });
