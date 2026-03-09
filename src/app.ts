@@ -1,17 +1,8 @@
-import { AmbiguousLinkApiError, ApiClient } from "./services/api-client";
+import { ApiClient } from "./services/api-client";
 import Sortable from "sortablejs";
 import type { AddFormValues as AddFormValuesInput } from "./ui/domain/add-form";
-import type {
-  AmbiguousLinkPayload,
-  LinkReleaseCandidate,
-  ListenStatus,
-  MusicItemSort,
-  StackWithCount,
-} from "./types";
-import {
-  buildCreateMusicItemInputFromValues,
-  getCoverScanErrorMessage,
-} from "./ui/domain/add-form";
+import type { LinkReleaseCandidate, ListenStatus, MusicItemSort, StackWithCount } from "./types";
+import { getCoverScanErrorMessage } from "./ui/domain/add-form";
 import { buildContextKey, buildMusicItemFilters } from "./ui/domain/music-list";
 import { constrainDimensions } from "./ui/domain/scan";
 import {
@@ -49,18 +40,10 @@ interface StackDropdownOptions {
   shouldIgnoreOutsideClick?: (target: HTMLElement) => boolean;
 }
 
-interface LinkPickerState {
-  url: string;
-  message: string;
-  values: AddFormValuesInput;
-  candidates: LinkReleaseCandidate[];
-  selectedCandidateId: string | null;
-}
-
 export class App {
   private api: ApiClient;
   private appActor = createActor(appMachine).start();
-  private addFormActor = createActor(addFormMachine).start();
+  private addFormActor!: ReturnType<typeof createActor<typeof addFormMachine>>;
   private musicListEl: HTMLElement | null = null;
   private musicListScrollbarEl: HTMLElement | null = null;
   private musicListTrackEl: HTMLElement | null = null;
@@ -77,7 +60,6 @@ export class App {
   private musicListSortable: Sortable | null = null;
   private musicListReorderMediaQuery: MediaQueryList | null = null;
   private isReordering = false;
-  private linkPickerState: LinkPickerState | null = null;
   private readonly handleMusicListReorderMediaChange = (): void => {
     this.syncMusicListReorderMode();
   };
@@ -141,9 +123,7 @@ export class App {
   }
 
   private setupAddForm(): void {
-    if (this.formCtx.initialized) {
-      return;
-    }
+    this.addFormActor = createActor(addFormMachine, { input: { api: this.api } }).start();
 
     const form = document.getElementById("add-form");
     const submitButton = document.getElementById("add-form-submit");
@@ -153,10 +133,6 @@ export class App {
 
     this.addFormActor.send({ type: "INITIALIZED" });
 
-    const detailsEl = form.querySelector(".add-form__details");
-    const titleInput = form.querySelector('input[name="title"]');
-    const artistInput = form.querySelector('input[name="artist"]');
-    const artworkInput = form.querySelector('input[name="artworkUrl"]');
     const scanButton = document.getElementById("add-form-scan-btn");
     const scanInput = document.getElementById("scan-file-input");
 
@@ -173,21 +149,9 @@ export class App {
 
       scanInput.addEventListener("change", async () => {
         const file = scanInput.files?.[0];
-        if (!file) {
-          return;
-        }
-
-        const secondary = form.querySelector<HTMLElement>(".add-form__secondary");
-        if (secondary?.hidden) secondary.hidden = false;
-
-        await this.handleCoverScan(
-          file,
-          scanButton,
-          detailsEl instanceof HTMLDetailsElement ? detailsEl : null,
-          artistInput instanceof HTMLInputElement ? artistInput : null,
-          titleInput instanceof HTMLInputElement ? titleInput : null,
-          artworkInput instanceof HTMLInputElement ? artworkInput : null,
-        );
+        if (!file) return;
+        const imageBase64 = await this.encodeScanImage(file);
+        this.addFormActor.send({ type: "SCAN_FILE_SELECTED", imageBase64 });
         scanInput.value = "";
       });
     }
@@ -209,28 +173,99 @@ export class App {
       this.renderAddFormStackChips();
     });
 
-    form.addEventListener("submit", async (event) => {
+    form.addEventListener("submit", (event) => {
       event.preventDefault();
 
-      const secondary = form.querySelector<HTMLElement>(".add-form__secondary");
-      const urlInput = form.querySelector<HTMLInputElement>('input[name="url"]');
-      if (secondary?.hidden && !urlInput?.value.trim()) {
-        secondary.hidden = false;
-        const artistInput = form.querySelector<HTMLInputElement>('input[name="artist"]');
-        artistInput?.focus();
-        return;
-      }
 
       if (!this.appCtx.isReady) {
         alert("App is still loading. Please try again in a moment.");
         return;
       }
+      const urlInput = form.querySelector<HTMLInputElement>('input[name="url"]');
+      const url = urlInput?.value.trim() ?? "";
+      this.addFormActor.send({
+        type: "SUBMIT_CLICKED",
+        url,
+        pendingValues: this.readAddFormValues(new FormData(form)),
+      });
+    });
 
-      try {
-        await this.createItemFromValues(this.readAddFormValues(new FormData(form)), form);
-      } catch (error) {
-        console.error("Failed to add item:", error);
-        alert("Failed to add item. Please try again.");
+    this.addFormActor.subscribe((snapshot) => {
+      const ctx = snapshot.context;
+      const formEl = document.getElementById("add-form") as HTMLFormElement | null;
+      if (!formEl) return;
+
+      // Secondary fields
+      const secondary = formEl.querySelector<HTMLElement>(".add-form__secondary");
+      if (secondary) secondary.hidden = !ctx.showSecondaryFields;
+
+      // Submit button
+      const submitBtn = document.getElementById("add-form-submit") as HTMLButtonElement | null;
+      if (submitBtn) {
+        submitBtn.disabled = ctx.submitState === "submitting";
+        submitBtn.textContent = ctx.submitState === "submitting" ? "Adding..." : "Add";
+      }
+
+      // Loading overlay
+      const overlay = document.getElementById("add-loading-overlay");
+      const isSubmitting = ctx.submitState === "submitting";
+      overlay?.classList.toggle("is-visible", isSubmitting);
+      overlay?.setAttribute("aria-hidden", isSubmitting ? "false" : "true");
+
+      // Scan button
+      const scanBtn = document.getElementById("add-form-scan-btn") as HTMLButtonElement | null;
+      if (scanBtn) {
+        scanBtn.disabled = ctx.scanState === "scanning";
+        scanBtn.classList.toggle("is-loading", ctx.scanState === "scanning");
+        scanBtn.textContent = ctx.scanState === "scanning" ? "Scanning..." : "Scan";
+      }
+
+      // Scan results — populate form fields when available
+      if (ctx.scanResult) {
+        const artistInput = formEl.querySelector<HTMLInputElement>('input[name="artist"]');
+        const titleInput = formEl.querySelector<HTMLInputElement>('input[name="title"]');
+        const artworkInput = formEl.querySelector<HTMLInputElement>('input[name="artworkUrl"]');
+        const detailsEl = formEl.querySelector<HTMLDetailsElement>(".add-form__details");
+        if (artistInput && ctx.scanResult.artist) {
+          artistInput.value = ctx.scanResult.artist;
+          artistInput.dispatchEvent(new Event("input", { bubbles: true }));
+        }
+        if (titleInput && ctx.scanResult.title) {
+          titleInput.value = ctx.scanResult.title;
+          titleInput.dispatchEvent(new Event("input", { bubbles: true }));
+        }
+        if (artworkInput && ctx.scanResult.artworkUrl) {
+          artworkInput.value = ctx.scanResult.artworkUrl;
+        }
+        if (detailsEl && (ctx.scanResult.artist || ctx.scanResult.title)) detailsEl.open = true;
+        // Consume the result
+        this.addFormActor.send({ type: "SCAN_RESULT_CONSUMED" });
+      }
+
+      // Scan error
+      if (ctx.scanError) {
+        alert(getCoverScanErrorMessage(new Error(ctx.scanError)));
+        this.addFormActor.send({ type: "SCAN_RESULT_CONSUMED" });
+      }
+
+      // Link picker
+      const modal = document.getElementById("link-picker-modal");
+      if (modal instanceof HTMLElement) {
+        if (snapshot.matches("linkPickerOpen") && ctx.linkPicker) {
+          this.renderLinkPickerFromContext(ctx.linkPicker);
+        } else {
+          modal.hidden = true;
+        }
+      }
+
+      // On success: createdItemId is set — reset form and notify appMachine
+      if (ctx.createdItemId != null) {
+        formEl.reset();
+        const sec = formEl.querySelector<HTMLElement>(".add-form__secondary");
+        if (sec) sec.hidden = true;
+        this.renderAddFormStackChips();
+        this.appActor.send({ type: "ITEM_CREATED" });
+        this.addFormActor.send({ type: "CLEAR_CREATED_ITEM" });
       }
     });
   }
@@ -256,102 +291,6 @@ export class App {
     return typeof value === "string" ? value : "";
   }
 
-  private async enrichValuesWithMusicBrainz(values: AddFormValuesInput): Promise<{
-    values: AddFormValuesInput;
-    musicbrainzReleaseId?: string;
-    musicbrainzArtistId?: string;
-  }> {
-    let mbReleaseId: string | undefined;
-    let mbArtistId: string | undefined;
-
-    if (values.artist.trim() && values.title.trim()) {
-      try {
-        const enrichment = await this.api.lookupRelease(
-          values.artist.trim(),
-          values.title.trim(),
-          values.year.trim() || undefined,
-        );
-
-        if (enrichment.year != null && !values.year.trim()) {
-          values.year = String(enrichment.year);
-        }
-        if (enrichment.label && !values.label.trim()) {
-          values.label = enrichment.label;
-        }
-        if (enrichment.country && !values.country.trim()) {
-          values.country = enrichment.country;
-        }
-        if (enrichment.catalogueNumber && !values.catalogueNumber.trim()) {
-          values.catalogueNumber = enrichment.catalogueNumber;
-        }
-        if (enrichment.artworkUrl && !values.artworkUrl.trim()) {
-          values.artworkUrl = enrichment.artworkUrl;
-        }
-        if (enrichment.musicbrainzReleaseId) {
-          mbReleaseId = enrichment.musicbrainzReleaseId;
-        }
-        if (enrichment.musicbrainzArtistId) {
-          mbArtistId = enrichment.musicbrainzArtistId;
-        }
-      } catch {
-        // non-fatal: enrichment failure does not block saving
-      }
-    }
-
-    return {
-      values,
-      musicbrainzReleaseId: mbReleaseId,
-      musicbrainzArtistId: mbArtistId,
-    };
-  }
-
-  private async createItemFromValues(
-    rawValues: AddFormValuesInput,
-    form: HTMLFormElement,
-    options?: { selectedCandidateId?: string },
-  ): Promise<void> {
-    this.setSubmitButtonState(true);
-    try {
-      const values = { ...rawValues };
-      const enriched = await this.enrichValuesWithMusicBrainz(values);
-
-      const item = await this.api.createMusicItem({
-        ...buildCreateMusicItemInputFromValues(enriched.values),
-        listenStatus: "to-listen",
-        musicbrainzReleaseId: enriched.musicbrainzReleaseId,
-        musicbrainzArtistId: enriched.musicbrainzArtistId,
-        selectedCandidateId: options?.selectedCandidateId,
-      });
-
-      await this.handleCreatedItem(item.id, form);
-      this.closeLinkPicker();
-    } catch (error) {
-      if (error instanceof AmbiguousLinkApiError) {
-        this.openLinkPicker(error.payload, rawValues);
-        return;
-      }
-      throw error;
-    } finally {
-      this.setSubmitButtonState(false);
-    }
-  }
-
-  private async handleCreatedItem(itemId: number, form: HTMLFormElement): Promise<void> {
-    if (this.formCtx.selectedStackIds.length > 0) {
-      await this.api.setItemStacks(itemId, this.formCtx.selectedStackIds);
-      this.addFormActor.send({ type: "CLEAR_STACKS" });
-      this.renderAddFormStackChips();
-      await this.renderStackBar();
-    }
-
-    form.reset();
-    const secondary = form.querySelector<HTMLElement>(".add-form__secondary");
-    if (secondary) secondary.hidden = true;
-    if (this.shouldRefreshListAfterAdd()) {
-      await this.renderMusicList();
-    }
-  }
-
   private setupLinkPicker(): void {
     const modal = document.getElementById("link-picker-modal");
     const list = document.getElementById("link-picker-list");
@@ -373,63 +312,54 @@ export class App {
       const target = (event.target as HTMLElement).closest(
         "[data-candidate-id]",
       ) as HTMLElement | null;
-      if (!target || !this.linkPickerState) {
-        return;
-      }
-
-      this.linkPickerState = {
-        ...this.linkPickerState,
-        selectedCandidateId: target.dataset.candidateId ?? null,
-      };
-      this.renderLinkPicker();
+      if (!target) return;
+      this.addFormActor.send({
+        type: "CANDIDATE_SELECTED",
+        candidateId: target.dataset.candidateId ?? "",
+      });
     });
 
     submit.addEventListener("click", () => {
-      void this.submitSelectedLinkCandidate();
+      const lp = this.formCtx.linkPicker;
+      const candidate = lp?.candidates.find((c) => c.candidateId === lp?.selectedCandidateId);
+      if (candidate) this.populateAddFormFromCandidate(candidate);
+      this.addFormActor.send({ type: "CANDIDATE_SUBMITTED" });
     });
 
     manual.addEventListener("click", () => {
-      this.enterSelectedCandidateManually();
+      const lp = this.formCtx.linkPicker;
+      const candidate = lp?.candidates.find((c) => c.candidateId === lp?.selectedCandidateId);
+      if (candidate) this.populateAddFormFromCandidate(candidate);
+      this.addFormActor.send({ type: "ENTER_MANUALLY" });
+      const form = document.getElementById("add-form") as HTMLFormElement | null;
+      form?.querySelector<HTMLInputElement>('input[name="artist"]')?.focus();
     });
 
     cancel.addEventListener("click", () => {
-      this.closeLinkPicker();
+      this.addFormActor.send({ type: "LINK_PICKER_CANCELLED" });
     });
 
     modal.addEventListener("click", (event) => {
       const target = event.target as HTMLElement;
       if (target.dataset.linkPickerClose === "true") {
-        this.closeLinkPicker();
+        this.addFormActor.send({ type: "LINK_PICKER_CANCELLED" });
       }
     });
 
     document.addEventListener("keydown", (event) => {
-      if (event.key === "Escape" && this.linkPickerState) {
-        this.closeLinkPicker();
+      if (event.key === "Escape" && this.formCtx.linkPicker) {
+        this.addFormActor.send({ type: "LINK_PICKER_CANCELLED" });
       }
     });
   }
 
-  private openLinkPicker(payload: AmbiguousLinkPayload, values: AddFormValuesInput): void {
-    this.linkPickerState = {
-      url: payload.url,
-      message: payload.message,
-      values: { ...values },
-      candidates: payload.candidates,
-      selectedCandidateId: null,
-    };
-    this.renderLinkPicker();
-  }
-
-  private closeLinkPicker(): void {
-    this.linkPickerState = null;
-    const modal = document.getElementById("link-picker-modal");
-    if (modal instanceof HTMLElement) {
-      modal.hidden = true;
-    }
-  }
-
-  private renderLinkPicker(): void {
+  private renderLinkPickerFromContext(linkPicker: {
+    url: string;
+    message: string;
+    candidates: LinkReleaseCandidate[];
+    selectedCandidateId: string | null;
+    pendingValues: AddFormValuesInput;
+  }): void {
     const modal = document.getElementById("link-picker-modal");
     const list = document.getElementById("link-picker-list");
     const url = document.getElementById("link-picker-url");
@@ -442,67 +372,17 @@ export class App {
       !(url instanceof HTMLElement) ||
       !(message instanceof HTMLElement) ||
       !(submit instanceof HTMLButtonElement)
-    ) {
+    )
       return;
-    }
-
-    if (!this.linkPickerState) {
-      modal.hidden = true;
-      return;
-    }
 
     modal.hidden = false;
-    url.textContent = this.linkPickerState.url;
-    message.textContent = this.linkPickerState.message;
+    url.textContent = linkPicker.url;
+    message.textContent = linkPicker.message;
     list.innerHTML = renderAmbiguousLinkCandidates(
-      this.linkPickerState.candidates,
-      this.linkPickerState.selectedCandidateId,
+      linkPicker.candidates,
+      linkPicker.selectedCandidateId,
     );
-    submit.disabled = !this.linkPickerState.selectedCandidateId;
-  }
-
-  private findSelectedLinkCandidate(): LinkReleaseCandidate | null {
-    if (!this.linkPickerState?.selectedCandidateId) {
-      return null;
-    }
-
-    return (
-      this.linkPickerState.candidates.find(
-        (candidate) => candidate.candidateId === this.linkPickerState?.selectedCandidateId,
-      ) ?? null
-    );
-  }
-
-  private buildValuesForSelectedCandidate(
-    values: AddFormValuesInput,
-    candidate: LinkReleaseCandidate,
-  ): AddFormValuesInput {
-    return {
-      ...values,
-      artist: candidate.artist ?? values.artist,
-      title: candidate.title || values.title,
-      itemType: candidate.itemType ?? values.itemType,
-    };
-  }
-
-  private enterSelectedCandidateManually(): void {
-    const form = document.getElementById("add-form");
-    if (!(form instanceof HTMLFormElement) || !this.linkPickerState) {
-      return;
-    }
-
-    const selectedCandidate = this.findSelectedLinkCandidate();
-    if (selectedCandidate) {
-      this.populateAddFormFromCandidate(selectedCandidate);
-    }
-
-    const secondary = form.querySelector<HTMLElement>(".add-form__secondary");
-    if (secondary) {
-      secondary.hidden = false;
-    }
-
-    this.closeLinkPicker();
-    form.querySelector<HTMLInputElement>('input[name="artist"]')?.focus();
+    submit.disabled = !linkPicker.selectedCandidateId;
   }
 
   private populateAddFormFromCandidate(candidate: LinkReleaseCandidate): void {
@@ -525,90 +405,8 @@ export class App {
     }
   }
 
-  private async submitSelectedLinkCandidate(): Promise<void> {
-    const form = document.getElementById("add-form");
-    if (!(form instanceof HTMLFormElement) || !this.linkPickerState?.selectedCandidateId) {
-      return;
-    }
-
-    const selectedCandidate = this.findSelectedLinkCandidate();
-    if (!selectedCandidate) {
-      return;
-    }
-
-    const values = this.buildValuesForSelectedCandidate(
-      this.linkPickerState.values,
-      selectedCandidate,
-    );
-    await this.createItemFromValues(values, form, {
-      selectedCandidateId: selectedCandidate.candidateId,
-    });
-  }
-
   private shouldRefreshListAfterAdd(): boolean {
     return this.appCtx.currentFilter === "all" || this.appCtx.currentFilter === "to-listen";
-  }
-
-  private setSubmitButtonState(isLoading: boolean): void {
-    const button = document.getElementById("add-form-submit");
-    if (!(button instanceof HTMLButtonElement)) return;
-
-    this.addFormActor.send({ type: isLoading ? "SUBMIT_STARTED" : "SUBMIT_FINISHED" });
-    button.disabled = isLoading;
-    button.textContent = isLoading ? "Adding..." : "Add";
-
-    const overlay = document.getElementById("add-loading-overlay");
-    overlay?.classList.toggle("is-visible", isLoading);
-    overlay?.setAttribute("aria-hidden", isLoading ? "false" : "true");
-  }
-
-  private setScanButtonState(button: HTMLButtonElement, isLoading: boolean): void {
-    this.addFormActor.send({
-      type: isLoading ? "SCAN_STARTED" : "SCAN_FINISHED",
-    });
-
-    button.disabled = isLoading;
-    button.classList.toggle("is-loading", isLoading);
-    button.textContent = isLoading ? "Scanning..." : "Scan";
-  }
-
-  private async handleCoverScan(
-    file: File,
-    scanButton: HTMLButtonElement,
-    detailsEl: HTMLDetailsElement | null,
-    artistInput: HTMLInputElement | null,
-    titleInput: HTMLInputElement | null,
-    artworkInput: HTMLInputElement | null,
-  ): Promise<void> {
-    this.setScanButtonState(scanButton, true);
-
-    try {
-      const imageBase64 = await this.encodeScanImage(file);
-      const uploadResult = await this.api.uploadReleaseImage(imageBase64);
-
-      if (artworkInput) {
-        artworkInput.value = uploadResult.artworkUrl;
-      }
-
-      if (detailsEl) {
-        detailsEl.open = true;
-      }
-
-      const result = await this.api.scanCover(imageBase64);
-      if (artistInput && result.artist) {
-        artistInput.value = result.artist;
-        artistInput.dispatchEvent(new Event("input", { bubbles: true }));
-      }
-
-      if (titleInput && result.title) {
-        titleInput.value = result.title;
-        titleInput.dispatchEvent(new Event("input", { bubbles: true }));
-      }
-    } catch (error) {
-      alert(getCoverScanErrorMessage(error));
-    } finally {
-      this.setScanButtonState(scanButton, false);
-    }
   }
 
   private async encodeScanImage(file: File): Promise<string> {
