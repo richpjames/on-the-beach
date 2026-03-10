@@ -216,10 +216,10 @@ describe("GET /feed/stacks/:stackId.rss", () => {
     expect(body).toContain("<title>Untitled Mix</title>");
   });
 
-  test("item link uses primary_url", async () => {
+  test("item link points to the internal release page", async () => {
     const fetchStack = mock(async (_id: number) => ({ id: 1, name: "Ambient" }));
     const fetchItems = mock(async (_id: number) => [
-      makeItem({ primary_url: "https://bandcamp.com/album/geogaddi" }),
+      makeItem({ id: 42, primary_url: "https://bandcamp.com/album/geogaddi" }),
     ]);
     const fetchPrimaryFeedItems = mock(async (_feed: PrimaryFeedKey) => []);
     const app = makeApp(fetchStack, fetchItems, fetchPrimaryFeedItems);
@@ -227,7 +227,7 @@ describe("GET /feed/stacks/:stackId.rss", () => {
     const res = await app.request("http://localhost/feed/stacks/1.rss");
     const body = await res.text();
 
-    expect(body).toContain("<link>https://bandcamp.com/album/geogaddi</link>");
+    expect(body).toContain("<link>http://localhost/r/42</link>");
   });
 
   test("item pubDate is derived from created_at", async () => {
