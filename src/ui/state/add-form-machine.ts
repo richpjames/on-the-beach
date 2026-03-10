@@ -315,24 +315,48 @@ export const addFormMachine = setup({
           api: context.api,
           imageBase64: context.pendingScanBase64!,
         }),
-        onDone: {
-          target: "idle",
-          actions: assign(({ event }) => ({
-            scanState: "idle" as const,
-            scanResult: event.output,
-            pendingScanBase64: null,
-            scanError: null,
-          })),
-        },
-        onError: {
-          target: "idle",
-          actions: assign(({ event }) => ({
-            scanState: "idle" as const,
-            scanError: String(event.error),
-            pendingScanBase64: null,
-            scanResult: null,
-          })),
-        },
+        onDone: [
+          {
+            guard: ({ context }) => context.showSecondaryFields,
+            target: "enteringManually",
+            actions: assign(({ event }) => ({
+              scanState: "idle" as const,
+              scanResult: event.output,
+              pendingScanBase64: null,
+              scanError: null,
+            })),
+          },
+          {
+            target: "idle",
+            actions: assign(({ event }) => ({
+              scanState: "idle" as const,
+              scanResult: event.output,
+              pendingScanBase64: null,
+              scanError: null,
+            })),
+          },
+        ],
+        onError: [
+          {
+            guard: ({ context }) => context.showSecondaryFields,
+            target: "enteringManually",
+            actions: assign(({ event }) => ({
+              scanState: "idle" as const,
+              scanError: String(event.error),
+              pendingScanBase64: null,
+              scanResult: null,
+            })),
+          },
+          {
+            target: "idle",
+            actions: assign(({ event }) => ({
+              scanState: "idle" as const,
+              scanError: String(event.error),
+              pendingScanBase64: null,
+              scanResult: null,
+            })),
+          },
+        ],
       },
     },
     submitting: {

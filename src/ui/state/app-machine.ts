@@ -98,7 +98,10 @@ export const appMachine = createMachine({
     },
     ITEM_CREATED: {
       actions: assign(({ context }) => ({
-        listVersion: context.listVersion + 1,
+        listVersion:
+          context.currentFilter === "all" || context.currentFilter === "to-listen"
+            ? context.listVersion + 1
+            : context.listVersion,
         stackBarVersion: context.stackBarVersion + 1,
       })),
     },

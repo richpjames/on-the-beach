@@ -421,6 +421,25 @@ describe("add form machine — scan flow", () => {
     expect(ctx.scanResult?.artworkUrl).toBe("https://cdn.example.com/art.jpg");
   });
 
+  it("returns to enteringManually after scan when showSecondaryFields is true", async () => {
+    const { waitFor } = await import("xstate");
+    const api = makeMockApi({
+      uploadReleaseImage: async () => ({ artworkUrl: "https://cdn.example.com/art.jpg" }),
+      scanCover: async () => ({ artist: "Scanned Artist", title: "Scanned Title" }),
+    }) as any;
+    const actor = createActor(addFormMachine, { input: { api } }).start();
+
+    // Enter enteringManually by submitting with no URL
+    actor.send({ type: "SUBMIT_CLICKED", url: "" });
+    expect(actor.getSnapshot().value).toBe("enteringManually");
+
+    actor.send({ type: "SCAN_FILE_SELECTED", imageBase64: "base64data" });
+    await waitFor(actor, (s) => s.value !== "scanning", { timeout: 5000 });
+
+    expect(actor.getSnapshot().value).toBe("enteringManually");
+    expect(actor.getSnapshot().context.scanResult?.artist).toBe("Scanned Artist");
+  });
+
   it("returns to idle with scanError on failure", async () => {
     const { waitFor } = await import("xstate");
     const api = makeMockApi({
@@ -572,11 +591,29 @@ describe("app machine — version counters", () => {
     expect(actor.getSnapshot().context.stackBarVersion).toBe(1);
   });
 
-  it("increments both versions on ITEM_CREATED", () => {
+  it("increments both versions on ITEM_CREATED when filter is to-listen", () => {
     const actor = createActor(appMachine).start();
     actor.send({ type: "ITEM_CREATED" });
     expect(actor.getSnapshot().context.listVersion).toBe(1);
     expect(actor.getSnapshot().context.stackBarVersion).toBe(1);
+  });
+
+  it("does not increment listVersion on ITEM_CREATED when filter is listened", () => {
+    const actor = createActor(appMachine).start();
+    actor.send({ type: "FILTER_SELECTED", filter: "listened" });
+    const v0 = actor.getSnapshot().context.listVersion;
+    const s0 = actor.getSnapshot().context.stackBarVersion;
+    actor.send({ type: "ITEM_CREATED" });
+    expect(actor.getSnapshot().context.listVersion).toBe(v0); // no list re-render
+    expect(actor.getSnapshot().context.stackBarVersion).toBe(s0 + 1); // stack bar still updates
+  });
+
+  it("increments listVersion on ITEM_CREATED when filter is all", () => {
+    const actor = createActor(appMachine).start();
+    actor.send({ type: "FILTER_SELECTED", filter: "all" });
+    const v0 = actor.getSnapshot().context.listVersion;
+    actor.send({ type: "ITEM_CREATED" });
+    expect(actor.getSnapshot().context.listVersion).toBe(v0 + 1);
   });
 
   it("increments both versions on STACK_DELETED", () => {
