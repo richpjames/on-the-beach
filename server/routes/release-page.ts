@@ -53,6 +53,37 @@ function parseLinkMetadata(raw: string | null): Record<string, string> | null {
   return null;
 }
 
+function extractYouTubeVideoId(url: string): string | null {
+  try {
+    const parsed = new URL(url);
+    if (parsed.hostname === "www.youtube.com" || parsed.hostname === "youtube.com") {
+      return parsed.searchParams.get("v");
+    }
+    if (parsed.hostname === "youtu.be") {
+      return parsed.pathname.slice(1) || null;
+    }
+  } catch {
+    // invalid URL
+  }
+  return null;
+}
+
+function renderYouTubeEmbed(item: MusicItemFull): string {
+  if (!item.primary_url) return "";
+  const videoId = extractYouTubeVideoId(item.primary_url);
+  if (!videoId || !/^[\w-]+$/.test(videoId)) return "";
+
+  const src = `https://www.youtube-nocookie.com/embed/${escapeHtml(videoId)}`;
+  return `<iframe
+    class="release-page__youtube-embed"
+    src="${src}"
+    style="border:0;width:100%;aspect-ratio:16/9;"
+    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+    allowfullscreen
+    title="YouTube player"
+  ></iframe>`;
+}
+
 function renderBandcampEmbed(item: MusicItemFull): string {
   const meta = parseLinkMetadata(item.primary_link_metadata);
   const albumId = meta?.album_id;
@@ -136,7 +167,7 @@ function renderReleasePage(item: MusicItemFull, cssHref: string): string {
 
           <div class="release-page__body">
 
-            ${safeArtworkUrl(item.artwork_url ?? "") ? `<img class="release-page__artwork" src="${escapeHtml(item.artwork_url!)}" alt="Artwork for ${escapeHtml(item.title)}" />` : ""}
+            ${item.primary_source === "youtube" ? renderYouTubeEmbed(item) : safeArtworkUrl(item.artwork_url ?? "") ? `<img class="release-page__artwork" src="${escapeHtml(item.artwork_url!)}" alt="Artwork for ${escapeHtml(item.title)}" />` : ""}
 
             <div class="release-page__content">
 
@@ -148,7 +179,7 @@ function renderReleasePage(item: MusicItemFull, cssHref: string): string {
                 ${item.notes ? `<p class="release-page__notes">${escapeHtml(item.notes)}</p>` : ""}
                 ${renderStarRating(item.id, item.rating, "star-rating--large")}
                 <div id="stack-chips" class="release-page__stacks"></div>
-                ${item.primary_url && item.primary_source !== "bandcamp" ? `<a class="release-page__source-link" href="${escapeHtml(item.primary_url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(sourceDisplayName(item.primary_source ?? parseUrl(item.primary_url).source))}</a>` : ""}
+                ${item.primary_url && item.primary_source !== "bandcamp" && item.primary_source !== "youtube" ? `<a class="release-page__source-link" href="${escapeHtml(item.primary_url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(sourceDisplayName(item.primary_source ?? parseUrl(item.primary_url).source))}</a>` : ""}
                 ${item.primary_source === "bandcamp" ? renderBandcampEmbed(item) : ""}
               </div>
 
