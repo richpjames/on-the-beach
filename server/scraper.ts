@@ -217,11 +217,14 @@ export function parseBandcampOg(og: OgData): ScrapedMetadata {
 
 export function extractBandcampEmbedMetadata(html: string): Record<string, string> | null {
   // Primary: <meta name="bc-page-properties" content='{"item_type":"album","item_id":123}'>
+  // Use flexible patterns to handle extra attributes and either attribute order.
   const metaMatch =
-    html.match(/<meta\s+name="bc-page-properties"\s+content='([^']+)'/i) ??
-    html.match(/<meta\s+name='bc-page-properties'\s+content="([^"]+)"/i) ??
-    html.match(/<meta\s+name="bc-page-properties"\s+content="([^"]+)"/i) ??
-    html.match(/<meta\s+name='bc-page-properties'\s+content='([^']+)'/i);
+    html.match(/<meta\s[^>]*?name="bc-page-properties"[^>]*?content='([^']+)'/i) ??
+    html.match(/<meta\s[^>]*?name='bc-page-properties'[^>]*?content='([^']+)'/i) ??
+    html.match(/<meta\s[^>]*?name="bc-page-properties"[^>]*?content="([^"]+)"/i) ??
+    html.match(/<meta\s[^>]*?name='bc-page-properties'[^>]*?content="([^"]+)"/i) ??
+    html.match(/<meta\s[^>]*?content='([^']+)'[^>]*?name="bc-page-properties"/i) ??
+    html.match(/<meta\s[^>]*?content="([^"]+)"[^>]*?name="bc-page-properties"/i);
   if (metaMatch) {
     try {
       const parsed = JSON.parse(decodeHtmlEntities(metaMatch[1])) as unknown;
@@ -240,16 +243,17 @@ export function extractBandcampEmbedMetadata(html: string): Record<string, strin
     } catch {
       // fall through to TralbumData
     }
-  } else {
-    // Fallback: TralbumData = { "id" : 123, "item_type" : "album" }
-    const tralbumIdMatch = html.match(/TralbumData\s*=\s*\{[\s\S]*?"id"\s*:\s*(\d+)/);
-    const tralbumTypeMatch = html.match(/TralbumData\s*=\s*\{[\s\S]*?"item_type"\s*:\s*"([^"]+)"/);
-    if (tralbumIdMatch) {
-      return {
-        album_id: tralbumIdMatch[1],
-        ...(tralbumTypeMatch ? { item_type: tralbumTypeMatch[1] } : {}),
-      };
-    }
+  }
+
+  // Fallback: TralbumData = { "id" : 123, "item_type" : "album" }
+  // This runs whether or not bc-page-properties was found, in case it was present but invalid.
+  const tralbumIdMatch = html.match(/TralbumData\s*=\s*\{[\s\S]*?"id"\s*:\s*(\d+)/);
+  const tralbumTypeMatch = html.match(/TralbumData\s*=\s*\{[\s\S]*?"item_type"\s*:\s*"([^"]+)"/);
+  if (tralbumIdMatch) {
+    return {
+      album_id: tralbumIdMatch[1],
+      ...(tralbumTypeMatch ? { item_type: tralbumTypeMatch[1] } : {}),
+    };
   }
 
   return null;
@@ -866,13 +870,15 @@ export async function scrapeUrl(
 
     let html = "";
     const decoder = new TextDecoder();
-    const maxBytes = source === "unknown" ? MAX_UNKNOWN_HTML_BYTES : MAX_HEAD_BYTES;
+    // Bandcamp needs body content too (TralbumData JS is in the body)
+    const maxBytes =
+      source === "unknown" || source === "bandcamp" ? MAX_UNKNOWN_HTML_BYTES : MAX_HEAD_BYTES;
 
     while (html.length < maxBytes) {
       const { done, value } = await reader.read();
       if (done) break;
       html += decoder.decode(value, { stream: true });
-      if (source === "unknown") {
+      if (source === "unknown" || source === "bandcamp") {
         if (html.includes("</body>")) break;
       } else if (html.includes("</head>")) {
         break;

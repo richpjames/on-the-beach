@@ -751,6 +751,33 @@ describe("extractBandcampEmbedMetadata", () => {
     expect(extractBandcampEmbedMetadata(html)).toBeNull();
   });
 
+  test("handles extra attributes between name and content on meta tag", () => {
+    const html = `<meta data-react="true" name="bc-page-properties" data-other="x" content='{"item_type":"album","item_id":7777777}'>`;
+    expect(extractBandcampEmbedMetadata(html)).toEqual({
+      album_id: "7777777",
+      item_type: "album",
+    });
+  });
+
+  test("handles content attribute before name attribute on meta tag", () => {
+    const html = `<meta content='{"item_type":"track","item_id":8888888}' name="bc-page-properties">`;
+    expect(extractBandcampEmbedMetadata(html)).toEqual({
+      album_id: "8888888",
+      item_type: "track",
+    });
+  });
+
+  test("falls back to TralbumData when bc-page-properties has invalid item_id", () => {
+    const html = `
+      <meta name="bc-page-properties" content='{"item_type":"album"}'>
+      <script>TralbumData = {"id" : 9999999, "item_type" : "album"}</script>
+    `;
+    expect(extractBandcampEmbedMetadata(html)).toEqual({
+      album_id: "9999999",
+      item_type: "album",
+    });
+  });
+
   test("TralbumData fallback works with nested objects", () => {
     const html = `<script>TralbumData = {"nested": {"foo": "bar"}, "id" : 5551234, "item_type" : "album"}</script>`;
     expect(extractBandcampEmbedMetadata(html)).toEqual({
@@ -771,6 +798,20 @@ describe("scrapeUrl bandcamp embedMetadata", () => {
     );
     const result = await scrapeUrl("https://artist.bandcamp.com/album/my-album", "bandcamp");
     expect(result?.embedMetadata).toEqual({ album_id: "1234567", item_type: "album" });
+    mock.restore();
+  });
+
+  test("populates embedMetadata from TralbumData in body when bc-page-properties is absent", async () => {
+    const html = `<html><head>
+      <meta property="og:title" content="My Album, by Artist" />
+    </head><body>
+      <script>TralbumData = {"id" : 9876543, "item_type" : "album"}</script>
+    </body></html>`;
+    spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      new Response(html, { headers: { "content-type": "text/html" } }),
+    );
+    const result = await scrapeUrl("https://artist.bandcamp.com/album/my-album", "bandcamp");
+    expect(result?.embedMetadata).toEqual({ album_id: "9876543", item_type: "album" });
     mock.restore();
   });
 });
