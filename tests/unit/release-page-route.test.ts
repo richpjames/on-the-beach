@@ -256,25 +256,14 @@ describe("Bandcamp embed", () => {
 });
 
 describe("YouTube embed", () => {
-  test("renders YouTube embed iframe when primary_source is youtube", async () => {
+  test.each([
+    ["www.youtube.com", "https://www.youtube.com/watch?v=iS7-iBia7GE"],
+    ["m.youtube.com (mobile)", "https://m.youtube.com/watch?v=iS7-iBia7GE"],
+    ["youtu.be (shortlink)", "https://youtu.be/iS7-iBia7GE"],
+  ])("renders YouTube embed for %s URL", async (_label, primary_url) => {
     const item = {
       ...baseItem,
-      primary_url: "https://www.youtube.com/watch?v=iS7-iBia7GE",
-      primary_source: "youtube" as const,
-      primary_link_metadata: null,
-    };
-    mockFetchItem.mockResolvedValue(item);
-    const app = makeApp();
-    const res = await app.request("http://localhost/r/42");
-    const html = await res.text();
-    expect(html).toContain("youtube-nocookie.com/embed/iS7-iBia7GE");
-    expect(html).toContain("<iframe");
-  });
-
-  test("renders YouTube embed when primary_url is a mobile m.youtube.com URL", async () => {
-    const item = {
-      ...baseItem,
-      primary_url: "https://m.youtube.com/watch?v=iS7-iBia7GE",
+      primary_url,
       primary_source: "youtube" as const,
       primary_link_metadata: null,
     };
