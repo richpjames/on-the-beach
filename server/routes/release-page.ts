@@ -181,6 +181,7 @@ function renderReleasePage(item: MusicItemFull, cssHref: string): string {
                 <div id="stack-chips" class="release-page__stacks"></div>
                 ${item.primary_url && item.primary_source !== "bandcamp" && item.primary_source !== "youtube" ? `<a class="release-page__source-link" href="${escapeHtml(item.primary_url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(sourceDisplayName(item.primary_source ?? parseUrl(item.primary_url).source))}</a>` : ""}
                 ${item.primary_source === "bandcamp" ? renderBandcampEmbed(item) : ""}
+                <div id="secondary-links"></div>
               </div>
 
               <div id="edit-mode" hidden>
@@ -400,6 +401,27 @@ function renderReleasePage(item: MusicItemFull, cssHref: string): string {
 
       renderStackChips();
       loadStacks();
+
+      // ── Apple Music secondary link lookup ────────────────────────────────
+      const PLAYABLE_SOURCES = new Set(['bandcamp','spotify','soundcloud','youtube','apple_music','tidal','deezer','mixcloud']);
+      const primarySource = ${JSON.stringify(item.primary_source)};
+      if (!primarySource || !PLAYABLE_SOURCES.has(primarySource)) {
+        fetch('/api/release/apple-music-lookup/' + ITEM_ID, { method: 'POST' })
+          .then(r => r.ok ? r.json() : null)
+          .then(data => {
+            if (!data || !data.url) return;
+            const container = document.getElementById('secondary-links');
+            if (!container) return;
+            const a = document.createElement('a');
+            a.className = 'release-page__source-link';
+            a.href = data.url;
+            a.target = '_blank';
+            a.rel = 'noopener noreferrer';
+            a.textContent = 'Apple Music';
+            container.appendChild(a);
+          })
+          .catch(() => {});
+      }
 
       // ── Star Rating ─────────────────────────────────────────────────────────
       const ratingEl = document.querySelector('[data-rating-stars]');

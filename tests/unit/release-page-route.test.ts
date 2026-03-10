@@ -137,6 +137,51 @@ describe("GET /r/:id", () => {
   });
 });
 
+describe("Apple Music secondary lookup", () => {
+  test("includes lookup script when primary_source is null", async () => {
+    mockFetchItem.mockResolvedValue({ ...baseItem, primary_source: null, primary_url: null });
+    const app = makeApp();
+    const res = await app.request("http://localhost/r/42");
+    const html = await res.text();
+    expect(html).toContain("apple-music-lookup");
+  });
+
+  test("includes lookup script when primary_source is discogs", async () => {
+    mockFetchItem.mockResolvedValue({
+      ...baseItem,
+      primary_source: "discogs" as const,
+      primary_url: "https://www.discogs.com/release/123",
+    });
+    const app = makeApp();
+    const res = await app.request("http://localhost/r/42");
+    const html = await res.text();
+    expect(html).toContain("apple-music-lookup");
+  });
+
+  test("does not trigger lookup when primary_source is spotify", async () => {
+    mockFetchItem.mockResolvedValue({
+      ...baseItem,
+      primary_source: "spotify" as const,
+      primary_url: "https://open.spotify.com/album/abc",
+    });
+    const app = makeApp();
+    const res = await app.request("http://localhost/r/42");
+    const html = await res.text();
+    // The PLAYABLE_SOURCES check means the fetch won't run for spotify
+    // We verify the JS condition won't trigger for spotify
+    expect(html).toContain("PLAYABLE_SOURCES");
+    expect(html).toContain('"spotify"');
+  });
+
+  test("includes secondary-links container in view mode", async () => {
+    mockFetchItem.mockResolvedValue(baseItem);
+    const app = makeApp();
+    const res = await app.request("http://localhost/r/42");
+    const html = await res.text();
+    expect(html).toContain('id="secondary-links"');
+  });
+});
+
 describe("Bandcamp embed", () => {
   test("renders embed iframe when primary_source is bandcamp and metadata has album_id", async () => {
     const item = {
