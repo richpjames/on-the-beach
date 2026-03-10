@@ -207,17 +207,19 @@ export function renderStackDropdownContent(
   selectedStackIds: Set<number>,
 ): string {
   return `
-    ${stacks
-      .map(
-        (stack) => `
-      <label class="stack-dropdown__item">
-        <input type="checkbox" class="stack-dropdown__checkbox"
-               data-stack-id="${stack.id}" ${selectedStackIds.has(stack.id) ? "checked" : ""}>
-        ${escapeHtml(stack.name)}
-      </label>
-    `,
-      )
-      .join("")}
+    <div class="stack-dropdown__list">
+      ${stacks
+        .map(
+          (stack) => `
+        <label class="stack-dropdown__item">
+          <input type="checkbox" class="stack-dropdown__checkbox"
+                 data-stack-id="${stack.id}" ${selectedStackIds.has(stack.id) ? "checked" : ""}>
+          ${escapeHtml(stack.name)}
+        </label>
+      `,
+        )
+        .join("")}
+    </div>
     <div class="stack-dropdown__new">
       <input type="text" class="stack-dropdown__new-input input"
              placeholder="New stack...">
