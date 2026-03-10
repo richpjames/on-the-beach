@@ -30,6 +30,7 @@ export default defineConfig({
       testIgnore: /ui-percy\.spec\.ts/,
       use: {
         ...devices["Desktop Chrome"],
+        launchOptions: { args: ["--no-sandbox"] },
       },
     },
     {
@@ -37,6 +38,7 @@ export default defineConfig({
       testMatch: /ui-percy\.spec\.ts/,
       use: {
         ...devices["Desktop Chrome"],
+        launchOptions: { args: ["--no-sandbox"] },
       },
     },
     {
@@ -44,6 +46,7 @@ export default defineConfig({
       testMatch: /ui-percy\.spec\.ts/,
       use: {
         ...devices["Pixel 7"],
+        launchOptions: { args: ["--no-sandbox"] },
       },
     },
     {

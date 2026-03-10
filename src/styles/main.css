@@ -1555,6 +1555,12 @@ a:hover {
   border-radius: 0;
 }
 
+.stack-dropdown__list {
+  max-height: 110px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
 .stack-dropdown__item {
   display: flex;
   align-items: center;
