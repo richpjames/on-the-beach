@@ -3,7 +3,7 @@ import { fetchFullItem } from "../music-item-creator";
 import type { MusicItemFull } from "../../src/types";
 import { getPageAssets } from "../page-assets";
 import { renderStarRating } from "../../src/ui/view/templates";
-import { parseUrl } from "../utils";
+import { parseUrl, extractYouTubeVideoId } from "../utils";
 
 export type FetchItemFn = (id: number) => Promise<MusicItemFull | null>;
 
@@ -49,25 +49,6 @@ function parseLinkMetadata(raw: string | null): Record<string, string> | null {
     }
   } catch {
     // ignore malformed JSON
-  }
-  return null;
-}
-
-function extractYouTubeVideoId(url: string): string | null {
-  try {
-    const parsed = new URL(url);
-    if (
-      parsed.hostname === "www.youtube.com" ||
-      parsed.hostname === "youtube.com" ||
-      parsed.hostname === "m.youtube.com"
-    ) {
-      return parsed.searchParams.get("v");
-    }
-    if (parsed.hostname === "youtu.be") {
-      return parsed.pathname.slice(1) || null;
-    }
-  } catch {
-    // invalid URL
   }
   return null;
 }

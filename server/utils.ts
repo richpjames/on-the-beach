@@ -91,6 +91,25 @@ export function parseUrl(url: string): ParsedUrl {
   };
 }
 
+export function extractYouTubeVideoId(url: string): string | null {
+  try {
+    const parsed = new URL(url);
+    if (
+      parsed.hostname === "www.youtube.com" ||
+      parsed.hostname === "youtube.com" ||
+      parsed.hostname === "m.youtube.com"
+    ) {
+      return parsed.searchParams.get("v");
+    }
+    if (parsed.hostname === "youtu.be") {
+      return parsed.pathname.slice(1) || null;
+    }
+  } catch {
+    // invalid URL
+  }
+  return null;
+}
+
 export function isValidUrl(url: string): boolean {
   try {
     new URL(url);
