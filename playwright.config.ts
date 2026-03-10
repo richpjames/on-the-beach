@@ -23,9 +23,6 @@ export default defineConfig({
   workers: resolveWorkers(),
   use: {
     headless: true,
-    launchOptions: {
-      args: ["--no-sandbox"],
-    },
   },
   projects: [
     {
