@@ -37,17 +37,17 @@ function itemTitle(item: MusicItemFull): string {
   return item.artist_name ? `${item.artist_name} — ${item.title}` : item.title;
 }
 
-function renderRss(feed: FeedInfo, items: MusicItemFull[]): string {
+function renderRss(feed: FeedInfo, items: MusicItemFull[], baseUrl: string): string {
   const itemsXml = items
     .map((item) => {
       const title = escapeXml(itemTitle(item));
-      const link = item.primary_url ? escapeXml(item.primary_url) : "";
+      const link = escapeXml(`${baseUrl}/r/${item.id}`);
       const pubDate = toRfc2822(item.created_at);
       const guid = `music-item-${item.id}`;
 
       return `    <item>
       <title>${title}</title>
-      ${link ? `<link>${link}</link>` : ""}
+      <link>${link}</link>
       <pubDate>${pubDate}</pubDate>
       <guid isPermaLink="false">${guid}</guid>
     </item>`;
@@ -249,12 +249,14 @@ export function createRssRoutes(
 
   routes.get("/all.rss", async (c) => {
     const items = await fetchPrimaryFeedItems("all");
+    const baseUrl = new URL(c.req.url).origin;
     const xml = renderRss(
       {
         title: "All",
         description: "All items in On The Beach",
       },
       items,
+      baseUrl,
     );
 
     return c.body(xml, 200, {
@@ -264,12 +266,14 @@ export function createRssRoutes(
 
   routes.get("/to-listen.rss", async (c) => {
     const items = await fetchPrimaryFeedItems("to-listen");
+    const baseUrl = new URL(c.req.url).origin;
     const xml = renderRss(
       {
         title: "To Listen",
         description: 'Items with status "To Listen" in On The Beach',
       },
       items,
+      baseUrl,
     );
 
     return c.body(xml, 200, {
@@ -279,12 +283,14 @@ export function createRssRoutes(
 
   routes.get("/listened.rss", async (c) => {
     const items = await fetchPrimaryFeedItems("listened");
+    const baseUrl = new URL(c.req.url).origin;
     const xml = renderRss(
       {
         title: "Listened",
         description: 'Items with status "Listened" in On The Beach',
       },
       items,
+      baseUrl,
     );
 
     return c.body(xml, 200, {
@@ -306,12 +312,14 @@ export function createRssRoutes(
     }
 
     const items = await fetchStackItems(stackId);
+    const baseUrl = new URL(c.req.url).origin;
     const xml = renderRss(
       {
         title: stack.name,
         description: `Items in the ${stack.name} stack`,
       },
       items,
+      baseUrl,
     );
 
     return c.body(xml, 200, {
