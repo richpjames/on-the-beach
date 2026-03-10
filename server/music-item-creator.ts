@@ -1,4 +1,5 @@
 import { eq, and } from "drizzle-orm";
+import { assign, createActor, fromPromise, setup, waitFor } from "xstate";
 import { db } from "./db/index";
 import { musicItems, artists, musicLinks, sources, musicItemStacks, stacks } from "./db/schema";
 import { parseUrl, isValidUrl, normalize, capitalize } from "./utils";
@@ -359,6 +360,167 @@ async function resolveReleaseCandidates(
   });
 }
 
+// ---------------------------------------------------------------------------
+// XState scraping machine
+// ---------------------------------------------------------------------------
+
+type ResolveOutput = {
+  normalizedUrl: string;
+  source: ReturnType<typeof parseUrl>["source"];
+  candidates: ReleaseCandidateInput[];
+};
+
+interface ScrapingMachineContext {
+  url: string;
+  overrides: Partial<CreateMusicItemInput> | undefined;
+  resolvedUrl: string;
+  resolvedSource: ReturnType<typeof parseUrl>["source"];
+  candidates: ReleaseCandidateInput[];
+  existingItems: MusicItemFull[];
+  results: CreateResult[];
+  ambiguousPayload: AmbiguousLinkPayload | null;
+  error: Error | null;
+}
+
+const scrapingMachine = setup({
+  types: {} as {
+    context: ScrapingMachineContext;
+    input: { url: string; overrides?: Partial<CreateMusicItemInput> };
+  },
+  actors: {
+    resolve: fromPromise<ResolveOutput, { url: string; overrides?: Partial<CreateMusicItemInput> }>(
+      async ({ input }) => resolveReleaseCandidates(input.url, input.overrides),
+    ),
+    checkDuplicates: fromPromise<MusicItemFull[], { normalizedUrl: string }>(
+      async ({ input }) => fetchItemsByUrl(input.normalizedUrl),
+    ),
+    insert: fromPromise<
+      CreateResult[],
+      {
+        normalizedUrl: string;
+        source: ReturnType<typeof parseUrl>["source"];
+        candidates: ReleaseCandidateInput[];
+        existingItems: MusicItemFull[];
+        overrides?: Partial<CreateMusicItemInput>;
+      }
+    >(async ({ input }) => {
+      const { normalizedUrl, source, candidates, existingItems: baseItems, overrides } = input;
+      const existingItems = [...baseItems];
+      const results: CreateResult[] = [];
+
+      for (const candidate of candidates) {
+        const existing = matchExistingItem(existingItems, candidate);
+        if (existing) {
+          results.push({ item: existing, created: false });
+          continue;
+        }
+
+        const item = await insertMusicItemWithLink(normalizedUrl, source, candidate, overrides);
+        existingItems.push(item);
+        results.push({ item, created: true });
+      }
+
+      return results;
+    }),
+  },
+}).createMachine({
+  context: ({ input }) => ({
+    url: input.url,
+    overrides: input.overrides,
+    resolvedUrl: "",
+    resolvedSource: "unknown" as ReturnType<typeof parseUrl>["source"],
+    candidates: [],
+    existingItems: [],
+    results: [],
+    ambiguousPayload: null,
+    error: null,
+  }),
+  initial: "resolving",
+  states: {
+    resolving: {
+      invoke: {
+        src: "resolve",
+        input: ({ context }) => ({ url: context.url, overrides: context.overrides }),
+        onDone: {
+          target: "checkingDuplicates",
+          actions: assign(({ event }) => ({
+            resolvedUrl: event.output.normalizedUrl,
+            resolvedSource: event.output.source,
+            candidates: event.output.candidates,
+          })),
+        },
+        onError: [
+          {
+            guard: ({ event }) => event.error instanceof AmbiguousLinkSelectionError,
+            target: "ambiguous",
+            actions: assign(({ event }) => ({
+              ambiguousPayload: (event.error as AmbiguousLinkSelectionError).payload,
+            })),
+          },
+          {
+            target: "failed",
+            actions: assign(({ event }) => ({
+              error: event.error instanceof Error ? event.error : new Error(String(event.error)),
+            })),
+          },
+        ],
+      },
+    },
+    checkingDuplicates: {
+      invoke: {
+        src: "checkDuplicates",
+        input: ({ context }) => ({ normalizedUrl: context.resolvedUrl }),
+        onDone: [
+          {
+            // Known source with an existing item — return it without inserting.
+            guard: ({ context, event }) =>
+              context.resolvedSource !== "unknown" && event.output.length > 0,
+            target: "done",
+            actions: assign(({ event }) => ({
+              results: [{ item: event.output[0]!, created: false }],
+            })),
+          },
+          {
+            target: "inserting",
+            actions: assign(({ event }) => ({ existingItems: event.output })),
+          },
+        ],
+        onError: {
+          target: "failed",
+          actions: assign(({ event }) => ({
+            error: event.error instanceof Error ? event.error : new Error(String(event.error)),
+          })),
+        },
+      },
+    },
+    inserting: {
+      invoke: {
+        src: "insert",
+        input: ({ context }) => ({
+          normalizedUrl: context.resolvedUrl,
+          source: context.resolvedSource,
+          candidates: context.candidates,
+          existingItems: context.existingItems,
+          overrides: context.overrides,
+        }),
+        onDone: {
+          target: "done",
+          actions: assign(({ event }) => ({ results: event.output })),
+        },
+        onError: {
+          target: "failed",
+          actions: assign(({ event }) => ({
+            error: event.error instanceof Error ? event.error : new Error(String(event.error)),
+          })),
+        },
+      },
+    },
+    done: { type: "final" },
+    ambiguous: { type: "final" },
+    failed: { type: "final" },
+  },
+});
+
 /**
  * Create a music item from a URL. Handles URL parsing, OG scraping,
  * artist resolution, and duplicate detection.
@@ -380,6 +542,8 @@ export async function createMusicItemFromUrl(
 
 /**
  * Create music items from a URL, returning results as an array.
+ * Orchestrated via an XState machine with explicit states for resolving,
+ * duplicate checking, and inserting.
  */
 export async function createMusicItemsFromUrl(
   url: string,
@@ -389,34 +553,26 @@ export async function createMusicItemsFromUrl(
     throw new Error("Invalid URL");
   }
 
-  const parsed = parseUrl(url);
-  const resolved = await resolveReleaseCandidates(parsed.normalizedUrl, overrides);
-  const existingItems = await fetchItemsByUrl(resolved.normalizedUrl);
+  const { normalizedUrl } = parseUrl(url);
+  const actor = createActor(scrapingMachine, { input: { url: normalizedUrl, overrides } });
+  actor.start();
 
-  if (resolved.source !== "unknown" && existingItems[0]) {
-    return [{ item: existingItems[0], created: false }];
+  const snapshot = await waitFor(
+    actor,
+    (state) => state.matches("done") || state.matches("ambiguous") || state.matches("failed"),
+  );
+
+  actor.stop();
+
+  if (snapshot.matches("ambiguous")) {
+    throw new AmbiguousLinkSelectionError(snapshot.context.ambiguousPayload!);
   }
 
-  const results: CreateResult[] = [];
-
-  for (const candidate of resolved.candidates) {
-    const existing = matchExistingItem(existingItems, candidate);
-    if (existing) {
-      results.push({ item: existing, created: false });
-      continue;
-    }
-
-    const item = await insertMusicItemWithLink(
-      resolved.normalizedUrl,
-      resolved.source,
-      candidate,
-      overrides,
-    );
-    existingItems.push(item);
-    results.push({ item, created: true });
+  if (snapshot.matches("failed")) {
+    throw snapshot.context.error!;
   }
 
-  return results;
+  return snapshot.context.results;
 }
 
 /**
