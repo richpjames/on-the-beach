@@ -254,3 +254,63 @@ describe("Bandcamp embed", () => {
     expect(html).toContain("bandcamp.com/EmbeddedPlayer/album=9999");
   });
 });
+
+describe("YouTube embed", () => {
+  test("renders YouTube embed iframe when primary_source is youtube", async () => {
+    const item = {
+      ...baseItem,
+      primary_url: "https://www.youtube.com/watch?v=iS7-iBia7GE",
+      primary_source: "youtube" as const,
+      primary_link_metadata: null,
+    };
+    mockFetchItem.mockResolvedValue(item);
+    const app = makeApp();
+    const res = await app.request("http://localhost/r/42");
+    const html = await res.text();
+    expect(html).toContain("youtube-nocookie.com/embed/iS7-iBia7GE");
+    expect(html).toContain("<iframe");
+  });
+
+  test("renders YouTube embed when primary_url is a mobile m.youtube.com URL", async () => {
+    const item = {
+      ...baseItem,
+      primary_url: "https://m.youtube.com/watch?v=iS7-iBia7GE",
+      primary_source: "youtube" as const,
+      primary_link_metadata: null,
+    };
+    mockFetchItem.mockResolvedValue(item);
+    const app = makeApp();
+    const res = await app.request("http://localhost/r/42");
+    const html = await res.text();
+    expect(html).toContain("youtube-nocookie.com/embed/iS7-iBia7GE");
+    expect(html).toContain("<iframe");
+  });
+
+  test("does not render YouTube embed when primary_source is not youtube", async () => {
+    const item = {
+      ...baseItem,
+      primary_url: "https://open.spotify.com/album/abc",
+      primary_source: "spotify" as const,
+      primary_link_metadata: null,
+    };
+    mockFetchItem.mockResolvedValue(item);
+    const app = makeApp();
+    const res = await app.request("http://localhost/r/42");
+    const html = await res.text();
+    expect(html).not.toContain("youtube-nocookie.com/embed");
+  });
+
+  test("does not render YouTube embed when primary_url is missing", async () => {
+    const item = {
+      ...baseItem,
+      primary_url: null,
+      primary_source: "youtube" as const,
+      primary_link_metadata: null,
+    };
+    mockFetchItem.mockResolvedValue(item);
+    const app = makeApp();
+    const res = await app.request("http://localhost/r/42");
+    const html = await res.text();
+    expect(html).not.toContain("youtube-nocookie.com/embed");
+  });
+});
