@@ -934,3 +934,66 @@ export async function scrapeUrl(
     return hasScrapedMetadata(fallback) ? fallback : null;
   }
 }
+
+function normalizeForMatch(s: string): string {
+  return s
+    .toLowerCase()
+    .replace(/[^\w\s]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+/**
+ * Search Apple Music (iTunes Search API) for a release by title and artist.
+ * Returns the Apple Music URL for the best matching result, or null if not found.
+ */
+export async function searchAppleMusic(
+  title: string,
+  artist: string | null,
+  timeoutMs = 8000,
+): Promise<string | null> {
+  try {
+    const term = [artist, title].filter(Boolean).join(" ");
+    const searchUrl = `https://itunes.apple.com/search?term=${encodeURIComponent(term)}&media=music&entity=album,musicTrack,mix&limit=10`;
+
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+
+    const response = await fetch(searchUrl, {
+      signal: controller.signal,
+      headers: { Accept: "application/json" },
+    });
+
+    clearTimeout(timer);
+
+    if (!response.ok) return null;
+
+    const data = (await response.json()) as unknown;
+    if (!isRecord(data) || !Array.isArray(data.results)) return null;
+
+    const normalizedTitle = normalizeForMatch(title);
+    const normalizedArtist = artist ? normalizeForMatch(artist) : null;
+
+    for (const result of data.results) {
+      if (!isRecord(result)) continue;
+
+      const resultTitle = firstDefined(
+        getString(result.collectionName),
+        getString(result.trackName),
+      );
+      const resultArtist = getString(result.artistName);
+
+      if (!resultTitle) continue;
+      if (normalizeForMatch(resultTitle) !== normalizedTitle) continue;
+      if (normalizedArtist && resultArtist && normalizeForMatch(resultArtist) !== normalizedArtist)
+        continue;
+
+      const url = firstDefined(getString(result.collectionViewUrl), getString(result.trackViewUrl));
+      if (url) return url;
+    }
+
+    return null;
+  } catch {
+    return null;
+  }
+}
