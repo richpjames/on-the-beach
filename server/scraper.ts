@@ -946,6 +946,12 @@ function normalizeForMatch(s: string): string {
 /**
  * Search Apple Music (iTunes Search API) for a release by title and artist.
  * Returns the Apple Music URL for the best matching result, or null if not found.
+ *
+ * Matching strategy (in order):
+ *  1. Exact title + artist match
+ *  2. Partial match — one title is a prefix/substring of the other (handles
+ *     Wikipedia-style disambiguators like "Foo (1981 album)" vs "Foo")
+ *  3. First result whose artist matches (search query is already specific)
  */
 export async function searchAppleMusic(
   title: string,
@@ -969,26 +975,58 @@ export async function searchAppleMusic(
     if (!response.ok) return null;
 
     const data = (await response.json()) as unknown;
-    if (!isRecord(data) || !Array.isArray(data.results)) return null;
+    if (!isRecord(data) || !Array.isArray(data.results) || data.results.length === 0) return null;
 
     const normalizedTitle = normalizeForMatch(title);
     const normalizedArtist = artist ? normalizeForMatch(artist) : null;
 
+    function artistMatches(resultArtist: string | undefined): boolean {
+      if (!normalizedArtist || !resultArtist) return true;
+      return normalizeForMatch(resultArtist) === normalizedArtist;
+    }
+
+    function titlesCompatible(resultTitle: string): boolean {
+      const rn = normalizeForMatch(resultTitle);
+      return (
+        rn === normalizedTitle || rn.startsWith(normalizedTitle) || normalizedTitle.startsWith(rn)
+      );
+    }
+
+    function resultUrl(result: Record<string, unknown>): string | undefined {
+      return firstDefined(getString(result.collectionViewUrl), getString(result.trackViewUrl));
+    }
+
+    // Pass 1: exact title + artist
     for (const result of data.results) {
       if (!isRecord(result)) continue;
-
       const resultTitle = firstDefined(
         getString(result.collectionName),
         getString(result.trackName),
       );
-      const resultArtist = getString(result.artistName);
+      if (!resultTitle || normalizeForMatch(resultTitle) !== normalizedTitle) continue;
+      if (!artistMatches(getString(result.artistName))) continue;
+      const url = resultUrl(result);
+      if (url) return url;
+    }
 
-      if (!resultTitle) continue;
-      if (normalizeForMatch(resultTitle) !== normalizedTitle) continue;
-      if (normalizedArtist && resultArtist && normalizeForMatch(resultArtist) !== normalizedArtist)
-        continue;
+    // Pass 2: compatible title (one is a prefix of the other) + artist
+    for (const result of data.results) {
+      if (!isRecord(result)) continue;
+      const resultTitle = firstDefined(
+        getString(result.collectionName),
+        getString(result.trackName),
+      );
+      if (!resultTitle || !titlesCompatible(resultTitle)) continue;
+      if (!artistMatches(getString(result.artistName))) continue;
+      const url = resultUrl(result);
+      if (url) return url;
+    }
 
-      const url = firstDefined(getString(result.collectionViewUrl), getString(result.trackViewUrl));
+    // Pass 3: first result whose artist matches (search query is already scoped)
+    for (const result of data.results) {
+      if (!isRecord(result)) continue;
+      if (!artistMatches(getString(result.artistName))) continue;
+      const url = resultUrl(result);
       if (url) return url;
     }
 
