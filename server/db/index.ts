@@ -11,3 +11,24 @@ export const db = drizzle(sqlite, { schema });
 
 // Apply any pending migrations on startup (idempotent)
 migrate(db, { migrationsFolder: `${import.meta.dir}/../../drizzle` });
+
+// Seed reference data (idempotent — onConflictDoNothing)
+const SEED_SOURCES = [
+  { name: "bandcamp", displayName: "Bandcamp", urlPattern: "bandcamp.com" },
+  { name: "spotify", displayName: "Spotify", urlPattern: "open.spotify.com" },
+  { name: "soundcloud", displayName: "SoundCloud", urlPattern: "soundcloud.com" },
+  { name: "youtube", displayName: "YouTube", urlPattern: "youtube.com" },
+  { name: "apple_music", displayName: "Apple Music", urlPattern: "music.apple.com" },
+  { name: "discogs", displayName: "Discogs", urlPattern: "discogs.com" },
+  { name: "tidal", displayName: "Tidal", urlPattern: "tidal.com" },
+  { name: "deezer", displayName: "Deezer", urlPattern: "deezer.com" },
+  { name: "mixcloud", displayName: "Mixcloud", urlPattern: "mixcloud.com" },
+  { name: "physical", displayName: "Physical Media", urlPattern: null },
+] as const;
+
+for (const source of SEED_SOURCES) {
+  db.insert(schema.sources)
+    .values(source)
+    .onConflictDoNothing({ target: schema.sources.name })
+    .run();
+}
