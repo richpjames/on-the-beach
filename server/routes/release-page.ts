@@ -152,7 +152,7 @@ function renderReleasePage(item: MusicItemFull, cssHref: string): string {
 
           <div class="release-page__body">
 
-            ${item.primary_source === "youtube" ? renderYouTubeEmbed(item) : safeArtworkUrl(item.artwork_url ?? "") ? `<img class="release-page__artwork" src="${escapeHtml(item.artwork_url!)}" alt="Artwork for ${escapeHtml(item.title)}" />` : ""}
+            ${extractYouTubeVideoId(item.primary_url ?? "") ? renderYouTubeEmbed(item) : safeArtworkUrl(item.artwork_url ?? "") ? `<img class="release-page__artwork" src="${escapeHtml(item.artwork_url!)}" alt="Artwork for ${escapeHtml(item.title)}" />` : ""}
 
             <div class="release-page__content">
 
@@ -164,8 +164,8 @@ function renderReleasePage(item: MusicItemFull, cssHref: string): string {
                 ${item.notes ? `<p class="release-page__notes">${escapeHtml(item.notes)}</p>` : ""}
                 ${renderStarRating(item.id, item.rating, "star-rating--large")}
                 <div id="stack-chips" class="release-page__stacks"></div>
-                ${item.primary_url && item.primary_source !== "bandcamp" && item.primary_source !== "youtube" ? `<a class="release-page__source-link" href="${escapeHtml(item.primary_url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(sourceDisplayName(item.primary_source ?? parseUrl(item.primary_url).source))}</a>` : ""}
-                ${item.primary_source === "bandcamp" ? renderBandcampEmbed(item) : ""}
+                ${item.primary_url && !extractYouTubeVideoId(item.primary_url) && !item.primary_url.includes("bandcamp.com") ? `<a class="release-page__source-link" href="${escapeHtml(item.primary_url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(sourceDisplayName(item.primary_source ?? parseUrl(item.primary_url).source))}</a>` : ""}
+                ${item.primary_url?.includes("bandcamp.com") ? renderBandcampEmbed(item) : ""}
                 <div id="secondary-links"></div>
               </div>
 
