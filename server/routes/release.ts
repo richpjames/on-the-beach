@@ -10,6 +10,7 @@ import type { ScanResult } from "../../src/types";
 import type { MusicBrainzFields } from "../musicbrainz";
 import { getUploadsDir, toUploadsPublicPath } from "../uploads";
 import { searchAppleMusic } from "../scraper";
+import { parseUrl } from "../utils";
 import { db } from "../db/index";
 import { musicItems, musicLinks, sources, artists } from "../db/schema";
 
@@ -62,6 +63,7 @@ export interface ItemInfoForLookup {
   title: string;
   artistName: string | null;
   primarySource: string | null;
+  primaryUrl: string | null;
 }
 
 export type FetchItemForLookupFn = (id: number) => Promise<ItemInfoForLookup | null>;
@@ -87,6 +89,7 @@ async function defaultFetchItemForLookup(id: number): Promise<ItemInfoForLookup 
       title: musicItems.title,
       artistName: artists.name,
       primarySource: sources.name,
+      primaryUrl: musicLinks.url,
     })
     .from(musicItems)
     .leftJoin(artists, eq(musicItems.artistId, artists.id))
@@ -105,6 +108,7 @@ async function defaultFetchItemForLookup(id: number): Promise<ItemInfoForLookup 
     title: row.title,
     artistName: row.artistName ?? null,
     primarySource: row.primarySource ?? null,
+    primaryUrl: row.primaryUrl ?? null,
   };
 }
 
@@ -276,6 +280,10 @@ export function createReleaseRoutes(
     }
 
     if (item.primarySource && PLAYABLE_SOURCES.has(item.primarySource)) {
+      return c.json({ skipped: true }, 200);
+    }
+
+    if (item.primaryUrl && parseUrl(item.primaryUrl).source === "apple_music") {
       return c.json({ skipped: true }, 200);
     }
 
