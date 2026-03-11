@@ -12,6 +12,7 @@ import {
   scrapeUrl,
   UnsupportedMusicLinkError,
   extractBandcampEmbedMetadata,
+  searchAppleMusic,
 } from "../../server/scraper";
 
 function mockChatCompletionResponse(
@@ -812,6 +813,96 @@ describe("scrapeUrl bandcamp embedMetadata", () => {
     );
     const result = await scrapeUrl("https://artist.bandcamp.com/album/my-album", "bandcamp");
     expect(result?.embedMetadata).toEqual({ album_id: "9876543", item_type: "album" });
+    mock.restore();
+  });
+});
+
+function mockItunesResponse(results: object[]): Response {
+  return new Response(JSON.stringify({ resultCount: results.length, results }), {
+    headers: { "content-type": "application/json" },
+  });
+}
+
+describe("searchAppleMusic", () => {
+  test("returns URL for exact title and artist match", async () => {
+    spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      mockItunesResponse([
+        {
+          collectionName: "Blue Lines",
+          artistName: "Massive Attack",
+          collectionViewUrl: "https://music.apple.com/gb/album/blue-lines/123",
+        },
+      ]),
+    );
+    const result = await searchAppleMusic("Blue Lines", "Massive Attack");
+    expect(result).toBe("https://music.apple.com/gb/album/blue-lines/123");
+    mock.restore();
+  });
+
+  test("matches when item title has Wikipedia-style disambiguator", async () => {
+    spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      mockItunesResponse([
+        {
+          collectionName: "Michael Nyman",
+          artistName: "Michael Nyman",
+          collectionViewUrl: "https://music.apple.com/gb/album/michael-nyman/456",
+        },
+      ]),
+    );
+    // DB title is "Michael Nyman (1981 album)" — Apple Music has "Michael Nyman"
+    const result = await searchAppleMusic("Michael Nyman (1981 album)", "Michael Nyman");
+    expect(result).toBe("https://music.apple.com/gb/album/michael-nyman/456");
+    mock.restore();
+  });
+
+  test("falls back to first artist-matching result when title does not match", async () => {
+    spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      mockItunesResponse([
+        {
+          collectionName: "Something Else Entirely",
+          artistName: "Boards of Canada",
+          collectionViewUrl: "https://music.apple.com/album/boc/789",
+        },
+      ]),
+    );
+    const result = await searchAppleMusic("Music Has the Right to Children", "Boards of Canada");
+    expect(result).toBe("https://music.apple.com/album/boc/789");
+    mock.restore();
+  });
+
+  test("returns null when iTunes API returns no results", async () => {
+    spyOn(globalThis, "fetch").mockResolvedValueOnce(mockItunesResponse([]));
+    const result = await searchAppleMusic("Obscure Album", "Unknown Artist");
+    expect(result).toBeNull();
+    mock.restore();
+  });
+
+  test("returns null when fetch fails", async () => {
+    spyOn(globalThis, "fetch").mockRejectedValueOnce(new Error("network error"));
+    const result = await searchAppleMusic("Some Album", "Some Artist");
+    expect(result).toBeNull();
+    mock.restore();
+  });
+
+  test("returns null when response is not ok", async () => {
+    spyOn(globalThis, "fetch").mockResolvedValueOnce(new Response(null, { status: 500 }));
+    const result = await searchAppleMusic("Some Album", "Some Artist");
+    expect(result).toBeNull();
+    mock.restore();
+  });
+
+  test("uses trackViewUrl when collectionViewUrl is absent", async () => {
+    spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      mockItunesResponse([
+        {
+          trackName: "A Song",
+          artistName: "Artist",
+          trackViewUrl: "https://music.apple.com/track/999",
+        },
+      ]),
+    );
+    const result = await searchAppleMusic("A Song", "Artist");
+    expect(result).toBe("https://music.apple.com/track/999");
     mock.restore();
   });
 });
