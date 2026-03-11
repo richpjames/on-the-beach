@@ -419,9 +419,26 @@ describe("POST /api/release/apple-music-lookup/:id", () => {
       title: "Some Album",
       artistName: "Some Artist",
       primarySource: "bandcamp",
+      primaryUrl: null,
     });
     const app = makeApp();
     const res = await app.request("http://localhost/api/release/apple-music-lookup/3", {
+      method: "POST",
+    });
+    const body = await res.json();
+    expect(body.skipped).toBe(true);
+    expect(mockSearchAppleMusic).not.toHaveBeenCalled();
+  });
+
+  test("skips search when primary URL is Apple Music even if primarySource is null", async () => {
+    mockFetchItemForLookup.mockResolvedValue({
+      title: "The Band (Remastered)",
+      artistName: "The Band",
+      primarySource: null,
+      primaryUrl: "https://music.apple.com/es/album/the-band-remastered/1440846597",
+    });
+    const app = makeApp();
+    const res = await app.request("http://localhost/api/release/apple-music-lookup/4", {
       method: "POST",
     });
     const body = await res.json();
