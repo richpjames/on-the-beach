@@ -302,4 +302,33 @@ describe("YouTube embed", () => {
     const html = await res.text();
     expect(html).not.toContain("youtube-nocookie.com/embed");
   });
+
+  test("renders YouTube playlist embed for playlist URL", async () => {
+    const item = {
+      ...baseItem,
+      primary_url: "https://www.youtube.com/playlist?list=PLE31AAD9114F343C4",
+      primary_source: "youtube" as const,
+      primary_link_metadata: null,
+    };
+    mockFetchItem.mockResolvedValue(item);
+    const app = makeApp();
+    const res = await app.request("http://localhost/r/42");
+    const html = await res.text();
+    expect(html).toContain("youtube-nocookie.com/embed/videoseries?list=PLE31AAD9114F343C4");
+    expect(html).toContain("<iframe");
+  });
+
+  test("does not render YouTube playlist URL as a standalone source link", async () => {
+    const item = {
+      ...baseItem,
+      primary_url: "https://www.youtube.com/playlist?list=PLE31AAD9114F343C4",
+      primary_source: "youtube" as const,
+      primary_link_metadata: null,
+    };
+    mockFetchItem.mockResolvedValue(item);
+    const app = makeApp();
+    const res = await app.request("http://localhost/r/42");
+    const html = await res.text();
+    expect(html).not.toContain('href="https://www.youtube.com/playlist?list=PLE31AAD9114F343C4"');
+  });
 });

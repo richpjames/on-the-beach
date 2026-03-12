@@ -1,5 +1,5 @@
 import { describe, test, expect } from "bun:test";
-import { parseUrl } from "../../src/repository/utils";
+import { parseUrl, extractYouTubePlaylistId } from "../../src/repository/utils";
 
 describe("parseUrl - youtube", () => {
   test("identifies youtube watch link and preserves video ID in normalizedUrl", () => {
@@ -21,6 +21,36 @@ describe("parseUrl - youtube", () => {
 
     expect(result.source).toBe("youtube");
     expect(result.normalizedUrl).toBe("https://www.youtube.com/watch?v=C9CkvAQkQLs");
+  });
+
+  test("identifies youtube playlist link", () => {
+    const result = parseUrl("https://www.youtube.com/playlist?list=PLE31AAD9114F343C4");
+
+    expect(result.source).toBe("youtube");
+    expect(result.normalizedUrl).toBe("https://www.youtube.com/playlist?list=PLE31AAD9114F343C4");
+  });
+
+  test("normalizes youtube playlist link by stripping extra params", () => {
+    const result = parseUrl("https://www.youtube.com/playlist?list=PLE31AAD9114F343C4&si=abc123");
+
+    expect(result.source).toBe("youtube");
+    expect(result.normalizedUrl).toBe("https://www.youtube.com/playlist?list=PLE31AAD9114F343C4");
+  });
+});
+
+describe("extractYouTubePlaylistId", () => {
+  test("extracts playlist ID from standard playlist URL", () => {
+    expect(
+      extractYouTubePlaylistId("https://www.youtube.com/playlist?list=PLE31AAD9114F343C4"),
+    ).toBe("PLE31AAD9114F343C4");
+  });
+
+  test("returns null for a video watch URL", () => {
+    expect(extractYouTubePlaylistId("https://www.youtube.com/watch?v=C9CkvAQkQLs")).toBeNull();
+  });
+
+  test("returns null for non-youtube URLs", () => {
+    expect(extractYouTubePlaylistId("https://soundcloud.com/artist/track")).toBeNull();
   });
 });
 

@@ -39,6 +39,11 @@ const URL_PATTERNS: Array<{
     normalizer: (match) => `https://www.youtube.com/watch?v=${match[2]}`,
   },
   {
+    source: "youtube",
+    pattern: /^https?:\/\/(?:(?:www|m)\.)?youtube\.com\/playlist\?list=([a-zA-Z0-9_-]+)/,
+    normalizer: (match) => `https://www.youtube.com/playlist?list=${match[1]}`,
+  },
+  {
     source: "apple_music",
     pattern:
       /^https?:\/\/music\.apple\.com\/[a-z]{2}\/(album|playlist|artist|music-video|station)\/([^/]+)/,
@@ -103,6 +108,22 @@ export function extractYouTubeVideoId(url: string): string | null {
     }
     if (parsed.hostname === "youtu.be") {
       return parsed.pathname.slice(1) || null;
+    }
+  } catch {
+    // invalid URL
+  }
+  return null;
+}
+
+export function extractYouTubePlaylistId(url: string): string | null {
+  try {
+    const parsed = new URL(url);
+    if (
+      parsed.hostname === "www.youtube.com" ||
+      parsed.hostname === "youtube.com" ||
+      parsed.hostname === "m.youtube.com"
+    ) {
+      return parsed.searchParams.get("list");
     }
   } catch {
     // invalid URL
