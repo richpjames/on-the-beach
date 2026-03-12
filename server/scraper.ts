@@ -3,6 +3,7 @@ import {
   extractReleaseCandidatesFromWebText,
   type ExtractedReleaseCandidate,
 } from "./link-extractor";
+import { fetchDiscogsRelease } from "./discogs";
 
 export interface OgData {
   ogTitle?: string;
@@ -20,6 +21,8 @@ export interface ScrapedMetadata {
   imageUrl?: string;
   releases?: ExtractedReleaseCandidate[];
   embedMetadata?: Record<string, string>;
+  year?: number;
+  genre?: string;
 }
 
 type OgParser = (og: OgData) => ScrapedMetadata;
@@ -825,6 +828,10 @@ export async function scrapeUrl(
   }
 
   try {
+    if (source === "discogs") {
+      return await fetchDiscogsRelease(url, timeoutMs);
+    }
+
     if (source === "youtube") {
       return await scrapeYouTubeOEmbed(url, timeoutMs);
     }

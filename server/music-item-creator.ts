@@ -134,6 +134,8 @@ interface ReleaseCandidateInput {
   evidence?: string;
   isPrimary?: boolean;
   embedMetadata?: Record<string, string>;
+  year?: number;
+  genre?: string;
 }
 
 export class AmbiguousLinkSelectionError extends Error {
@@ -216,9 +218,9 @@ async function insertMusicItemWithLink(
       notes: overrides?.notes ?? null,
       artworkUrl: overrides?.artworkUrl ?? candidate.artworkUrl ?? null,
       label: overrides?.label ?? null,
-      year: overrides?.year ?? null,
+      year: overrides?.year ?? candidate.year ?? null,
       country: overrides?.country ?? null,
-      genre: overrides?.genre ?? null,
+      genre: overrides?.genre ?? candidate.genre ?? null,
       catalogueNumber: overrides?.catalogueNumber ?? null,
       musicbrainzReleaseId: overrides?.musicbrainzReleaseId ?? null,
       musicbrainzArtistId: overrides?.musicbrainzArtistId ?? null,
@@ -278,6 +280,8 @@ async function resolveReleaseCandidates(
           itemType: overrides?.itemType ?? scraped?.itemType ?? "album",
           artworkUrl: overrides?.artworkUrl ?? scraped?.imageUrl ?? null,
           embedMetadata: scraped?.embedMetadata,
+          year: overrides?.year ?? scraped?.year,
+          genre: overrides?.genre ?? scraped?.genre,
         },
       ],
     };
