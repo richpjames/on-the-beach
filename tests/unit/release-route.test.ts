@@ -445,4 +445,20 @@ describe("POST /api/release/apple-music-lookup/:id", () => {
     expect(body.skipped).toBe(true);
     expect(mockSearchAppleMusic).not.toHaveBeenCalled();
   });
+
+  test("skips search when primary URL is Apple Music with unusual format not matched by parseUrl", async () => {
+    mockFetchItemForLookup.mockResolvedValue({
+      title: "Some Song",
+      artistName: "Some Artist",
+      primarySource: null,
+      primaryUrl: "https://music.apple.com/us/song/some-song/123456789",
+    });
+    const app = makeApp();
+    const res = await app.request("http://localhost/api/release/apple-music-lookup/5", {
+      method: "POST",
+    });
+    const body = await res.json();
+    expect(body.skipped).toBe(true);
+    expect(mockSearchAppleMusic).not.toHaveBeenCalled();
+  });
 });

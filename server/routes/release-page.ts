@@ -3,7 +3,7 @@ import { fetchFullItem } from "../music-item-creator";
 import type { MusicItemFull } from "../../src/types";
 import { getPageAssets } from "../page-assets";
 import { renderStarRating } from "../../src/ui/view/templates";
-import { parseUrl, extractYouTubeVideoId } from "../utils";
+import { parseUrl, extractYouTubeVideoId, extractYouTubePlaylistId } from "../utils";
 
 export type FetchItemFn = (id: number) => Promise<MusicItemFull | null>;
 
@@ -55,11 +55,11 @@ function parseLinkMetadata(raw: string | null): Record<string, string> | null {
 
 function renderYouTubeEmbed(item: MusicItemFull): string {
   if (!item.primary_url) return "";
-  const videoId = extractYouTubeVideoId(item.primary_url);
-  if (!videoId || !/^[\w-]+$/.test(videoId)) return "";
 
-  const src = `https://www.youtube-nocookie.com/embed/${escapeHtml(videoId)}`;
-  return `<iframe
+  const videoId = extractYouTubeVideoId(item.primary_url);
+  if (videoId && /^[\w-]+$/.test(videoId)) {
+    const src = `https://www.youtube-nocookie.com/embed/${escapeHtml(videoId)}`;
+    return `<iframe
     class="release-page__youtube-embed"
     src="${src}"
     style="border:0;width:100%;aspect-ratio:16/9;"
@@ -67,6 +67,22 @@ function renderYouTubeEmbed(item: MusicItemFull): string {
     allowfullscreen
     title="YouTube player"
   ></iframe>`;
+  }
+
+  const playlistId = extractYouTubePlaylistId(item.primary_url);
+  if (playlistId && /^[\w-]+$/.test(playlistId)) {
+    const src = `https://www.youtube-nocookie.com/embed/videoseries?list=${escapeHtml(playlistId)}`;
+    return `<iframe
+    class="release-page__youtube-embed"
+    src="${src}"
+    style="border:0;width:100%;aspect-ratio:16/9;"
+    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+    allowfullscreen
+    title="YouTube playlist player"
+  ></iframe>`;
+  }
+
+  return "";
 }
 
 function renderBandcampEmbed(item: MusicItemFull): string {
@@ -151,7 +167,7 @@ function renderReleasePage(item: MusicItemFull, cssHref: string): string {
 
           <div class="release-page__body">
 
-            ${extractYouTubeVideoId(item.primary_url ?? "") ? renderYouTubeEmbed(item) : safeArtworkUrl(item.artwork_url ?? "") ? `<img class="release-page__artwork" src="${escapeHtml(item.artwork_url!)}" alt="Artwork for ${escapeHtml(item.title)}" />` : ""}
+            ${extractYouTubeVideoId(item.primary_url ?? "") || extractYouTubePlaylistId(item.primary_url ?? "") ? renderYouTubeEmbed(item) : safeArtworkUrl(item.artwork_url ?? "") ? `<img class="release-page__artwork" src="${escapeHtml(item.artwork_url!)}" alt="Artwork for ${escapeHtml(item.title)}" />` : ""}
 
             <div class="release-page__content">
 
@@ -163,7 +179,7 @@ function renderReleasePage(item: MusicItemFull, cssHref: string): string {
                 ${item.notes ? `<p class="release-page__notes">${escapeHtml(item.notes)}</p>` : ""}
                 ${renderStarRating(item.id, item.rating, "star-rating--large")}
                 <div id="stack-chips" class="release-page__stacks"></div>
-                ${item.primary_url && !extractYouTubeVideoId(item.primary_url) && !item.primary_url.includes("bandcamp.com") ? `<a class="release-page__source-link" href="${escapeHtml(item.primary_url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(sourceDisplayName(item.primary_source ?? parseUrl(item.primary_url).source))}</a>` : ""}
+                ${item.primary_url && !extractYouTubeVideoId(item.primary_url) && !extractYouTubePlaylistId(item.primary_url) && !item.primary_url.includes("bandcamp.com") ? `<a class="release-page__source-link" href="${escapeHtml(item.primary_url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(sourceDisplayName(item.primary_source ?? parseUrl(item.primary_url).source))}</a>` : ""}
                 ${item.primary_url?.includes("bandcamp.com") ? renderBandcampEmbed(item) : ""}
                 <div id="secondary-links"></div>
               </div>
@@ -316,9 +332,13 @@ function renderReleasePage(item: MusicItemFull, cssHref: string): string {
         }
       }
 
+      function sortStacks(stacks) {
+        return stacks.sort((a, b) => a.name.localeCompare(b.name));
+      }
+
       async function loadStacks() {
         const res = await fetch('/api/stacks');
-        if (res.ok) { allStacks = await res.json(); renderStackChips(); renderStackPicker(); }
+        if (res.ok) { allStacks = sortStacks(await res.json()); renderStackChips(); renderStackPicker(); }
       }
 
       document.getElementById('new-stack-input').addEventListener('keydown', async e => {
@@ -334,6 +354,7 @@ function renderReleasePage(item: MusicItemFull, cssHref: string): string {
           const stack = await res.json();
           e.target.value = '';
           allStacks.push(stack);
+          sortStacks(allStacks);
           await toggleStack(stack.id, true);
         }
       });

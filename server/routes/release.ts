@@ -283,7 +283,11 @@ export function createReleaseRoutes(
       return c.json({ skipped: true }, 200);
     }
 
-    if (item.primaryUrl && parseUrl(item.primaryUrl).source === "apple_music") {
+    if (
+      item.primaryUrl &&
+      (parseUrl(item.primaryUrl).source === "apple_music" ||
+        item.primaryUrl.includes("music.apple.com"))
+    ) {
       return c.json({ skipped: true }, 200);
     }
 
