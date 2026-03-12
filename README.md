@@ -122,6 +122,16 @@ Coolify deployment runbook: `docs/deployment/coolify-alpha.md`
 
 The app ships as a single Docker container (Dockerfile builds the frontend and starts the Bun server). Use `Dockerfile` build pack, port `3000`, and mount persistent volumes for the database and uploads directories.
 
+## Repo Documentation
+
+Short repo guides now live under `docs/areas/`.
+
+- `docs/areas/server/` for entrypoints and route groups
+- `docs/areas/frontend/` for the app shell, state machines, and retro UI rules
+- `docs/areas/data/` for schema and persistence
+- `docs/areas/integrations/` for ingest, scraping, scanning, and enrichment
+- `docs/areas/quality/` for tests and eval tooling
+
 ## License
 
 This project is licensed under PolyForm Noncommercial License 1.0.0.
