@@ -37,7 +37,6 @@
   /* Status colors (Winamp-palette) */
   --status-listen: #6699ff;
   --status-playing: #ffcc44;
-  --status-done: #44ff88;
   --status-grey: #888888;
 
   /* Danger */
@@ -1453,12 +1452,6 @@ select.input {
   color: #44ff88;
   border-color: #006622;
   text-shadow: 0 0 4px #00ff44;
-}
-
-.badge--done {
-  background: #111111;
-  color: #777777;
-  border-color: #444444;
 }
 
 .badge--source {

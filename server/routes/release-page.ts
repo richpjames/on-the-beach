@@ -113,7 +113,6 @@ function renderReleasePage(item: MusicItemFull, cssHref: string): string {
   const statusOptions = [
     { value: "to-listen", label: "To Listen" },
     { value: "listened", label: "Listened" },
-    { value: "done", label: "Done" },
   ]
     .map(
       ({ value, label }) =>
