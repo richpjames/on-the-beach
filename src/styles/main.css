@@ -2087,9 +2087,7 @@ body::after {
 }
 
 .release-page #edit-mode {
-  display: grid;
-  grid-template-columns: 2fr 1fr;
-  gap: 8px;
+  display: block;
   padding: 8px;
   border-width: 2px;
   border-style: solid;
@@ -2133,6 +2131,15 @@ body::after {
   border-bottom: 1px solid var(--chrome-dark);
   font-weight: bold;
   color: var(--chrome-black);
+}
+
+.release-page__stacks--inline {
+  padding: 4px 6px;
+  border-bottom: 1px solid var(--chrome-dark);
+}
+
+.release-page__stacks--inline:empty {
+  display: none;
 }
 
 .release-page__edit-stacks-list {

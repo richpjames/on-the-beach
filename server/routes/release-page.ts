@@ -178,7 +178,6 @@ function renderReleasePage(item: MusicItemFull, cssHref: string): string {
                 ${item.catalogue_number ? `<p class="release-page__catalogue">${escapeHtml(item.catalogue_number)}</p>` : ""}
                 ${item.notes ? `<p class="release-page__notes">${escapeHtml(item.notes)}</p>` : ""}
                 ${renderStarRating(item.id, item.rating, "star-rating--large")}
-                <div id="stack-chips" class="release-page__stacks"></div>
                 ${item.primary_url && !extractYouTubeVideoId(item.primary_url) && !extractYouTubePlaylistId(item.primary_url) && !item.primary_url.includes("bandcamp.com") ? `<a class="release-page__source-link" href="${escapeHtml(item.primary_url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(sourceDisplayName(item.primary_source ?? parseUrl(item.primary_url).source))}</a>` : ""}
                 ${item.primary_url?.includes("bandcamp.com") ? renderBandcampEmbed(item) : ""}
                 <div id="secondary-links"></div>
@@ -206,12 +205,14 @@ function renderReleasePage(item: MusicItemFull, cssHref: string): string {
                     <button type="button" class="btn" id="cancel-btn">Cancel</button>
                   </div>
                 </div>
-                <div class="release-page__edit-stacks">
-                  <div class="release-page__edit-stacks-header">Stacks</div>
-                  <div id="stack-picker-list" class="release-page__edit-stacks-list"></div>
-                  <div class="release-page__edit-stacks-new">
-                    <input type="text" class="input stack-dropdown__new-input" id="new-stack-input" placeholder="New stack…" />
-                  </div>
+              </div>
+
+              <div class="release-page__edit-stacks">
+                <div class="release-page__edit-stacks-header">Stacks</div>
+                <div id="stack-chips" class="release-page__stacks release-page__stacks--inline"></div>
+                <div id="stack-picker-list" class="release-page__edit-stacks-list"></div>
+                <div class="release-page__edit-stacks-new">
+                  <input type="text" class="input stack-dropdown__new-input" id="new-stack-input" placeholder="New stack…" />
                 </div>
               </div>
 
