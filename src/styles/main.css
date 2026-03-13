@@ -2122,6 +2122,7 @@ body::after {
   background: var(--chrome-white);
   overflow: hidden;
   min-width: 0;
+  max-height: 50vh;
 }
 
 .release-page__edit-stacks-header {
