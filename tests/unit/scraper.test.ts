@@ -13,6 +13,8 @@ import {
   UnsupportedMusicLinkError,
   extractBandcampEmbedMetadata,
   searchAppleMusic,
+  parseNtsOg,
+  parseCanonicalUrl,
 } from "../../server/scraper";
 
 function mockChatCompletionResponse(
@@ -904,5 +906,68 @@ describe("searchAppleMusic", () => {
     const result = await searchAppleMusic("A Song", "Artist");
     expect(result).toBe("https://music.apple.com/track/999");
     mock.restore();
+  });
+});
+
+describe("parseNtsOg", () => {
+  test("strips '| NTS Radio' suffix from title", () => {
+    const og = { ogTitle: "Tropic Of Cancer - 6th March 2026 | NTS Radio" };
+    const result = parseNtsOg(og);
+    expect(result.potentialTitle).toBe("Tropic Of Cancer - 6th March 2026");
+  });
+
+  test("strips '| NTS' suffix from title", () => {
+    const og = { ogTitle: "Hessle Audio | NTS" };
+    const result = parseNtsOg(og);
+    expect(result.potentialTitle).toBe("Hessle Audio");
+  });
+
+  test("strips 'on NTS Radio' suffix from title", () => {
+    const og = { ogTitle: "Tropic Of Cancer on NTS Radio" };
+    const result = parseNtsOg(og);
+    expect(result.potentialTitle).toBe("Tropic Of Cancer");
+  });
+
+  test("sets itemType to mix", () => {
+    const og = { ogTitle: "Some Show | NTS Radio" };
+    const result = parseNtsOg(og);
+    expect(result.itemType).toBe("mix");
+  });
+
+  test("returns og:image as imageUrl", () => {
+    const og = {
+      ogTitle: "Some Show | NTS Radio",
+      ogImage: "https://nts.live/images/show.jpg",
+    };
+    const result = parseNtsOg(og);
+    expect(result.imageUrl).toBe("https://nts.live/images/show.jpg");
+  });
+
+  test("handles title with no NTS suffix", () => {
+    const og = { ogTitle: "Tropic Of Cancer - 6th March 2026" };
+    const result = parseNtsOg(og);
+    expect(result.potentialTitle).toBe("Tropic Of Cancer - 6th March 2026");
+    expect(result.itemType).toBe("mix");
+  });
+});
+
+describe("parseCanonicalUrl", () => {
+  test("extracts canonical URL from link tag (rel before href)", () => {
+    const html = `<link rel="canonical" href="https://www.nts.live/shows/tropic-of-cancer/episodes/tropic-of-cancer-6th-march-2026" />`;
+    expect(parseCanonicalUrl(html)).toBe(
+      "https://www.nts.live/shows/tropic-of-cancer/episodes/tropic-of-cancer-6th-march-2026",
+    );
+  });
+
+  test("extracts canonical URL from link tag (href before rel)", () => {
+    const html = `<link href="https://www.nts.live/shows/my-show/episodes/ep-1" rel="canonical" />`;
+    expect(parseCanonicalUrl(html)).toBe(
+      "https://www.nts.live/shows/my-show/episodes/ep-1",
+    );
+  });
+
+  test("returns undefined when no canonical tag is present", () => {
+    const html = `<head><title>No canonical here</title></head>`;
+    expect(parseCanonicalUrl(html)).toBeUndefined();
   });
 });

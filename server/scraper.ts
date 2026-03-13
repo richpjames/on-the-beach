@@ -23,6 +23,7 @@ export interface ScrapedMetadata {
   embedMetadata?: Record<string, string>;
   year?: number;
   genre?: string;
+  canonicalUrl?: string;
 }
 
 type OgParser = (og: OgData) => ScrapedMetadata;
@@ -792,11 +793,34 @@ export function parseDefaultOg(og: OgData): ScrapedMetadata {
   };
 }
 
+export function parseCanonicalUrl(html: string): string | undefined {
+  const match =
+    html.match(/<link\s[^>]*rel=["']canonical["'][^>]*href=["']([^"']+)["']/i) ??
+    html.match(/<link\s[^>]*href=["']([^"']+)["'][^>]*rel=["']canonical["']/i);
+  return match?.[1]?.trim() || undefined;
+}
+
+export function parseNtsOg(og: OgData): ScrapedMetadata {
+  const rawTitle = og.ogTitle || og.title || "";
+  // NTS format: "Show Name - Episode Info | NTS Radio" or "Show Name | NTS"
+  const title = rawTitle
+    .replace(/\s*\|\s*NTS(?:\s+Radio)?\s*$/i, "")
+    .replace(/\s+on\s+NTS(?:\s+Radio)?\s*$/i, "")
+    .trim();
+
+  return {
+    potentialTitle: title || undefined,
+    imageUrl: og.ogImage,
+    itemType: "mix",
+  };
+}
+
 export const SOURCE_PARSERS: Partial<Record<SourceName, OgParser>> = {
   bandcamp: parseBandcampOg,
   soundcloud: parseSoundcloudOg,
   apple_music: parseAppleMusicOg,
   mixcloud: parseMixcloudOg,
+  nts: parseNtsOg,
 };
 
 export async function scrapeUrl(
@@ -923,6 +947,14 @@ export async function scrapeUrl(
     if (source === "apple_music") {
       const appleMusicOg = parseAppleMusicOg(og);
       return mergeScrapedMetadata(appleMusicOEmbed, appleMusicLookup, appleMusicOg);
+    }
+
+    if (source === "nts") {
+      const result = parseNtsOg(og);
+      const canonicalUrl =
+        firstDefined(og.metaTags?.["og:url"], parseCanonicalUrl(html)) || undefined;
+      if (canonicalUrl) result.canonicalUrl = canonicalUrl;
+      return result;
     }
 
     const parser = SOURCE_PARSERS[source] || parseDefaultOg;

@@ -74,6 +74,14 @@ const URL_PATTERNS: Array<{
     source: "deezer",
     pattern: /^https?:\/\/(?:www\.)?deezer\.com\/[a-z]{2}\/(album|track|playlist)\/(\d+)/,
   },
+  {
+    source: "nts",
+    pattern: /^https?:\/\/(?:www\.)?nts\.live\/shows\/([^/]+)(?:\/episodes\/([^/?]+))?/,
+    extractor: (match) => ({
+      potentialArtist: match[1]?.replace(/-/g, " "),
+      potentialTitle: match[2]?.replace(/-/g, " "),
+    }),
+  },
 ];
 
 export function parseUrl(url: string): ParsedUrl {
