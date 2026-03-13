@@ -445,7 +445,6 @@ function renderMainPage(opts: {
             </div>
           </div>
           <div class="add-loading-dialog__body">
-            <div class="add-loading-dialog__disc" aria-hidden="true"></div>
             <div class="add-loading-dialog__content">
               <p class="add-loading-dialog__status" id="add-loading-status">
                 Adding to collection...
