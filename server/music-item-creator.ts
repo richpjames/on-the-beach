@@ -271,7 +271,7 @@ async function resolveReleaseCandidates(
     const artistName = overrides?.artistName || scraped?.potentialArtist || parsed.potentialArtist;
 
     return {
-      normalizedUrl: parsed.normalizedUrl,
+      normalizedUrl: scraped?.canonicalUrl || parsed.normalizedUrl,
       source: parsed.source,
       candidates: [
         {

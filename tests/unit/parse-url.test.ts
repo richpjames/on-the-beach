@@ -54,6 +54,57 @@ describe("extractYouTubePlaylistId", () => {
   });
 });
 
+describe("parseUrl - nts", () => {
+  test("identifies NTS episode link", () => {
+    const result = parseUrl(
+      "https://www.nts.live/shows/tropic-of-cancer/episodes/tropic-of-cancer-6th-march-2026",
+    );
+
+    expect(result.source).toBe("nts");
+  });
+
+  test("strips query params from normalized URL", () => {
+    const result = parseUrl(
+      "https://www.nts.live/shows/tropic-of-cancer/episodes/tropic-of-cancer-6th-march-2026?some=param",
+    );
+
+    expect(result.normalizedUrl).toBe(
+      "https://www.nts.live/shows/tropic-of-cancer/episodes/tropic-of-cancer-6th-march-2026",
+    );
+  });
+
+  test("extracts show slug as potentialArtist", () => {
+    const result = parseUrl(
+      "https://www.nts.live/shows/tropic-of-cancer/episodes/tropic-of-cancer-6th-march-2026",
+    );
+
+    expect(result.potentialArtist).toBe("tropic of cancer");
+  });
+
+  test("extracts episode slug as potentialTitle", () => {
+    const result = parseUrl(
+      "https://www.nts.live/shows/tropic-of-cancer/episodes/tropic-of-cancer-6th-march-2026",
+    );
+
+    expect(result.potentialTitle).toBe("tropic of cancer 6th march 2026");
+  });
+
+  test("identifies NTS show index page (no episode)", () => {
+    const result = parseUrl("https://www.nts.live/shows/tropic-of-cancer");
+
+    expect(result.source).toBe("nts");
+    expect(result.potentialArtist).toBe("tropic of cancer");
+  });
+
+  test("matches nts.live URLs without www prefix", () => {
+    const result = parseUrl(
+      "https://nts.live/shows/tropic-of-cancer/episodes/tropic-of-cancer-6th-march-2026",
+    );
+
+    expect(result.source).toBe("nts");
+  });
+});
+
 describe("parseUrl - apple music", () => {
   test("identifies apple music release link and extracts title", () => {
     const result = parseUrl("https://music.apple.com/es/album/el-poder-verde/1810282984?l=en-GB");

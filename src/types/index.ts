@@ -15,6 +15,7 @@ export type SourceName =
   | "tidal"
   | "deezer"
   | "mixcloud"
+  | "nts"
   | "physical"
   | "unknown";
 
