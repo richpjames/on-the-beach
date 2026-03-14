@@ -29,16 +29,10 @@ jobs:
       - name: Run unit tests
         run: bun run test:unit
 
-  browser-checks:
-    name: ${{ matrix.check }}
+  e2e:
+    name: e2e
     runs-on: ubuntu-latest
     timeout-minutes: 45
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - check: e2e
-          - check: percy
     container:
       image: mcr.microsoft.com/playwright:v1.58.2-jammy
       options: --user root --ipc=host
@@ -56,28 +50,8 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
-      - name: Install Playwright WebKit
-        run: npx playwright install webkit
-
       - name: Setup database
         run: bun run db:migrate && bun run db:seed
 
-      - name: Validate Percy token
-        if: ${{ matrix.check == 'percy' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.fork == false) }}
-        env:
-          PERCY_TOKEN: ${{ secrets.PERCY_TOKEN }}
-        run: |
-          if [ -z "$PERCY_TOKEN" ]; then
-            echo "Missing PERCY_TOKEN GitHub Actions secret."
-            exit 1
-          fi
-
       - name: Run E2E checks
-        if: ${{ matrix.check == 'e2e' }}
         run: bun run test:e2e
-
-      - name: Run Percy visual checks
-        if: ${{ matrix.check == 'percy' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.fork == false) }}
-        env:
-          PERCY_TOKEN: ${{ secrets.PERCY_TOKEN }}
-        run: bunx @percy/cli exec -- bun run test:e2e:ui

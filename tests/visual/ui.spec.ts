@@ -1,9 +1,10 @@
-import percySnapshot from "@percy/playwright";
 import path from "node:path";
-import type { APIRequestContext, Page, TestInfo } from "@playwright/test";
-import { expect, test } from "./fixtures/parallel-test";
+import type { APIRequestContext, Page } from "@playwright/test";
+import { expect, test } from "../../playwright/fixtures/parallel-test";
 
-const PERCY_CSS = `
+// CSS injected before each screenshot to produce stable, deterministic renders.
+// Mirrors the percyCSS block from the previous Percy setup.
+const VISUAL_CSS = `
   body::before,
   body::after {
     display: none !important;
@@ -51,7 +52,7 @@ test.beforeEach(async ({ request }) => {
   await request.post("/api/__test__/reset");
 });
 
-test("captures main and release views", async ({ page }, testInfo) => {
+test("captures main and release views", async ({ page }) => {
   await page.goto("/");
   await expect(page.getByPlaceholder("Paste a music link...")).toBeVisible();
 
@@ -67,11 +68,11 @@ test("captures main and release views", async ({ page }, testInfo) => {
     label: "Shoreline Works",
     year: "2023",
     genre: "Dub Techno",
-    notes: "Percy fixture manual item",
+    notes: "Visual fixture manual item",
   });
 
   await expect(page.locator(".music-card")).toHaveCount(2);
-  await captureSnapshot(page, testInfo, "main-app-view");
+  await captureSnapshot(page, "main-app-view");
 
   await page
     .locator(".music-card", { hasText: "Water Bearer" })
@@ -82,10 +83,10 @@ test("captures main and release views", async ({ page }, testInfo) => {
   await expect(page.locator(".release-page")).toBeVisible();
   await expect(page.locator("#view-mode")).toBeVisible();
 
-  await captureSnapshot(page, testInfo, "release-page-view");
+  await captureSnapshot(page, "release-page-view");
 });
 
-test("captures add loading dialog", async ({ page }, testInfo) => {
+test("captures add loading dialog", async ({ page }) => {
   await page.goto("/");
   await expect(page.getByPlaceholder("Paste a music link...")).toBeVisible();
 
@@ -96,10 +97,10 @@ test("captures add loading dialog", async ({ page }, testInfo) => {
   });
 
   await expect(page.locator(".add-loading-dialog")).toBeVisible();
-  await captureSnapshot(page, testInfo, "add-loading-dialog");
+  await captureSnapshot(page, "add-loading-dialog");
 });
 
-test("captures main long-list view", async ({ page, request }, testInfo) => {
+test("captures main long-list view", async ({ page, request }) => {
   await seedLongList(request);
 
   await page.goto("/");
@@ -108,20 +109,27 @@ test("captures main long-list view", async ({ page, request }, testInfo) => {
     LONG_LIST_FIXTURES.at(-1)!.title,
   );
 
-  await captureSnapshot(page, testInfo, "main-app-long-list-view");
+  await captureSnapshot(page, "main-app-long-list-view");
 });
 
-async function captureSnapshot(page: Page, testInfo: TestInfo, viewName: string): Promise<void> {
-  const viewport = page.viewportSize();
-  const widths = viewport ? [viewport.width] : undefined;
-  const minHeight = viewport?.height;
+// ---------------------------------------------------------------------------
+// Screenshot helper
+// ---------------------------------------------------------------------------
 
-  await percySnapshot(page, `${testInfo.project.name} - ${viewName}`, {
-    percyCSS: PERCY_CSS,
-    widths,
-    minHeight,
+async function captureSnapshot(page: Page, name: string): Promise<void> {
+  await page.addStyleTag({ content: VISUAL_CSS });
+
+  // maxDiffPixelRatio: 0.01 — tune this down (e.g. 0.001) for strict
+  // pixel-perfect comparisons, or up (e.g. 0.05) if minor font-rendering
+  // differences between machines cause false positives.
+  await expect(page).toHaveScreenshot(`${name}.png`, {
+    maxDiffPixelRatio: 0.01,
   });
 }
+
+// ---------------------------------------------------------------------------
+// Data helpers (identical to the previous Percy spec)
+// ---------------------------------------------------------------------------
 
 async function seedLongList(request: APIRequestContext): Promise<void> {
   for (const item of LONG_LIST_FIXTURES) {
