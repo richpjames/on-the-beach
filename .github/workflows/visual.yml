@@ -14,7 +14,7 @@ jobs:
   # Run visual tests inside the official Playwright container (Linux/Chromium).
   # Baselines committed to the repo must be generated on the same platform
   # (Linux) to avoid cross-platform rendering differences causing false
-  # positives. See CONTRIBUTING.md for instructions.
+  # positives. See README for instructions.
   # -------------------------------------------------------------------------
   visual-tests:
     name: Run visual tests
@@ -47,18 +47,21 @@ jobs:
         continue-on-error: true
         run: bun run test:visual
 
-      - name: Upload HTML report
-        uses: actions/upload-artifact@v4
+      - name: Upload HTML report as Pages artifact
+        uses: actions/upload-pages-artifact@v3
         if: always()
         with:
-          name: visual-report-pr-${{ github.event.pull_request.number }}
           path: playwright-report/
-          retention-days: 30
 
   # -------------------------------------------------------------------------
-  # Publish the HTML report to GitHub Pages and post a sticky PR comment with
-  # a direct link. Runs in a plain ubuntu runner so git operations work without
-  # the container user restrictions.
+  # Deploy the HTML report to GitHub Pages using the Actions Pages API (no
+  # gh-pages branch required — configure Pages source as "GitHub Actions" in
+  # the repo settings). Posts a sticky PR comment with a direct link to the
+  # deployed report.
+  #
+  # Note: each deployment replaces the previous one, so only the most recently
+  # pushed PR's report is live at any time. The sticky comment on each PR is
+  # updated in place, so reviewers always see the current state of their PR.
   # -------------------------------------------------------------------------
   publish-report:
     name: Publish report
@@ -68,30 +71,18 @@ jobs:
     timeout-minutes: 10
 
     permissions:
-      contents: write
+      pages: write
+      id-token: write
       pull-requests: write
 
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+
     steps:
-      - name: Checkout gh-pages branch
-        uses: actions/checkout@v4
-        with:
-          ref: gh-pages
-          # Create the branch if it doesn't exist yet.
-          fetch-depth: 0
-
-      - name: Download visual report artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: visual-report-pr-${{ github.event.pull_request.number }}
-          path: visual-reports/${{ github.event.pull_request.number }}
-
-      - name: Commit report to gh-pages
-        run: |
-          git config user.name  "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add visual-reports/${{ github.event.pull_request.number }}
-          git commit -m "chore: visual report for PR #${{ github.event.pull_request.number }} (${{ github.sha }})" || echo "Nothing to commit"
-          git push origin gh-pages
+      - name: Deploy to GitHub Pages
+        id: deploy
+        uses: actions/deploy-pages@v4
 
       - name: Post sticky PR comment with report link
         uses: marocchino/sticky-pull-request-comment@v2
@@ -102,7 +93,7 @@ jobs:
 
             The Playwright screenshot diff report for this PR has been published to GitHub Pages:
 
-            **[View visual diff report](https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/visual-reports/${{ github.event.pull_request.number }}/)**
+            **[View visual diff report](${{ steps.deploy.outputs.page_url }})**
 
             > Snapshots are compared against baselines committed to the repo.
             > If differences are intentional, update baselines locally on Linux
