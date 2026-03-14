@@ -47,26 +47,21 @@ jobs:
         continue-on-error: true
         run: bun run test:visual
 
-      - name: Upload HTML report as artifact
-        uses: actions/upload-artifact@v4
+      - name: Upload HTML report as Pages artifact
+        uses: actions/upload-pages-artifact@v3
         if: always()
         with:
-          name: playwright-report
           path: playwright-report/
-          retention-days: 30
 
   # -------------------------------------------------------------------------
-  # Deploy the HTML report to the gh-pages branch so it is served over HTTP
-  # (images in the Playwright report require HTTP to load). Uses a direct git
-  # push rather than the Actions Pages API, which avoids the github-pages
-  # environment protection rules that block PR branch deployments.
+  # Deploy the HTML report to GitHub Pages using the Actions Pages API (no
+  # gh-pages branch required — configure Pages source as "GitHub Actions" in
+  # the repo settings). Posts a sticky PR comment with a direct link to the
+  # deployed report.
   #
-  # Requires Pages source to be set to "Deploy from a branch → gh-pages" in
-  # the repo settings (Settings → Pages → Source).
-  #
-  # Note: each deployment overwrites the previous one, so only the most
-  # recently pushed PR's report is live at any time. The sticky comment on
-  # each PR is updated in place.
+  # Note: each deployment replaces the previous one, so only the most recently
+  # pushed PR's report is live at any time. The sticky comment on each PR is
+  # updated in place, so reviewers always see the current state of their PR.
   # -------------------------------------------------------------------------
   publish-report:
     name: Publish report
@@ -76,22 +71,18 @@ jobs:
     timeout-minutes: 10
 
     permissions:
-      contents: write
+      pages: write
+      id-token: write
       pull-requests: write
 
-    steps:
-      - name: Download report artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: playwright-report
-          path: playwright-report/
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
 
-      - name: Deploy report to gh-pages branch
-        uses: peaceiris/actions-gh-pages@v4
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./playwright-report
-          destination_dir: visual-report
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deploy
+        uses: actions/deploy-pages@v4
 
       - name: Post sticky PR comment with report link
         uses: marocchino/sticky-pull-request-comment@v2
@@ -102,7 +93,7 @@ jobs:
 
             The Playwright screenshot diff report for this PR has been published to GitHub Pages:
 
-            **[View visual diff report](https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/visual-report/)**
+            **[View visual diff report](${{ steps.deploy.outputs.page_url }})**
 
             > Snapshots are compared against baselines committed to the repo.
             > If differences are intentional, update baselines locally on Linux
