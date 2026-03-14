@@ -1,0 +1,110 @@
+name: Visual Regression
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened]
+
+concurrency:
+  group: visual-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # -------------------------------------------------------------------------
+  # Run visual tests inside the official Playwright container (Linux/Chromium).
+  # Baselines committed to the repo must be generated on the same platform
+  # (Linux) to avoid cross-platform rendering differences causing false
+  # positives. See CONTRIBUTING.md for instructions.
+  # -------------------------------------------------------------------------
+  visual-tests:
+    name: Run visual tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    container:
+      image: mcr.microsoft.com/playwright:v1.58.2-jammy
+      options: --user root --ipc=host
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install unzip for Bun setup
+        run: apt-get update && apt-get install -y unzip
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Setup database
+        run: bun run db:migrate && bun run db:seed
+
+      - name: Run visual tests
+        # continue-on-error so the report is always published, even on failure,
+        # so reviewers can inspect the diff before deciding whether it is
+        # intentional.
+        continue-on-error: true
+        run: bun run test:visual
+
+      - name: Upload HTML report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: visual-report-pr-${{ github.event.pull_request.number }}
+          path: playwright-report/
+          retention-days: 30
+
+  # -------------------------------------------------------------------------
+  # Publish the HTML report to GitHub Pages and post a sticky PR comment with
+  # a direct link. Runs in a plain ubuntu runner so git operations work without
+  # the container user restrictions.
+  # -------------------------------------------------------------------------
+  publish-report:
+    name: Publish report
+    needs: visual-tests
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    permissions:
+      contents: write
+      pull-requests: write
+
+    steps:
+      - name: Checkout gh-pages branch
+        uses: actions/checkout@v4
+        with:
+          ref: gh-pages
+          # Create the branch if it doesn't exist yet.
+          fetch-depth: 0
+
+      - name: Download visual report artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: visual-report-pr-${{ github.event.pull_request.number }}
+          path: visual-reports/${{ github.event.pull_request.number }}
+
+      - name: Commit report to gh-pages
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add visual-reports/${{ github.event.pull_request.number }}
+          git commit -m "chore: visual report for PR #${{ github.event.pull_request.number }} (${{ github.sha }})" || echo "Nothing to commit"
+          git push origin gh-pages
+
+      - name: Post sticky PR comment with report link
+        uses: marocchino/sticky-pull-request-comment@v2
+        with:
+          header: visual-regression-report
+          message: |
+            ## Visual Regression Report
+
+            The Playwright screenshot diff report for this PR has been published to GitHub Pages:
+
+            **[View visual diff report](https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/visual-reports/${{ github.event.pull_request.number }}/)**
+
+            > Snapshots are compared against baselines committed to the repo.
+            > If differences are intentional, update baselines locally on Linux
+            > with `bun run test:visual:update` and commit the new snapshots.
+            > See [README — Visual Regression Tests](../blob/main/README.md#visual-regression-tests) for details.

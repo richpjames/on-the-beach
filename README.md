@@ -58,7 +58,8 @@ bun run build           # Build frontend for production
 bun run typecheck       # Type-check without building
 bun run test:unit       # Unit tests (Bun test)
 bun run test:e2e        # Smoke E2E tests (Playwright)
-bun run test:e2e:ui     # UI visual snapshots (Playwright projects for Chrome/Safari, desktop/mobile)
+bun run test:visual     # Visual regression tests (Playwright screenshot comparison)
+bun run test:visual:update  # Re-generate baseline screenshots after intentional UI changes
 bun run test:e2e:full   # Full E2E suite (Playwright)
 bun run db:generate     # Generate Drizzle migrations
 bun run db:migrate      # Apply migrations
@@ -68,28 +69,37 @@ bun run lint            # Lint with oxlint
 bun run format          # Format with oxfmt
 ```
 
-## Visual Regression (Percy)
+## Visual Regression Tests
 
-Percy uploads require a `PERCY_TOKEN`.
+Visual regression tests use Playwright's built-in screenshot comparison. No external service or token is required.
 
-- Local run (uploads snapshots):
-
-```bash
-PERCY_TOKEN=<your-token> npx percy exec -- bun run test:e2e:ui
-```
-
-- Local run without Percy upload (still runs tests):
+### Running locally
 
 ```bash
-bun run test:e2e:ui
+bun run test:visual
 ```
 
-- CI setup: add `PERCY_TOKEN` as a GitHub Actions secret and pass it in the Percy step:
+Playwright compares the captured screenshots against the baselines committed in `tests/visual/`. A diff report is written to `playwright-report/` and opened automatically after the run.
 
-```yaml
-env:
-  PERCY_TOKEN: ${{ secrets.PERCY_TOKEN }}
+### Updating baselines after intentional UI changes
+
+```bash
+bun run test:visual:update
 ```
+
+This overwrites the baseline PNGs. Review the diff, then commit the updated files.
+
+> **Important:** baselines must be generated on Linux to match the CI environment. Running `test:visual:update` on macOS or Windows will produce slightly different pixel output and cause false failures in CI. Use a Linux machine, WSL2, or the dev container to regenerate baselines.
+
+### Reviewing diffs in pull requests
+
+The `Visual Regression` GitHub Actions workflow runs automatically on every PR against `main`. When it completes, a sticky comment is posted with a link to the Playwright HTML report published to GitHub Pages at:
+
+```
+https://<owner>.github.io/<repo>/visual-reports/<pr-number>/
+```
+
+The workflow uses `continue-on-error: true` so the report is always published even when screenshots differ, giving reviewers a chance to inspect the diff before deciding whether it is intentional.
 
 ## Email Ingest
 

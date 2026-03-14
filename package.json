@@ -12,7 +12,8 @@
     "test:unit": "bun test tests/unit",
     "test:unit:watch": "bun test --watch tests/unit",
     "test:e2e": "bunx playwright test playwright",
-    "test:e2e:ui": "bunx playwright test --project=ui-chrome-desktop --project=ui-chrome-mobile --project=ui-safari-desktop --project=ui-safari-mobile --workers=1",
+    "test:visual": "bunx playwright test --project=visual-desktop --project=visual-mobile --workers=1",
+    "test:visual:update": "bunx playwright test --project=visual-desktop --project=visual-mobile --workers=1 --update-snapshots",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:studio": "drizzle-kit studio",
@@ -38,8 +39,6 @@
   },
   "devDependencies": {
     "@hono/node-server": "^1.19.11",
-    "@percy/playwright": "^1.0.10",
-    "@percy/sdk-utils": "^1.31.9",
     "@playwright/test": "^1.58.2",
     "@types/better-sqlite3": "^7.6.13",
     "@types/mailparser": "^3.4.6",
