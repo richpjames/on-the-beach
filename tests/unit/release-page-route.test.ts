@@ -255,6 +255,55 @@ describe("Bandcamp embed", () => {
   });
 });
 
+describe("Mixcloud embed from metadata", () => {
+  test("renders Mixcloud widget iframe when primary_link_metadata has mixcloud_url", async () => {
+    const item = {
+      ...baseItem,
+      primary_url: "https://www.worldwidefm.net/episode/breakfast-club-coco-coco-maria-24-02-2026",
+      primary_source: "unknown" as const,
+      primary_link_metadata: JSON.stringify({
+        mixcloud_url:
+          "https://www.mixcloud.com/WorldwideFM/breakfast-club-coco-coco-maria-24-02-2026/",
+      }),
+    };
+    mockFetchItem.mockResolvedValue(item);
+    const app = makeApp();
+    const res = await app.request("http://localhost/r/42");
+    const html = await res.text();
+    expect(html).toContain("mixcloud.com/widget/iframe/");
+    expect(html).toContain("%2FWorldwideFM%2Fbreakfast-club-coco-coco-maria-24-02-2026%2F");
+    expect(html).toContain("<iframe");
+  });
+
+  test("does not render Mixcloud widget when metadata has no mixcloud_url", async () => {
+    const item = {
+      ...baseItem,
+      primary_url: "https://www.worldwidefm.net/episode/some-show",
+      primary_source: "unknown" as const,
+      primary_link_metadata: null,
+    };
+    mockFetchItem.mockResolvedValue(item);
+    const app = makeApp();
+    const res = await app.request("http://localhost/r/42");
+    const html = await res.text();
+    expect(html).not.toContain("mixcloud.com/widget/iframe/");
+  });
+
+  test("does not render Mixcloud widget for non-mixcloud URL in metadata", async () => {
+    const item = {
+      ...baseItem,
+      primary_url: "https://www.worldwidefm.net/episode/some-show",
+      primary_source: "unknown" as const,
+      primary_link_metadata: JSON.stringify({ mixcloud_url: "https://malicious.com/path/" }),
+    };
+    mockFetchItem.mockResolvedValue(item);
+    const app = makeApp();
+    const res = await app.request("http://localhost/r/42");
+    const html = await res.text();
+    expect(html).not.toContain("mixcloud.com/widget/iframe/");
+  });
+});
+
 describe("YouTube embed", () => {
   test.each([
     ["www.youtube.com", "https://www.youtube.com/watch?v=iS7-iBia7GE"],

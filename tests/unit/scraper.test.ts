@@ -12,6 +12,7 @@ import {
   scrapeUrl,
   UnsupportedMusicLinkError,
   extractBandcampEmbedMetadata,
+  extractMixcloudEmbedUrl,
   searchAppleMusic,
   parseNtsOg,
   parseCanonicalUrl,
@@ -961,13 +962,44 @@ describe("parseCanonicalUrl", () => {
 
   test("extracts canonical URL from link tag (href before rel)", () => {
     const html = `<link href="https://www.nts.live/shows/my-show/episodes/ep-1" rel="canonical" />`;
-    expect(parseCanonicalUrl(html)).toBe(
-      "https://www.nts.live/shows/my-show/episodes/ep-1",
-    );
+    expect(parseCanonicalUrl(html)).toBe("https://www.nts.live/shows/my-show/episodes/ep-1");
   });
 
   test("returns undefined when no canonical tag is present", () => {
     const html = `<head><title>No canonical here</title></head>`;
     expect(parseCanonicalUrl(html)).toBeUndefined();
+  });
+});
+
+describe("extractMixcloudEmbedUrl", () => {
+  test("extracts Mixcloud URL from widget iframe src", () => {
+    const html = `<iframe width="100%" height="60" src="https://www.mixcloud.com/widget/iframe/?hide_cover=1&feed=%2FWorldwideFM%2Fbreakfast-club-coco-coco-maria-24-02-2026%2F" frameborder="0"></iframe>`;
+    expect(extractMixcloudEmbedUrl(html)).toBe(
+      "https://www.mixcloud.com/WorldwideFM/breakfast-club-coco-coco-maria-24-02-2026/",
+    );
+  });
+
+  test("appends trailing slash when feed lacks one", () => {
+    const html = `<iframe src="https://www.mixcloud.com/widget/iframe/?feed=%2FArtist%2Fshow-name"></iframe>`;
+    expect(extractMixcloudEmbedUrl(html)).toBe("https://www.mixcloud.com/Artist/show-name/");
+  });
+
+  test("returns null when no Mixcloud iframe is present", () => {
+    const html = `<iframe src="https://www.youtube.com/embed/abc123"></iframe>`;
+    expect(extractMixcloudEmbedUrl(html)).toBeNull();
+  });
+
+  test("returns null when Mixcloud iframe has no feed parameter", () => {
+    const html = `<iframe src="https://www.mixcloud.com/widget/iframe/?hide_cover=1"></iframe>`;
+    expect(extractMixcloudEmbedUrl(html)).toBeNull();
+  });
+
+  test("returns null for empty HTML", () => {
+    expect(extractMixcloudEmbedUrl("")).toBeNull();
+  });
+
+  test("handles double-quoted src attribute", () => {
+    const html = `<iframe src="https://www.mixcloud.com/widget/iframe/?feed=%2FDJ%2Fmy-mix%2F"></iframe>`;
+    expect(extractMixcloudEmbedUrl(html)).toBe("https://www.mixcloud.com/DJ/my-mix/");
   });
 });

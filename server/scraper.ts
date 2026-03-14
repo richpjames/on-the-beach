@@ -263,6 +263,25 @@ export function extractBandcampEmbedMetadata(html: string): Record<string, strin
   return null;
 }
 
+export function extractMixcloudEmbedUrl(html: string): string | null {
+  const iframeRegex =
+    /<iframe[^>]+src=["'](https?:\/\/(?:www\.)?mixcloud\.com\/widget\/iframe\/\?[^"']*)["']/gi;
+  let match: RegExpExecArray | null;
+  while ((match = iframeRegex.exec(html)) !== null) {
+    try {
+      const srcUrl = new URL(match[1]);
+      const feed = srcUrl.searchParams.get("feed");
+      if (feed && /^\/[^/]+\/[^/]+/.test(feed)) {
+        const normalized = feed.endsWith("/") ? feed : `${feed}/`;
+        return `https://www.mixcloud.com${normalized}`;
+      }
+    } catch {
+      // ignore invalid URLs
+    }
+  }
+  return null;
+}
+
 export function parseSoundcloudOg(og: OgData): ScrapedMetadata {
   const title = og.ogTitle || og.title || "";
   // SoundCloud format: "Track by Artist" or "Stream Track by Artist"
@@ -920,7 +939,23 @@ export async function scrapeUrl(
 
     const og = parseOgTags(html);
     if (source === "unknown") {
-      return await scrapeUnknownUrl(url, html, og);
+      const mixcloudUrl = extractMixcloudEmbedUrl(html);
+      try {
+        const result = await scrapeUnknownUrl(url, html, og);
+        if (result && mixcloudUrl) {
+          result.embedMetadata = { mixcloud_url: mixcloudUrl };
+        }
+        return result;
+      } catch (err) {
+        if (err instanceof UnsupportedMusicLinkError && mixcloudUrl) {
+          return {
+            potentialTitle: og.ogTitle || og.title || undefined,
+            imageUrl: og.ogImage,
+            embedMetadata: { mixcloud_url: mixcloudUrl },
+          };
+        }
+        throw err;
+      }
     }
 
     if (source === "mixcloud") {

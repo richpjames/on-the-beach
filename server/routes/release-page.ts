@@ -102,6 +102,31 @@ function renderBandcampEmbed(item: MusicItemFull): string {
   ></iframe>`;
 }
 
+function renderMixcloudEmbedFromMetadata(item: MusicItemFull): string {
+  const meta = parseLinkMetadata(item.primary_link_metadata);
+  const mixcloudUrl = meta?.mixcloud_url;
+  if (!mixcloudUrl) return "";
+
+  let pathname: string;
+  try {
+    const parsed = new URL(mixcloudUrl);
+    if (!parsed.hostname.toLowerCase().endsWith("mixcloud.com")) return "";
+    pathname = parsed.pathname;
+  } catch {
+    return "";
+  }
+
+  const widgetSrc = `https://www.mixcloud.com/widget/iframe/?hide_cover=1&feed=${encodeURIComponent(pathname)}`;
+
+  return `<iframe
+    class="release-page__mixcloud-embed"
+    src="${escapeHtml(widgetSrc)}"
+    style="border:0;width:100%;height:60px;"
+    title="Mixcloud player"
+    allow="autoplay"
+  ></iframe>`;
+}
+
 function renderNotFoundPage(): string {
   return `<!doctype html>
 <html lang="en">
@@ -180,6 +205,7 @@ function renderReleasePage(item: MusicItemFull, cssHref: string): string {
                 ${renderStarRating(item.id, item.rating, "star-rating--large")}
                 ${item.primary_url && !extractYouTubeVideoId(item.primary_url) && !extractYouTubePlaylistId(item.primary_url) && !item.primary_url.includes("bandcamp.com") ? `<a class="release-page__source-link" href="${escapeHtml(item.primary_url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(sourceDisplayName(item.primary_source ?? parseUrl(item.primary_url).source))}</a>` : ""}
                 ${item.primary_url?.includes("bandcamp.com") ? renderBandcampEmbed(item) : ""}
+                ${renderMixcloudEmbedFromMetadata(item)}
                 <div id="secondary-links"></div>
               </div>
 
