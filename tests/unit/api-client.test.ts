@@ -12,7 +12,7 @@ describe("ApiClient.createMusicItem", () => {
         JSON.stringify({
           kind: "ambiguous_link",
           url: "https://example.com/newsletter",
-          message: "This link mentions several releases. Pick one to add.",
+          message: "This link mentions several releases. Pick one or more to add.",
           candidates: [
             {
               candidateId: "cand-1",
@@ -42,7 +42,7 @@ describe("ApiClient.createMusicItem", () => {
     expect((thrown as AmbiguousLinkApiError).payload).toEqual({
       kind: "ambiguous_link",
       url: "https://example.com/newsletter",
-      message: "This link mentions several releases. Pick one to add.",
+      message: "This link mentions several releases. Pick one or more to add.",
       candidates: [
         {
           candidateId: "cand-1",
