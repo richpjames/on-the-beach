@@ -91,9 +91,8 @@ export const addFormMachine = setup({
       { api: ApiClient; valuesArray: AddFormValuesInput[]; selectedStackIds: number[] }
     >(async ({ input }) => {
       const { api, valuesArray, selectedStackIds } = input;
-      let lastItemId = 0;
 
-      for (const values of valuesArray) {
+      const submitOne = async (values: AddFormValuesInput): Promise<number> => {
         // Enrich with MusicBrainz (non-fatal)
         let enrichedValues = { ...values };
         let musicbrainzReleaseId: string | undefined;
@@ -135,10 +134,11 @@ export const addFormMachine = setup({
           await api.setItemStacks(item.id, selectedStackIds);
         }
 
-        lastItemId = item.id;
-      }
+        return item.id;
+      };
 
-      return { itemId: lastItemId };
+      const itemIds = await Promise.all(valuesArray.map(submitOne));
+      return { itemId: itemIds[itemIds.length - 1] };
     }),
   },
 }).createMachine({
