@@ -29,12 +29,62 @@ function toRfc2822(isoDate: string): string {
   return new Date(isoDate).toUTCString();
 }
 
+function capitalize(str: string): string {
+  return str.charAt(0).toUpperCase() + str.slice(1);
+}
+
 // ---------------------------------------------------------------------------
 // RSS rendering
 // ---------------------------------------------------------------------------
 
 function itemTitle(item: MusicItemFull): string {
   return item.artist_name ? `${item.artist_name} — ${item.title}` : item.title;
+}
+
+function renderItemDescription(item: MusicItemFull): string {
+  const lines: string[] = [];
+
+  // Type · Year · Genre · Country
+  const metaParts: string[] = [];
+  if (item.item_type) metaParts.push(capitalize(item.item_type));
+  if (item.year) metaParts.push(String(item.year));
+  if (item.genre) metaParts.push(item.genre);
+  if (item.country) metaParts.push(item.country);
+  if (metaParts.length > 0) lines.push(metaParts.join(" · "));
+
+  // Label · Catalogue number
+  const labelParts = [item.label, item.catalogue_number].filter(Boolean) as string[];
+  if (labelParts.length > 0) lines.push(labelParts.join(" · "));
+
+  // Source (with link if available)
+  if (item.primary_source && item.primary_url) {
+    lines.push(`Source: ${capitalize(item.primary_source)} — ${item.primary_url}`);
+  } else if (item.primary_source) {
+    lines.push(`Source: ${capitalize(item.primary_source)}`);
+  }
+
+  // Rating
+  if (item.rating != null) {
+    const stars = "★".repeat(item.rating) + "☆".repeat(5 - item.rating);
+    lines.push(`Rating: ${stars}`);
+  }
+
+  // Status
+  if (item.listen_status) {
+    lines.push(`Status: ${item.listen_status === "to-listen" ? "To Listen" : "Listened"}`);
+  }
+
+  // Physical format
+  if (item.is_physical && item.physical_format) {
+    lines.push(`Format: ${capitalize(item.physical_format)}`);
+  }
+
+  // Notes
+  if (item.notes) {
+    lines.push(`\nNotes: ${item.notes}`);
+  }
+
+  return lines.join("\n");
 }
 
 function renderRss(feed: FeedInfo, items: MusicItemFull[], baseUrl: string): string {
@@ -44,12 +94,14 @@ function renderRss(feed: FeedInfo, items: MusicItemFull[], baseUrl: string): str
       const link = escapeXml(`${baseUrl}/r/${item.id}`);
       const pubDate = toRfc2822(item.created_at);
       const guid = `music-item-${item.id}`;
+      const description = renderItemDescription(item);
 
       return `    <item>
       <title>${title}</title>
       <link>${link}</link>
       <pubDate>${pubDate}</pubDate>
       <guid isPermaLink="false">${guid}</guid>
+      <description><![CDATA[${description}]]></description>
     </item>`;
     })
     .join("\n");
@@ -252,8 +304,8 @@ export function createRssRoutes(
     const baseUrl = new URL(c.req.url).origin;
     const xml = renderRss(
       {
-        title: "All",
-        description: "All items in On The Beach",
+        title: "On the Beach — All",
+        description: "All items in On the Beach",
       },
       items,
       baseUrl,
@@ -269,8 +321,8 @@ export function createRssRoutes(
     const baseUrl = new URL(c.req.url).origin;
     const xml = renderRss(
       {
-        title: "To Listen",
-        description: 'Items with status "To Listen" in On The Beach',
+        title: "On the Beach — To Listen",
+        description: 'Items with status "To Listen" in On the Beach',
       },
       items,
       baseUrl,
@@ -286,8 +338,8 @@ export function createRssRoutes(
     const baseUrl = new URL(c.req.url).origin;
     const xml = renderRss(
       {
-        title: "Listened",
-        description: 'Items with status "Listened" in On The Beach',
+        title: "On the Beach — Listened",
+        description: 'Items with status "Listened" in On the Beach',
       },
       items,
       baseUrl,
@@ -315,8 +367,8 @@ export function createRssRoutes(
     const baseUrl = new URL(c.req.url).origin;
     const xml = renderRss(
       {
-        title: stack.name,
-        description: `Items in the ${stack.name} stack`,
+        title: `On the Beach — ${stack.name}`,
+        description: `Items in the ${stack.name} stack on On the Beach`,
       },
       items,
       baseUrl,

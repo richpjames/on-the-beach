@@ -72,7 +72,7 @@ describe("GET /feed/:filter.rss", () => {
     const res = await app.request("http://localhost/feed/to-listen.rss");
     const body = await res.text();
 
-    expect(body).toContain("<title>To Listen</title>");
+    expect(body).toContain("<title>On the Beach — To Listen</title>");
     expect(fetchPrimaryFeedItems).toHaveBeenCalledWith("to-listen");
   });
 
@@ -85,7 +85,7 @@ describe("GET /feed/:filter.rss", () => {
     const res = await app.request("http://localhost/feed/listened.rss");
     const body = await res.text();
 
-    expect(body).toContain("<title>Listened</title>");
+    expect(body).toContain("<title>On the Beach — Listened</title>");
     expect(fetchPrimaryFeedItems).toHaveBeenCalledWith("listened");
   });
 
@@ -150,7 +150,7 @@ describe("GET /feed/stacks/:stackId.rss", () => {
     const res = await app.request("http://localhost/feed/stacks/5.rss");
     const body = await res.text();
 
-    expect(body).toContain("<title>Jazz</title>");
+    expect(body).toContain("<title>On the Beach — Jazz</title>");
   });
 
   test("returns valid RSS envelope", async () => {
@@ -255,6 +255,51 @@ describe("GET /feed/stacks/:stackId.rss", () => {
 
     expect(body).not.toContain("<item>");
     expect(body).toContain("<channel>");
+  });
+
+  test("item description includes genre, year, source and notes when available", async () => {
+    const fetchStack = mock(async (_id: number) => ({ id: 1, name: "Ambient" }));
+    const fetchItems = mock(async (_id: number) => [
+      makeItem({
+        item_type: "album",
+        year: 1995,
+        genre: "Electronic",
+        country: "UK",
+        label: "Warp Records",
+        catalogue_number: "WARPCD30",
+        primary_source: "bandcamp",
+        primary_url: "https://warp.bandcamp.com/album/tri-repetae",
+        notes: "Seminal album",
+        rating: 4,
+      }),
+    ]);
+    const fetchPrimaryFeedItems = mock(async (_feed: PrimaryFeedKey) => []);
+    const app = makeApp(fetchStack, fetchItems, fetchPrimaryFeedItems);
+
+    const res = await app.request("http://localhost/feed/stacks/1.rss");
+    const body = await res.text();
+
+    expect(body).toContain("Album · 1995 · Electronic · UK");
+    expect(body).toContain("Warp Records · WARPCD30");
+    expect(body).toContain("Source: Bandcamp");
+    expect(body).toContain("★★★★☆");
+    expect(body).toContain("Seminal album");
+  });
+
+  test("item description omits missing fields gracefully", async () => {
+    const fetchStack = mock(async (_id: number) => ({ id: 1, name: "Ambient" }));
+    const fetchItems = mock(async (_id: number) => [
+      makeItem({ genre: null, year: null, label: null, notes: null, rating: null }),
+    ]);
+    const fetchPrimaryFeedItems = mock(async (_feed: PrimaryFeedKey) => []);
+    const app = makeApp(fetchStack, fetchItems, fetchPrimaryFeedItems);
+
+    const res = await app.request("http://localhost/feed/stacks/1.rss");
+    const body = await res.text();
+
+    expect(body).toContain("<description>");
+    expect(body).not.toContain("Notes:");
+    expect(body).not.toContain("Rating:");
   });
 
   test("passes the correct stack ID to both fetch functions", async () => {
