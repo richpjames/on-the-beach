@@ -52,6 +52,7 @@ export type AddFormEvent =
       pendingValues: AddFormValuesInput;
     }
   | { type: "CANDIDATE_TOGGLED"; candidateId: string }
+  | { type: "ALL_CANDIDATES_SELECTED" }
   | { type: "CANDIDATE_SUBMITTED" }
   | { type: "LINK_PICKER_CANCELLED" }
   | { type: "ENTER_MANUALLY" }
@@ -289,6 +290,16 @@ export const addFormMachine = setup({
               },
             };
           }),
+        },
+        ALL_CANDIDATES_SELECTED: {
+          actions: assign(({ context }) => ({
+            linkPicker: context.linkPicker
+              ? {
+                  ...context.linkPicker,
+                  selectedCandidateIds: context.linkPicker.candidates.map((c) => c.candidateId),
+                }
+              : null,
+          })),
         },
         CANDIDATE_SUBMITTED: {
           guard: ({ context }) => (context.linkPicker?.selectedCandidateIds.length ?? 0) > 0,
