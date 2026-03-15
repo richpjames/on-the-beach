@@ -400,9 +400,9 @@ function renderMainPage(opts: {
           aria-labelledby="link-picker-title"
         >
           <div class="link-picker__header">
-            <h2 id="link-picker-title">Pick a release</h2>
+            <h2 id="link-picker-title">Pick releases</h2>
             <p id="link-picker-message">
-              This link mentions several releases. Choose one to add.
+              This link mentions several releases. Pick one or more to add.
             </p>
             <p id="link-picker-url" class="link-picker__url"></p>
           </div>

@@ -359,7 +359,7 @@ async function resolveReleaseCandidates(
   throw new AmbiguousLinkSelectionError({
     kind: "ambiguous_link",
     url: parsed.normalizedUrl,
-    message: "This link mentions several releases. Pick one to add.",
+    message: "This link mentions several releases. Pick one or more to add.",
     candidates: extractedCandidates.map(toReleaseCandidate),
   });
 }
