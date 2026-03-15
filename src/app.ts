@@ -334,16 +334,22 @@ function setupLinkPicker(): void {
   const submit = document.getElementById("link-picker-submit");
   const manual = document.getElementById("link-picker-manual");
   const cancel = document.getElementById("link-picker-cancel");
+  const selectAll = document.getElementById("link-picker-select-all");
 
   if (
     !(modal instanceof HTMLElement) ||
     !(list instanceof HTMLElement) ||
     !(submit instanceof HTMLButtonElement) ||
     !(manual instanceof HTMLButtonElement) ||
-    !(cancel instanceof HTMLButtonElement)
+    !(cancel instanceof HTMLButtonElement) ||
+    !(selectAll instanceof HTMLButtonElement)
   ) {
     return;
   }
+
+  selectAll.addEventListener("click", () => {
+    addFormActor.send({ type: "ALL_CANDIDATES_SELECTED" });
+  });
 
   list.addEventListener("click", (event) => {
     const target = (event.target as HTMLElement).closest(
