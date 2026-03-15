@@ -908,6 +908,36 @@ describe("searchAppleMusic", () => {
     expect(result).toBe("https://music.apple.com/track/999");
     mock.restore();
   });
+
+  test("strips uo and i query params from iTunes API URLs", async () => {
+    spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      mockItunesResponse([
+        {
+          collectionName: "Blue Lines",
+          artistName: "Massive Attack",
+          collectionViewUrl: "https://music.apple.com/gb/album/blue-lines/123?uo=4",
+        },
+      ]),
+    );
+    const result = await searchAppleMusic("Blue Lines", "Massive Attack");
+    expect(result).toBe("https://music.apple.com/gb/album/blue-lines/123");
+    mock.restore();
+  });
+
+  test("strips track-specific ?i= param from trackViewUrl", async () => {
+    spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      mockItunesResponse([
+        {
+          trackName: "A Song",
+          artistName: "Artist",
+          trackViewUrl: "https://music.apple.com/us/album/name/456?i=789&uo=4",
+        },
+      ]),
+    );
+    const result = await searchAppleMusic("A Song", "Artist");
+    expect(result).toBe("https://music.apple.com/us/album/name/456");
+    mock.restore();
+  });
 });
 
 describe("parseNtsOg", () => {

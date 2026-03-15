@@ -1067,7 +1067,15 @@ export async function searchAppleMusic(
     }
 
     function resultUrl(result: Record<string, unknown>): string | undefined {
-      return firstDefined(getString(result.collectionViewUrl), getString(result.trackViewUrl));
+      const raw = firstDefined(getString(result.collectionViewUrl), getString(result.trackViewUrl));
+      if (!raw) return undefined;
+      try {
+        const u = new URL(raw);
+        u.search = "";
+        return u.toString();
+      } catch {
+        return raw;
+      }
     }
 
     // Pass 1: exact title + artist
