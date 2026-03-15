@@ -406,9 +406,11 @@ function renderMainPage(opts: {
             </p>
             <p id="link-picker-url" class="link-picker__url"></p>
           </div>
+          <div class="link-picker__list-header">
+            <button type="button" id="link-picker-select-all" class="btn btn--ghost">Select all</button>
+          </div>
           <div id="link-picker-list" class="link-picker__list"></div>
           <div class="link-picker__actions">
-            <button type="button" id="link-picker-select-all" class="btn btn--ghost">Select all</button>
             <button type="button" id="link-picker-cancel" class="btn btn--ghost">Cancel</button>
             <button type="button" id="link-picker-manual" class="btn btn--ghost">
               Enter manually

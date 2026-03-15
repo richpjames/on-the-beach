@@ -1819,6 +1819,11 @@ a:hover {
   color: var(--chrome-darker);
 }
 
+.link-picker__list-header {
+  display: flex;
+  justify-content: flex-end;
+}
+
 .link-picker__list {
   display: grid;
   gap: 8px;
