@@ -23,13 +23,13 @@ export interface AddFormContext {
   scanState: "idle" | "scanning";
   submitState: "idle" | "submitting" | "error";
   showSecondaryFields: boolean;
-  pendingValues: AddFormValuesInput | null;
+  pendingValues: AddFormValuesInput[] | null;
   createdItemId: number | null;
   linkPicker: {
     url: string;
     message: string;
     candidates: LinkReleaseCandidate[];
-    selectedCandidateId: string | null;
+    selectedCandidateIds: string[];
     pendingValues: AddFormValuesInput;
   } | null;
   pendingScanBase64: string | null;
@@ -51,7 +51,7 @@ export type AddFormEvent =
       candidates: LinkReleaseCandidate[];
       pendingValues: AddFormValuesInput;
     }
-  | { type: "CANDIDATE_SELECTED"; candidateId: string }
+  | { type: "CANDIDATE_TOGGLED"; candidateId: string }
   | { type: "CANDIDATE_SUBMITTED" }
   | { type: "LINK_PICKER_CANCELLED" }
   | { type: "ENTER_MANUALLY" }
@@ -87,51 +87,57 @@ export const addFormMachine = setup({
     ),
     submitItem: fromPromise<
       { itemId: number },
-      { api: ApiClient; values: AddFormValuesInput; selectedStackIds: number[] }
+      { api: ApiClient; valuesArray: AddFormValuesInput[]; selectedStackIds: number[] }
     >(async ({ input }) => {
-      const { api, values, selectedStackIds } = input;
+      const { api, valuesArray, selectedStackIds } = input;
+      let lastItemId = 0;
 
-      // Enrich with MusicBrainz (non-fatal)
-      let enrichedValues = { ...values };
-      let musicbrainzReleaseId: string | undefined;
-      let musicbrainzArtistId: string | undefined;
+      for (const values of valuesArray) {
+        // Enrich with MusicBrainz (non-fatal)
+        let enrichedValues = { ...values };
+        let musicbrainzReleaseId: string | undefined;
+        let musicbrainzArtistId: string | undefined;
 
-      if (values.artist.trim() && values.title.trim()) {
-        try {
-          const enrichment = await api.lookupRelease(
-            values.artist.trim(),
-            values.title.trim(),
-            values.year.trim() || undefined,
-          );
-          if (enrichment.year != null && !values.year.trim())
-            enrichedValues.year = String(enrichment.year);
-          if (enrichment.label && !values.label.trim()) enrichedValues.label = enrichment.label;
-          if (enrichment.country && !values.country.trim())
-            enrichedValues.country = enrichment.country;
-          if (enrichment.catalogueNumber && !values.catalogueNumber.trim())
-            enrichedValues.catalogueNumber = enrichment.catalogueNumber;
-          if (enrichment.artworkUrl && !values.artworkUrl.trim())
-            enrichedValues.artworkUrl = enrichment.artworkUrl;
-          if (enrichment.musicbrainzReleaseId)
-            musicbrainzReleaseId = enrichment.musicbrainzReleaseId;
-          if (enrichment.musicbrainzArtistId) musicbrainzArtistId = enrichment.musicbrainzArtistId;
-        } catch {
-          // non-fatal
+        if (values.artist.trim() && values.title.trim()) {
+          try {
+            const enrichment = await api.lookupRelease(
+              values.artist.trim(),
+              values.title.trim(),
+              values.year.trim() || undefined,
+            );
+            if (enrichment.year != null && !values.year.trim())
+              enrichedValues.year = String(enrichment.year);
+            if (enrichment.label && !values.label.trim()) enrichedValues.label = enrichment.label;
+            if (enrichment.country && !values.country.trim())
+              enrichedValues.country = enrichment.country;
+            if (enrichment.catalogueNumber && !values.catalogueNumber.trim())
+              enrichedValues.catalogueNumber = enrichment.catalogueNumber;
+            if (enrichment.artworkUrl && !values.artworkUrl.trim())
+              enrichedValues.artworkUrl = enrichment.artworkUrl;
+            if (enrichment.musicbrainzReleaseId)
+              musicbrainzReleaseId = enrichment.musicbrainzReleaseId;
+            if (enrichment.musicbrainzArtistId)
+              musicbrainzArtistId = enrichment.musicbrainzArtistId;
+          } catch {
+            // non-fatal
+          }
         }
+
+        const item = await api.createMusicItem({
+          ...buildCreateMusicItemInputFromValues(enrichedValues),
+          listenStatus: "to-listen",
+          musicbrainzReleaseId,
+          musicbrainzArtistId,
+        });
+
+        if (selectedStackIds.length > 0) {
+          await api.setItemStacks(item.id, selectedStackIds);
+        }
+
+        lastItemId = item.id;
       }
 
-      const item = await api.createMusicItem({
-        ...buildCreateMusicItemInputFromValues(enrichedValues),
-        listenStatus: "to-listen",
-        musicbrainzReleaseId,
-        musicbrainzArtistId,
-      });
-
-      if (selectedStackIds.length > 0) {
-        await api.setItemStacks(item.id, selectedStackIds);
-      }
-
-      return { itemId: item.id };
+      return { itemId: lastItemId };
     }),
   },
 }).createMachine({
@@ -224,7 +230,7 @@ export const addFormMachine = setup({
             // url is present — go to submitting
             target: "submitting",
             actions: assign(({ event }) => ({
-              pendingValues: event.pendingValues ?? null,
+              pendingValues: event.pendingValues ? [event.pendingValues] : null,
               submitState: "submitting" as const,
             })),
           },
@@ -236,7 +242,7 @@ export const addFormMachine = setup({
               url: event.url,
               message: event.message,
               candidates: event.candidates,
-              selectedCandidateId: null,
+              selectedCandidateIds: [],
               pendingValues: event.pendingValues,
             },
           })),
@@ -249,7 +255,7 @@ export const addFormMachine = setup({
           guard: ({ event }) => event.pendingValues != null,
           target: "submitting",
           actions: assign(({ event }) => ({
-            pendingValues: event.pendingValues,
+            pendingValues: event.pendingValues ? [event.pendingValues] : null,
             submitState: "submitting" as const,
           })),
         },
@@ -260,7 +266,7 @@ export const addFormMachine = setup({
               url: event.url,
               message: event.message,
               candidates: event.candidates,
-              selectedCandidateId: null,
+              selectedCandidateIds: [],
               pendingValues: event.pendingValues,
             },
           })),
@@ -269,30 +275,39 @@ export const addFormMachine = setup({
     },
     linkPickerOpen: {
       on: {
-        CANDIDATE_SELECTED: {
-          actions: assign(({ context, event }) => ({
-            linkPicker: context.linkPicker
-              ? { ...context.linkPicker, selectedCandidateId: event.candidateId }
-              : null,
-          })),
+        CANDIDATE_TOGGLED: {
+          actions: assign(({ context, event }) => {
+            if (!context.linkPicker) return {};
+            const ids = context.linkPicker.selectedCandidateIds;
+            const isSelected = ids.includes(event.candidateId);
+            return {
+              linkPicker: {
+                ...context.linkPicker,
+                selectedCandidateIds: isSelected
+                  ? ids.filter((id) => id !== event.candidateId)
+                  : [...ids, event.candidateId],
+              },
+            };
+          }),
         },
         CANDIDATE_SUBMITTED: {
-          guard: ({ context }) => context.linkPicker?.selectedCandidateId != null,
+          guard: ({ context }) => (context.linkPicker?.selectedCandidateIds.length ?? 0) > 0,
           target: "submitting",
           actions: assign(({ context }) => {
-            const candidate = context.linkPicker!.candidates.find(
-              (c) => c.candidateId === context.linkPicker!.selectedCandidateId,
-            );
-            const base = context.linkPicker!.pendingValues;
+            const { selectedCandidateIds, candidates, pendingValues: base } = context.linkPicker!;
+            const selectedCandidates = selectedCandidateIds
+              .map((id) => candidates.find((c) => c.candidateId === id))
+              .filter((c): c is LinkReleaseCandidate => c != null);
             return {
-              pendingValues: candidate
-                ? {
-                    ...base,
-                    artist: candidate.artist ?? base.artist,
-                    title: candidate.title || base.title,
-                    itemType: candidate.itemType ?? base.itemType,
-                  }
-                : base,
+              pendingValues:
+                selectedCandidates.length > 0
+                  ? selectedCandidates.map((candidate) => ({
+                      ...base,
+                      artist: candidate.artist ?? base.artist,
+                      title: candidate.title || base.title,
+                      itemType: candidate.itemType ?? base.itemType,
+                    }))
+                  : [base],
               submitState: "submitting" as const,
               linkPicker: null,
             };
@@ -364,7 +379,7 @@ export const addFormMachine = setup({
         src: "submitItem",
         input: ({ context }) => ({
           api: context.api,
-          values: context.pendingValues!,
+          valuesArray: context.pendingValues!,
           selectedStackIds: context.selectedStackIds,
         }),
         onDone: {
@@ -387,8 +402,8 @@ export const addFormMachine = setup({
                 url: (event.error as AmbiguousLinkApiError).payload.url,
                 message: (event.error as AmbiguousLinkApiError).payload.message,
                 candidates: (event.error as AmbiguousLinkApiError).payload.candidates,
-                selectedCandidateId: null,
-                pendingValues: context.pendingValues!,
+                selectedCandidateIds: [],
+                pendingValues: context.pendingValues![0],
               },
             })),
           },

@@ -127,7 +127,7 @@ describe("add form machine — secondary fields and link picker", () => {
     const ctx = actor.getSnapshot().context;
     expect(actor.getSnapshot().value).toBe("linkPickerOpen");
     expect(ctx.linkPicker?.candidates).toHaveLength(1);
-    expect(ctx.linkPicker?.selectedCandidateId).toBeNull();
+    expect(ctx.linkPicker?.selectedCandidateIds).toEqual([]);
   });
 
   it("selects a link picker candidate", () => {
@@ -152,8 +152,8 @@ describe("add form machine — secondary fields and link picker", () => {
       candidates: [{ candidateId: "a", title: "Release A", artist: "Artist", itemType: "album" }],
       pendingValues,
     });
-    actor.send({ type: "CANDIDATE_SELECTED", candidateId: "a" });
-    expect(actor.getSnapshot().context.linkPicker?.selectedCandidateId).toBe("a");
+    actor.send({ type: "CANDIDATE_TOGGLED", candidateId: "a" });
+    expect(actor.getSnapshot().context.linkPicker?.selectedCandidateIds).toEqual(["a"]);
   });
 
   it("cancels link picker and returns to idle", () => {
@@ -379,7 +379,7 @@ describe("add form machine — async submit flow", () => {
     await waitFor(actor, (snapshot) => snapshot.value !== "submitting", { timeout: 5000 });
     expect(actor.getSnapshot().value).toBe("linkPickerOpen");
 
-    actor.send({ type: "CANDIDATE_SELECTED", candidateId: "a" });
+    actor.send({ type: "CANDIDATE_TOGGLED", candidateId: "a" });
     actor.send({ type: "CANDIDATE_SUBMITTED" });
     expect(actor.getSnapshot().value).toBe("submitting");
 
