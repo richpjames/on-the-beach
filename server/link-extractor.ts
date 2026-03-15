@@ -1,5 +1,6 @@
 import { Mistral } from "@mistralai/mistralai";
 import type { ItemType, LinkReleaseCandidate } from "../src/types";
+import { decodeHtmlEntities } from "./scraper";
 
 const DEFAULT_LINK_MODEL = "mistral-small-latest";
 const MAX_AI_TEXT_CHARS = 20_000;
@@ -78,7 +79,7 @@ function normalizeNullableString(value: unknown): string | undefined {
     return undefined;
   }
 
-  return trimmed;
+  return decodeHtmlEntities(trimmed);
 }
 
 function normalizeItemType(value: unknown): ItemType | undefined {
