@@ -229,11 +229,11 @@ export function renderStackDropdownContent(
 
 export function renderAmbiguousLinkCandidates(
   candidates: LinkReleaseCandidate[],
-  selectedCandidateId: string | null,
+  selectedCandidateIds: string[],
 ): string {
   return candidates
     .map((candidate) => {
-      const isSelected = candidate.candidateId === selectedCandidateId;
+      const isSelected = selectedCandidateIds.includes(candidate.candidateId);
       return `
         <button
           type="button"

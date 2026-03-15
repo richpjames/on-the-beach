@@ -351,21 +351,19 @@ function setupLinkPicker(): void {
     ) as HTMLElement | null;
     if (!target) return;
     addFormActor.send({
-      type: "CANDIDATE_SELECTED",
+      type: "CANDIDATE_TOGGLED",
       candidateId: target.dataset.candidateId ?? "",
     });
   });
 
   submit.addEventListener("click", () => {
-    const lp = formCtx().linkPicker;
-    const candidate = lp?.candidates.find((c) => c.candidateId === lp?.selectedCandidateId);
-    if (candidate) populateAddFormFromCandidate(candidate);
     addFormActor.send({ type: "CANDIDATE_SUBMITTED" });
   });
 
   manual.addEventListener("click", () => {
     const lp = formCtx().linkPicker;
-    const candidate = lp?.candidates.find((c) => c.candidateId === lp?.selectedCandidateId);
+    const firstId = lp?.selectedCandidateIds[0];
+    const candidate = firstId ? lp?.candidates.find((c) => c.candidateId === firstId) : undefined;
     if (candidate) populateAddFormFromCandidate(candidate);
     addFormActor.send({ type: "ENTER_MANUALLY" });
     const form = document.getElementById("add-form") as HTMLFormElement | null;
@@ -394,7 +392,7 @@ function renderLinkPickerFromContext(linkPicker: {
   url: string;
   message: string;
   candidates: LinkReleaseCandidate[];
-  selectedCandidateId: string | null;
+  selectedCandidateIds: string[];
   pendingValues: AddFormValuesInput;
 }): void {
   const modal = document.getElementById("link-picker-modal");
@@ -417,9 +415,9 @@ function renderLinkPickerFromContext(linkPicker: {
   message.textContent = linkPicker.message;
   list.innerHTML = renderAmbiguousLinkCandidates(
     linkPicker.candidates,
-    linkPicker.selectedCandidateId,
+    linkPicker.selectedCandidateIds,
   );
-  submit.disabled = !linkPicker.selectedCandidateId;
+  submit.disabled = linkPicker.selectedCandidateIds.length === 0;
 }
 
 function populateAddFormFromCandidate(candidate: LinkReleaseCandidate): void {
