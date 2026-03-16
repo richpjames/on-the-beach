@@ -269,6 +269,14 @@
     </main>
     <footer class="footer">
       <span id="app-version"></span>
+      <div id="now-playing-bar" class="now-playing-bar" hidden>
+        <span class="now-playing-bar__icon" aria-hidden="true">♫</span>
+        <button id="now-playing-reopen" class="now-playing-bar__info" title="Show player">
+          <span id="now-playing-title" class="now-playing-bar__title"></span>
+          <span id="now-playing-artist" class="now-playing-bar__artist"></span>
+        </button>
+        <button id="now-playing-stop" class="now-playing-bar__stop" aria-label="Stop playback" title="Stop">✕</button>
+      </div>
     </footer>
 
     <div id="add-loading-overlay" class="add-loading-overlay" aria-hidden="true">
@@ -314,6 +322,20 @@
         </div>
       </div>
     </div>
+
+    <div id="release-modal" class="release-modal" hidden>
+      <div class="release-modal__overlay"></div>
+      <div class="release-modal__window">
+        <div class="release-modal__titlebar">
+          <span class="release-modal__titlebar-icon" aria-hidden="true">💿</span>
+          <span id="release-modal-title" class="release-modal__title"></span>
+          <button id="release-modal-close" class="release-modal__winbtn release-modal__winbtn--close" aria-label="Close">✕</button>
+        </div>
+        <div id="release-modal-body" class="release-modal__body"></div>
+      </div>
+    </div>
+
+    <div id="now-playing-player" aria-hidden="true"></div>
 
     <script type="module" src="/src/main.ts"></script>
   </body>

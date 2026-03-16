@@ -2366,3 +2366,237 @@ body::after {
   display: flex;
   justify-content: flex-end;
 }
+
+/* ═══════════════════════════════════════════════════
+   NOW-PLAYING BAR — Persistent music status in footer
+═══════════════════════════════════════════════════ */
+
+.now-playing-bar {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex: 1;
+  min-width: 0;
+  border-left: 1px solid var(--chrome-dark);
+  padding-left: 8px;
+  margin-left: 4px;
+}
+
+.now-playing-bar__icon {
+  font-size: 12px;
+  color: var(--led-green);
+  text-shadow:
+    0 0 4px var(--led-green),
+    0 0 2px var(--led-green);
+  flex-shrink: 0;
+  animation: now-playing-pulse 1.8s ease-in-out infinite;
+}
+
+@keyframes now-playing-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+.now-playing-bar__info {
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
+  flex: 1;
+  min-width: 0;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 1px 4px;
+  text-align: left;
+}
+
+.now-playing-bar__info:hover {
+  background: var(--chrome-dark);
+  color: var(--chrome-white);
+}
+
+.now-playing-bar__title {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--chrome-black);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 150px;
+}
+
+.now-playing-bar__info:hover .now-playing-bar__title,
+.now-playing-bar__info:hover .now-playing-bar__artist {
+  color: var(--chrome-white);
+}
+
+.now-playing-bar__artist {
+  font-family: "Tahoma", "MS Sans Serif", sans-serif;
+  font-size: 10px;
+  color: var(--chrome-darker);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 120px;
+}
+
+.now-playing-bar__stop {
+  background: var(--chrome);
+  border: 2px solid;
+  border-color: var(--chrome-white) var(--chrome-darker) var(--chrome-darker) var(--chrome-white);
+  color: var(--chrome-black);
+  font-size: 9px;
+  width: 14px;
+  height: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  cursor: pointer;
+  flex-shrink: 0;
+  line-height: 1;
+}
+
+.now-playing-bar__stop:active {
+  border-color: var(--chrome-darker) var(--chrome-white) var(--chrome-white) var(--chrome-darker);
+}
+
+/* ═══════════════════════════════════════════════════
+   RELEASE MODAL — Windows 98 Dialog for in-page playback
+═══════════════════════════════════════════════════ */
+
+.release-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 9000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--window-gutter);
+}
+
+.release-modal[hidden] {
+  display: none;
+}
+
+.release-modal__overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+}
+
+.release-modal__window {
+  position: relative;
+  width: 100%;
+  max-width: 560px;
+  background: var(--chrome);
+  border-width: 2px;
+  border-style: solid;
+  border-color: var(--chrome-white) var(--chrome-darker) var(--chrome-darker) var(--chrome-white);
+  box-shadow:
+    3px 3px 0 #000000,
+    5px 5px 0 rgba(0, 0, 0, 0.3);
+  display: flex;
+  flex-direction: column;
+  max-height: 85vh;
+}
+
+.release-modal__titlebar {
+  background: var(--title-bar);
+  padding: 3px 4px 3px 6px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  user-select: none;
+  flex-shrink: 0;
+}
+
+.release-modal__titlebar-icon {
+  font-size: 13px;
+  line-height: 1;
+}
+
+.release-modal__title {
+  color: #ffffff;
+  font-family: "Tahoma", "MS Sans Serif", sans-serif;
+  font-size: 11px;
+  font-weight: bold;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.release-modal__winbtn {
+  width: 16px;
+  height: 14px;
+  background: var(--chrome);
+  border: 2px solid;
+  border-color: var(--chrome-white) var(--chrome-darker) var(--chrome-darker) var(--chrome-white);
+  color: #000000;
+  font-size: 9px;
+  font-family: Tahoma, sans-serif;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.release-modal__winbtn:active {
+  border-color: var(--chrome-darker) var(--chrome-white) var(--chrome-white) var(--chrome-darker);
+}
+
+.release-modal__body {
+  padding: 8px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.release-modal__player {
+  width: 100%;
+}
+
+.release-modal__player:empty {
+  display: none;
+}
+
+.release-modal__artwork {
+  width: 100%;
+  max-height: 200px;
+  object-fit: contain;
+  display: block;
+}
+
+.release-modal__info {
+  padding: 4px 2px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.release-modal__release-title {
+  font-family: var(--font-mono);
+  font-size: 1rem;
+  color: var(--chrome-black);
+  font-weight: bold;
+}
+
+.release-modal__artist {
+  font-size: 0.9rem;
+  color: var(--chrome-darker);
+}
+
+.release-modal__full-page-link {
+  align-self: flex-start;
+  margin-top: 4px;
+  font-size: 11px;
+}
+
+#now-playing-player {
+  display: none;
+}
