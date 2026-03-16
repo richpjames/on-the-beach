@@ -338,7 +338,9 @@ function renderReleasePage(item: MusicItemFull, cssHref: string): string {
 
       function renderStackPicker() {
         const el = document.getElementById('stack-picker-list');
-        el.innerHTML = allStacks.map(s =>
+        const query = document.getElementById('new-stack-input').value.trim().toLowerCase();
+        const visible = query ? allStacks.filter(s => s.name.toLowerCase().includes(query)) : allStacks;
+        el.innerHTML = visible.map(s =>
           '<label class="stack-dropdown__item">' +
           '<input type="checkbox" class="stack-dropdown__checkbox" data-sid="' + s.id + '"' +
           (assignedIds.has(s.id) ? ' checked' : '') + '> ' +
@@ -367,6 +369,8 @@ function renderReleasePage(item: MusicItemFull, cssHref: string): string {
         const res = await fetch('/api/stacks');
         if (res.ok) { allStacks = sortStacks(await res.json()); renderStackChips(); renderStackPicker(); }
       }
+
+      document.getElementById('new-stack-input').addEventListener('input', renderStackPicker);
 
       document.getElementById('new-stack-input').addEventListener('keydown', async e => {
         if (e.key !== 'Enter') return;
