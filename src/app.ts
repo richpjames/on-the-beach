@@ -16,6 +16,9 @@ import {
 import { createActor } from "xstate";
 import { addFormMachine } from "./ui/state/add-form-machine";
 import { appMachine } from "./ui/state/app-machine";
+import type { NowPlaying } from "./ui/state/app-machine";
+import type { MusicItemFull } from "./types";
+import { escapeHtml } from "./ui/view/templates";
 import {
   renderAddFormStackChips,
   renderAmbiguousLinkCandidates,
@@ -61,6 +64,7 @@ let activeStackDropdownCleanup: ((skipOnClose?: boolean) => void) | null = null;
 let musicListSortable: Sortable | null = null;
 let musicListReorderMediaQuery: MediaQueryList | null = null;
 let isReordering = false;
+let nowPlayingIframe: HTMLIFrameElement | null = null;
 
 const handleMusicListReorderMediaChange = (): void => {
   syncMusicListReorderMode();
@@ -115,6 +119,8 @@ function initializeUI(hasServerData: boolean): void {
   setupMusicListReorder();
   setupCustomListScrollbar();
   setupCustomStackScrollbar();
+  setupReleaseModal();
+  setupNowPlayingBar();
 
   if (hasServerData) {
     syncStackFeedLinks();
@@ -159,6 +165,8 @@ function initializeUI(hasServerData: boolean): void {
       prevStackBarVersion = ctx.stackBarVersion;
       void renderStackBar();
     }
+
+    syncNowPlayingBar(ctx.nowPlaying);
   });
 }
 
@@ -920,6 +928,19 @@ function setupEventDelegation(): void {
 
   list.addEventListener("click", async (event) => {
     const target = event.target as HTMLElement;
+
+    // Intercept release page link clicks to open in-page modal
+    const releaseLink = target.closest('a[href^="/r/"]') as HTMLAnchorElement | null;
+    if (releaseLink) {
+      const match = releaseLink.getAttribute("href")?.match(/^\/r\/(\d+)$/);
+      if (match) {
+        event.preventDefault();
+        closeItemActionMenu();
+        void openReleaseModal(Number(match[1]));
+        return;
+      }
+    }
+
     const menuToggle = target.closest('[data-action="toggle-item-menu"]') as HTMLElement | null;
 
     if (menuToggle) {
@@ -1699,4 +1720,280 @@ async function openStackDropdown(options: StackDropdownOptions): Promise<void> {
       await options.onCreate(name);
     });
   }
+}
+
+// ── Release Modal & Now-Playing ──────────────────────────────────────────────
+
+function extractYouTubeVideoId(url: string): string | null {
+  try {
+    const parsed = new URL(url);
+    if (
+      parsed.hostname === "www.youtube.com" ||
+      parsed.hostname === "youtube.com" ||
+      parsed.hostname === "m.youtube.com"
+    ) {
+      return parsed.searchParams.get("v");
+    }
+    if (parsed.hostname === "youtu.be") {
+      return parsed.pathname.slice(1) || null;
+    }
+  } catch {
+    // invalid URL
+  }
+  return null;
+}
+
+function extractYouTubePlaylistId(url: string): string | null {
+  try {
+    const parsed = new URL(url);
+    if (
+      parsed.hostname === "www.youtube.com" ||
+      parsed.hostname === "youtube.com" ||
+      parsed.hostname === "m.youtube.com"
+    ) {
+      return parsed.searchParams.get("list");
+    }
+  } catch {
+    // invalid URL
+  }
+  return null;
+}
+
+function parseItemLinkMetadata(raw: string | null): Record<string, string> | null {
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw) as unknown;
+    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+      return parsed as Record<string, string>;
+    }
+  } catch {
+    // ignore
+  }
+  return null;
+}
+
+function buildEmbedInfo(
+  item: MusicItemFull,
+): { src: string; type: "youtube" | "bandcamp" | "mixcloud" } | null {
+  const url = item.primary_url;
+  if (!url) return null;
+
+  if (item.primary_source === "youtube") {
+    const videoId = extractYouTubeVideoId(url);
+    if (videoId && /^[\w-]+$/.test(videoId)) {
+      return {
+        src: `https://www.youtube-nocookie.com/embed/${videoId}`,
+        type: "youtube",
+      };
+    }
+    const playlistId = extractYouTubePlaylistId(url);
+    if (playlistId && /^[\w-]+$/.test(playlistId)) {
+      return {
+        src: `https://www.youtube-nocookie.com/embed/videoseries?list=${playlistId}`,
+        type: "youtube",
+      };
+    }
+  }
+
+  if (item.primary_source === "bandcamp" || url.includes("bandcamp.com")) {
+    const meta = parseItemLinkMetadata(item.primary_link_metadata);
+    const albumId = meta?.album_id;
+    if (albumId) {
+      const embedType = meta.item_type === "track" ? "track" : "album";
+      return {
+        src: `https://bandcamp.com/EmbeddedPlayer/${embedType}=${albumId}/size=large/bgcol=ffffff/linkcol=0687f5/artwork=none/transparent=true/`,
+        type: "bandcamp",
+      };
+    }
+  }
+
+  if (item.primary_source === "mixcloud") {
+    const meta = parseItemLinkMetadata(item.primary_link_metadata);
+    const mixcloudUrl = meta?.mixcloud_url;
+    if (mixcloudUrl) {
+      try {
+        const parsed = new URL(mixcloudUrl);
+        if (parsed.hostname.toLowerCase().endsWith("mixcloud.com")) {
+          return {
+            src: `https://www.mixcloud.com/widget/iframe/?hide_cover=1&feed=${encodeURIComponent(parsed.pathname)}`,
+            type: "mixcloud",
+          };
+        }
+      } catch {
+        // invalid URL
+      }
+    }
+  }
+
+  return null;
+}
+
+function buildReleaseIframe(
+  embedSrc: string,
+  embedType: "youtube" | "bandcamp" | "mixcloud",
+): HTMLIFrameElement {
+  const iframe = document.createElement("iframe");
+  iframe.src = embedSrc;
+  iframe.style.border = "0";
+  iframe.style.width = "100%";
+  iframe.title = `${embedType} player`;
+  if (embedType === "youtube") {
+    iframe.style.aspectRatio = "16/9";
+    iframe.allow =
+      "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture";
+    iframe.allowFullscreen = true;
+  } else if (embedType === "bandcamp") {
+    iframe.style.height = "300px";
+    iframe.setAttribute("seamless", "");
+  } else if (embedType === "mixcloud") {
+    iframe.style.height = "60px";
+    iframe.allow = "autoplay";
+  }
+  return iframe;
+}
+
+function setupReleaseModal(): void {
+  document.getElementById("release-modal-close")?.addEventListener("click", () => {
+    closeReleaseModal();
+  });
+
+  document.querySelector(".release-modal__overlay")?.addEventListener("click", () => {
+    closeReleaseModal();
+  });
+
+  document.addEventListener("keydown", (e) => {
+    const modal = document.getElementById("release-modal");
+    if (e.key === "Escape" && modal && !modal.hidden) {
+      closeReleaseModal();
+    }
+  });
+}
+
+async function openReleaseModal(itemId: number): Promise<void> {
+  const modal = document.getElementById("release-modal");
+  if (!modal) return;
+
+  const current = appCtx().nowPlaying;
+
+  // If reopening the same item that's already playing, just re-show the modal
+  if (current?.itemId === itemId && nowPlayingIframe) {
+    const playerContainer = document.getElementById("release-modal-player");
+    if (playerContainer && !playerContainer.contains(nowPlayingIframe)) {
+      playerContainer.appendChild(nowPlayingIframe);
+    }
+    modal.hidden = false;
+    return;
+  }
+
+  // Stop any existing playback before opening a new one
+  stopNowPlaying();
+
+  let item: MusicItemFull;
+  try {
+    const res = await fetch(`/api/music-items/${itemId}`);
+    if (!res.ok) return;
+    item = (await res.json()) as MusicItemFull;
+  } catch {
+    return;
+  }
+
+  const titleEl = document.getElementById("release-modal-title");
+  if (titleEl) titleEl.textContent = item.title;
+
+  const body = document.getElementById("release-modal-body");
+  if (!body) return;
+
+  const embed = buildEmbedInfo(item);
+
+  const safeArtworkUrl =
+    item.artwork_url && /^(https?:\/\/|\/uploads\/)/.test(item.artwork_url)
+      ? item.artwork_url
+      : null;
+
+  const artworkHtml =
+    !embed && safeArtworkUrl
+      ? `<img class="release-modal__artwork" src="${escapeHtml(safeArtworkUrl)}" alt="Artwork for ${escapeHtml(item.title)}" />`
+      : "";
+
+  body.innerHTML = `
+    <div id="release-modal-player" class="release-modal__player"></div>
+    ${artworkHtml}
+    <div class="release-modal__info">
+      <div class="release-modal__release-title">${escapeHtml(item.title)}</div>
+      ${item.artist_name ? `<div class="release-modal__artist">${escapeHtml(item.artist_name)}</div>` : ""}
+      <a href="/r/${item.id}" class="release-modal__full-page-link btn btn--ghost">Open full page ↗</a>
+    </div>
+  `;
+
+  if (embed) {
+    const iframe = buildReleaseIframe(embed.src, embed.type);
+    nowPlayingIframe = iframe;
+    document.getElementById("release-modal-player")?.appendChild(iframe);
+  }
+
+  appActor.send({
+    type: "PLAYBACK_STARTED",
+    nowPlaying: {
+      itemId: item.id,
+      title: item.title,
+      artist: item.artist_name ?? null,
+      embedSrc: embed?.src ?? null,
+      embedType: embed?.type ?? null,
+    },
+  });
+
+  modal.hidden = false;
+}
+
+function closeReleaseModal(): void {
+  const modal = document.getElementById("release-modal");
+  if (!modal) return;
+
+  modal.hidden = true;
+
+  // Move the iframe to the persistent container so music keeps playing
+  if (nowPlayingIframe) {
+    const persistentContainer = document.getElementById("now-playing-player");
+    if (persistentContainer) {
+      persistentContainer.appendChild(nowPlayingIframe);
+    }
+  }
+}
+
+function stopNowPlaying(): void {
+  if (nowPlayingIframe) {
+    nowPlayingIframe.remove();
+    nowPlayingIframe = null;
+  }
+  appActor.send({ type: "PLAYBACK_STOPPED" });
+}
+
+function setupNowPlayingBar(): void {
+  document.getElementById("now-playing-reopen")?.addEventListener("click", () => {
+    const nowPlaying = appCtx().nowPlaying;
+    if (nowPlaying) {
+      void openReleaseModal(nowPlaying.itemId);
+    }
+  });
+
+  document.getElementById("now-playing-stop")?.addEventListener("click", () => {
+    stopNowPlaying();
+  });
+}
+
+function syncNowPlayingBar(nowPlaying: NowPlaying | null): void {
+  const bar = document.getElementById("now-playing-bar");
+  if (!bar) return;
+
+  if (!nowPlaying) {
+    bar.hidden = true;
+    return;
+  }
+
+  bar.hidden = false;
+
+  const titleEl = document.getElementById("now-playing-title");
+  const artistEl = document.getElementById("now-playing-artist");
+  if (titleEl) titleEl.textContent = nowPlaying.title;
+  if (artistEl) artistEl.textContent = nowPlaying.artist ?? "";
 }

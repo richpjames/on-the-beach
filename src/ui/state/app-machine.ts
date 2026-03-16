@@ -1,6 +1,14 @@
 import { assign, createMachine } from "xstate";
 import type { ListenStatus, MusicItemSort, StackWithCount } from "../../types";
 
+export interface NowPlaying {
+  itemId: number;
+  title: string;
+  artist: string | null;
+  embedSrc: string | null;
+  embedType: "youtube" | "bandcamp" | "mixcloud" | null;
+}
+
 export interface AppContext {
   currentFilter: ListenStatus | "all";
   currentStack: number | null;
@@ -13,6 +21,7 @@ export interface AppContext {
   sortPanelOpen: boolean;
   listVersion: number;
   stackBarVersion: number;
+  nowPlaying: NowPlaying | null;
 }
 
 export type AppEvent =
@@ -28,7 +37,9 @@ export type AppEvent =
   | { type: "SEARCH_PANEL_TOGGLED" }
   | { type: "SORT_PANEL_TOGGLED" }
   | { type: "BROWSE_PANELS_CLOSED" }
-  | { type: "ITEM_CREATED" };
+  | { type: "ITEM_CREATED" }
+  | { type: "PLAYBACK_STARTED"; nowPlaying: NowPlaying }
+  | { type: "PLAYBACK_STOPPED" };
 
 export const appMachine = createMachine({
   types: {} as { context: AppContext; events: AppEvent },
@@ -44,6 +55,7 @@ export const appMachine = createMachine({
     sortPanelOpen: false,
     listVersion: 0,
     stackBarVersion: 0,
+    nowPlaying: null,
   },
   on: {
     APP_READY: {
@@ -119,6 +131,12 @@ export const appMachine = createMachine({
     },
     BROWSE_PANELS_CLOSED: {
       actions: assign({ searchPanelOpen: false, sortPanelOpen: false }),
+    },
+    PLAYBACK_STARTED: {
+      actions: assign(({ event }) => ({ nowPlaying: event.nowPlaying })),
+    },
+    PLAYBACK_STOPPED: {
+      actions: assign({ nowPlaying: null }),
     },
   },
 });
