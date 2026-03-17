@@ -402,7 +402,7 @@ describe("add form machine — scan flow", () => {
     expect(actor.getSnapshot().context.scanState).toBe("scanning");
   });
 
-  it("returns to idle with scan results on success", async () => {
+  it("returns to enteringManually with scan results on success from idle", async () => {
     const { waitFor } = await import("xstate");
     const api = makeMockApi({
       uploadReleaseImage: async () => ({ artworkUrl: "https://cdn.example.com/art.jpg" }),
@@ -414,8 +414,9 @@ describe("add form machine — scan flow", () => {
     await waitFor(actor, (s) => s.value !== "scanning", { timeout: 5000 });
 
     const ctx = actor.getSnapshot().context;
-    expect(actor.getSnapshot().value).toBe("idle");
+    expect(actor.getSnapshot().value).toBe("enteringManually");
     expect(ctx.scanState).toBe("idle");
+    expect(ctx.showSecondaryFields).toBe(true);
     expect(ctx.scanResult?.artist).toBe("Scanned Artist");
     expect(ctx.scanResult?.title).toBe("Scanned Title");
     expect(ctx.scanResult?.artworkUrl).toBe("https://cdn.example.com/art.jpg");
