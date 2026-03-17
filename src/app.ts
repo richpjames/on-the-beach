@@ -258,16 +258,19 @@ export function setupAddForm(): void {
 
     // Loading overlay
     const overlay = document.getElementById("add-loading-overlay");
-    const isSubmitting = ctx.submitState === "submitting";
-    overlay?.classList.toggle("is-visible", isSubmitting);
-    overlay?.setAttribute("aria-hidden", isSubmitting ? "false" : "true");
+    const showOverlay = ctx.submitState === "submitting" || ctx.scanState === "scanning";
+    overlay?.classList.toggle("is-visible", showOverlay);
+    overlay?.setAttribute("aria-hidden", showOverlay ? "false" : "true");
+    const statusEl = document.getElementById("add-loading-status");
+    if (statusEl) {
+      statusEl.textContent =
+        ctx.scanState === "scanning" ? "Scanning cover..." : "Adding to collection...";
+    }
 
     // Scan button
     const scanBtn = document.getElementById("add-form-scan-btn") as HTMLButtonElement | null;
     if (scanBtn) {
       scanBtn.disabled = ctx.scanState === "scanning";
-      scanBtn.classList.toggle("is-loading", ctx.scanState === "scanning");
-      scanBtn.textContent = ctx.scanState === "scanning" ? "Scanning..." : "Scan";
     }
 
     // Scan results — populate form fields when available
