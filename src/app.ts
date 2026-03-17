@@ -22,9 +22,7 @@ import {
 import { createActor } from "xstate";
 import { addFormMachine } from "./ui/state/add-form-machine";
 import { appMachine } from "./ui/state/app-machine";
-import type { NowPlaying } from "./ui/state/app-machine";
 import {
-  escapeHtml,
   renderAddFormStackChips,
   renderAmbiguousLinkCandidates,
   renderMusicList,
@@ -124,8 +122,7 @@ function initializeUI(hasServerData: boolean): void {
   setupMusicListReorder();
   setupCustomListScrollbar();
   setupCustomStackScrollbar();
-  setupReleaseModal();
-  setupNowPlayingBar();
+  setupNowPlayingPanel();
 
   if (hasServerData) {
     syncStackFeedLinks();
@@ -170,8 +167,6 @@ function initializeUI(hasServerData: boolean): void {
       prevStackBarVersion = ctx.stackBarVersion;
       void renderStackBar();
     }
-
-    syncNowPlayingBar(ctx.nowPlaying);
   });
 }
 
@@ -941,7 +936,7 @@ function setupEventDelegation(): void {
       if (match) {
         event.preventDefault();
         closeItemActionMenu();
-        void openReleaseModal(Number(match[1]));
+        void openNowPlayingPanel(Number(match[1]));
         return;
       }
     }
@@ -1857,40 +1852,29 @@ function buildReleaseIframe(
   return iframe;
 }
 
-function setupReleaseModal(): void {
-  document.getElementById("release-modal-close")?.addEventListener("click", () => {
-    closeReleaseModal();
+function setupNowPlayingPanel(): void {
+  document.getElementById("now-playing-toggle")?.addEventListener("click", () => {
+    const panel = document.getElementById("now-playing-panel");
+    if (!panel) return;
+    panel.classList.toggle("now-playing-panel--expanded");
   });
 
-  document.querySelector(".release-modal__overlay")?.addEventListener("click", () => {
-    closeReleaseModal();
-  });
-
-  document.addEventListener("keydown", (e) => {
-    const modal = document.getElementById("release-modal");
-    if (e.key === "Escape" && modal && !modal.hidden) {
-      closeReleaseModal();
-    }
+  document.getElementById("now-playing-stop")?.addEventListener("click", () => {
+    stopNowPlaying();
   });
 }
 
-async function openReleaseModal(itemId: number): Promise<void> {
-  const modal = document.getElementById("release-modal");
-  if (!modal) return;
+async function openNowPlayingPanel(itemId: number): Promise<void> {
+  const panel = document.getElementById("now-playing-panel");
+  if (!panel) return;
 
-  const current = appCtx().nowPlaying;
-
-  // If reopening the same item that's already playing, just re-show the modal
-  if (current?.itemId === itemId && nowPlayingIframe) {
-    const playerContainer = document.getElementById("release-modal-player");
-    if (playerContainer && !playerContainer.contains(nowPlayingIframe)) {
-      playerContainer.appendChild(nowPlayingIframe);
-    }
-    modal.hidden = false;
+  // Already playing this item — just expand the panel
+  if (appCtx().nowPlaying?.itemId === itemId && nowPlayingIframe) {
+    panel.hidden = false;
+    panel.classList.add("now-playing-panel--expanded");
     return;
   }
 
-  // Stop any existing playback before opening a new one
   stopNowPlaying();
 
   let item: MusicItemFull;
@@ -1902,39 +1886,27 @@ async function openReleaseModal(itemId: number): Promise<void> {
     return;
   }
 
-  const titleEl = document.getElementById("release-modal-title");
-  if (titleEl) titleEl.textContent = item.title;
-
-  const body = document.getElementById("release-modal-body");
-  if (!body) return;
-
   const embed = buildEmbedInfo(item);
 
-  const safeArtworkUrl =
-    item.artwork_url && /^(https?:\/\/|\/uploads\/)/.test(item.artwork_url)
-      ? item.artwork_url
-      : null;
-
-  const artworkHtml =
-    !embed && safeArtworkUrl
-      ? `<img class="release-modal__artwork" src="${escapeHtml(safeArtworkUrl)}" alt="Artwork for ${escapeHtml(item.title)}" />`
-      : "";
-
-  body.innerHTML = `
-    <div id="release-modal-player" class="release-modal__player"></div>
-    ${artworkHtml}
-    <div class="release-modal__info">
-      <div class="release-modal__release-title">${escapeHtml(item.title)}</div>
-      ${item.artist_name ? `<div class="release-modal__artist">${escapeHtml(item.artist_name)}</div>` : ""}
-      <a href="/r/${item.id}" class="release-modal__full-page-link btn btn--ghost">Open full page ↗</a>
-    </div>
-  `;
-
-  if (embed) {
-    const iframe = buildReleaseIframe(embed.src, embed.type);
-    nowPlayingIframe = iframe;
-    document.getElementById("release-modal-player")?.appendChild(iframe);
+  // No embed available — navigate to the release page instead
+  if (!embed) {
+    window.location.href = `/r/${item.id}`;
+    return;
   }
+
+  const titleEl = document.getElementById("now-playing-title");
+  const artistEl = document.getElementById("now-playing-artist");
+  const detailsLink = document.getElementById("now-playing-details") as HTMLAnchorElement | null;
+  if (titleEl) titleEl.textContent = item.title;
+  if (artistEl) artistEl.textContent = item.artist_name ?? "";
+  if (detailsLink) detailsLink.href = `/r/${item.id}`;
+
+  const playerEl = document.getElementById("now-playing-player");
+  if (!playerEl) return;
+
+  const iframe = buildReleaseIframe(embed.src, embed.type);
+  nowPlayingIframe = iframe;
+  playerEl.appendChild(iframe);
 
   appActor.send({
     type: "PLAYBACK_STARTED",
@@ -1942,27 +1914,13 @@ async function openReleaseModal(itemId: number): Promise<void> {
       itemId: item.id,
       title: item.title,
       artist: item.artist_name ?? null,
-      embedSrc: embed?.src ?? null,
-      embedType: embed?.type ?? null,
+      embedSrc: embed.src,
+      embedType: embed.type,
     },
   });
 
-  modal.hidden = false;
-}
-
-function closeReleaseModal(): void {
-  const modal = document.getElementById("release-modal");
-  if (!modal) return;
-
-  modal.hidden = true;
-
-  // Move the iframe to the persistent container so music keeps playing
-  if (nowPlayingIframe) {
-    const persistentContainer = document.getElementById("now-playing-player");
-    if (persistentContainer) {
-      persistentContainer.appendChild(nowPlayingIframe);
-    }
-  }
+  panel.hidden = false;
+  panel.classList.add("now-playing-panel--expanded");
 }
 
 function stopNowPlaying(): void {
@@ -1971,34 +1929,9 @@ function stopNowPlaying(): void {
     nowPlayingIframe = null;
   }
   appActor.send({ type: "PLAYBACK_STOPPED" });
-}
-
-function setupNowPlayingBar(): void {
-  document.getElementById("now-playing-reopen")?.addEventListener("click", () => {
-    const nowPlaying = appCtx().nowPlaying;
-    if (nowPlaying) {
-      void openReleaseModal(nowPlaying.itemId);
-    }
-  });
-
-  document.getElementById("now-playing-stop")?.addEventListener("click", () => {
-    stopNowPlaying();
-  });
-}
-
-function syncNowPlayingBar(nowPlaying: NowPlaying | null): void {
-  const bar = document.getElementById("now-playing-bar");
-  if (!bar) return;
-
-  if (!nowPlaying) {
-    bar.hidden = true;
-    return;
+  const panel = document.getElementById("now-playing-panel");
+  if (panel) {
+    panel.hidden = true;
+    panel.classList.remove("now-playing-panel--expanded");
   }
-
-  bar.hidden = false;
-
-  const titleEl = document.getElementById("now-playing-title");
-  const artistEl = document.getElementById("now-playing-artist");
-  if (titleEl) titleEl.textContent = nowPlaying.title;
-  if (artistEl) artistEl.textContent = nowPlaying.artist ?? "";
 }

@@ -23,10 +23,10 @@ test("youtube link shows source badge and embed in player modal", async ({ page 
   const sourceBadgeLink = card.locator(`.badge--source[href="${youtubeUrl}"]`);
   await expect(sourceBadgeLink).toHaveText("youtube");
 
-  // Clicking the card link opens the in-page modal with the embed
+  // Clicking the card link opens the now-playing panel with the embed
   await card.locator("a.music-card__link").click();
-  await expect(page.locator("#release-modal")).toBeVisible({ timeout: 10_000 });
-  await expect(page.locator("#release-modal iframe")).toBeVisible({ timeout: 10_000 });
+  await expect(page.locator("#now-playing-panel")).toBeVisible({ timeout: 10_000 });
+  await expect(page.locator("#now-playing-panel iframe")).toBeVisible({ timeout: 10_000 });
 });
 
 test("mobile m.youtube.com link is normalised and embed shows", async ({ page }) => {
@@ -47,8 +47,8 @@ test("mobile m.youtube.com link is normalised and embed shows", async ({ page })
   await expect(card).toBeVisible();
   await expect(card.locator(".badge--source")).toHaveText("youtube");
 
-  // Clicking the card link opens the in-page modal with the embed
+  // Clicking the card link opens the now-playing panel with the embed
   await card.locator("a.music-card__link").click();
-  await expect(page.locator("#release-modal")).toBeVisible({ timeout: 10_000 });
-  await expect(page.locator("#release-modal iframe")).toBeVisible({ timeout: 10_000 });
+  await expect(page.locator("#now-playing-panel")).toBeVisible({ timeout: 10_000 });
+  await expect(page.locator("#now-playing-panel iframe")).toBeVisible({ timeout: 10_000 });
 });
