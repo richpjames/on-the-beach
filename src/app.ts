@@ -1,7 +1,13 @@
 import { ApiClient } from "./services/api-client";
 import Sortable from "sortablejs";
 import type { AddFormValues as AddFormValuesInput } from "./ui/domain/add-form";
-import type { LinkReleaseCandidate, ListenStatus, MusicItemSort, StackWithCount } from "./types";
+import type {
+  LinkReleaseCandidate,
+  ListenStatus,
+  MusicItemFull,
+  MusicItemSort,
+  StackWithCount,
+} from "./types";
 import { getCoverScanErrorMessage } from "./ui/domain/add-form";
 import { buildContextKey, buildMusicItemFilters } from "./ui/domain/music-list";
 import { constrainDimensions } from "./ui/domain/scan";
@@ -17,9 +23,8 @@ import { createActor } from "xstate";
 import { addFormMachine } from "./ui/state/add-form-machine";
 import { appMachine } from "./ui/state/app-machine";
 import type { NowPlaying } from "./ui/state/app-machine";
-import type { MusicItemFull } from "./types";
-import { escapeHtml } from "./ui/view/templates";
 import {
+  escapeHtml,
   renderAddFormStackChips,
   renderAmbiguousLinkCandidates,
   renderMusicList,
