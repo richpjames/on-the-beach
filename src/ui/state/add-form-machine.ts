@@ -353,12 +353,13 @@ export const addFormMachine = setup({
             })),
           },
           {
-            target: "idle",
+            target: "enteringManually",
             actions: assign(({ event }) => ({
               scanState: "idle" as const,
               scanResult: event.output,
               pendingScanBase64: null,
               scanError: null,
+              showSecondaryFields: true,
             })),
           },
         ],
