@@ -1,3 +1,4 @@
+import Case from "case";
 import type { LinkReleaseCandidate, MusicItemFull, StackWithCount } from "../../types";
 import { renderStarRatingControl } from "../components/star-rating";
 import type { FilterSelection } from "../domain/music-list";
@@ -62,8 +63,8 @@ export function renderMusicCard(item: MusicItemFull): string {
           ${
             item.primary_source
               ? item.primary_url
-                ? `<a href="${escapeHtml(item.primary_url)}" target="_blank" rel="noopener noreferrer" class="badge badge--source">${escapeHtml(item.primary_source)}</a>`
-                : `<span class="badge badge--source">${escapeHtml(item.primary_source)}</span>`
+                ? `<a href="${escapeHtml(item.primary_url)}" target="_blank" rel="noopener noreferrer" class="badge badge--source">${escapeHtml(Case.title(item.primary_source))}</a>`
+                : `<span class="badge badge--source">${escapeHtml(Case.title(item.primary_source))}</span>`
               : ""
           }
         </div>
