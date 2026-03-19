@@ -30,6 +30,7 @@
   },
   "dependencies": {
     "@mistralai/mistralai": "^1.14.1",
+    "case": "^1.6.3",
     "drizzle-orm": "^0.45.1",
     "hono": "^4.12.5",
     "mailparser": "^3.9.3",
