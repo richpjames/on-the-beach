@@ -21,7 +21,7 @@ test("youtube link shows source badge and embed in player modal", async ({ page 
   await expect(card).toBeVisible();
 
   const sourceBadgeLink = card.locator(`.badge--source[href="${youtubeUrl}"]`);
-  await expect(sourceBadgeLink).toHaveText("youtube");
+  await expect(sourceBadgeLink).toHaveText("Youtube");
 
   // Clicking the card link opens the in-page modal with the embed
   await card.locator("a.music-card__link").click();
@@ -45,7 +45,7 @@ test("mobile m.youtube.com link is normalised and embed shows", async ({ page })
 
   await expect(page.locator(".music-card")).toHaveCount(1, { timeout: 30_000 });
   await expect(card).toBeVisible();
-  await expect(card.locator(".badge--source")).toHaveText("youtube");
+  await expect(card.locator(".badge--source")).toHaveText("Youtube");
 
   // Clicking the card link opens the in-page modal with the embed
   await card.locator("a.music-card__link").click();
