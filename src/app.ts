@@ -1,13 +1,7 @@
 import { ApiClient } from "./services/api-client";
 import Sortable from "sortablejs";
 import type { AddFormValues as AddFormValuesInput } from "./ui/domain/add-form";
-import type {
-  LinkReleaseCandidate,
-  ListenStatus,
-  MusicItemFull,
-  MusicItemSort,
-  StackWithCount,
-} from "./types";
+import type { LinkReleaseCandidate, ListenStatus, MusicItemSort, StackWithCount } from "./types";
 import { getCoverScanErrorMessage } from "./ui/domain/add-form";
 import { buildContextKey, buildMusicItemFilters } from "./ui/domain/music-list";
 import { constrainDimensions } from "./ui/domain/scan";
@@ -67,7 +61,6 @@ let activeStackDropdownCleanup: ((skipOnClose?: boolean) => void) | null = null;
 let musicListSortable: Sortable | null = null;
 let musicListReorderMediaQuery: MediaQueryList | null = null;
 let isReordering = false;
-let nowPlayingIframe: HTMLIFrameElement | null = null;
 
 const handleMusicListReorderMediaChange = (): void => {
   syncMusicListReorderMode();
@@ -122,7 +115,6 @@ function initializeUI(hasServerData: boolean): void {
   setupMusicListReorder();
   setupCustomListScrollbar();
   setupCustomStackScrollbar();
-  setupNowPlayingPanel();
 
   if (hasServerData) {
     syncStackFeedLinks();
@@ -929,18 +921,6 @@ function setupEventDelegation(): void {
   list.addEventListener("click", async (event) => {
     const target = event.target as HTMLElement;
 
-    // Intercept release page link clicks to open in-page modal
-    const releaseLink = target.closest('a[href^="/r/"]') as HTMLAnchorElement | null;
-    if (releaseLink) {
-      const match = releaseLink.getAttribute("href")?.match(/^\/r\/(\d+)$/);
-      if (match) {
-        event.preventDefault();
-        closeItemActionMenu();
-        void openNowPlayingPanel(Number(match[1]));
-        return;
-      }
-    }
-
     const menuToggle = target.closest('[data-action="toggle-item-menu"]') as HTMLElement | null;
 
     if (menuToggle) {
@@ -1719,219 +1699,5 @@ async function openStackDropdown(options: StackDropdownOptions): Promise<void> {
 
       await options.onCreate(name);
     });
-  }
-}
-
-// ── Release Modal & Now-Playing ──────────────────────────────────────────────
-
-function extractYouTubeVideoId(url: string): string | null {
-  try {
-    const parsed = new URL(url);
-    if (
-      parsed.hostname === "www.youtube.com" ||
-      parsed.hostname === "youtube.com" ||
-      parsed.hostname === "m.youtube.com"
-    ) {
-      return parsed.searchParams.get("v");
-    }
-    if (parsed.hostname === "youtu.be") {
-      return parsed.pathname.slice(1) || null;
-    }
-  } catch {
-    // invalid URL
-  }
-  return null;
-}
-
-function extractYouTubePlaylistId(url: string): string | null {
-  try {
-    const parsed = new URL(url);
-    if (
-      parsed.hostname === "www.youtube.com" ||
-      parsed.hostname === "youtube.com" ||
-      parsed.hostname === "m.youtube.com"
-    ) {
-      return parsed.searchParams.get("list");
-    }
-  } catch {
-    // invalid URL
-  }
-  return null;
-}
-
-function parseItemLinkMetadata(raw: string | null): Record<string, string> | null {
-  if (!raw) return null;
-  try {
-    const parsed = JSON.parse(raw) as unknown;
-    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
-      return parsed as Record<string, string>;
-    }
-  } catch {
-    // ignore
-  }
-  return null;
-}
-
-function buildEmbedInfo(
-  item: MusicItemFull,
-): { src: string; type: "youtube" | "bandcamp" | "mixcloud" } | null {
-  const url = item.primary_url;
-  if (!url) return null;
-
-  if (item.primary_source === "youtube") {
-    const videoId = extractYouTubeVideoId(url);
-    if (videoId && /^[\w-]+$/.test(videoId)) {
-      return {
-        src: `https://www.youtube-nocookie.com/embed/${videoId}`,
-        type: "youtube",
-      };
-    }
-    const playlistId = extractYouTubePlaylistId(url);
-    if (playlistId && /^[\w-]+$/.test(playlistId)) {
-      return {
-        src: `https://www.youtube-nocookie.com/embed/videoseries?list=${playlistId}`,
-        type: "youtube",
-      };
-    }
-  }
-
-  if (item.primary_source === "bandcamp" || url.includes("bandcamp.com")) {
-    const meta = parseItemLinkMetadata(item.primary_link_metadata);
-    const albumId = meta?.album_id;
-    if (albumId) {
-      const embedType = meta.item_type === "track" ? "track" : "album";
-      return {
-        src: `https://bandcamp.com/EmbeddedPlayer/${embedType}=${albumId}/size=large/bgcol=ffffff/linkcol=0687f5/artwork=none/transparent=true/`,
-        type: "bandcamp",
-      };
-    }
-  }
-
-  if (item.primary_source === "mixcloud") {
-    const meta = parseItemLinkMetadata(item.primary_link_metadata);
-    const mixcloudUrl = meta?.mixcloud_url;
-    if (mixcloudUrl) {
-      try {
-        const parsed = new URL(mixcloudUrl);
-        if (parsed.hostname.toLowerCase().endsWith("mixcloud.com")) {
-          return {
-            src: `https://www.mixcloud.com/widget/iframe/?hide_cover=1&feed=${encodeURIComponent(parsed.pathname)}`,
-            type: "mixcloud",
-          };
-        }
-      } catch {
-        // invalid URL
-      }
-    }
-  }
-
-  return null;
-}
-
-function buildReleaseIframe(
-  embedSrc: string,
-  embedType: "youtube" | "bandcamp" | "mixcloud",
-): HTMLIFrameElement {
-  const iframe = document.createElement("iframe");
-  iframe.src = embedSrc;
-  iframe.style.border = "0";
-  iframe.style.width = "100%";
-  iframe.title = `${embedType} player`;
-  if (embedType === "youtube") {
-    iframe.style.aspectRatio = "16/9";
-    iframe.allow =
-      "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture";
-    iframe.allowFullscreen = true;
-  } else if (embedType === "bandcamp") {
-    iframe.style.height = "300px";
-    iframe.setAttribute("seamless", "");
-  } else if (embedType === "mixcloud") {
-    iframe.style.height = "60px";
-    iframe.allow = "autoplay";
-  }
-  return iframe;
-}
-
-function setupNowPlayingPanel(): void {
-  document.getElementById("now-playing-toggle")?.addEventListener("click", () => {
-    const panel = document.getElementById("now-playing-panel");
-    if (!panel) return;
-    panel.classList.toggle("now-playing-panel--expanded");
-  });
-
-  document.getElementById("now-playing-stop")?.addEventListener("click", () => {
-    stopNowPlaying();
-  });
-}
-
-async function openNowPlayingPanel(itemId: number): Promise<void> {
-  const panel = document.getElementById("now-playing-panel");
-  if (!panel) return;
-
-  // Already playing this item — just expand the panel
-  if (appCtx().nowPlaying?.itemId === itemId && nowPlayingIframe) {
-    panel.hidden = false;
-    panel.classList.add("now-playing-panel--expanded");
-    return;
-  }
-
-  stopNowPlaying();
-
-  let item: MusicItemFull;
-  try {
-    const res = await fetch(`/api/music-items/${itemId}`);
-    if (!res.ok) return;
-    item = (await res.json()) as MusicItemFull;
-  } catch {
-    return;
-  }
-
-  const embed = buildEmbedInfo(item);
-
-  // No embed available — navigate to the release page instead
-  if (!embed) {
-    window.location.href = `/r/${item.id}`;
-    return;
-  }
-
-  const titleEl = document.getElementById("now-playing-title");
-  const artistEl = document.getElementById("now-playing-artist");
-  const detailsLink = document.getElementById("now-playing-details") as HTMLAnchorElement | null;
-  if (titleEl) titleEl.textContent = item.title;
-  if (artistEl) artistEl.textContent = item.artist_name ?? "";
-  if (detailsLink) detailsLink.href = `/r/${item.id}`;
-
-  const playerEl = document.getElementById("now-playing-player");
-  if (!playerEl) return;
-
-  const iframe = buildReleaseIframe(embed.src, embed.type);
-  nowPlayingIframe = iframe;
-  playerEl.appendChild(iframe);
-
-  appActor.send({
-    type: "PLAYBACK_STARTED",
-    nowPlaying: {
-      itemId: item.id,
-      title: item.title,
-      artist: item.artist_name ?? null,
-      embedSrc: embed.src,
-      embedType: embed.type,
-    },
-  });
-
-  panel.hidden = false;
-  panel.classList.add("now-playing-panel--expanded");
-}
-
-function stopNowPlaying(): void {
-  if (nowPlayingIframe) {
-    nowPlayingIframe.remove();
-    nowPlayingIframe = null;
-  }
-  appActor.send({ type: "PLAYBACK_STOPPED" });
-  const panel = document.getElementById("now-playing-panel");
-  if (panel) {
-    panel.hidden = true;
-    panel.classList.remove("now-playing-panel--expanded");
   }
 }
