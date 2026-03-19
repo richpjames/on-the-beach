@@ -22,7 +22,7 @@ test("links with protocol https", async ({ page }) => {
   await expect(card).toBeVisible();
 
   const sourceBadgeLink = card.locator(`.badge--source[href="${bandcampUrl}"]`);
-  await expect(sourceBadgeLink).toHaveText("bandcamp");
+  await expect(sourceBadgeLink).toHaveText("Bandcamp");
   await expect(sourceBadgeLink).toHaveAttribute("href", bandcampUrl);
 });
 
@@ -49,7 +49,7 @@ test("links without https", async ({ page }) => {
   await expect(card.locator(".music-card__title")).toContainText(/paper masks/i);
 
   // Should show bandcamp as the source badge
-  await expect(card.locator(".badge--source")).toHaveText("bandcamp");
+  await expect(card.locator(".badge--source")).toHaveText("Bandcamp");
 
   // The source badge should link to the full URL with protocol
   await expect(card.locator(".badge--source")).toHaveAttribute("href", expectedNormalizedUrl);
