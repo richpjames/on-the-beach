@@ -147,7 +147,7 @@ function renderMainPage(opts: {
         </div>
       </header>
 
-      <main class="main">
+      <main id="main" class="main">
         <section class="add-section">
           <form id="add-form" class="add-form" method="post">
             <div class="add-form__primary">
@@ -446,6 +446,9 @@ function renderMainPage(opts: {
       </div>
 
       <div id="now-playing-player" aria-hidden="true"></div>
+
+      <!-- Persistent release-page view: populated by src/router.ts on SPA navigation -->
+      <div id="release-view" hidden></div>
 
       <div id="add-loading-overlay" class="add-loading-overlay" aria-hidden="true">
         <div
