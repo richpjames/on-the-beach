@@ -155,7 +155,7 @@ function renderMainPage(opts: {
                 type="text"
                 id="url-input"
                 name="url"
-                placeholder="Paste a music link..."
+                placeholder="search or paste a link"
                 class="input"
               />
               <input
@@ -164,14 +164,6 @@ function renderMainPage(opts: {
                 class="add-form__scan-input"
                 accept="image/*"
               />
-              <button
-                type="button"
-                id="add-form-scan-btn"
-                class="btn add-form__scan-btn"
-                aria-label="Scan release cover"
-              >
-                Scan
-              </button>
               <button type="submit" id="add-form-submit" class="btn btn--primary">Add</button>
             </div>
 
