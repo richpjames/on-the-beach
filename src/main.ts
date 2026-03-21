@@ -1,8 +1,10 @@
 import { initialize } from "./app";
+import { initRouter } from "./router";
 
 async function bootstrap() {
   try {
     await initialize();
+    initRouter();
     console.log("[App] Initialized successfully");
   } catch (error) {
     console.error("[App] Failed to initialize:", error);
