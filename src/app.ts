@@ -184,20 +184,11 @@ export function setupAddForm(): void {
     return;
   }
 
-  const scanButton = document.getElementById("add-form-scan-btn");
   const scanInput = document.getElementById("scan-file-input");
 
   submitButton.disabled = false;
 
-  if (scanButton instanceof HTMLButtonElement && scanInput instanceof HTMLInputElement) {
-    scanButton.addEventListener("click", () => {
-      if (formCtx().scanState === "scanning") {
-        return;
-      }
-
-      scanInput.click();
-    });
-
+  if (scanInput instanceof HTMLInputElement) {
     scanInput.addEventListener("change", async () => {
       const file = scanInput.files?.[0];
       if (!file) return;
@@ -227,12 +218,20 @@ export function setupAddForm(): void {
   form.addEventListener("submit", (event) => {
     event.preventDefault();
 
+    const urlInput = form.querySelector<HTMLInputElement>('input[name="url"]');
+    const url = urlInput?.value.trim() ?? "";
+
+    if (!url) {
+      if (formCtx().scanState !== "scanning" && scanInput instanceof HTMLInputElement) {
+        scanInput.click();
+      }
+      return;
+    }
+
     if (!appCtx().isReady) {
       alert("App is still loading. Please try again in a moment.");
       return;
     }
-    const urlInput = form.querySelector<HTMLInputElement>('input[name="url"]');
-    const url = urlInput?.value.trim() ?? "";
     addFormActor.send({
       type: "SUBMIT_CLICKED",
       url,
@@ -265,12 +264,6 @@ export function setupAddForm(): void {
     if (statusEl) {
       statusEl.textContent =
         ctx.scanState === "scanning" ? "Scanning cover..." : "Adding to collection...";
-    }
-
-    // Scan button
-    const scanBtn = document.getElementById("add-form-scan-btn") as HTMLButtonElement | null;
-    if (scanBtn) {
-      scanBtn.disabled = ctx.scanState === "scanning";
     }
 
     // Scan results — populate form fields when available
