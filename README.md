@@ -44,9 +44,6 @@ Open http://localhost:3000.
 | `MISTRAL_API_KEY`    | No       | —                    | Enables AI cover scanning and unsupported music-link extraction             |
 | `MISTRAL_LINK_MODEL` | No       | `mistral-small-latest` | Model for unsupported music-link extraction via chat completions.         |
 | `MISTRAL_SCAN_MODEL` | No       | `mistral-ocr-latest` | Model for cover scanning. Non-OCR models use chat-completions mode.         |
-| `SMTP_ENABLED`       | No       | `false`              | Set to `true` to start the embedded SMTP server                             |
-| `SMTP_PORT`          | No       | `2525`               | Port for the embedded SMTP server                                           |
-| `SMTP_ALLOWED_FROM`  | No       | (all)                | Comma-separated sender addresses to accept                                  |
 | `INGEST_API_KEY`     | No       | —                    | Secret token for the HTTP email ingest webhook. Required to enable it.      |
 | `INGEST_ENABLED`     | No       | `true`               | Set to `false` to disable the HTTP ingest endpoint without removing the key |
 
@@ -102,14 +99,6 @@ https://<owner>.github.io/<repo>/visual-reports/<pr-number>/
 The workflow uses `continue-on-error: true` so the report is always published even when screenshots differ, giving reviewers a chance to inspect the diff before deciding whether it is intentional.
 
 ## Email Ingest
-
-Music links can be ingested automatically from emails in two ways.
-
-### Embedded SMTP server
-
-Set `SMTP_ENABLED=true`. The server listens on `SMTP_PORT` (default 2525) and extracts music URLs from incoming email bodies to create items automatically.
-
-### HTTP webhook
 
 Set `INGEST_API_KEY` to a secret token, then point your email provider's webhook at:
 
