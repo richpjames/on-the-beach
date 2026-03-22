@@ -6,6 +6,15 @@ test.beforeEach(async ({ page, request }) => {
   await page.goto("/");
 });
 
+test("photo button is visible and triggers file input", async ({ page }) => {
+  const scanBtn = page.getByRole("button", { name: "Scan release cover" });
+  await expect(scanBtn).toBeVisible();
+  await expect(scanBtn).toHaveText("Photo");
+
+  const [fileChooser] = await Promise.all([page.waitForEvent("filechooser"), scanBtn.click()]);
+  expect(fileChooser).toBeTruthy();
+});
+
 test("scan prefill opens details and fills artist/release title", async ({ page }) => {
   await page.route("**/api/release/image", async (route) => {
     await route.fulfill({
