@@ -6,6 +6,10 @@
   padding: 0;
 }
 
+[hidden] {
+  display: none !important;
+}
+
 :root {
   /* Windows 98 Silver Chrome */
   --chrome: #c0c0c0;
