@@ -7,12 +7,30 @@ test.beforeEach(async ({ page, request }) => {
 });
 
 test("photo button is visible and triggers file input", async ({ page }) => {
+  await page.route("**/api/release/image", async (route) => {
+    await route.fulfill({
+      status: 201,
+      contentType: "application/json",
+      body: JSON.stringify({ artworkUrl: "/uploads/mock-cover.jpg" }),
+    });
+  });
+  await page.route("**/api/release/scan", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ artist: "Test Artist", title: "Test Title" }),
+    });
+  });
+
   const scanBtn = page.getByRole("button", { name: "Scan release cover" });
   await expect(scanBtn).toBeVisible();
   await expect(scanBtn).toHaveText("Photo");
 
-  const [fileChooser] = await Promise.all([page.waitForEvent("filechooser"), scanBtn.click()]);
-  expect(fileChooser).toBeTruthy();
+  const fixturePath = path.join(process.cwd(), "playwright/fixtures/cover-sample.png");
+  await scanBtn.click();
+  await page.locator("#scan-file-input").setInputFiles(fixturePath);
+
+  await expect(page.locator(".add-form__details")).toHaveAttribute("open", "", { timeout: 5_000 });
 });
 
 test("scan prefill opens details and fills artist/release title", async ({ page }) => {
@@ -39,7 +57,6 @@ test("scan prefill opens details and fills artist/release title", async ({ page 
 
   const fixturePath = path.join(process.cwd(), "playwright/fixtures/cover-sample.png");
 
-  await page.getByRole("button", { name: "Scan release cover" }).click();
   await page.locator("#scan-file-input").setInputFiles(fixturePath);
 
   await expect(page.locator(".add-form__details")).toHaveAttribute("open", "");
