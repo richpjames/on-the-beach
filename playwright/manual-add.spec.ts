@@ -27,11 +27,12 @@ test("can manually add a release without link or artwork", async ({ page }) => {
   const addButton = page.getByRole("button", { name: "Add" });
   await expect(addButton).toBeEnabled();
   await addButton.click(); // reveals artist/release fields
-  await addButton.click(); // submits with empty fields
+  await page.locator('input[name="title"]').fill("Manual Release");
+  await addButton.click(); // submits
 
   const card = page.locator(".music-card").first();
   await expect(card).toBeVisible({ timeout: 10_000 });
-  await expect(card.locator(".music-card__title")).toHaveText("Untitled");
+  await expect(card.locator(".music-card__title")).toHaveText("Manual Release");
   await expect(card.locator('a[title="Open link"]')).toHaveCount(0);
   await expect(card.locator('img[alt="No artwork available"]')).toBeVisible();
 });

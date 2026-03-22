@@ -253,7 +253,13 @@ export const addFormMachine = setup({
     enteringManually: {
       on: {
         SUBMIT_CLICKED: {
-          guard: ({ event }) => event.pendingValues != null,
+          guard: ({ event }) =>
+            event.pendingValues != null &&
+            !!(
+              event.url?.trim() ||
+              event.pendingValues.title?.trim() ||
+              event.pendingValues.artist?.trim()
+            ),
           target: "submitting",
           actions: assign(({ event }) => ({
             pendingValues: event.pendingValues ? [event.pendingValues] : null,
