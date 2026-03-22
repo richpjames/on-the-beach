@@ -30,7 +30,6 @@ test("scan prefill opens details and fills artist/release title", async ({ page 
 
   const fixturePath = path.join(process.cwd(), "playwright/fixtures/cover-sample.png");
 
-  await page.getByRole("button", { name: "Scan release cover" }).click();
   await page.locator("#scan-file-input").setInputFiles(fixturePath);
 
   await expect(page.locator(".add-form__details")).toHaveAttribute("open", "");

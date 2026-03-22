@@ -1,5 +1,27 @@
 import { defineConfig, devices } from "@playwright/test";
 import os from "node:os";
+import path from "node:path";
+import { existsSync } from "node:fs";
+
+// Resolve the locally-cached Chromium binary. CI may not have network access
+// to download the revision expected by the installed playwright-core version,
+// so we fall back to whatever headless-shell revision is already present.
+function resolveChromeExecutable(): string | undefined {
+  const cacheRoot = path.join(os.homedir(), ".cache", "ms-playwright");
+  const candidates = [
+    // headless shell variants (newest first preference)
+    path.join(
+      cacheRoot,
+      "chromium_headless_shell-1208",
+      "chrome-headless-shell-linux64",
+      "chrome-headless-shell",
+    ),
+    path.join(cacheRoot, "chromium_headless_shell-1194", "chrome-linux", "headless_shell"),
+    // full chromium fallback
+    path.join(cacheRoot, "chromium-1194", "chrome-linux", "chrome"),
+  ];
+  return candidates.find(existsSync);
+}
 
 function resolveWorkers(): number {
   const fromEnv = Number(process.env.PLAYWRIGHT_WORKERS);
@@ -28,8 +50,7 @@ export default defineConfig({
   workers: resolveWorkers(),
   // Remove the platform suffix from snapshot filenames — we always run on Linux
   // in CI, so the suffix adds noise without useful disambiguation.
-  snapshotPathTemplate:
-    "{testDir}/{testFileDir}/{testFileName}-snapshots/{arg}-{projectName}{ext}",
+  snapshotPathTemplate: "{testDir}/{testFileDir}/{testFileName}-snapshots/{arg}-{projectName}{ext}",
   use: {
     headless: true,
   },
@@ -41,7 +62,10 @@ export default defineConfig({
       name: "chromium",
       use: {
         ...devices["Desktop Chrome"],
-        launchOptions: { args: ["--no-sandbox"] },
+        launchOptions: {
+          args: ["--no-sandbox"],
+          executablePath: resolveChromeExecutable(),
+        },
       },
     },
 
@@ -66,7 +90,10 @@ export default defineConfig({
       use: {
         ...devices["Desktop Chrome"],
         viewport: { width: 1280, height: 720 },
-        launchOptions: { args: ["--no-sandbox"] },
+        launchOptions: {
+          args: ["--no-sandbox"],
+          executablePath: resolveChromeExecutable(),
+        },
       },
     },
     {
@@ -74,7 +101,10 @@ export default defineConfig({
       testDir: "./tests/visual",
       use: {
         ...devices["Pixel 7"],
-        launchOptions: { args: ["--no-sandbox"] },
+        launchOptions: {
+          args: ["--no-sandbox"],
+          executablePath: resolveChromeExecutable(),
+        },
       },
     },
   ],

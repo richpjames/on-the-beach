@@ -221,13 +221,6 @@ export function setupAddForm(): void {
     const urlInput = form.querySelector<HTMLInputElement>('input[name="url"]');
     const url = urlInput?.value.trim() ?? "";
 
-    if (!url) {
-      if (formCtx().scanState !== "scanning" && scanInput instanceof HTMLInputElement) {
-        scanInput.click();
-      }
-      return;
-    }
-
     if (!appCtx().isReady) {
       alert("App is still loading. Please try again in a moment.");
       return;

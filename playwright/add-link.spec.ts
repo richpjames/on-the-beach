@@ -14,7 +14,7 @@ test("adding a link shows the new item", async ({ page }) => {
     "https://seekersinternational.bandcamp.com/album/thewherebetweenyou-me-reissue";
   const cardCountBefore = await page.locator(".music-card").count();
 
-  await page.getByPlaceholder("Paste a music link...").fill(bandcampUrl);
+  await page.getByPlaceholder("search or paste a link").fill(bandcampUrl);
   await page.getByRole("button", { name: "Add" }).click();
 
   const addedCard = page
