@@ -8,7 +8,7 @@ test("youtube link shows source badge and embed in player modal", async ({ page 
   const youtubeUrl = "https://www.youtube.com/watch?v=iS7-iBia7GE";
 
   await page.goto("/");
-  await page.getByPlaceholder("Paste a music link...").fill(youtubeUrl);
+  await page.getByPlaceholder("search or paste a link").fill(youtubeUrl);
   await page.getByRole("button", { name: "Add" }).click();
 
   const card = page
@@ -34,7 +34,7 @@ test("mobile m.youtube.com link is normalised and embed shows", async ({ page })
   const normalizedUrl = "https://www.youtube.com/watch?v=iS7-iBia7GE";
 
   await page.goto("/");
-  await page.getByPlaceholder("Paste a music link...").fill(mobileUrl);
+  await page.getByPlaceholder("search or paste a link").fill(mobileUrl);
   await page.getByRole("button", { name: "Add" }).click();
 
   const card = page

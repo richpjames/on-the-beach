@@ -9,7 +9,7 @@ test("initial form shows link input first, artist and release revealed after cli
 }) => {
   await page.goto("/");
 
-  await expect(page.getByPlaceholder("Paste a music link...")).toBeVisible();
+  await expect(page.getByPlaceholder("search or paste a link")).toBeVisible();
   await expect(page.locator('input[name="artist"]')).toBeHidden();
   await expect(page.locator('input[name="title"]')).toBeHidden();
   await expect(page.locator('select[name="itemType"]')).toBeHidden();

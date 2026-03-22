@@ -4,7 +4,7 @@ test.describe("Stack dropdown scroll", () => {
   test.beforeEach(async ({ page, request }) => {
     await request.post("/api/__test__/reset");
     await page.goto("/");
-    await expect(page.getByPlaceholder("Paste a music link...")).toBeVisible();
+    await expect(page.getByPlaceholder("search or paste a link")).toBeVisible();
   });
 
   test("shows scrollbar when more than 5 stacks exist and new-stack input stays visible", async ({
@@ -13,7 +13,7 @@ test.describe("Stack dropdown scroll", () => {
   }) => {
     // Add a music item to get a card
     await page
-      .getByPlaceholder("Paste a music link...")
+      .getByPlaceholder("search or paste a link")
       .fill("https://seekersinternational.bandcamp.com/album/scroll-test");
     await page.getByRole("button", { name: "Add" }).click();
     await expect(page.locator(".music-card").first()).toBeVisible({ timeout: 10_000 });
@@ -54,7 +54,7 @@ test.describe("Stack dropdown scroll", () => {
     await page.setViewportSize({ width: 390, height: 844 }); // iPhone 14 Pro
 
     await page
-      .getByPlaceholder("Paste a music link...")
+      .getByPlaceholder("search or paste a link")
       .fill("https://seekersinternational.bandcamp.com/album/mobile-scroll");
     await page.getByRole("button", { name: "Add" }).click();
     await expect(page.locator(".music-card").first()).toBeVisible({ timeout: 10_000 });
