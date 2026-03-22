@@ -164,6 +164,14 @@ function renderMainPage(opts: {
                 class="add-form__scan-input"
                 accept="image/*"
               />
+              <button
+                type="button"
+                id="add-form-scan-btn"
+                class="btn add-form__scan-btn"
+                aria-label="Scan release cover"
+              >
+                Photo
+              </button>
               <button type="submit" id="add-form-submit" class="btn btn--primary">Add</button>
             </div>
 
