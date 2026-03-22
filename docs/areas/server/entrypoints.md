@@ -12,7 +12,6 @@
 - Request logging is enabled globally with `hono/logger`.
 - Errors are normalized to a JSON `500` response inside `app.onError`.
 - Test-only helpers are mounted at `/api/__test__` when `NODE_ENV === "test"`.
-- SMTP ingest starts separately at boot when `SMTP_ENABLED=true`.
 
 ## Why this matters
 
