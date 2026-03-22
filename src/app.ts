@@ -179,9 +179,19 @@ export function setupAddForm(): void {
     return;
   }
 
+  const scanButton = document.getElementById("add-form-scan-btn");
   const scanInput = document.getElementById("scan-file-input");
 
   submitButton.disabled = false;
+
+  if (scanButton instanceof HTMLButtonElement && scanInput instanceof HTMLInputElement) {
+    scanButton.addEventListener("click", () => {
+      if (formCtx().scanState === "scanning") {
+        return;
+      }
+      scanInput.click();
+    });
+  }
 
   if (scanInput instanceof HTMLInputElement) {
     scanInput.addEventListener("change", async () => {
@@ -241,6 +251,12 @@ export function setupAddForm(): void {
     if (submitBtn) {
       submitBtn.disabled = ctx.submitState === "submitting";
       submitBtn.textContent = ctx.submitState === "submitting" ? "Adding..." : "Add";
+    }
+
+    // Scan button
+    const scanBtn = document.getElementById("add-form-scan-btn") as HTMLButtonElement | null;
+    if (scanBtn) {
+      scanBtn.disabled = ctx.scanState === "scanning";
     }
 
     // Loading overlay
