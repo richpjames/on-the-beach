@@ -4,7 +4,7 @@ test.beforeEach(async ({ request }) => {
   await request.post("/api/__test__/reset");
 });
 
-test("youtube link shows source badge and embed in player modal", async ({ page }) => {
+test("youtube link shows source badge and navigates to release page on click", async ({ page }) => {
   const youtubeUrl = "https://www.youtube.com/watch?v=iS7-iBia7GE";
 
   await page.goto("/");
@@ -23,13 +23,12 @@ test("youtube link shows source badge and embed in player modal", async ({ page 
   const sourceBadgeLink = card.locator(`.badge--source[href="${youtubeUrl}"]`);
   await expect(sourceBadgeLink).toHaveText("Youtube");
 
-  // Clicking the card link opens the in-page modal with the embed
+  // Clicking the card link navigates directly to the release page
   await card.locator("a.music-card__link").click();
-  await expect(page.locator("#release-modal")).toBeVisible({ timeout: 10_000 });
-  await expect(page.locator("#release-modal iframe")).toBeVisible({ timeout: 10_000 });
+  await expect(page).toHaveURL(/\/r\/\d+/, { timeout: 10_000 });
 });
 
-test("mobile m.youtube.com link is normalised and embed shows", async ({ page }) => {
+test("mobile m.youtube.com link is normalised and release page is reachable", async ({ page }) => {
   const mobileUrl = "https://m.youtube.com/watch?v=iS7-iBia7GE";
   const normalizedUrl = "https://www.youtube.com/watch?v=iS7-iBia7GE";
 
@@ -47,8 +46,7 @@ test("mobile m.youtube.com link is normalised and embed shows", async ({ page })
   await expect(card).toBeVisible();
   await expect(card.locator(".badge--source")).toHaveText("Youtube");
 
-  // Clicking the card link opens the in-page modal with the embed
+  // Clicking the card link navigates directly to the release page
   await card.locator("a.music-card__link").click();
-  await expect(page.locator("#release-modal")).toBeVisible({ timeout: 10_000 });
-  await expect(page.locator("#release-modal iframe")).toBeVisible({ timeout: 10_000 });
+  await expect(page).toHaveURL(/\/r\/\d+/, { timeout: 10_000 });
 });
