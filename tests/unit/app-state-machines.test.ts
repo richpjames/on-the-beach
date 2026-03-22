@@ -23,6 +23,7 @@ function makeMockApi(overrides: Partial<Record<string, unknown>> = {}) {
     lookupRelease: async () => ({}),
     setItemStacks: async () => {},
     listStacks: async () => [],
+    appleMusicLookup: async () => {},
     ...overrides,
   };
 }
@@ -250,6 +251,72 @@ describe("add form machine — secondary fields and link picker", () => {
     actor.send({ type: "FORM_RESET" });
     expect(actor.getSnapshot().value).toBe("idle");
     expect(actor.getSnapshot().context.showSecondaryFields).toBe(false);
+  });
+});
+
+describe("add form machine — Apple Music lookup on scan/photo submit", () => {
+  it("calls appleMusicLookup after creating an item with no URL", async () => {
+    let lookupCalledWithId: number | null = null;
+    const api = makeMockApi({
+      appleMusicLookup: async (id: number) => {
+        lookupCalledWithId = id;
+      },
+    }) as any;
+    const actor = createActor(addFormMachine, { input: { api } }).start();
+
+    const noUrlValues = {
+      url: "",
+      title: "Scanned Album",
+      artist: "Scanned Artist",
+      itemType: "album",
+      label: "",
+      year: "",
+      country: "",
+      genre: "",
+      catalogueNumber: "",
+      notes: "",
+      artworkUrl: "",
+    };
+
+    actor.send({ type: "SUBMIT_CLICKED", url: "" });
+    actor.send({ type: "SUBMIT_CLICKED", url: "", pendingValues: noUrlValues });
+    await waitFor(actor, (snapshot) => snapshot.value !== "submitting", { timeout: 5000 });
+
+    expect(actor.getSnapshot().value).toBe("idle");
+    expect(actor.getSnapshot().context.createdItemId).toBe(42);
+    // Allow the fire-and-forget lookup to resolve
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(lookupCalledWithId).toBe(42);
+  });
+
+  it("does not call appleMusicLookup when a URL is provided", async () => {
+    let lookupCalled = false;
+    const api = makeMockApi({
+      appleMusicLookup: async () => {
+        lookupCalled = true;
+      },
+    }) as any;
+    const actor = createActor(addFormMachine, { input: { api } }).start();
+
+    const urlValues = {
+      url: "https://bandcamp.com/artist/album",
+      title: "Album",
+      artist: "Artist",
+      itemType: "album",
+      label: "",
+      year: "",
+      country: "",
+      genre: "",
+      catalogueNumber: "",
+      notes: "",
+      artworkUrl: "",
+    };
+
+    actor.send({ type: "SUBMIT_CLICKED", url: urlValues.url, pendingValues: urlValues });
+    await waitFor(actor, (snapshot) => snapshot.value !== "submitting", { timeout: 5000 });
+
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(lookupCalled).toBe(false);
   });
 });
 

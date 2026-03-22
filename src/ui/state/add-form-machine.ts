@@ -134,6 +134,10 @@ export const addFormMachine = setup({
           await api.setItemStacks(item.id, selectedStackIds);
         }
 
+        if (!values.url.trim()) {
+          api.appleMusicLookup(item.id).catch(() => {});
+        }
+
         return item.id;
       };
 

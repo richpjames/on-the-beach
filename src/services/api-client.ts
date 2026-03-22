@@ -258,4 +258,8 @@ export class ApiClient {
       return {};
     }
   }
+
+  async appleMusicLookup(id: number): Promise<void> {
+    await fetch(this.buildUrl(`/api/release/apple-music-lookup/${id}`), { method: "POST" });
+  }
 }

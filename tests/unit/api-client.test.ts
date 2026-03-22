@@ -55,6 +55,29 @@ describe("ApiClient.createMusicItem", () => {
   });
 });
 
+describe("ApiClient.appleMusicLookup", () => {
+  afterEach(() => {
+    mock.restore();
+  });
+
+  test("calls the apple-music-lookup endpoint with POST", async () => {
+    const fetchSpy = spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      new Response(JSON.stringify({ url: "https://music.apple.com/album/123" }), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      }),
+    );
+
+    const client = new ApiClient("https://example.com");
+    await client.appleMusicLookup(7);
+
+    expect(fetchSpy).toHaveBeenCalledWith(
+      "https://example.com/api/release/apple-music-lookup/7",
+      { method: "POST" },
+    );
+  });
+});
+
 describe("ApiClient.listMusicItems", () => {
   afterEach(() => {
     mock.restore();
