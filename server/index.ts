@@ -100,9 +100,3 @@ if (isDev) {
   console.log(`Server running on http://localhost:${port}`);
   console.log(`Uploads dir: ${uploadsDir}`);
 }
-
-// ---------- SMTP ingest (opt-in via SMTP_ENABLED=true) ----------
-if (process.env.SMTP_ENABLED === "true") {
-  const { startSmtpIngest } = await import("./smtp-ingest");
-  startSmtpIngest();
-}
