@@ -56,6 +56,8 @@ async function navigateToRelease(path: string): Promise<void> {
   );
   main.hidden = true;
   releaseView.hidden = false;
+  const footer = document.querySelector<HTMLElement>(".footer");
+  if (footer) footer.hidden = true;
 
   runScripts(doc);
 }
@@ -71,6 +73,8 @@ function navigateToMain(): void {
   activeBackdropEl = null;
   document.body.classList.remove("release-page-body");
   main.hidden = false;
+  const footer = document.querySelector<HTMLElement>(".footer");
+  if (footer) footer.hidden = false;
 }
 
 function handleClick(e: MouseEvent): void {
