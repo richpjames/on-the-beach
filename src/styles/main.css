@@ -204,13 +204,13 @@ body {
 
 .add-form__primary {
   display: grid;
-  grid-template-columns: 1fr auto auto;
+  grid-template-columns: 1fr auto auto auto;
   gap: 3px;
   align-items: center;
 }
 
 .add-form__primary #add-form-submit {
-  grid-column: 3;
+  grid-column: 4;
 }
 
 .add-form__scan-input {
@@ -222,6 +222,20 @@ body {
 }
 
 .add-form__scan-btn.is-loading {
+  color: var(--chrome-darker);
+  cursor: wait;
+}
+
+.add-form__recognize-btn {
+  min-width: 52px;
+}
+
+.add-form__recognize-btn.is-recording {
+  color: var(--danger);
+  outline: 1px solid var(--danger);
+}
+
+.add-form__recognize-btn.is-recognizing {
   color: var(--chrome-darker);
   cursor: wait;
 }
@@ -1097,7 +1111,7 @@ select.input {
   }
 
   .add-form__primary {
-    grid-template-columns: minmax(0, 1fr) auto auto;
+    grid-template-columns: minmax(0, 1fr) auto auto auto;
     gap: 5px 3px;
   }
 
@@ -1107,6 +1121,7 @@ select.input {
   }
 
   .add-form__primary #add-form-scan-btn,
+  .add-form__primary #add-form-recognize-btn,
   .add-form__primary #add-form-submit {
     width: auto;
   }

@@ -170,6 +170,14 @@ export interface LinkReleaseCandidate {
   isPrimary?: boolean;
 }
 
+export interface RecognizeResult {
+  recognized: boolean;
+  artist?: string;
+  title?: string;
+  album?: string;
+  year?: string;
+}
+
 export interface AmbiguousLinkPayload {
   kind: "ambiguous_link";
   url: string;

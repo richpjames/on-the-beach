@@ -21,6 +21,7 @@ export interface AddFormContext {
   initialized: boolean;
   selectedStackIds: number[];
   scanState: "idle" | "scanning";
+  recognizeState: "idle" | "recording" | "recognizing";
   submitState: "idle" | "submitting" | "error";
   showSecondaryFields: boolean;
   pendingValues: AddFormValuesInput[] | null;
@@ -33,8 +34,11 @@ export interface AddFormContext {
     pendingValues: AddFormValuesInput;
   } | null;
   pendingScanBase64: string | null;
+  pendingAudioBase64: string | null;
+  pendingAudioMimeType: string | null;
   scanResult: ScanResultData | null;
   scanError: string | null;
+  recognizeError: string | null;
 }
 
 export type AddFormEvent =
@@ -59,7 +63,10 @@ export type AddFormEvent =
   | { type: "CLEAR_CREATED_ITEM" }
   | { type: "FORM_RESET" }
   | { type: "SCAN_FILE_SELECTED"; imageBase64: string }
-  | { type: "SCAN_RESULT_CONSUMED" };
+  | { type: "SCAN_RESULT_CONSUMED" }
+  | { type: "RECOGNIZE_RECORDING_STARTED" }
+  | { type: "AUDIO_CAPTURED"; audioBase64: string; mimeType: string }
+  | { type: "RECOGNIZE_ERROR_CONSUMED" };
 
 export const addFormMachine = setup({
   types: {} as {
@@ -68,6 +75,20 @@ export const addFormMachine = setup({
     input: { api: ApiClient };
   },
   actors: {
+    recognizeMusic: fromPromise<
+      { artist: string; title: string; album?: string; year?: string } | null,
+      { api: ApiClient; audioBase64: string; mimeType: string }
+    >(async ({ input }) => {
+      const { api, audioBase64, mimeType } = input;
+      const result = await api.recognizeMusic(audioBase64, mimeType);
+      if (!result.recognized || !result.artist || !result.title) return null;
+      return {
+        artist: result.artist,
+        title: result.title,
+        album: result.album,
+        year: result.year,
+      };
+    }),
     scanCover: fromPromise<ScanResultData, { api: ApiClient; imageBase64: string }>(
       async ({ input }) => {
         const { api, imageBase64 } = input;
@@ -147,14 +168,18 @@ export const addFormMachine = setup({
     initialized: false,
     selectedStackIds: [],
     scanState: "idle",
+    recognizeState: "idle",
     submitState: "idle",
     showSecondaryFields: false,
     pendingValues: null,
     createdItemId: null,
     linkPicker: null,
     pendingScanBase64: null,
+    pendingAudioBase64: null,
+    pendingAudioMimeType: null,
     scanResult: null,
     scanError: null,
+    recognizeError: null,
   }),
   initial: "idle",
   on: {
@@ -202,8 +227,12 @@ export const addFormMachine = setup({
         pendingValues: null,
         createdItemId: null,
         pendingScanBase64: null,
+        pendingAudioBase64: null,
+        pendingAudioMimeType: null,
         scanResult: null,
         scanError: null,
+        recognizeState: "idle" as const,
+        recognizeError: null,
       }),
     },
     SCAN_FILE_SELECTED: {
@@ -216,6 +245,23 @@ export const addFormMachine = setup({
     },
     SCAN_RESULT_CONSUMED: {
       actions: assign({ scanResult: null, scanError: null }),
+    },
+    RECOGNIZE_RECORDING_STARTED: {
+      guard: ({ context }) =>
+        context.submitState !== "submitting" && context.recognizeState === "idle",
+      actions: assign({ recognizeState: "recording" as const, recognizeError: null }),
+    },
+    AUDIO_CAPTURED: {
+      guard: ({ context }) => context.recognizeState === "recording",
+      target: ".recognizing",
+      actions: assign(({ event }) => ({
+        recognizeState: "recognizing" as const,
+        pendingAudioBase64: event.audioBase64,
+        pendingAudioMimeType: event.mimeType,
+      })),
+    },
+    RECOGNIZE_ERROR_CONSUMED: {
+      actions: assign({ recognizeError: null }),
     },
   },
   states: {
@@ -430,6 +476,66 @@ export const addFormMachine = setup({
             actions: assign({ submitState: "error" as const }),
           },
         ],
+      },
+    },
+    recognizing: {
+      invoke: {
+        src: "recognizeMusic",
+        input: ({ context }) => ({
+          api: context.api,
+          audioBase64: context.pendingAudioBase64!,
+          mimeType: context.pendingAudioMimeType!,
+        }),
+        onDone: [
+          {
+            // Nothing recognized
+            guard: ({ event }) => event.output === null,
+            target: "idle",
+            actions: assign({
+              recognizeState: "idle" as const,
+              pendingAudioBase64: null,
+              pendingAudioMimeType: null,
+              recognizeError: "Song not recognised. Try again in a quieter environment.",
+            }),
+          },
+          {
+            // Recognized — auto-submit
+            target: "submitting",
+            actions: assign(({ event }) => {
+              const result = event.output!;
+              return {
+                recognizeState: "idle" as const,
+                pendingAudioBase64: null,
+                pendingAudioMimeType: null,
+                submitState: "submitting" as const,
+                pendingValues: [
+                  {
+                    url: "",
+                    artist: result.artist,
+                    title: result.title,
+                    itemType: "track" as const,
+                    label: "",
+                    year: result.year ?? "",
+                    country: "",
+                    genre: "",
+                    catalogueNumber: "",
+                    notes: result.album ? `Album: ${result.album}` : "",
+                    artworkUrl: "",
+                  },
+                ],
+              };
+            }),
+          },
+        ],
+        onError: {
+          target: "idle",
+          actions: assign(({ event }) => ({
+            recognizeState: "idle" as const,
+            pendingAudioBase64: null,
+            pendingAudioMimeType: null,
+            recognizeError: `Recognition failed: ${String(event.error)}`,
+          })),
+        },
       },
     },
   },

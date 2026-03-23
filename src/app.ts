@@ -193,6 +193,13 @@ export function setupAddForm(): void {
     });
   }
 
+  const recognizeButton = document.getElementById("add-form-recognize-btn");
+  if (recognizeButton instanceof HTMLButtonElement) {
+    recognizeButton.addEventListener("click", () => {
+      void startMusicRecognition(recognizeButton);
+    });
+  }
+
   if (scanInput instanceof HTMLInputElement) {
     scanInput.addEventListener("change", async () => {
       const file = scanInput.files?.[0];
@@ -259,15 +266,34 @@ export function setupAddForm(): void {
       scanBtn.disabled = ctx.scanState === "scanning";
     }
 
+    // Recognize button
+    const recognizeBtn = document.getElementById(
+      "add-form-recognize-btn",
+    ) as HTMLButtonElement | null;
+    if (recognizeBtn) {
+      const isActive = ctx.recognizeState !== "idle";
+      recognizeBtn.disabled = isActive || ctx.submitState === "submitting";
+      recognizeBtn.classList.toggle("is-recording", ctx.recognizeState === "recording");
+      recognizeBtn.classList.toggle("is-recognizing", ctx.recognizeState === "recognizing");
+    }
+
     // Loading overlay
     const overlay = document.getElementById("add-loading-overlay");
-    const showOverlay = ctx.submitState === "submitting" || ctx.scanState === "scanning";
+    const showOverlay =
+      ctx.submitState === "submitting" ||
+      ctx.scanState === "scanning" ||
+      ctx.recognizeState === "recognizing";
     overlay?.classList.toggle("is-visible", showOverlay);
     overlay?.setAttribute("aria-hidden", showOverlay ? "false" : "true");
     const statusEl = document.getElementById("add-loading-status");
     if (statusEl) {
-      statusEl.textContent =
-        ctx.scanState === "scanning" ? "Scanning cover..." : "Adding to collection...";
+      if (ctx.scanState === "scanning") {
+        statusEl.textContent = "Scanning cover...";
+      } else if (ctx.recognizeState === "recognizing") {
+        statusEl.textContent = "Identifying song...";
+      } else {
+        statusEl.textContent = "Adding to collection...";
+      }
     }
 
     // Scan results — populate form fields when available
@@ -296,6 +322,12 @@ export function setupAddForm(): void {
     if (ctx.scanError) {
       alert(getCoverScanErrorMessage(new Error(ctx.scanError)));
       addFormActor.send({ type: "SCAN_RESULT_CONSUMED" });
+    }
+
+    // Recognize error
+    if (ctx.recognizeError) {
+      alert(ctx.recognizeError);
+      addFormActor.send({ type: "RECOGNIZE_ERROR_CONSUMED" });
     }
 
     // Link picker
@@ -511,6 +543,71 @@ function loadImage(dataUrl: string): Promise<HTMLImageElement> {
     image.onerror = () => reject(new Error("Failed to load image"));
     image.src = dataUrl;
   });
+}
+
+const RECORD_DURATION_MS = 8000;
+
+async function startMusicRecognition(btn: HTMLButtonElement): Promise<void> {
+  const ctx = formCtx();
+  if (ctx.recognizeState !== "idle" || ctx.submitState === "submitting") return;
+
+  let stream: MediaStream;
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+  } catch {
+    alert("Microphone access is required for music recognition.");
+    return;
+  }
+
+  addFormActor.send({ type: "RECOGNIZE_RECORDING_STARTED" });
+
+  const mimeType = MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
+    ? "audio/webm;codecs=opus"
+    : MediaRecorder.isTypeSupported("audio/webm")
+      ? "audio/webm"
+      : "audio/ogg";
+
+  const recorder = new MediaRecorder(stream, { mimeType });
+  const chunks: Blob[] = [];
+
+  recorder.ondataavailable = (e) => {
+    if (e.data.size > 0) chunks.push(e.data);
+  };
+
+  // Countdown in button label
+  const originalText = btn.textContent ?? "Listen";
+  let secondsLeft = Math.round(RECORD_DURATION_MS / 1000);
+  btn.textContent = `${secondsLeft}s`;
+  const countdownInterval = setInterval(() => {
+    secondsLeft -= 1;
+    if (secondsLeft > 0) {
+      btn.textContent = `${secondsLeft}s`;
+    }
+  }, 1000);
+
+  recorder.onstop = async () => {
+    clearInterval(countdownInterval);
+    btn.textContent = originalText;
+    stream.getTracks().forEach((t) => t.stop());
+
+    const blob = new Blob(chunks, { type: mimeType });
+    const arrayBuffer = await blob.arrayBuffer();
+    const uint8 = new Uint8Array(arrayBuffer);
+    let binary = "";
+    for (let i = 0; i < uint8.length; i++) {
+      binary += String.fromCharCode(uint8[i]);
+    }
+    const audioBase64 = btoa(binary);
+    const baseMimeType = mimeType.split(";")[0];
+    addFormActor.send({ type: "AUDIO_CAPTURED", audioBase64, mimeType: baseMimeType });
+  };
+
+  recorder.start();
+  setTimeout(() => {
+    if (recorder.state === "recording") {
+      recorder.stop();
+    }
+  }, RECORD_DURATION_MS);
 }
 
 function setupFilterBar(): void {

@@ -13,6 +13,7 @@ import { searchAppleMusic } from "../scraper";
 import { parseUrl } from "../utils";
 import { db } from "../db/index";
 import { musicItems, musicLinks, sources, artists } from "../db/schema";
+import { recognizeAudio, isAcrCloudConfigured } from "../acrcloud";
 
 const MAX_IMAGE_BASE64_LENGTH = 2_000_000;
 const BASE64_PATTERN = /^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/;
@@ -304,6 +305,43 @@ export function createReleaseRoutes(
     await saveAppleMusicLinkFn(id, appleMusicUrl);
 
     return c.json({ url: appleMusicUrl }, 200);
+  });
+
+  routes.post("/recognize", async (c) => {
+    if (!isAcrCloudConfigured()) {
+      return c.json({ error: "Music recognition is not configured" }, 503);
+    }
+
+    let body: unknown;
+    try {
+      body = await c.req.json();
+    } catch (err) {
+      console.error("[api] POST /api/release/recognize invalid JSON:", err);
+      return c.json({ error: "Invalid JSON payload" }, 400);
+    }
+
+    if (!body || typeof body !== "object") {
+      return c.json({ error: "Invalid JSON payload" }, 400);
+    }
+
+    const { audioBase64, mimeType } = body as Record<string, unknown>;
+
+    if (typeof audioBase64 !== "string" || !audioBase64.trim()) {
+      return c.json({ error: "audioBase64 is required" }, 400);
+    }
+
+    const resolvedMimeType = typeof mimeType === "string" ? mimeType : "audio/webm";
+
+    try {
+      const result = await recognizeAudio(audioBase64.trim(), resolvedMimeType);
+      if (!result) {
+        return c.json({ recognized: false }, 200);
+      }
+      return c.json({ recognized: true, ...result }, 200);
+    } catch (err) {
+      console.error("[api] POST /api/release/recognize failed:", err);
+      return c.json({ error: "Recognition failed" }, 500);
+    }
   });
 
   return routes;

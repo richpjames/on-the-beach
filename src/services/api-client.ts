@@ -11,6 +11,7 @@ import type {
   ScanResult,
   UploadImageResult,
   LookupReleaseResult,
+  RecognizeResult,
 } from "../types";
 
 export class AmbiguousLinkApiError extends Error {
@@ -241,6 +242,14 @@ export class ApiClient {
       "/api/release/image",
       "uploadReleaseImage",
       this.jsonRequest("POST", { imageBase64 }),
+    );
+  }
+
+  async recognizeMusic(audioBase64: string, mimeType: string): Promise<RecognizeResult> {
+    return this.requestJson<RecognizeResult>(
+      "/api/release/recognize",
+      "recognizeMusic",
+      this.jsonRequest("POST", { audioBase64, mimeType }),
     );
   }
 
