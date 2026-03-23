@@ -14,6 +14,7 @@
     "test:e2e": "bunx playwright test playwright",
     "test:visual": "bunx playwright test --project=visual-desktop --project=visual-mobile --workers=1",
     "test:visual:update": "bunx playwright test --project=visual-desktop --project=visual-mobile --workers=1 --update-snapshots",
+    "test:visual:update-baselines": "bash scripts/update-visual-baselines.sh",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:studio": "drizzle-kit studio",
