@@ -2018,6 +2018,13 @@ body::after {
   flex: 0 0 auto;
 }
 
+#release-view {
+  background: var(--chrome);
+  padding: 4px 4px 0;
+  display: block;
+  flex: 0 0 auto;
+}
+
 .release-page {
   display: flex;
   flex-direction: column;

@@ -460,7 +460,7 @@ function renderReleasePage(item: MusicItemFull, cssHref: string): string {
       }
 
       // ── Star Rating ─────────────────────────────────────────────────────────
-      const ratingEl = document.querySelector('[data-rating-stars]');
+      const ratingEl = document.querySelector('.release-page [data-rating-stars]');
       const MIN_RATING = 0.5;
       const MAX_RATING = 5;
       const HALF_STEP = 0.5;
