@@ -54,7 +54,7 @@ test.beforeEach(async ({ request }) => {
 
 test("captures main and release views", async ({ page }) => {
   await page.goto("/");
-  await expect(page.getByPlaceholder("Paste a music link...")).toBeVisible();
+  await expect(page.getByPlaceholder("search or paste a link")).toBeVisible();
 
   const scanFixturePath = path.join(process.cwd(), "playwright/fixtures/cover-sample.png");
   const uploadedArtworkUrl = "/uploads/sally-oldfield-water-bearer.png";
@@ -88,7 +88,7 @@ test("captures main and release views", async ({ page }) => {
 
 test("captures add loading dialog", async ({ page }) => {
   await page.goto("/");
-  await expect(page.getByPlaceholder("Paste a music link...")).toBeVisible();
+  await expect(page.getByPlaceholder("search or paste a link")).toBeVisible();
 
   await page.evaluate(() => {
     const overlay = document.getElementById("add-loading-overlay");
