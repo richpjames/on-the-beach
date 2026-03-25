@@ -1,4 +1,6 @@
-import { assign, fromPromise, setup } from "xstate";
+import { assign, fromCallback, fromPromise, sendTo, setup } from "xstate";
+
+export const RECORD_DURATION_MS = 15000;
 import type { LinkReleaseCandidate } from "../../types";
 import type { AddFormValues } from "../domain/add-form";
 import { buildCreateMusicItemInputFromValues } from "../domain/add-form";
@@ -64,8 +66,10 @@ export type AddFormEvent =
   | { type: "FORM_RESET" }
   | { type: "SCAN_FILE_SELECTED"; imageBase64: string }
   | { type: "SCAN_RESULT_CONSUMED" }
-  | { type: "RECOGNIZE_RECORDING_STARTED" }
+  | { type: "RECOGNIZE_CLICKED" }
+  | { type: "STOP_RECORDING" }
   | { type: "AUDIO_CAPTURED"; audioBase64: string; mimeType: string }
+  | { type: "MIC_DENIED" }
   | { type: "RECOGNIZE_ERROR_CONSUMED" };
 
 export const addFormMachine = setup({
@@ -75,6 +79,81 @@ export const addFormMachine = setup({
     input: { api: ApiClient };
   },
   actors: {
+    recordAudio: fromCallback(
+      ({
+        input,
+        sendBack,
+        receive,
+      }: {
+        input: { durationMs: number };
+        sendBack: (
+          event:
+            | { type: "AUDIO_CAPTURED"; audioBase64: string; mimeType: string }
+            | { type: "MIC_DENIED" },
+        ) => void;
+        receive: (listener: (event: { type: string }) => void) => void;
+      }) => {
+        let recorder: MediaRecorder | null = null;
+        let stream: MediaStream | null = null;
+        let timeoutId: ReturnType<typeof setTimeout> | null = null;
+        let stopRequested = false;
+
+        void navigator.mediaDevices
+          .getUserMedia({ audio: true })
+          .then((s) => {
+            if (stopRequested) {
+              s.getTracks().forEach((t) => t.stop());
+              return;
+            }
+            stream = s;
+
+            const mimeType = MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
+              ? "audio/webm;codecs=opus"
+              : MediaRecorder.isTypeSupported("audio/webm")
+                ? "audio/webm"
+                : "audio/ogg";
+
+            recorder = new MediaRecorder(stream, { mimeType });
+            const chunks: Blob[] = [];
+
+            recorder.ondataavailable = (e) => {
+              if (e.data.size > 0) chunks.push(e.data);
+            };
+
+            recorder.onstop = () => {
+              stream!.getTracks().forEach((t) => t.stop());
+              if (timeoutId) clearTimeout(timeoutId);
+              void new Blob(chunks, { type: mimeType }).arrayBuffer().then((buf) => {
+                const uint8 = new Uint8Array(buf);
+                let binary = "";
+                for (let i = 0; i < uint8.length; i++) binary += String.fromCharCode(uint8[i]);
+                sendBack({
+                  type: "AUDIO_CAPTURED",
+                  audioBase64: btoa(binary),
+                  mimeType: mimeType.split(";")[0],
+                });
+              });
+            };
+
+            recorder.start();
+            timeoutId = setTimeout(() => {
+              if (recorder?.state === "recording") recorder.stop();
+            }, input.durationMs);
+          })
+          .catch(() => sendBack({ type: "MIC_DENIED" }));
+
+        receive((event) => {
+          if (event.type === "STOP" && recorder?.state === "recording") recorder.stop();
+        });
+
+        return () => {
+          stopRequested = true;
+          if (timeoutId) clearTimeout(timeoutId);
+          if (recorder?.state === "recording") recorder.stop();
+          stream?.getTracks().forEach((t) => t.stop());
+        };
+      },
+    ),
     recognizeMusic: fromPromise<
       { artist: string; title: string; album?: string; year?: string } | null,
       { api: ApiClient; audioBase64: string; mimeType: string }
@@ -246,20 +325,6 @@ export const addFormMachine = setup({
     SCAN_RESULT_CONSUMED: {
       actions: assign({ scanResult: null, scanError: null }),
     },
-    RECOGNIZE_RECORDING_STARTED: {
-      guard: ({ context }) =>
-        context.submitState !== "submitting" && context.recognizeState === "idle",
-      actions: assign({ recognizeState: "recording" as const, recognizeError: null }),
-    },
-    AUDIO_CAPTURED: {
-      guard: ({ context }) => context.recognizeState === "recording",
-      target: ".recognizing",
-      actions: assign(({ event }) => ({
-        recognizeState: "recognizing" as const,
-        pendingAudioBase64: event.audioBase64,
-        pendingAudioMimeType: event.mimeType,
-      })),
-    },
     RECOGNIZE_ERROR_CONSUMED: {
       actions: assign({ recognizeError: null }),
     },
@@ -267,6 +332,10 @@ export const addFormMachine = setup({
   states: {
     idle: {
       on: {
+        RECOGNIZE_CLICKED: {
+          guard: ({ context }) => context.submitState !== "submitting",
+          target: "recording",
+        },
         SUBMIT_CLICKED: [
           {
             guard: ({ event }) => !event.url.trim(),
@@ -476,6 +545,34 @@ export const addFormMachine = setup({
             actions: assign({ submitState: "error" as const }),
           },
         ],
+      },
+    },
+    recording: {
+      entry: assign({ recognizeState: "recording" as const, recognizeError: null }),
+      invoke: {
+        id: "recordAudio",
+        src: "recordAudio",
+        input: { durationMs: RECORD_DURATION_MS },
+      },
+      on: {
+        AUDIO_CAPTURED: {
+          target: "recognizing",
+          actions: assign(({ event }) => ({
+            recognizeState: "recognizing" as const,
+            pendingAudioBase64: event.audioBase64,
+            pendingAudioMimeType: event.mimeType,
+          })),
+        },
+        MIC_DENIED: {
+          target: "idle",
+          actions: assign({
+            recognizeState: "idle" as const,
+            recognizeError: "Microphone access is required for music recognition.",
+          }),
+        },
+        STOP_RECORDING: {
+          actions: sendTo("recordAudio", { type: "STOP" }),
+        },
       },
     },
     recognizing: {
