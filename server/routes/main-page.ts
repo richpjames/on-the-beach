@@ -172,6 +172,14 @@ function renderMainPage(opts: {
               >
                 Photo
               </button>
+              <button
+                type="button"
+                id="add-form-recognize-btn"
+                class="btn add-form__recognize-btn"
+                aria-label="Identify playing song"
+              >
+                Listen
+              </button>
               <button type="submit" id="add-form-submit" class="btn btn--primary">Add</button>
             </div>
 
