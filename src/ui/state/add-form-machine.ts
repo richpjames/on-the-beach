@@ -155,17 +155,34 @@ export const addFormMachine = setup({
       },
     ),
     recognizeMusic: fromPromise<
-      { artist: string; title: string; album?: string; year?: string } | null,
+      { artist: string; title: string; album?: string; year?: string; artworkUrl?: string } | null,
       { api: ApiClient; audioBase64: string; mimeType: string }
     >(async ({ input }) => {
       const { api, audioBase64, mimeType } = input;
       const result = await api.recognizeMusic(audioBase64, mimeType);
       if (!result.recognized || !result.artist || !result.title) return null;
+
+      // Look up artwork via MusicBrainz using the album title if available,
+      // falling back to the track title. This is non-fatal.
+      let artworkUrl: string | undefined;
+      const lookupTitle = result.album ?? result.title;
+      try {
+        const lookup = await api.lookupRelease(
+          result.artist,
+          lookupTitle,
+          result.year ?? undefined,
+        );
+        artworkUrl = lookup.artworkUrl;
+      } catch {
+        // non-fatal
+      }
+
       return {
         artist: result.artist,
         title: result.title,
         album: result.album,
         year: result.year,
+        artworkUrl,
       };
     }),
     scanCover: fromPromise<ScanResultData, { api: ApiClient; imageBase64: string }>(
@@ -617,7 +634,7 @@ export const addFormMachine = setup({
                     genre: "",
                     catalogueNumber: "",
                     notes: result.album ? `Album: ${result.album}` : "",
-                    artworkUrl: "",
+                    artworkUrl: result.artworkUrl ?? "",
                   },
                 ],
               };
