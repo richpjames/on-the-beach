@@ -20,7 +20,7 @@ import {
   setStarRatingValue,
 } from "./ui/components/star-rating";
 import { createActor } from "xstate";
-import { addFormMachine } from "./ui/state/add-form-machine";
+import { addFormMachine, RECORD_DURATION_MS } from "./ui/state/add-form-machine";
 import { appMachine } from "./ui/state/app-machine";
 import {
   escapeHtml,
@@ -166,7 +166,6 @@ function initializeUI(hasServerData: boolean): void {
       prevStackBarVersion = ctx.stackBarVersion;
       void renderStackBar();
     }
-
   });
 }
 
@@ -196,7 +195,12 @@ export function setupAddForm(): void {
   const recognizeButton = document.getElementById("add-form-recognize-btn");
   if (recognizeButton instanceof HTMLButtonElement) {
     recognizeButton.addEventListener("click", () => {
-      void startMusicRecognition(recognizeButton);
+      const ctx = formCtx();
+      if (ctx.recognizeState === "recording") {
+        addFormActor.send({ type: "STOP_RECORDING" });
+      } else {
+        addFormActor.send({ type: "RECOGNIZE_CLICKED" });
+      }
     });
   }
 
@@ -244,6 +248,9 @@ export function setupAddForm(): void {
     });
   });
 
+  let countdownInterval: ReturnType<typeof setInterval> | null = null;
+  let prevRecognizeState = "idle";
+
   addFormActor.subscribe((snapshot) => {
     const ctx = snapshot.context;
     const formEl = document.getElementById("add-form") as HTMLFormElement | null;
@@ -272,10 +279,26 @@ export function setupAddForm(): void {
     ) as HTMLButtonElement | null;
     if (recognizeBtn) {
       const isActive = ctx.recognizeState !== "idle";
-      recognizeBtn.disabled = isActive || ctx.submitState === "submitting";
+      recognizeBtn.disabled = ctx.submitState === "submitting";
       recognizeBtn.classList.toggle("is-recording", ctx.recognizeState === "recording");
       recognizeBtn.classList.toggle("is-recognizing", ctx.recognizeState === "recognizing");
+
+      if (ctx.recognizeState === "recording" && prevRecognizeState !== "recording") {
+        let secondsLeft = Math.round(RECORD_DURATION_MS / 1000);
+        recognizeBtn.textContent = `${secondsLeft}s`;
+        countdownInterval = setInterval(() => {
+          secondsLeft -= 1;
+          if (secondsLeft > 0) recognizeBtn.textContent = `${secondsLeft}s`;
+        }, 1000);
+      } else if (ctx.recognizeState !== "recording" && prevRecognizeState === "recording") {
+        if (countdownInterval) {
+          clearInterval(countdownInterval);
+          countdownInterval = null;
+        }
+        recognizeBtn.textContent = "Listen";
+      }
     }
+    prevRecognizeState = ctx.recognizeState;
 
     // Loading overlay
     const overlay = document.getElementById("add-loading-overlay");
@@ -543,71 +566,6 @@ function loadImage(dataUrl: string): Promise<HTMLImageElement> {
     image.onerror = () => reject(new Error("Failed to load image"));
     image.src = dataUrl;
   });
-}
-
-const RECORD_DURATION_MS = 8000;
-
-async function startMusicRecognition(btn: HTMLButtonElement): Promise<void> {
-  const ctx = formCtx();
-  if (ctx.recognizeState !== "idle" || ctx.submitState === "submitting") return;
-
-  let stream: MediaStream;
-  try {
-    stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-  } catch {
-    alert("Microphone access is required for music recognition.");
-    return;
-  }
-
-  addFormActor.send({ type: "RECOGNIZE_RECORDING_STARTED" });
-
-  const mimeType = MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
-    ? "audio/webm;codecs=opus"
-    : MediaRecorder.isTypeSupported("audio/webm")
-      ? "audio/webm"
-      : "audio/ogg";
-
-  const recorder = new MediaRecorder(stream, { mimeType });
-  const chunks: Blob[] = [];
-
-  recorder.ondataavailable = (e) => {
-    if (e.data.size > 0) chunks.push(e.data);
-  };
-
-  // Countdown in button label
-  const originalText = btn.textContent ?? "Listen";
-  let secondsLeft = Math.round(RECORD_DURATION_MS / 1000);
-  btn.textContent = `${secondsLeft}s`;
-  const countdownInterval = setInterval(() => {
-    secondsLeft -= 1;
-    if (secondsLeft > 0) {
-      btn.textContent = `${secondsLeft}s`;
-    }
-  }, 1000);
-
-  recorder.onstop = async () => {
-    clearInterval(countdownInterval);
-    btn.textContent = originalText;
-    stream.getTracks().forEach((t) => t.stop());
-
-    const blob = new Blob(chunks, { type: mimeType });
-    const arrayBuffer = await blob.arrayBuffer();
-    const uint8 = new Uint8Array(arrayBuffer);
-    let binary = "";
-    for (let i = 0; i < uint8.length; i++) {
-      binary += String.fromCharCode(uint8[i]);
-    }
-    const audioBase64 = btoa(binary);
-    const baseMimeType = mimeType.split(";")[0];
-    addFormActor.send({ type: "AUDIO_CAPTURED", audioBase64, mimeType: baseMimeType });
-  };
-
-  recorder.start();
-  setTimeout(() => {
-    if (recorder.state === "recording") {
-      recorder.stop();
-    }
-  }, RECORD_DURATION_MS);
 }
 
 function setupFilterBar(): void {
@@ -1861,4 +1819,3 @@ function parseItemLinkMetadata(raw: string | null): Record<string, string> | nul
   }
   return null;
 }
-

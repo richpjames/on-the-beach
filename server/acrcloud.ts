@@ -74,8 +74,11 @@ export async function recognizeAudio(
     };
   };
 
+  console.log("[acrcloud] response:", JSON.stringify(data));
+
   if (data.status?.code !== 0) {
-    // code 1001 = no result
+    // code 1001 = no result; other codes = errors
+    console.error("[acrcloud] non-zero status:", JSON.stringify(data.status));
     return null;
   }
 
