@@ -47,7 +47,22 @@ if (process.env.NODE_ENV === "test") {
 
 // ---------- Environment ----------
 const isDev = process.env.NODE_ENV !== "production";
-const port = Number(process.env.PORT) || 3000;
+const preferredPort = Number(process.env.PORT) || 3000;
+
+async function findAvailablePort(startPort: number): Promise<number> {
+  const { createServer } = await import("node:net");
+  return new Promise((resolve) => {
+    const probe = createServer();
+    probe.once("error", () => resolve(findAvailablePort(startPort + 1)));
+    probe.once("listening", () => probe.close(() => resolve(startPort)));
+    probe.listen(startPort);
+  });
+}
+
+const port = await findAvailablePort(preferredPort);
+if (port !== preferredPort) {
+  console.log(`Port ${preferredPort} in use, using ${port} instead`);
+}
 
 if (isDev) {
   // ---- Development: Vite dev server as middleware ----
