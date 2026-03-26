@@ -1004,6 +1004,8 @@ select.input {
 
 @media (max-width: 520px) {
   body:not(.release-page-body) {
+    --window-gutter: 0px;
+    --window-top-space: 0px;
     height: auto;
     max-height: none;
     overflow-y: auto;
