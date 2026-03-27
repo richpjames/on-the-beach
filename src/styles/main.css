@@ -2359,6 +2359,26 @@ a:hover {
   color: var(--chrome-black);
 }
 
+.release-page__listen-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px;
+  font-family: "Tahoma", "MS Sans Serif", sans-serif;
+  font-size: 11px;
+  background: var(--chrome);
+  border-width: 2px;
+  border-style: solid;
+  border-color: var(--chrome-white) var(--chrome-darker) var(--chrome-darker) var(--chrome-white);
+  cursor: pointer;
+  color: #000000;
+  margin-top: 8px;
+}
+
+.release-page__listen-btn:active {
+  border-color: var(--chrome-darker) var(--chrome-white) var(--chrome-white) var(--chrome-darker);
+}
+
 .release-page__footer {
   display: flex;
   justify-content: flex-end;
