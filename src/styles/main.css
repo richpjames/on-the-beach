@@ -2375,8 +2375,13 @@ a:hover {
   margin-top: 8px;
 }
 
+.release-page__listen-btn:hover {
+  background: var(--chrome-light);
+}
+
 .release-page__listen-btn:active {
   border-color: var(--chrome-darker) var(--chrome-white) var(--chrome-white) var(--chrome-darker);
+  padding: 3px 11px 1px 13px;
 }
 
 .release-page__footer {
