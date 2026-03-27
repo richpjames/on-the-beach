@@ -2,7 +2,7 @@ import { Mistral } from "@mistralai/mistralai";
 import type { ScanResult } from "../src/types";
 import { parseScanJson } from "./scan-parser";
 
-const DEFAULT_SCAN_MODEL = "mistral-ocr-latest";
+const DEFAULT_SCAN_MODEL = "mistral-small-2506";
 
 const SCAN_PROMPT =
   "You are reading a photo of a music release cover. Respond with JSON only using keys artist, title, and confidence. " +
