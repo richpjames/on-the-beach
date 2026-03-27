@@ -1959,8 +1959,10 @@ a:hover {
 #taskbar-start {
   width: 80px;
   flex-shrink: 0;
-  border: none;
-  border-right: 2px solid var(--chrome-darker);
+  border-width: 1px;
+  border-style: solid;
+  border-color: var(--chrome-white) var(--chrome-darker) var(--chrome-darker) var(--chrome-white);
+  margin: 3px 4px 3px 3px;
   font-weight: bold;
   font-size: 11px;
   font-family: "Tahoma", "MS Sans Serif", sans-serif;
@@ -1968,6 +1970,10 @@ a:hover {
   cursor: default;
   padding: 0 8px;
   text-align: left;
+}
+
+#taskbar-start:active {
+  border-color: var(--chrome-darker) var(--chrome-white) var(--chrome-white) var(--chrome-darker);
 }
 
 .taskbar__task {
@@ -1992,12 +1998,18 @@ a:hover {
   border-color: var(--chrome-darker) var(--chrome-white) var(--chrome-white) var(--chrome-darker);
 }
 
+.taskbar__task:active {
+  border-color: var(--chrome-darker) var(--chrome-white) var(--chrome-white) var(--chrome-darker);
+}
+
 .taskbar__clock {
   margin-left: auto;
-  padding: 0 10px;
   font-size: 11px;
   font-family: "Tahoma", "MS Sans Serif", sans-serif;
-  border-left: 1px solid var(--chrome-dark);
+  border-width: 1px;
+  border-style: solid;
+  border-color: var(--chrome-dark) var(--chrome-white) var(--chrome-white) var(--chrome-dark);
+  padding: 0 8px;
   display: flex;
   align-items: center;
 }
@@ -2069,7 +2081,7 @@ a:hover {
   color: #000000;
   line-height: 1;
   padding: 0;
-  font-family: "Tahoma", monospace;
+  font-family: "Tahoma", "MS Sans Serif", sans-serif;
 }
 
 .player-window__winbtn:active {
