@@ -89,8 +89,8 @@ function initDrag(): void {
     if (!dragging) return;
     windowEl.style.left = `${startLeft + (e.clientX - startX)}px`;
     windowEl.style.top = `${startTop + (e.clientY - startY)}px`;
-    windowEl.style.bottom = "auto";
-    windowEl.style.right = "auto";
+    windowEl.style.removeProperty("bottom");
+    windowEl.style.removeProperty("right");
   });
 
   document.addEventListener("mouseup", () => {
