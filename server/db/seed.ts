@@ -12,6 +12,7 @@ const SEED_SOURCES = [
   { name: "deezer", displayName: "Deezer", urlPattern: "deezer.com" },
   { name: "mixcloud", displayName: "Mixcloud", urlPattern: "mixcloud.com" },
   { name: "nts", displayName: "NTS Radio", urlPattern: "nts.live" },
+  { name: "pitchfork", displayName: "Pitchfork", urlPattern: "pitchfork.com" },
   { name: "physical", displayName: "Physical Media", urlPattern: null },
 ] as const;
 

@@ -82,6 +82,10 @@ const URL_PATTERNS: Array<{
       potentialTitle: match[2]?.replace(/-/g, " "),
     }),
   },
+  {
+    source: "pitchfork",
+    pattern: /^https?:\/\/(?:www\.)?pitchfork\.com\/reviews\/(?:albums|tracks|eps)\/([^/?]+)/,
+  },
 ];
 
 export function parseUrl(url: string): ParsedUrl {

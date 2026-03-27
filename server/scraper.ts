@@ -819,6 +819,32 @@ export function parseCanonicalUrl(html: string): string | undefined {
   return match?.[1]?.trim() || undefined;
 }
 
+export function parsePitchforkOg(og: OgData): ScrapedMetadata {
+  const rawTitle = og.ogTitle || og.title || "";
+  // Pitchfork format: "Artist: Title Album Review | Pitchfork"
+  // Also handles EP, Track, Reissue, Compilation review types.
+  const withoutSite = rawTitle.replace(/\s*\|\s*Pitchfork\s*$/i, "").trim();
+
+  const colonIdx = withoutSite.indexOf(": ");
+  if (colonIdx !== -1) {
+    const artist = withoutSite.slice(0, colonIdx).trim();
+    const titleWithType = withoutSite.slice(colonIdx + 2).trim();
+    const title = titleWithType
+      .replace(/\s+(?:Album|EP|Single|Track|Reissue|Compilation)\s+Review\s*$/i, "")
+      .trim();
+    return {
+      potentialArtist: artist || undefined,
+      potentialTitle: title || undefined,
+      imageUrl: og.ogImage,
+    };
+  }
+
+  return {
+    potentialTitle: withoutSite || undefined,
+    imageUrl: og.ogImage,
+  };
+}
+
 export function parseNtsOg(og: OgData): ScrapedMetadata {
   const rawTitle = og.ogTitle || og.title || "";
   // NTS format: "Show Name - Episode Info | NTS Radio" or "Show Name | NTS"
@@ -840,6 +866,7 @@ export const SOURCE_PARSERS: Partial<Record<SourceName, OgParser>> = {
   apple_music: parseAppleMusicOg,
   mixcloud: parseMixcloudOg,
   nts: parseNtsOg,
+  pitchfork: parsePitchforkOg,
 };
 
 export async function scrapeUrl(

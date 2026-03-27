@@ -148,3 +148,53 @@ describe("parseUrl - apple music", () => {
     expect(result.source).toBe("apple_music");
   });
 });
+
+describe("parseUrl - pitchfork", () => {
+  test("identifies pitchfork album review link", () => {
+    const result = parseUrl(
+      "https://pitchfork.com/reviews/albums/shinichi-atobe-silent-way/",
+    );
+
+    expect(result.source).toBe("pitchfork");
+  });
+
+  test("strips trailing slash from normalized URL", () => {
+    const result = parseUrl(
+      "https://pitchfork.com/reviews/albums/shinichi-atobe-silent-way/",
+    );
+
+    expect(result.normalizedUrl).toBe(
+      "https://pitchfork.com/reviews/albums/shinichi-atobe-silent-way/",
+    );
+  });
+
+  test("identifies pitchfork track review link", () => {
+    const result = parseUrl(
+      "https://pitchfork.com/reviews/tracks/burial-antidawn/",
+    );
+
+    expect(result.source).toBe("pitchfork");
+  });
+
+  test("identifies pitchfork EP review link", () => {
+    const result = parseUrl(
+      "https://pitchfork.com/reviews/eps/actress-karma-and-desire/",
+    );
+
+    expect(result.source).toBe("pitchfork");
+  });
+
+  test("matches pitchfork.com URLs without www prefix", () => {
+    const result = parseUrl(
+      "https://www.pitchfork.com/reviews/albums/burial-untrue/",
+    );
+
+    expect(result.source).toBe("pitchfork");
+  });
+
+  test("does not match non-review pitchfork URLs", () => {
+    const result = parseUrl("https://pitchfork.com/features/lists-and-guides/best-albums/");
+
+    expect(result.source).toBe("unknown");
+  });
+});

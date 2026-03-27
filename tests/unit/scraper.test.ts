@@ -15,6 +15,7 @@ import {
   extractMixcloudEmbedUrl,
   searchAppleMusic,
   parseNtsOg,
+  parsePitchforkOg,
   parseCanonicalUrl,
 } from "../../server/scraper";
 
@@ -979,6 +980,50 @@ describe("parseNtsOg", () => {
     const result = parseNtsOg(og);
     expect(result.potentialTitle).toBe("Tropic Of Cancer - 6th March 2026");
     expect(result.itemType).toBe("mix");
+  });
+});
+
+describe("parsePitchforkOg", () => {
+  test('splits "Artist: Title Album Review | Pitchfork" format', () => {
+    const result = parsePitchforkOg({
+      ogTitle: "Shinichi Atobe: Silent Way Album Review | Pitchfork",
+      ogImage: "https://media.pitchfork.com/photos/cover.jpg",
+    });
+    expect(result.potentialArtist).toBe("Shinichi Atobe");
+    expect(result.potentialTitle).toBe("Silent Way");
+    expect(result.imageUrl).toBe("https://media.pitchfork.com/photos/cover.jpg");
+  });
+
+  test('strips EP Review suffix', () => {
+    const result = parsePitchforkOg({
+      ogTitle: "Actress: Karma & Desire EP Review | Pitchfork",
+    });
+    expect(result.potentialArtist).toBe("Actress");
+    expect(result.potentialTitle).toBe("Karma & Desire");
+  });
+
+  test('strips Reissue Review suffix', () => {
+    const result = parsePitchforkOg({
+      ogTitle: "Talk Talk: Spirit of Eden Reissue Review | Pitchfork",
+    });
+    expect(result.potentialArtist).toBe("Talk Talk");
+    expect(result.potentialTitle).toBe("Spirit of Eden");
+  });
+
+  test("handles title without colon separator", () => {
+    const result = parsePitchforkOg({
+      ogTitle: "Best New Albums of 2024 | Pitchfork",
+    });
+    expect(result.potentialTitle).toBe("Best New Albums of 2024");
+    expect(result.potentialArtist).toBeUndefined();
+  });
+
+  test("returns og:image as imageUrl", () => {
+    const result = parsePitchforkOg({
+      ogTitle: "Burial: Untrue Album Review | Pitchfork",
+      ogImage: "https://media.pitchfork.com/photos/untrue.jpg",
+    });
+    expect(result.imageUrl).toBe("https://media.pitchfork.com/photos/untrue.jpg");
   });
 });
 
