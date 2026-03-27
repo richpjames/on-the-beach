@@ -431,14 +431,6 @@ function renderMainPage(opts: {
       </div>
       <footer class="footer">
         <span id="app-version">v${escapeHtml(opts.appVersion)}</span>
-        <div id="now-playing-bar" class="now-playing-bar" hidden>
-          <span class="now-playing-bar__icon" aria-hidden="true">♫</span>
-          <button id="now-playing-reopen" class="now-playing-bar__info" title="Show player">
-            <span id="now-playing-title" class="now-playing-bar__title"></span>
-            <span id="now-playing-artist" class="now-playing-bar__artist"></span>
-          </button>
-          <button id="now-playing-stop" class="now-playing-bar__stop" aria-label="Stop playback" title="Stop">✕</button>
-        </div>
       </footer>
 
       <div id="release-modal" class="release-modal" hidden>
@@ -453,7 +445,17 @@ function renderMainPage(opts: {
         </div>
       </div>
 
-      <div id="now-playing-player" aria-hidden="true"></div>
+      <div id="now-playing-player" class="player-window" hidden aria-hidden="true">
+        <div class="player-window__titlebar" id="player-titlebar">
+          <span class="player-window__icon" aria-hidden="true">♫</span>
+          <span class="player-window__title" id="player-title-text">Now Playing</span>
+          <div class="player-window__winbtns">
+            <button class="player-window__winbtn" id="player-minimize" title="Minimize">_</button>
+            <button class="player-window__winbtn player-window__winbtn--close" id="player-close" aria-label="Stop playback" title="Close">✕</button>
+          </div>
+        </div>
+        <div class="player-window__body" id="player-body"></div>
+      </div>
 
       <!-- Persistent release-page view: populated by src/router.ts on SPA navigation -->
       <div id="release-view" hidden></div>
@@ -504,6 +506,14 @@ function renderMainPage(opts: {
 
     <script id="__initial_state__" type="application/json">${opts.stacksJson}</script>${viteClient}
     <script type="module" src="${escapeHtml(opts.scriptSrc)}"></script>
+    <div id="taskbar">
+      <button id="taskbar-start" class="taskbar__start">🪟 Start</button>
+      <button id="taskbar-np-btn" class="taskbar__task" hidden>
+        <span aria-hidden="true">♫</span>
+        <span id="taskbar-np-label"></span>
+      </button>
+      <span id="taskbar-clock" class="taskbar__clock"></span>
+    </div>
   </body>
 </html>`;
 }
