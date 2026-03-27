@@ -6,6 +6,30 @@ describe("parseScanJson", () => {
     expect(parseScanJson('{"artist":"Radiohead","title":"OK Computer"}')).toEqual({
       artist: "Radiohead",
       title: "OK Computer",
+      confidence: 0,
+    });
+  });
+
+  test("parses confidence when present", () => {
+    expect(parseScanJson('{"artist":"Radiohead","title":"OK Computer","confidence":0.95}')).toEqual(
+      {
+        artist: "Radiohead",
+        title: "OK Computer",
+        confidence: 0.95,
+      },
+    );
+  });
+
+  test("clamps confidence to [0, 1]", () => {
+    expect(parseScanJson('{"artist":"X","title":"Y","confidence":1.5}')).toEqual({
+      artist: "X",
+      title: "Y",
+      confidence: 1,
+    });
+    expect(parseScanJson('{"artist":"X","title":"Y","confidence":-0.5}')).toEqual({
+      artist: "X",
+      title: "Y",
+      confidence: 0,
     });
   });
 
@@ -13,6 +37,7 @@ describe("parseScanJson", () => {
     expect(parseScanJson('```json\n{"artist":"Bonobo","title":"Migration"}\n```')).toEqual({
       artist: "Bonobo",
       title: "Migration",
+      confidence: 0,
     });
   });
 
@@ -20,6 +45,7 @@ describe("parseScanJson", () => {
     expect(parseScanJson('{"artist":"","title":"OK Computer"}')).toEqual({
       artist: null,
       title: "OK Computer",
+      confidence: 0,
     });
   });
 
@@ -27,6 +53,7 @@ describe("parseScanJson", () => {
     expect(parseScanJson('{"artist":"NULL","title":" null "}')).toEqual({
       artist: null,
       title: null,
+      confidence: 0,
     });
   });
 

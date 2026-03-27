@@ -2,7 +2,8 @@ import { Hono } from "hono";
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { eq, and } from "drizzle-orm";
-import { extractReleaseInfo } from "../vision";
+import { extractReleaseInfo, extractReleaseInfoFromWebContext } from "../vision";
+import { getWebContext } from "../google-vision";
 import { lookupRelease } from "../musicbrainz";
 import { fetchAndSaveCoverArt } from "../cover-art-archive";
 import { createScanEnricher } from "../scan-enricher";
@@ -159,7 +160,12 @@ async function saveReleaseImage(base64Image: string): Promise<string> {
 }
 
 export function createReleaseRoutes(
-  scanReleaseCover: ExtractReleaseInfoFn = createScanEnricher(extractReleaseInfo, lookupRelease),
+  scanReleaseCover: ExtractReleaseInfoFn = createScanEnricher(
+    extractReleaseInfo,
+    lookupRelease,
+    getWebContext,
+    extractReleaseInfoFromWebContext,
+  ),
   saveImage: SaveReleaseImageFn = saveReleaseImage,
   lookupReleaseFn: LookupReleaseFn = lookupRelease,
   fetchCoverArtFn: FetchCoverArtFn = fetchAndSaveCoverArt,
