@@ -4,6 +4,8 @@ declare global {
   }
 }
 
+let clockInterval: ReturnType<typeof setInterval> | null = null;
+
 let windowEl: HTMLElement;
 let titleEl: HTMLElement;
 let bodyEl: HTMLElement;
@@ -30,7 +32,12 @@ export function initPlayer(): void {
 function load(src: string, title: string, artist: string): void {
   const label = artist ? `${artist} — ${title}` : title;
 
-  bodyEl.innerHTML = `<iframe src="${src}" seamless title="Bandcamp player"></iframe>`;
+  bodyEl.innerHTML = "";
+  const iframe = document.createElement("iframe");
+  iframe.src = src;
+  iframe.title = "Bandcamp player";
+  iframe.setAttribute("seamless", "");
+  bodyEl.appendChild(iframe);
   titleEl.textContent = label;
   npLabelEl.textContent = label;
 
@@ -83,6 +90,14 @@ function initDrag(): void {
     startLeft = rect.left;
     startTop = rect.top;
     e.preventDefault();
+
+    document.addEventListener(
+      "mouseup",
+      () => {
+        dragging = false;
+      },
+      { once: true },
+    );
   });
 
   document.addEventListener("mousemove", (e) => {
@@ -91,10 +106,6 @@ function initDrag(): void {
     windowEl.style.top = `${startTop + (e.clientY - startY)}px`;
     windowEl.style.removeProperty("bottom");
     windowEl.style.removeProperty("right");
-  });
-
-  document.addEventListener("mouseup", () => {
-    dragging = false;
   });
 }
 
@@ -111,5 +122,6 @@ function initClock(): void {
   }
 
   tick();
-  setInterval(tick, 10_000);
+  if (clockInterval !== null) clearInterval(clockInterval);
+  clockInterval = setInterval(tick, 10_000);
 }
