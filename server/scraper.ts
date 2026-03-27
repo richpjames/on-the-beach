@@ -1072,6 +1072,11 @@ export async function searchAppleMusic(
       try {
         const u = new URL(raw);
         u.search = "";
+        if (u.hostname === "itunes.apple.com") {
+          u.hostname = "music.apple.com";
+          // iTunes paths use /id123456789 suffix; Apple Music uses /123456789
+          u.pathname = u.pathname.replace(/\/id(\d+)$/, "/$1");
+        }
         return u.toString();
       } catch {
         return raw;
