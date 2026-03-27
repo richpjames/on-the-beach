@@ -286,10 +286,6 @@ export function createReleaseRoutes(
       return c.json({ error: "Not found" }, 404);
     }
 
-    if (item.primarySource && PLAYABLE_SOURCES.has(item.primarySource)) {
-      return c.json({ skipped: true }, 200);
-    }
-
     if (
       item.primaryUrl &&
       (parseUrl(item.primaryUrl).source === "apple_music" ||
