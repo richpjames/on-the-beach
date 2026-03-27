@@ -450,7 +450,7 @@ function renderMainPage(opts: {
           <span class="player-window__icon" aria-hidden="true">♫</span>
           <span class="player-window__title" id="player-title-text">Now Playing</span>
           <div class="player-window__winbtns">
-            <button class="player-window__winbtn" id="player-minimize" title="Minimize">_</button>
+            <button class="player-window__winbtn" id="player-minimize" aria-label="Minimize" title="Minimize">_</button>
             <button class="player-window__winbtn player-window__winbtn--close" id="player-close" aria-label="Stop playback" title="Close">✕</button>
           </div>
         </div>
@@ -504,8 +504,6 @@ function renderMainPage(opts: {
         </div>
       </div>
 
-    <script id="__initial_state__" type="application/json">${opts.stacksJson}</script>${viteClient}
-    <script type="module" src="${escapeHtml(opts.scriptSrc)}"></script>
     <div id="taskbar">
       <button id="taskbar-start" class="taskbar__start">🪟 Start</button>
       <button id="taskbar-np-btn" class="taskbar__task" hidden>
@@ -514,6 +512,8 @@ function renderMainPage(opts: {
       </button>
       <span id="taskbar-clock" class="taskbar__clock"></span>
     </div>
+    <script id="__initial_state__" type="application/json">${opts.stacksJson}</script>${viteClient}
+    <script type="module" src="${escapeHtml(opts.scriptSrc)}"></script>
   </body>
 </html>`;
 }
