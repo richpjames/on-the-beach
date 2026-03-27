@@ -91,7 +91,7 @@ function renderBandcampEmbed(item: MusicItemFull): string {
   if (!albumId) return "";
 
   const embedType = meta.item_type === "track" ? "track" : "album";
-  const src = `https://bandcamp.com/EmbeddedPlayer/${embedType}=${escapeHtml(albumId)}/size=large/bgcol=ffffff/linkcol=0687f5/artwork=none/transparent=true/`;
+  const src = `https://bandcamp.com/EmbeddedPlayer/${escapeHtml(embedType)}=${escapeHtml(albumId)}/size=large/bgcol=ffffff/linkcol=0687f5/artwork=none/transparent=true/`;
 
   const title = escapeHtml(item.title);
   const artist = escapeHtml(item.artist_name ?? "");
@@ -265,11 +265,14 @@ function renderReleasePage(item: MusicItemFull, cssHref: string): string {
       const listenBtn = document.querySelector('.release-page__listen-btn');
       if (listenBtn) {
         listenBtn.addEventListener('click', () => {
-          window.__player?.load(
-            listenBtn.dataset.src,
-            listenBtn.dataset.title,
-            listenBtn.dataset.artist,
-          );
+          const src = listenBtn.dataset.src;
+          if (src) {
+            window.__player?.load(
+              src,
+              listenBtn.dataset.title ?? '',
+              listenBtn.dataset.artist ?? '',
+            );
+          }
         });
       }
 
