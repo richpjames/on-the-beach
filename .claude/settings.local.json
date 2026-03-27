@@ -60,7 +60,14 @@
       "Bash(scp:*)",
       "mcp__plugin_playwright_playwright__browser_click",
       "mcp__plugin_playwright_playwright__browser_evaluate",
-      "mcp__plugin_playwright_playwright__browser_run_code"
+      "mcp__plugin_playwright_playwright__browser_run_code",
+      "Bash(chmod:*)",
+      "Bash(/dev/null diff:*)",
+      "Bash(npx tsc:*)",
+      "Bash(/dev/null echo:*)"
     ]
+  },
+  "remote": {
+    "defaultEnvironmentId": "env_014GUU4HmjNN6ENCtCL3aNcs"
   }
 }
