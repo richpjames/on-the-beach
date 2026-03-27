@@ -5,8 +5,15 @@ import { parseScanJson } from "./scan-parser";
 const DEFAULT_SCAN_MODEL = "mistral-ocr-latest";
 
 const SCAN_PROMPT =
-  "You are reading a photo of a music release cover. Respond with JSON only using keys artist and title. " +
-  'If uncertain, use null values. Example: {"artist":"Radiohead","title":"OK Computer"}';
+  "You are reading a photo of a music release cover. Respond with JSON only using keys artist, title, and confidence. " +
+  "confidence is a number from 0 to 1 reflecting your certainty about the extracted artist and title. " +
+  'If uncertain, use null values for artist/title and a low confidence score. Example: {"artist":"Radiohead","title":"OK Computer","confidence":0.95}';
+
+const WEB_CONTEXT_PROMPT =
+  "You are reading a photo of a music release cover. Web search results for this image are provided below to help identify the release. " +
+  "Respond with JSON only using keys artist, title, and confidence. " +
+  "confidence is a number from 0 to 1 reflecting your certainty about the extracted artist and title. " +
+  'If uncertain, use null values for artist/title and a low confidence score. Example: {"artist":"Radiohead","title":"OK Computer","confidence":0.95}';
 
 const OCR_SCHEMA = {
   name: "music_release_scan",
@@ -17,8 +24,9 @@ const OCR_SCHEMA = {
     properties: {
       artist: { type: ["string", "null"] },
       title: { type: ["string", "null"] },
+      confidence: { type: "number" },
     },
-    required: ["artist", "title"],
+    required: ["artist", "title", "confidence"],
   },
 } as const;
 
@@ -143,6 +151,50 @@ async function extractWithOcr(
   });
 
   return parseOcrResponse(response);
+}
+
+export async function extractReleaseInfoFromWebContext(
+  base64Image: string,
+  webContext: string,
+): Promise<ScanResult | null> {
+  const apiKey = process.env.MISTRAL_API_KEY;
+  if (!apiKey) {
+    return null;
+  }
+
+  const model = getScanModel();
+  const client = new Mistral({ apiKey });
+
+  try {
+    const response = await client.chat.complete({
+      model,
+      temperature: 0,
+      responseFormat: { type: "json_object" },
+      messages: [
+        {
+          role: "user",
+          content: [
+            { type: "text", text: `${WEB_CONTEXT_PROMPT}\n\nWeb context:\n${webContext}` },
+            { type: "image_url", imageUrl: `data:image/jpeg;base64,${base64Image}` },
+          ],
+        },
+      ],
+    });
+
+    const message = response.choices[0]?.message?.content;
+    const textContent = contentToText(message);
+    if (!textContent) {
+      console.error("[vision] Mistral web context pass returned no text content");
+      return null;
+    }
+
+    const result = parseScanJson(textContent);
+    console.log("[vision] Mistral web context scan result:", result);
+    return result;
+  } catch (err) {
+    console.error("[vision] Mistral API error (web context pass):", err);
+    return null;
+  }
 }
 
 export async function extractReleaseInfo(base64Image: string): Promise<ScanResult | null> {
