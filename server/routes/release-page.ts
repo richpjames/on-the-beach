@@ -93,13 +93,15 @@ function renderBandcampEmbed(item: MusicItemFull): string {
   const embedType = meta.item_type === "track" ? "track" : "album";
   const src = `https://bandcamp.com/EmbeddedPlayer/${embedType}=${escapeHtml(albumId)}/size=large/bgcol=ffffff/linkcol=0687f5/artwork=none/transparent=true/`;
 
-  return `<iframe
-    class="release-page__bandcamp-embed"
-    src="${src}"
-    seamless
-    style="border:0;width:100%;height:300px;"
-    title="Bandcamp player"
-  ></iframe>`;
+  const title = escapeHtml(item.title);
+  const artist = escapeHtml(item.artist_name ?? "");
+
+  return `<button
+    class="release-page__listen-btn"
+    data-src="${src}"
+    data-title="${title}"
+    data-artist="${artist}"
+  >▶ Listen</button>`;
 }
 
 function renderMixcloudEmbedFromMetadata(item: MusicItemFull): string {
@@ -259,6 +261,17 @@ function renderReleasePage(item: MusicItemFull, cssHref: string): string {
     </main>
     <script>
       const ITEM_ID = ${item.id};
+
+      const listenBtn = document.querySelector('.release-page__listen-btn');
+      if (listenBtn) {
+        listenBtn.addEventListener('click', () => {
+          window.__player?.load(
+            listenBtn.dataset.src,
+            listenBtn.dataset.title,
+            listenBtn.dataset.artist,
+          );
+        });
+      }
 
       document.getElementById('edit-btn').addEventListener('click', () => {
         document.getElementById('view-mode').hidden = true;
