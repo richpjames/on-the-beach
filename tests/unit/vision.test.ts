@@ -74,18 +74,18 @@ describe("extractReleaseInfo", () => {
     mock.restore();
   });
 
-  test("uses OCR by default and parses document annotation JSON", async () => {
+  test("uses chat model by default and parses JSON response", async () => {
     spyOn(globalThis, "fetch").mockResolvedValueOnce(
-      mockOcrResponse({
-        documentAnnotation: '{"artist":"Radiohead","title":"OK Computer"}',
-      }),
+      mockChatCompletionResponse('{"artist":"Radiohead","title":"OK Computer"}'),
     );
 
     const result = await extractReleaseInfo("base64-image-data");
     expect(result).toEqual({ artist: "Radiohead", title: "OK Computer", confidence: 0 });
   });
 
-  test("parses OCR JSON found in page markdown when annotation is missing", async () => {
+  test("parses OCR JSON found in page markdown when OCR model is set", async () => {
+    process.env.MISTRAL_SCAN_MODEL = "mistral-ocr-latest";
+
     spyOn(globalThis, "fetch").mockResolvedValueOnce(
       mockOcrResponse({
         pages: [{ markdown: '{"artist":"Bonobo","title":"Migration"}' }],
@@ -96,7 +96,7 @@ describe("extractReleaseInfo", () => {
     expect(result).toEqual({ artist: "Bonobo", title: "Migration", confidence: 0 });
   });
 
-  test("supports chat model fallback via MISTRAL_SCAN_MODEL", async () => {
+  test("supports chat model override via MISTRAL_SCAN_MODEL", async () => {
     process.env.MISTRAL_SCAN_MODEL = "mistral-small-latest";
 
     spyOn(globalThis, "fetch").mockResolvedValueOnce(

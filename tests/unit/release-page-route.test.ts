@@ -183,7 +183,7 @@ describe("Apple Music secondary lookup", () => {
 });
 
 describe("Bandcamp embed", () => {
-  test("renders embed iframe when primary_source is bandcamp and metadata has album_id", async () => {
+  test("renders listen button when primary_source is bandcamp and metadata has album_id", async () => {
     const item = {
       ...baseItem,
       primary_url: "https://artist.bandcamp.com/album/my-album",
@@ -195,7 +195,7 @@ describe("Bandcamp embed", () => {
     const res = await app.request("http://localhost/r/42");
     const html = await res.text();
     expect(html).toContain("bandcamp.com/EmbeddedPlayer/album=1536701931");
-    expect(html).toContain("<iframe");
+    expect(html).toContain("release-page__listen-btn");
   });
 
   test("does not render embed when primary_source is not bandcamp", async () => {
