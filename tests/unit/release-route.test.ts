@@ -329,7 +329,7 @@ describe("POST /api/release/apple-music-lookup/:id", () => {
     expect(res.status).toBe(404);
   });
 
-  test("returns skipped when item already has a playable source", async () => {
+  test("searches Apple Music even when primary source is a playable source", async () => {
     mockFetchItemForLookup.mockResolvedValue({
       title: "Blue Lines",
       artistName: "Massive Attack",
@@ -341,8 +341,8 @@ describe("POST /api/release/apple-music-lookup/:id", () => {
     });
     expect(res.status).toBe(200);
     const body = await res.json();
-    expect(body.skipped).toBe(true);
-    expect(mockSearchAppleMusic).not.toHaveBeenCalled();
+    expect(body.url).toBeNull();
+    expect(mockSearchAppleMusic).toHaveBeenCalled();
   });
 
   test("returns existing Apple Music link without searching again", async () => {
@@ -414,7 +414,7 @@ describe("POST /api/release/apple-music-lookup/:id", () => {
     expect(mockSearchAppleMusic).toHaveBeenCalled();
   });
 
-  test("skips search when primary source is bandcamp (playable)", async () => {
+  test("searches Apple Music when primary source is bandcamp", async () => {
     mockFetchItemForLookup.mockResolvedValue({
       title: "Some Album",
       artistName: "Some Artist",
@@ -426,8 +426,8 @@ describe("POST /api/release/apple-music-lookup/:id", () => {
       method: "POST",
     });
     const body = await res.json();
-    expect(body.skipped).toBe(true);
-    expect(mockSearchAppleMusic).not.toHaveBeenCalled();
+    expect(body.url).toBeNull();
+    expect(mockSearchAppleMusic).toHaveBeenCalled();
   });
 
   test("skips search when primary URL is Apple Music even if primarySource is null", async () => {
