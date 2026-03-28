@@ -39,7 +39,7 @@ describe("app state machine", () => {
 
     const ctx = actor.getSnapshot().context;
     expect(ctx.isReady).toBe(true);
-    expect(ctx.currentFilter).toBe("listened");
+    expect(ctx.currentFilter).toBe("all");
     expect(ctx.currentStack).toBe(4);
     expect(ctx.searchQuery).toBe("dub");
     expect(ctx.currentSort).toBe("star-rating");

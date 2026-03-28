@@ -55,7 +55,7 @@ const URL_PATTERNS: Array<{
   },
   {
     source: "discogs",
-    pattern: /^https?:\/\/(?:www\.)?discogs\.com\/(release|master)\/(\d+)/,
+    pattern: /^https?:\/\/(?:www\.)?discogs\.com\/(?:(?:release|master)\/\d+|sell\/item\/\d+)/,
   },
   {
     source: "tidal",

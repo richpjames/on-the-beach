@@ -16,7 +16,11 @@ const MASTER_FIXTURE = {
   genres: ["Electronic"],
   styles: ["Grime", "UK Funky"],
   images: [
-    { type: "primary", uri: "https://img.discogs.com/cover.jpg", uri150: "https://img.discogs.com/cover150.jpg" },
+    {
+      type: "primary",
+      uri: "https://img.discogs.com/cover.jpg",
+      uri150: "https://img.discogs.com/cover150.jpg",
+    },
     { type: "secondary", uri: "https://img.discogs.com/back.jpg" },
   ],
 };
@@ -30,7 +34,7 @@ const RELEASE_FIXTURE = {
   styles: ["Techno"],
   country: "UK",
   labels: [{ name: "Test Label", catno: "TL001" }],
-  formats: [{ name: "Vinyl", qty: "1", descriptions: ["EP", "12\""] }],
+  formats: [{ name: "Vinyl", qty: "1", descriptions: ["EP", '12"'] }],
   images: [
     { type: "secondary", uri: "https://img.discogs.com/secondary.jpg" },
     { type: "primary", uri: "https://img.discogs.com/primary.jpg" },
@@ -81,7 +85,7 @@ describe("parseDiscogsRelease", () => {
   test("infers single itemType from formats", () => {
     const data = {
       title: "Test",
-      formats: [{ name: "Vinyl", descriptions: ["Single", "7\""] }],
+      formats: [{ name: "Vinyl", descriptions: ["Single", '7"'] }],
     };
     const result = parseDiscogsRelease(data);
     expect(result?.itemType).toBe("single");
@@ -148,7 +152,10 @@ describe("fetchDiscogsRelease", () => {
       makeDiscogsResponse(MASTER_FIXTURE),
     );
 
-    await fetchDiscogsRelease("https://www.discogs.com/master/1033558-Dot-Rotten-Rotten-Riddims-Vol-1", 5000);
+    await fetchDiscogsRelease(
+      "https://www.discogs.com/master/1033558-Dot-Rotten-Rotten-Riddims-Vol-1",
+      5000,
+    );
 
     const [url] = fetchSpy.mock.calls[0] as [string, RequestInit];
     expect(url).toBe("https://api.discogs.com/masters/1033558");
@@ -210,6 +217,38 @@ describe("fetchDiscogsRelease", () => {
     spyOn(globalThis, "fetch").mockRejectedValueOnce(new Error("network error"));
 
     const result = await fetchDiscogsRelease("https://www.discogs.com/master/1033558", 5000);
+    expect(result).toBeNull();
+  });
+
+  test("resolves sell/item URL via marketplace listing", async () => {
+    const fetchSpy = spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(makeDiscogsResponse({ release: { id: 5678 } }))
+      .mockResolvedValueOnce(makeDiscogsResponse(RELEASE_FIXTURE));
+
+    const result = await fetchDiscogsRelease("https://www.discogs.com/sell/item/4090403029", 5000);
+
+    const [listingUrl] = fetchSpy.mock.calls[0] as [string, RequestInit];
+    expect(listingUrl).toBe("https://api.discogs.com/marketplace/listings/4090403029");
+
+    const [releaseUrl] = fetchSpy.mock.calls[1] as [string, RequestInit];
+    expect(releaseUrl).toBe("https://api.discogs.com/releases/5678");
+
+    expect(result).toEqual({
+      potentialTitle: "Some EP",
+      potentialArtist: "Test Artist",
+      imageUrl: "https://img.discogs.com/primary.jpg",
+      itemType: "ep",
+      year: 2016,
+      genre: "Techno",
+    });
+  });
+
+  test("returns null when sell/item listing cannot be resolved", async () => {
+    spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      makeDiscogsResponse({ message: "Not Found" }, 404),
+    );
+
+    const result = await fetchDiscogsRelease("https://www.discogs.com/sell/item/9999999", 5000);
     expect(result).toBeNull();
   });
 });

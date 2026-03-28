@@ -64,7 +64,8 @@
       "Bash(chmod:*)",
       "Bash(/dev/null diff:*)",
       "Bash(npx tsc:*)",
-      "Bash(/dev/null echo:*)"
+      "Bash(/dev/null echo:*)",
+      "mcp__plugin_playwright_playwright__browser_console_messages"
     ]
   },
   "remote": {
