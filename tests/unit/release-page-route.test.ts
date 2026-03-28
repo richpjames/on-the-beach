@@ -309,7 +309,7 @@ describe("YouTube embed", () => {
     ["www.youtube.com", "https://www.youtube.com/watch?v=iS7-iBia7GE"],
     ["m.youtube.com (mobile)", "https://m.youtube.com/watch?v=iS7-iBia7GE"],
     ["youtu.be (shortlink)", "https://youtu.be/iS7-iBia7GE"],
-  ])("renders YouTube embed for %s URL", async (_label, primary_url) => {
+  ])("renders YouTube watch button for %s URL", async (_label, primary_url) => {
     const item = {
       ...baseItem,
       primary_url,
@@ -320,8 +320,10 @@ describe("YouTube embed", () => {
     const app = makeApp();
     const res = await app.request("http://localhost/r/42");
     const html = await res.text();
-    expect(html).toContain("youtube-nocookie.com/embed/iS7-iBia7GE");
-    expect(html).toContain("<iframe");
+    expect(html).toContain('data-src="https://www.youtube-nocookie.com/embed/iS7-iBia7GE"');
+    expect(html).toContain('data-player-type="video"');
+    expect(html).toContain("release-page__listen-btn");
+    expect(html).not.toContain("<iframe");
   });
 
   test("does not render YouTube embed when primary_source is not youtube", async () => {
@@ -352,7 +354,7 @@ describe("YouTube embed", () => {
     expect(html).not.toContain("youtube-nocookie.com/embed");
   });
 
-  test("renders YouTube playlist embed for playlist URL", async () => {
+  test("renders YouTube watch button for playlist URL", async () => {
     const item = {
       ...baseItem,
       primary_url: "https://www.youtube.com/playlist?list=PLE31AAD9114F343C4",
@@ -363,8 +365,28 @@ describe("YouTube embed", () => {
     const app = makeApp();
     const res = await app.request("http://localhost/r/42");
     const html = await res.text();
-    expect(html).toContain("youtube-nocookie.com/embed/videoseries?list=PLE31AAD9114F343C4");
-    expect(html).toContain("<iframe");
+    expect(html).toContain(
+      'data-src="https://www.youtube-nocookie.com/embed/videoseries?list=PLE31AAD9114F343C4"',
+    );
+    expect(html).toContain('data-player-type="video"');
+    expect(html).toContain("release-page__listen-btn");
+    expect(html).not.toContain("<iframe");
+  });
+
+  test("shows artwork image for youtube items instead of inline video", async () => {
+    const item = {
+      ...baseItem,
+      primary_url: "https://www.youtube.com/watch?v=iS7-iBia7GE",
+      primary_source: "youtube" as const,
+      artwork_url: "/uploads/yt-art.jpg",
+      primary_link_metadata: null,
+    };
+    mockFetchItem.mockResolvedValue(item);
+    const app = makeApp();
+    const res = await app.request("http://localhost/r/42");
+    const html = await res.text();
+    expect(html).toContain('src="/uploads/yt-art.jpg"');
+    expect(html).toContain("release-page__artwork");
   });
 
   test("does not render YouTube playlist URL as a standalone source link", async () => {

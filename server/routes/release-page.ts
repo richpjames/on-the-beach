@@ -53,33 +53,35 @@ function parseLinkMetadata(raw: string | null): Record<string, string> | null {
   return null;
 }
 
-function renderYouTubeEmbed(item: MusicItemFull): string {
+function renderYouTubeButton(item: MusicItemFull): string {
   if (!item.primary_url) return "";
 
   const videoId = extractYouTubeVideoId(item.primary_url);
   if (videoId && /^[\w-]+$/.test(videoId)) {
     const src = `https://www.youtube-nocookie.com/embed/${escapeHtml(videoId)}`;
-    return `<iframe
-    class="release-page__youtube-embed"
-    src="${src}"
-    style="border:0;width:100%;aspect-ratio:16/9;"
-    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-    allowfullscreen
-    title="YouTube player"
-  ></iframe>`;
+    const title = escapeHtml(item.title);
+    const artist = escapeHtml(item.artist_name ?? "");
+    return `<button
+    class="release-page__listen-btn"
+    data-src="${src}"
+    data-title="${title}"
+    data-artist="${artist}"
+    data-player-type="video"
+  >▶ Watch</button>`;
   }
 
   const playlistId = extractYouTubePlaylistId(item.primary_url);
   if (playlistId && /^[\w-]+$/.test(playlistId)) {
     const src = `https://www.youtube-nocookie.com/embed/videoseries?list=${escapeHtml(playlistId)}`;
-    return `<iframe
-    class="release-page__youtube-embed"
-    src="${src}"
-    style="border:0;width:100%;aspect-ratio:16/9;"
-    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-    allowfullscreen
-    title="YouTube playlist player"
-  ></iframe>`;
+    const title = escapeHtml(item.title);
+    const artist = escapeHtml(item.artist_name ?? "");
+    return `<button
+    class="release-page__listen-btn"
+    data-src="${src}"
+    data-title="${title}"
+    data-artist="${artist}"
+    data-player-type="video"
+  >▶ Watch</button>`;
   }
 
   return "";
@@ -194,7 +196,7 @@ function renderReleasePage(item: MusicItemFull, cssHref: string): string {
 
           <div class="release-page__body">
 
-            ${extractYouTubeVideoId(item.primary_url ?? "") || extractYouTubePlaylistId(item.primary_url ?? "") ? renderYouTubeEmbed(item) : safeArtworkUrl(item.artwork_url ?? "") ? `<img class="release-page__artwork" src="${escapeHtml(item.artwork_url!)}" alt="Artwork for ${escapeHtml(item.title)}" />` : ""}
+            ${safeArtworkUrl(item.artwork_url ?? "") ? `<img class="release-page__artwork" src="${escapeHtml(item.artwork_url!)}" alt="Artwork for ${escapeHtml(item.title)}" />` : ""}
 
             <div class="release-page__content">
 
@@ -207,6 +209,7 @@ function renderReleasePage(item: MusicItemFull, cssHref: string): string {
                 ${renderStarRating(item.id, item.rating, "star-rating--large")}
                 ${item.primary_url && !extractYouTubeVideoId(item.primary_url) && !extractYouTubePlaylistId(item.primary_url) && !item.primary_url.includes("bandcamp.com") ? `<a class="release-page__source-link" href="${escapeHtml(item.primary_url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(sourceDisplayName(item.primary_source ?? parseUrl(item.primary_url).source))}</a>` : ""}
                 ${item.primary_url?.includes("bandcamp.com") ? renderBandcampEmbed(item) : ""}
+                ${item.primary_source === "youtube" ? renderYouTubeButton(item) : ""}
                 ${renderMixcloudEmbedFromMetadata(item)}
                 <div id="secondary-links"></div>
               </div>
@@ -271,6 +274,7 @@ function renderReleasePage(item: MusicItemFull, cssHref: string): string {
               src,
               listenBtn.dataset.title ?? '',
               listenBtn.dataset.artist ?? '',
+              listenBtn.dataset.playerType ?? 'audio',
             );
           }
         });
