@@ -2194,6 +2194,13 @@ a:hover {
   box-shadow: 0 8px 40px rgba(0, 0, 0, 0.4);
 }
 
+.release-page__artwork-play {
+  all: unset;
+  cursor: pointer;
+  display: block;
+  margin: 0 auto;
+}
+
 /* ── View mode info panel ── */
 .release-page #view-mode {
   display: flex;
