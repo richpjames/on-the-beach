@@ -29,14 +29,29 @@ export function initPlayer(): void {
   window.__player = { load, stop };
 }
 
-function load(src: string, title: string, artist: string): void {
+function load(
+  src: string,
+  title: string,
+  artist: string,
+  playerType: "audio" | "video" = "audio",
+): void {
   const label = artist ? `${artist} — ${title}` : title;
 
   bodyEl.innerHTML = "";
   const iframe = document.createElement("iframe");
   iframe.src = src;
-  iframe.title = "Bandcamp player";
+  iframe.title = playerType === "video" ? "YouTube player" : "Bandcamp player";
   iframe.setAttribute("seamless", "");
+  if (playerType === "video") {
+    iframe.setAttribute(
+      "allow",
+      "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture",
+    );
+    iframe.allowFullscreen = true;
+    windowEl.classList.add("player-window--video");
+  } else {
+    windowEl.classList.remove("player-window--video");
+  }
   bodyEl.appendChild(iframe);
   titleEl.textContent = label;
   npLabelEl.textContent = label;
@@ -49,6 +64,7 @@ function load(src: string, title: string, artist: string): void {
 
 function stop(): void {
   bodyEl.innerHTML = "";
+  windowEl.classList.remove("player-window--video");
   npBtnEl.hidden = true;
   windowEl.hidden = true;
   windowEl.setAttribute("aria-hidden", "true");
@@ -104,8 +120,8 @@ function initDrag(): void {
     if (!dragging) return;
     windowEl.style.left = `${startLeft + (e.clientX - startX)}px`;
     windowEl.style.top = `${startTop + (e.clientY - startY)}px`;
-    windowEl.style.removeProperty("bottom");
-    windowEl.style.removeProperty("right");
+    windowEl.style.bottom = "auto";
+    windowEl.style.right = "auto";
   });
 }
 
