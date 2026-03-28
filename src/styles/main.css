@@ -2099,6 +2099,15 @@ a:hover {
   border: 0;
 }
 
+.player-window--video {
+  width: 480px;
+}
+
+.player-window--video .player-window__body iframe {
+  height: auto;
+  aspect-ratio: 16 / 9;
+}
+
 /* ─── Release Permalink Page ────────────────────────────────────────────── */
 
 /* Blurred artwork backdrop — sits behind the app window on the "desktop" */
@@ -2273,7 +2282,7 @@ a:hover {
   background: var(--chrome-white);
   overflow: hidden;
   min-width: 0;
-  max-height: 50vh;
+  max-height: calc(100vh - 100px);
 }
 
 .release-page__edit-stacks-header {
@@ -2292,7 +2301,7 @@ a:hover {
 }
 
 .release-page__stacks--inline:empty {
-  display: none;
+  min-height: 24px;
 }
 
 .release-page__edit-stacks-list {
