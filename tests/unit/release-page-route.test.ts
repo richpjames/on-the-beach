@@ -389,7 +389,7 @@ describe("YouTube embed", () => {
     expect(html).toContain("release-page__artwork");
   });
 
-  test("does not render YouTube playlist URL as a standalone source link", async () => {
+  test("renders YouTube source link to original video", async () => {
     const item = {
       ...baseItem,
       primary_url: "https://www.youtube.com/playlist?list=PLE31AAD9114F343C4",
@@ -400,6 +400,7 @@ describe("YouTube embed", () => {
     const app = makeApp();
     const res = await app.request("http://localhost/r/42");
     const html = await res.text();
-    expect(html).not.toContain('href="https://www.youtube.com/playlist?list=PLE31AAD9114F343C4"');
+    expect(html).toContain('href="https://www.youtube.com/playlist?list=PLE31AAD9114F343C4"');
+    expect(html).toContain("YouTube");
   });
 });

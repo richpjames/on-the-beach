@@ -254,8 +254,13 @@ musicItemRoutes.get("/", async (c) => {
       desc(musicItems.id),
     );
   } else {
-    // created_at is only second-resolution in SQLite, so break ties by id.
-    query = query.orderBy(desc(musicItems.createdAt), desc(musicItems.id));
+    // For listened items, sort by when they were marked listened; otherwise by when added.
+    // Both timestamps are only second-resolution in SQLite, so break ties by id.
+    const isListenedOnly = listenStatus === "listened" || listenStatus === "done";
+    query = query.orderBy(
+      isListenedOnly ? desc(musicItems.listenedAt) : desc(musicItems.createdAt),
+      desc(musicItems.id),
+    );
   }
 
   const items = await query;

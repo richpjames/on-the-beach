@@ -53,38 +53,28 @@ function parseLinkMetadata(raw: string | null): Record<string, string> | null {
   return null;
 }
 
-function renderYouTubeButton(item: MusicItemFull): string {
-  if (!item.primary_url) return "";
-
-  const videoId = extractYouTubeVideoId(item.primary_url);
+function youTubeEmbedSrc(url: string): string | null {
+  const videoId = extractYouTubeVideoId(url);
   if (videoId && /^[\w-]+$/.test(videoId)) {
-    const src = `https://www.youtube-nocookie.com/embed/${escapeHtml(videoId)}`;
-    const title = escapeHtml(item.title);
-    const artist = escapeHtml(item.artist_name ?? "");
-    return `<button
-    class="release-page__listen-btn"
-    data-src="${src}"
-    data-title="${title}"
-    data-artist="${artist}"
-    data-player-type="video"
-  >▶ Watch</button>`;
+    return `https://www.youtube-nocookie.com/embed/${escapeHtml(videoId)}`;
   }
-
-  const playlistId = extractYouTubePlaylistId(item.primary_url);
+  const playlistId = extractYouTubePlaylistId(url);
   if (playlistId && /^[\w-]+$/.test(playlistId)) {
-    const src = `https://www.youtube-nocookie.com/embed/videoseries?list=${escapeHtml(playlistId)}`;
-    const title = escapeHtml(item.title);
-    const artist = escapeHtml(item.artist_name ?? "");
-    return `<button
-    class="release-page__listen-btn"
-    data-src="${src}"
-    data-title="${title}"
-    data-artist="${artist}"
-    data-player-type="video"
-  >▶ Watch</button>`;
+    return `https://www.youtube-nocookie.com/embed/videoseries?list=${escapeHtml(playlistId)}`;
   }
+  return null;
+}
 
-  return "";
+function youTubePlayerAttrs(item: MusicItemFull): string {
+  const src = item.primary_url ? youTubeEmbedSrc(item.primary_url) : null;
+  if (!src) return "";
+  return ` data-src="${src}" data-title="${escapeHtml(item.title)}" data-artist="${escapeHtml(item.artist_name ?? "")}" data-player-type="video"`;
+}
+
+function renderYouTubeButton(item: MusicItemFull): string {
+  const attrs = youTubePlayerAttrs(item);
+  if (!attrs) return "";
+  return `<button class="release-page__listen-btn"${attrs}>▶ Watch</button>`;
 }
 
 function renderBandcampEmbed(item: MusicItemFull): string {
@@ -196,7 +186,7 @@ function renderReleasePage(item: MusicItemFull, cssHref: string): string {
 
           <div class="release-page__body">
 
-            ${safeArtworkUrl(item.artwork_url ?? "") ? `<img class="release-page__artwork" src="${escapeHtml(item.artwork_url!)}" alt="Artwork for ${escapeHtml(item.title)}" />` : ""}
+            ${safeArtworkUrl(item.artwork_url ?? "") ? (item.primary_source === "youtube" ? `<button class="release-page__artwork-play release-page__listen-btn"${youTubePlayerAttrs(item)}><img class="release-page__artwork" src="${escapeHtml(item.artwork_url!)}" alt="Artwork for ${escapeHtml(item.title)}" /></button>` : `<img class="release-page__artwork" src="${escapeHtml(item.artwork_url!)}" alt="Artwork for ${escapeHtml(item.title)}" />`) : ""}
 
             <div class="release-page__content">
 
@@ -207,7 +197,7 @@ function renderReleasePage(item: MusicItemFull, cssHref: string): string {
                 ${item.catalogue_number ? `<p class="release-page__catalogue">${escapeHtml(item.catalogue_number)}</p>` : ""}
                 ${item.notes ? `<p class="release-page__notes">${escapeHtml(item.notes)}</p>` : ""}
                 ${renderStarRating(item.id, item.rating, "star-rating--large")}
-                ${item.primary_url && !extractYouTubeVideoId(item.primary_url) && !extractYouTubePlaylistId(item.primary_url) && !item.primary_url.includes("bandcamp.com") ? `<a class="release-page__source-link" href="${escapeHtml(item.primary_url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(sourceDisplayName(item.primary_source ?? parseUrl(item.primary_url).source))}</a>` : ""}
+                ${item.primary_url && !item.primary_url.includes("bandcamp.com") ? `<a class="release-page__source-link" href="${escapeHtml(item.primary_url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(sourceDisplayName(item.primary_source ?? parseUrl(item.primary_url).source))}</a>` : ""}
                 ${item.primary_url?.includes("bandcamp.com") ? renderBandcampEmbed(item) : ""}
                 ${item.primary_source === "youtube" ? renderYouTubeButton(item) : ""}
                 ${renderMixcloudEmbedFromMetadata(item)}
@@ -262,23 +252,118 @@ function renderReleasePage(item: MusicItemFull, cssHref: string): string {
 
       </div>
     </main>
+    <div id="now-playing-player" class="player-window" hidden aria-hidden="true">
+      <div class="player-window__titlebar" id="player-titlebar">
+        <span class="player-window__icon" aria-hidden="true">♫</span>
+        <span class="player-window__title" id="player-title-text">Now Playing</span>
+        <div class="player-window__winbtns">
+          <button class="player-window__winbtn" id="player-minimize" aria-label="Minimize" title="Minimize">_</button>
+          <button class="player-window__winbtn player-window__winbtn--close" id="player-close" aria-label="Stop playback" title="Close">✕</button>
+        </div>
+      </div>
+      <div class="player-window__body" id="player-body"></div>
+    </div>
+    <div id="taskbar">
+      <button id="taskbar-np-btn" class="taskbar__task" hidden>
+        <span aria-hidden="true">♫</span>
+        <span id="taskbar-np-label"></span>
+      </button>
+    </div>
     <script>
       const ITEM_ID = ${item.id};
 
-      const listenBtn = document.querySelector('.release-page__listen-btn');
-      if (listenBtn) {
-        listenBtn.addEventListener('click', () => {
-          const src = listenBtn.dataset.src;
+      // Init player if not already loaded (direct page load vs SPA navigation)
+      if (!window.__player) {
+        const windowEl = document.getElementById('now-playing-player');
+        const titleEl = document.getElementById('player-title-text');
+        const bodyEl = document.getElementById('player-body');
+        const npBtnEl = document.getElementById('taskbar-np-btn');
+        const npLabelEl = document.getElementById('taskbar-np-label');
+
+        if (windowEl && titleEl && bodyEl && npBtnEl && npLabelEl) {
+          function load(src, title, artist, playerType) {
+            playerType = playerType || 'audio';
+            const label = artist ? (artist + ' — ' + title) : title;
+            bodyEl.innerHTML = '';
+            const iframe = document.createElement('iframe');
+            iframe.src = src;
+            iframe.title = playerType === 'video' ? 'YouTube player' : 'Bandcamp player';
+            iframe.setAttribute('seamless', '');
+            if (playerType === 'video') {
+              iframe.setAttribute('allow', 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture');
+              iframe.allowFullscreen = true;
+              windowEl.classList.add('player-window--video');
+            } else {
+              windowEl.classList.remove('player-window--video');
+            }
+            bodyEl.appendChild(iframe);
+            titleEl.textContent = label;
+            npLabelEl.textContent = label;
+            npBtnEl.hidden = false;
+            delete npBtnEl.dataset.minimized;
+            windowEl.hidden = false;
+            windowEl.removeAttribute('aria-hidden');
+          }
+          function stop() {
+            bodyEl.innerHTML = '';
+            windowEl.classList.remove('player-window--video');
+            npBtnEl.hidden = true;
+            windowEl.hidden = true;
+            windowEl.setAttribute('aria-hidden', 'true');
+          }
+          document.getElementById('player-close')?.addEventListener('click', stop);
+          document.getElementById('player-minimize')?.addEventListener('click', () => {
+            windowEl.hidden = true;
+            npBtnEl.dataset.minimized = 'true';
+          });
+          npBtnEl.addEventListener('click', () => {
+            if (windowEl.hidden) {
+              windowEl.hidden = false;
+              windowEl.removeAttribute('aria-hidden');
+              delete npBtnEl.dataset.minimized;
+            } else {
+              windowEl.hidden = true;
+              npBtnEl.dataset.minimized = 'true';
+            }
+          });
+
+          // Dragging
+          const titlebar = document.getElementById('player-titlebar');
+          let startX = 0, startY = 0, startLeft = 0, startTop = 0, dragging = false;
+          titlebar?.addEventListener('mousedown', (e) => {
+            if (e.target.closest('button')) return;
+            dragging = true;
+            startX = e.clientX; startY = e.clientY;
+            const rect = windowEl.getBoundingClientRect();
+            startLeft = rect.left; startTop = rect.top;
+            e.preventDefault();
+            document.addEventListener('mouseup', () => { dragging = false; }, { once: true });
+          });
+          document.addEventListener('mousemove', (e) => {
+            if (!dragging) return;
+            windowEl.style.left = (startLeft + (e.clientX - startX)) + 'px';
+            windowEl.style.top = (startTop + (e.clientY - startY)) + 'px';
+            windowEl.style.bottom = 'auto';
+            windowEl.style.right = 'auto';
+          });
+
+          window.__player = { load, stop };
+        }
+      }
+
+      document.querySelectorAll('.release-page__listen-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const src = btn.dataset.src;
           if (src) {
             window.__player?.load(
               src,
-              listenBtn.dataset.title ?? '',
-              listenBtn.dataset.artist ?? '',
-              listenBtn.dataset.playerType ?? 'audio',
+              btn.dataset.title ?? '',
+              btn.dataset.artist ?? '',
+              btn.dataset.playerType ?? 'audio',
             );
           }
         });
-      }
+      });
 
       document.getElementById('edit-btn').addEventListener('click', () => {
         document.getElementById('view-mode').hidden = true;
