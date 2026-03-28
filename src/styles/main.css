@@ -2129,7 +2129,7 @@ a:hover {
   }
 }
 
-.release-page-body > :not(.release-page__backdrop),
+.release-page-body > :not(.release-page__backdrop):not(.player-window),
 .release-page-body .main {
   position: relative;
   z-index: 1;
