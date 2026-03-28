@@ -28,8 +28,7 @@ export type AppEvent =
   | { type: "SEARCH_PANEL_TOGGLED" }
   | { type: "SORT_PANEL_TOGGLED" }
   | { type: "BROWSE_PANELS_CLOSED" }
-  | { type: "ITEM_CREATED" }
-;
+  | { type: "ITEM_CREATED" };
 
 export const appMachine = createMachine({
   types: {} as { context: AppContext; events: AppEvent },
@@ -59,6 +58,7 @@ export const appMachine = createMachine({
     STACK_SELECTED: {
       actions: assign(({ context, event }) => ({
         currentStack: event.stackId,
+        currentFilter: "all",
         listVersion: context.listVersion + 1,
         stackBarVersion: context.stackBarVersion + 1,
       })),

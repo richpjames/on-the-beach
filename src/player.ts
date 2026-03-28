@@ -42,6 +42,8 @@ function load(
   iframe.src = src;
   iframe.title = playerType === "video" ? "YouTube player" : "Bandcamp player";
   iframe.setAttribute("seamless", "");
+  iframe.setAttribute("allow", "autoplay; encrypted-media");
+  windowEl.classList.remove("player-window--video", "player-window--apple-music");
   if (playerType === "video") {
     iframe.setAttribute(
       "allow",
@@ -49,8 +51,8 @@ function load(
     );
     iframe.allowFullscreen = true;
     windowEl.classList.add("player-window--video");
-  } else {
-    windowEl.classList.remove("player-window--video");
+  } else if (src.includes("embed.music.apple.com")) {
+    windowEl.classList.add("player-window--apple-music");
   }
   bodyEl.appendChild(iframe);
   titleEl.textContent = label;
@@ -64,7 +66,7 @@ function load(
 
 function stop(): void {
   bodyEl.innerHTML = "";
-  windowEl.classList.remove("player-window--video");
+  windowEl.classList.remove("player-window--video", "player-window--apple-music");
   npBtnEl.hidden = true;
   windowEl.hidden = true;
   windowEl.setAttribute("aria-hidden", "true");

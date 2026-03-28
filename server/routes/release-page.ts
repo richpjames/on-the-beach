@@ -96,6 +96,25 @@ function renderBandcampEmbed(item: MusicItemFull): string {
   >▶ Listen</button>`;
 }
 
+function renderAppleMusicButton(item: MusicItemFull): string {
+  if (!item.primary_url) return "";
+  try {
+    const parsed = new URL(item.primary_url);
+    if (!parsed.hostname.endsWith("music.apple.com")) return "";
+    const src = `https://embed.music.apple.com${parsed.pathname}`;
+    const title = escapeHtml(item.title);
+    const artist = escapeHtml(item.artist_name ?? "");
+    return `<button
+    class="release-page__listen-btn"
+    data-src="${escapeHtml(src)}"
+    data-title="${title}"
+    data-artist="${artist}"
+  >▶ Listen</button>`;
+  } catch {
+    return "";
+  }
+}
+
 function renderMixcloudEmbedFromMetadata(item: MusicItemFull): string {
   const meta = parseLinkMetadata(item.primary_link_metadata);
   const mixcloudUrl = meta?.mixcloud_url;
@@ -200,6 +219,7 @@ function renderReleasePage(item: MusicItemFull, cssHref: string): string {
                 ${item.primary_url && !item.primary_url.includes("bandcamp.com") ? `<a class="release-page__source-link" href="${escapeHtml(item.primary_url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(sourceDisplayName(item.primary_source ?? parseUrl(item.primary_url).source))}</a>` : ""}
                 ${item.primary_url?.includes("bandcamp.com") ? renderBandcampEmbed(item) : ""}
                 ${item.primary_source === "youtube" ? renderYouTubeButton(item) : ""}
+                ${item.primary_url?.includes("music.apple.com") ? renderAppleMusicButton(item) : ""}
                 ${renderMixcloudEmbedFromMetadata(item)}
                 <div id="secondary-links"></div>
               </div>
@@ -289,12 +309,14 @@ function renderReleasePage(item: MusicItemFull, cssHref: string): string {
             iframe.src = src;
             iframe.title = playerType === 'video' ? 'YouTube player' : 'Bandcamp player';
             iframe.setAttribute('seamless', '');
+            iframe.setAttribute('allow', 'autoplay; encrypted-media');
+            windowEl.classList.remove('player-window--video', 'player-window--apple-music');
             if (playerType === 'video') {
               iframe.setAttribute('allow', 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture');
               iframe.allowFullscreen = true;
               windowEl.classList.add('player-window--video');
-            } else {
-              windowEl.classList.remove('player-window--video');
+            } else if (src.includes('embed.music.apple.com')) {
+              windowEl.classList.add('player-window--apple-music');
             }
             bodyEl.appendChild(iframe);
             titleEl.textContent = label;
@@ -306,7 +328,7 @@ function renderReleasePage(item: MusicItemFull, cssHref: string): string {
           }
           function stop() {
             bodyEl.innerHTML = '';
-            windowEl.classList.remove('player-window--video');
+            windowEl.classList.remove('player-window--video', 'player-window--apple-music');
             npBtnEl.hidden = true;
             windowEl.hidden = true;
             windowEl.setAttribute('aria-hidden', 'true');

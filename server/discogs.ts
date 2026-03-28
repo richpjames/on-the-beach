@@ -56,19 +56,13 @@ function parsePrimaryGenre(genres: unknown, styles: unknown): string | undefined
 
 function parsePrimaryImageUri(images: unknown): string | undefined {
   if (!Array.isArray(images) || images.length === 0) return undefined;
-  const primary =
-    images.find((img) => (img as DiscogsImage).type === "primary") ?? images[0];
+  const primary = images.find((img) => (img as DiscogsImage).type === "primary") ?? images[0];
   const uri = (primary as DiscogsImage).uri;
   return typeof uri === "string" ? uri : undefined;
 }
 
 function parseYear(year: unknown): number | undefined {
-  const num =
-    typeof year === "number"
-      ? year
-      : typeof year === "string"
-        ? parseInt(year, 10)
-        : NaN;
+  const num = typeof year === "number" ? year : typeof year === "string" ? parseInt(year, 10) : NaN;
   return Number.isFinite(num) && num > 0 ? num : undefined;
 }
 
@@ -92,7 +86,9 @@ function parseItemType(formats: unknown): ItemType {
 
 function extractDiscogsTypeAndId(
   url: string,
-): { type: "release" | "master"; id: string } | null {
+): { type: "release" | "master" | "listing"; id: string } | null {
+  const listingMatch = url.match(/discogs\.com\/sell\/item\/(\d+)/);
+  if (listingMatch) return { type: "listing", id: listingMatch[1] };
   const match = url.match(/discogs\.com\/(release|master)\/(\d+)/);
   if (!match) return null;
   return { type: match[1] as "release" | "master", id: match[2] };
@@ -123,15 +119,36 @@ export function parseDiscogsRelease(data: unknown): DiscogsScrapedData | null {
   };
 }
 
+interface DiscogsListing {
+  release?: { id?: unknown };
+}
+
+async function resolveListingToReleaseId(
+  listingId: string,
+  timeoutMs: number,
+  headers: Record<string, string>,
+): Promise<string | null> {
+  const apiUrl = `${DISCOGS_API_BASE}/marketplace/listings/${listingId}`;
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    const response = await fetch(apiUrl, { signal: controller.signal, headers });
+    clearTimeout(timer);
+    if (!response.ok) return null;
+    const data = (await response.json()) as DiscogsListing;
+    const releaseId = data?.release?.id;
+    return typeof releaseId === "number" ? String(releaseId) : null;
+  } catch {
+    return null;
+  }
+}
+
 export async function fetchDiscogsRelease(
   url: string,
   timeoutMs: number,
 ): Promise<DiscogsScrapedData | null> {
   const info = extractDiscogsTypeAndId(url);
   if (!info) return null;
-
-  const endpoint = info.type === "master" ? "masters" : "releases";
-  const apiUrl = `${DISCOGS_API_BASE}/${endpoint}/${info.id}`;
 
   const headers: Record<string, string> = {
     "User-Agent": USER_AGENT,
@@ -142,6 +159,24 @@ export async function fetchDiscogsRelease(
   if (token) {
     headers["Authorization"] = `Discogs token=${token}`;
   }
+
+  let endpoint: string;
+  let id: string;
+
+  if (info.type === "listing") {
+    const releaseId = await resolveListingToReleaseId(info.id, timeoutMs, headers);
+    if (!releaseId) {
+      console.warn(`[discogs] Could not resolve listing ${info.id} to a release`);
+      return null;
+    }
+    endpoint = "releases";
+    id = releaseId;
+  } else {
+    endpoint = info.type === "master" ? "masters" : "releases";
+    id = info.id;
+  }
+
+  const apiUrl = `${DISCOGS_API_BASE}/${endpoint}/${id}`;
 
   try {
     const controller = new AbortController();
