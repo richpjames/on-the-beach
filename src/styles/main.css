@@ -1112,6 +1112,14 @@ select.input {
     cursor: default;
   }
 
+  .music-scrollbar {
+    display: none;
+  }
+
+  .music-list-shell {
+    grid-template-columns: 1fr;
+  }
+
   .add-form__primary {
     grid-template-columns: minmax(0, 1fr) auto auto auto;
     gap: 5px 3px;
