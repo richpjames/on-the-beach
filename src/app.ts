@@ -56,6 +56,11 @@ let musicListEl: HTMLElement | null = null;
 let musicListScrollbarEl: HTMLElement | null = null;
 let musicListTrackEl: HTMLElement | null = null;
 let musicListThumbEl: HTMLElement | null = null;
+let linkPickerListEl: HTMLElement | null = null;
+let linkPickerScrollbarEl: HTMLElement | null = null;
+let linkPickerTrackEl: HTMLElement | null = null;
+let linkPickerThumbEl: HTMLElement | null = null;
+let linkPickerThumbDrag: { startY: number; startTop: number } | null = null;
 let stackBarEl: HTMLElement | null = null;
 let stackBarScrollbarEl: HTMLElement | null = null;
 let stackBarTrackEl: HTMLElement | null = null;
@@ -122,6 +127,7 @@ function initializeUI(hasServerData: boolean): void {
   setupMusicListReorder();
   setupCustomListScrollbar();
   setupCustomStackScrollbar();
+  setupCustomLinkPickerScrollbar();
 
   if (hasServerData) {
     syncStackFeedLinks();
@@ -492,6 +498,10 @@ function renderLinkPickerFromContext(linkPicker: {
     linkPicker.selectedCandidateIds,
   );
   submit.disabled = linkPicker.selectedCandidateIds.length === 0;
+  if (linkPickerListEl) {
+    linkPickerListEl.scrollTop = 0;
+  }
+  syncCustomLinkPickerScrollbar();
 }
 
 function populateAddFormFromCandidate(candidate: LinkReleaseCandidate): void {
@@ -1320,6 +1330,160 @@ function syncCustomListScrollbar(): void {
 
   musicListThumbEl.style.height = `${thumbHeight}px`;
   musicListThumbEl.style.top = `${thumbTop}px`;
+}
+
+function setupCustomLinkPickerScrollbar(): void {
+  const list = document.getElementById("link-picker-list");
+  const scrollbar = document.getElementById("link-picker-scrollbar");
+  const track = document.getElementById("link-picker-scroll-track");
+  const thumb = document.getElementById("link-picker-scroll-thumb");
+  if (
+    !(list instanceof HTMLElement) ||
+    !(scrollbar instanceof HTMLElement) ||
+    !(track instanceof HTMLElement) ||
+    !(thumb instanceof HTMLElement)
+  ) {
+    return;
+  }
+
+  linkPickerListEl = list;
+  linkPickerScrollbarEl = scrollbar;
+  linkPickerTrackEl = track;
+  linkPickerThumbEl = thumb;
+
+  const upButton = scrollbar.querySelector('[data-link-picker-scroll-btn="up"]');
+  const downButton = scrollbar.querySelector('[data-link-picker-scroll-btn="down"]');
+
+  const scrollByStep = (delta: number): void => {
+    list.scrollBy({ top: delta, behavior: "auto" });
+  };
+
+  let repeatTimer: ReturnType<typeof setInterval> | null = null;
+  const startRepeatScroll = (delta: number): void => {
+    if (repeatTimer) {
+      clearInterval(repeatTimer);
+    }
+    repeatTimer = setInterval(() => {
+      scrollByStep(delta);
+    }, 60);
+  };
+
+  const stopRepeatScroll = (): void => {
+    if (!repeatTimer) {
+      return;
+    }
+    clearInterval(repeatTimer);
+    repeatTimer = null;
+  };
+
+  const bindScrollButton = (button: Element | null, delta: number): void => {
+    if (!(button instanceof HTMLButtonElement)) {
+      return;
+    }
+    button.addEventListener("click", () => {
+      scrollByStep(delta);
+    });
+    button.addEventListener("mousedown", () => {
+      startRepeatScroll(delta);
+    });
+    button.addEventListener("mouseup", stopRepeatScroll);
+    button.addEventListener("mouseleave", stopRepeatScroll);
+  };
+
+  bindScrollButton(upButton, -40);
+  bindScrollButton(downButton, 40);
+  document.addEventListener("mouseup", stopRepeatScroll);
+  window.addEventListener("blur", stopRepeatScroll);
+
+  track.addEventListener("mousedown", (event) => {
+    if (event.target === thumb) {
+      return;
+    }
+    const trackRect = track.getBoundingClientRect();
+    const thumbRect = thumb.getBoundingClientRect();
+    const clickOffset = event.clientY - trackRect.top;
+    const thumbTop = thumbRect.top - trackRect.top;
+    const direction = clickOffset < thumbTop ? -1 : 1;
+    list.scrollBy({ top: direction * Math.max(80, list.clientHeight * 0.8), behavior: "auto" });
+  });
+
+  const onDragMove = (event: MouseEvent): void => {
+    if (!linkPickerThumbDrag || !linkPickerListEl || !linkPickerTrackEl || !linkPickerThumbEl) {
+      return;
+    }
+    const scrollRange = linkPickerListEl.scrollHeight - linkPickerListEl.clientHeight;
+    if (scrollRange <= 0) {
+      return;
+    }
+    const trackHeight = linkPickerTrackEl.clientHeight;
+    const thumbHeight = linkPickerThumbEl.offsetHeight;
+    const maxThumbTop = Math.max(trackHeight - thumbHeight, 0);
+    if (maxThumbTop <= 0) {
+      return;
+    }
+    const nextTop = Math.max(
+      0,
+      Math.min(
+        maxThumbTop,
+        linkPickerThumbDrag.startTop + (event.clientY - linkPickerThumbDrag.startY),
+      ),
+    );
+    const ratio = nextTop / maxThumbTop;
+    linkPickerListEl.scrollTop = ratio * scrollRange;
+  };
+
+  const onDragEnd = (): void => {
+    linkPickerThumbDrag = null;
+    document.removeEventListener("mousemove", onDragMove);
+  };
+
+  thumb.addEventListener("mousedown", (event) => {
+    event.preventDefault();
+    const trackRect = track.getBoundingClientRect();
+    const thumbRect = thumb.getBoundingClientRect();
+    linkPickerThumbDrag = {
+      startY: event.clientY,
+      startTop: thumbRect.top - trackRect.top,
+    };
+    document.addEventListener("mousemove", onDragMove);
+    document.addEventListener("mouseup", onDragEnd, { once: true });
+  });
+
+  list.addEventListener("scroll", () => {
+    syncCustomLinkPickerScrollbar();
+  });
+  window.addEventListener("resize", () => {
+    syncCustomLinkPickerScrollbar();
+  });
+}
+
+function syncCustomLinkPickerScrollbar(): void {
+  if (!linkPickerListEl || !linkPickerScrollbarEl || !linkPickerTrackEl || !linkPickerThumbEl) {
+    return;
+  }
+
+  const scrollRange = linkPickerListEl.scrollHeight - linkPickerListEl.clientHeight;
+  const hasOverflow = scrollRange > 0;
+  linkPickerScrollbarEl.classList.toggle("is-disabled", !hasOverflow);
+
+  const trackHeight = linkPickerTrackEl.clientHeight;
+  if (!hasOverflow || trackHeight <= 0) {
+    linkPickerThumbEl.style.height = `${trackHeight}px`;
+    linkPickerThumbEl.style.top = "0px";
+    return;
+  }
+
+  const minThumbHeight = 56;
+  const thumbHeight = Math.max(
+    minThumbHeight,
+    Math.floor((linkPickerListEl.clientHeight / linkPickerListEl.scrollHeight) * trackHeight),
+  );
+  const maxThumbTop = Math.max(trackHeight - thumbHeight, 0);
+  const scrollRatio = scrollRange <= 0 ? 0 : linkPickerListEl.scrollTop / scrollRange;
+  const thumbTop = Math.round(maxThumbTop * scrollRatio);
+
+  linkPickerThumbEl.style.height = `${thumbHeight}px`;
+  linkPickerThumbEl.style.top = `${thumbTop}px`;
 }
 
 async function renderMusicListView(): Promise<void> {

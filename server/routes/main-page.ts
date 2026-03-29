@@ -417,7 +417,32 @@ function renderMainPage(opts: {
           <div class="link-picker__list-header">
             <button type="button" id="link-picker-select-all" class="btn btn--ghost">Select all</button>
           </div>
-          <div id="link-picker-list" class="link-picker__list"></div>
+          <div class="link-picker__list-shell">
+            <div id="link-picker-list" class="link-picker__list"></div>
+            <div id="link-picker-scrollbar" class="music-scrollbar">
+              <button
+                type="button"
+                class="music-scrollbar__button"
+                data-link-picker-scroll-btn="up"
+                aria-label="Scroll up"
+                tabindex="-1"
+              >
+                ▲
+              </button>
+              <div id="link-picker-scroll-track" class="music-scrollbar__track">
+                <div id="link-picker-scroll-thumb" class="music-scrollbar__thumb"></div>
+              </div>
+              <button
+                type="button"
+                class="music-scrollbar__button"
+                data-link-picker-scroll-btn="down"
+                aria-label="Scroll down"
+                tabindex="-1"
+              >
+                ▼
+              </button>
+            </div>
+          </div>
           <div class="link-picker__actions">
             <button type="button" id="link-picker-cancel" class="btn btn--ghost">Cancel</button>
             <button type="button" id="link-picker-manual" class="btn btn--ghost">
