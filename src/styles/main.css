@@ -1810,7 +1810,7 @@ a:hover {
   width: min(640px, calc(100vw - 24px));
   max-height: min(78vh, 720px);
   display: grid;
-  grid-template-rows: auto minmax(0, 1fr) auto;
+  grid-template-rows: auto auto minmax(0, 1fr) auto;
   gap: 10px;
   padding: 12px;
   background: var(--chrome);
@@ -1845,11 +1845,24 @@ a:hover {
   justify-content: flex-end;
 }
 
+.link-picker__list-shell {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 19px;
+  align-items: stretch;
+  min-height: 0;
+}
+
 .link-picker__list {
   display: grid;
   gap: 8px;
-  overflow: auto;
-  padding-right: 4px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-width: none;
+}
+
+.link-picker__list::-webkit-scrollbar {
+  width: 0;
+  height: 0;
 }
 
 .link-picker__candidate {
