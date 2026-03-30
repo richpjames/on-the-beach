@@ -31,3 +31,6 @@ pnpm-debug.log*
 # Eval results (generated, may contain large output)
 eval/results/*.json
 !eval/results/.gitkeep
+
+# Eval pending review (user data, not for commit)
+eval/fixtures/pending-review.json
