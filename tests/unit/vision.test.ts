@@ -80,7 +80,12 @@ describe("extractReleaseInfo", () => {
     );
 
     const result = await extractReleaseInfo("base64-image-data");
-    expect(result).toEqual({ artist: "Radiohead", title: "OK Computer", confidence: 0 });
+    expect(result).toEqual({
+      artist: "Radiohead",
+      title: "OK Computer",
+      artistConfidence: 0,
+      titleConfidence: 0,
+    });
   });
 
   test("parses OCR JSON found in page markdown when OCR model is set", async () => {
@@ -93,7 +98,12 @@ describe("extractReleaseInfo", () => {
     );
 
     const result = await extractReleaseInfo("base64-image-data");
-    expect(result).toEqual({ artist: "Bonobo", title: "Migration", confidence: 0 });
+    expect(result).toEqual({
+      artist: "Bonobo",
+      title: "Migration",
+      artistConfidence: 0,
+      titleConfidence: 0,
+    });
   });
 
   test("supports chat model override via MISTRAL_SCAN_MODEL", async () => {
@@ -104,7 +114,12 @@ describe("extractReleaseInfo", () => {
     );
 
     const result = await extractReleaseInfo("base64-image-data");
-    expect(result).toEqual({ artist: "Massive Attack", title: "Mezzanine", confidence: 0 });
+    expect(result).toEqual({
+      artist: "Massive Attack",
+      title: "Mezzanine",
+      artistConfidence: 0,
+      titleConfidence: 0,
+    });
   });
 
   test("returns null for non-JSON assistant output", async () => {
