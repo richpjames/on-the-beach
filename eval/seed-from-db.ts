@@ -50,7 +50,7 @@ function makeSlug(artist: string, title: string): string {
   return "unknown";
 }
 
-const GENERIC_ARTIST_PATTERNS = /^(unknown|various artists?|va|various)$/i;
+const GENERIC_ARTIST_PATTERNS = /^(unknown|unknown artist|various artists?|va|various)$/i;
 
 function isGenericArtist(name: string): boolean {
   const trimmed = name.trim();
