@@ -39,10 +39,16 @@ export function parseScanJson(rawContent: string): ScanResult | null {
       return null;
     }
 
-    const confidence =
-      typeof parsed.confidence === "number" ? Math.max(0, Math.min(1, parsed.confidence)) : 0;
+    const artistConfidence =
+      typeof parsed.artistConfidence === "number"
+        ? Math.max(0, Math.min(1, parsed.artistConfidence))
+        : 0;
+    const titleConfidence =
+      typeof parsed.titleConfidence === "number"
+        ? Math.max(0, Math.min(1, parsed.titleConfidence))
+        : 0;
 
-    return { artist, title, confidence };
+    return { artist, title, artistConfidence, titleConfidence };
   } catch {
     return null;
   }
