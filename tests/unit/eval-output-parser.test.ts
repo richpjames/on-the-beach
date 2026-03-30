@@ -22,7 +22,12 @@ describe("parseBatchOutput", () => {
     );
 
     expect(parsed.customId).toBe("radiohead-ok-computer");
-    expect(parsed.actual).toEqual({ artist: "Radiohead", title: "OK Computer", confidence: 0 });
+    expect(parsed.actual).toEqual({
+      artist: "Radiohead",
+      title: "OK Computer",
+      artistConfidence: 0,
+      titleConfidence: 0,
+    });
   });
 
   test("parses chat output with text chunks", () => {
@@ -45,7 +50,12 @@ describe("parseBatchOutput", () => {
     );
 
     expect(parsed.customId).toBe("bonobo-migration");
-    expect(parsed.actual).toEqual({ artist: "Bonobo", title: "Migration", confidence: 0 });
+    expect(parsed.actual).toEqual({
+      artist: "Bonobo",
+      title: "Migration",
+      artistConfidence: 0,
+      titleConfidence: 0,
+    });
   });
 
   test("parses OCR output document_annotation response", () => {
@@ -65,7 +75,8 @@ describe("parseBatchOutput", () => {
     expect(parsed.actual).toEqual({
       artist: "Caetano Veloso",
       title: "Caetano Veloso",
-      confidence: 0,
+      artistConfidence: 0,
+      titleConfidence: 0,
     });
   });
 
@@ -83,7 +94,12 @@ describe("parseBatchOutput", () => {
     );
 
     expect(parsed.customId).toBe("lecuona-plays-for-two");
-    expect(parsed.actual).toEqual({ artist: "Lecuona", title: "Plays For Two", confidence: 0 });
+    expect(parsed.actual).toEqual({
+      artist: "Lecuona",
+      title: "Plays For Two",
+      artistConfidence: 0,
+      titleConfidence: 0,
+    });
   });
 });
 
