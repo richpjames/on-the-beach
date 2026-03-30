@@ -32,7 +32,10 @@ export function createScanEnricher(
     const firstPass = await extract(base64Image);
     if (!firstPass) return null;
 
-    if (firstPass.confidence >= CONFIDENCE_THRESHOLD) {
+    if (
+      firstPass.artistConfidence >= CONFIDENCE_THRESHOLD &&
+      firstPass.titleConfidence >= CONFIDENCE_THRESHOLD
+    ) {
       return enrichWithMusicBrainz(firstPass, lookup);
     }
 
