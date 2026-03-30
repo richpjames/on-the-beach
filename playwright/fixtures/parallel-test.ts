@@ -203,13 +203,23 @@ async function stopServer(server: ChildProcess): Promise<void> {
   }
 
   server.kill("SIGTERM");
-  const exited = once(server, "exit");
-  const timeout = delay(5_000).then(() => "timeout");
-  const result = await Promise.race([exited, timeout]);
+
+  let termTimerId: ReturnType<typeof setTimeout>;
+  const termTimeout = new Promise<"timeout">((resolve) => {
+    termTimerId = setTimeout(() => resolve("timeout"), 5_000);
+  });
+  const result = await Promise.race([once(server, "exit"), termTimeout]);
+  clearTimeout(termTimerId!);
 
   if (result === "timeout" && server.exitCode === null) {
     server.kill("SIGKILL");
-    await once(server, "exit");
+
+    let killTimerId: ReturnType<typeof setTimeout>;
+    const killTimeout = new Promise<"timeout">((resolve) => {
+      killTimerId = setTimeout(() => resolve("timeout"), 5_000);
+    });
+    await Promise.race([once(server, "exit"), killTimeout]);
+    clearTimeout(killTimerId!);
   }
 }
 
