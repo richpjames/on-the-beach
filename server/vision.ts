@@ -5,15 +5,16 @@ import { parseScanJson } from "./scan-parser";
 const DEFAULT_SCAN_MODEL = "mistral-small-2506";
 
 const SCAN_PROMPT =
-  "You are reading a photo of a music release cover. Respond with JSON only using keys artist, title, and confidence. " +
-  "confidence is a number from 0 to 1 reflecting your certainty about the extracted artist and title. " +
-  'If uncertain, use null values for artist/title and a low confidence score. Example: {"artist":"Radiohead","title":"OK Computer","confidence":0.95}';
+  "You are reading a photo of a music release cover. " +
+  "Respond with JSON only using keys artist, title, artistConfidence, and titleConfidence. " +
+  "artistConfidence and titleConfidence are numbers from 0 to 1 reflecting your certainty about each extracted field independently. " +
+  'If uncertain about a field, use null for its value and a low confidence score. Example: {"artist":"Radiohead","title":"OK Computer","artistConfidence":0.95,"titleConfidence":0.9}';
 
 const WEB_CONTEXT_PROMPT =
   "You are reading a photo of a music release cover. Web search results for this image are provided below to help identify the release. " +
-  "Respond with JSON only using keys artist, title, and confidence. " +
-  "confidence is a number from 0 to 1 reflecting your certainty about the extracted artist and title. " +
-  'If uncertain, use null values for artist/title and a low confidence score. Example: {"artist":"Radiohead","title":"OK Computer","confidence":0.95}';
+  "Respond with JSON only using keys artist, title, artistConfidence, and titleConfidence. " +
+  "artistConfidence and titleConfidence are numbers from 0 to 1 reflecting your certainty about each extracted field independently. " +
+  'If uncertain about a field, use null for its value and a low confidence score. Example: {"artist":"Radiohead","title":"OK Computer","artistConfidence":0.95,"titleConfidence":0.9}';
 
 const OCR_SCHEMA = {
   name: "music_release_scan",
@@ -24,9 +25,10 @@ const OCR_SCHEMA = {
     properties: {
       artist: { type: ["string", "null"] },
       title: { type: ["string", "null"] },
-      confidence: { type: "number" },
+      artistConfidence: { type: "number" },
+      titleConfidence: { type: "number" },
     },
-    required: ["artist", "title", "confidence"],
+    required: ["artist", "title", "artistConfidence", "titleConfidence"],
   },
 } as const;
 
