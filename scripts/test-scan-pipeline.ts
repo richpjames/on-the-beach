@@ -20,7 +20,7 @@ console.log("=== First pass (Mistral OCR) ===");
 const first = await extractReleaseInfo(base64);
 console.log(first);
 
-if (first && first.confidence < 0.8) {
+if (first && (first.artistConfidence < 0.8 || first.titleConfidence < 0.8)) {
   console.log("\n=== Web context (Google Vision) ===");
   const ctx = await getWebContext(base64);
   console.log(ctx);
