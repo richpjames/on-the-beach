@@ -7,12 +7,14 @@ describe("createScanEnricher", () => {
   const highConfidenceResult: ScanResult = {
     artist: "Radiohead",
     title: "OK Computer",
-    confidence: 0.95,
+    artistConfidence: 0.95,
+    titleConfidence: 0.95,
   };
   const lowConfidenceResult: ScanResult = {
     artist: "Radiohead",
     title: "OK Computer",
-    confidence: 0.5,
+    artistConfidence: 0.5,
+    titleConfidence: 0.5,
   };
   const mbFields: MusicBrainzFields = {
     year: 1997,
@@ -37,7 +39,8 @@ describe("createScanEnricher", () => {
     expect(result).toEqual({
       artist: "Radiohead",
       title: "OK Computer",
-      confidence: 0.95,
+      artistConfidence: 0.95,
+      titleConfidence: 0.95,
       year: 1997,
       label: "Parlophone",
       country: "GB",
@@ -68,7 +71,8 @@ describe("createScanEnricher", () => {
     const secondPassResult: ScanResult = {
       artist: "Radiohead",
       title: "OK Computer",
-      confidence: 0.7,
+      artistConfidence: 0.7,
+      titleConfidence: 0.7,
     };
     const mockExtract = mock().mockResolvedValueOnce(lowConfidenceResult);
     const mockLookup = mock().mockResolvedValueOnce(null);
@@ -175,7 +179,12 @@ describe("createScanEnricher", () => {
   });
 
   test("skips MusicBrainz lookup when artist is null", async () => {
-    const noArtist: ScanResult = { artist: null, title: "Unknown", confidence: 0.9 };
+    const noArtist: ScanResult = {
+      artist: null,
+      title: "Unknown",
+      artistConfidence: 0.9,
+      titleConfidence: 0.9,
+    };
     const mockExtract = mock().mockResolvedValueOnce(noArtist);
     const mockLookup = mock();
     const mockGetWebContext = mock();
@@ -193,7 +202,12 @@ describe("createScanEnricher", () => {
   });
 
   test("skips MusicBrainz lookup when title is null", async () => {
-    const noTitle: ScanResult = { artist: "Someone", title: null, confidence: 0.9 };
+    const noTitle: ScanResult = {
+      artist: "Someone",
+      title: null,
+      artistConfidence: 0.9,
+      titleConfidence: 0.9,
+    };
     const mockExtract = mock().mockResolvedValueOnce(noTitle);
     const mockLookup = mock();
     const mockGetWebContext = mock();
