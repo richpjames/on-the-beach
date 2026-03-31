@@ -1742,6 +1742,7 @@ async function renderStackDropdown(cardEl: HTMLElement, itemId: number): Promise
     return;
   }
 
+  const stackBtn = actionsEl.querySelector<HTMLElement>('[data-action="stack"]');
   const itemStacks = await api.getStacksForItem(itemId);
   actionsEl.style.position = "relative";
   await openStackDropdown({
@@ -1766,6 +1767,13 @@ async function renderStackDropdown(cardEl: HTMLElement, itemId: number): Promise
       void renderMusicListView();
     },
   });
+
+  if (stackBtn) {
+    const dropdown = actionsEl.querySelector<HTMLElement>(".stack-dropdown");
+    if (dropdown) {
+      dropdown.style.top = `${stackBtn.offsetTop + stackBtn.offsetHeight}px`;
+    }
+  }
 }
 
 function closeActiveStackDropdown(): void {
