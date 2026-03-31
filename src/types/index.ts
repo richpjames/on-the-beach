@@ -79,6 +79,13 @@ export interface MusicItemFull extends MusicItem {
   primary_source: SourceName | null;
   primary_link_metadata: string | null;
   stacks: Array<{ id: number; name: string }>;
+  links: Array<{
+    id: number;
+    url: string;
+    source_name: string | null;
+    display_name: string | null;
+    is_primary: boolean;
+  }>;
 }
 
 // Input types for create/update
