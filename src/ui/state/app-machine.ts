@@ -28,7 +28,8 @@ export type AppEvent =
   | { type: "SEARCH_PANEL_TOGGLED" }
   | { type: "SORT_PANEL_TOGGLED" }
   | { type: "BROWSE_PANELS_CLOSED" }
-  | { type: "ITEM_CREATED" };
+  | { type: "ITEM_CREATED" }
+  | { type: "LIST_REFRESH" };
 
 export const appMachine = createMachine({
   types: {} as { context: AppContext; events: AppEvent },
@@ -120,6 +121,9 @@ export const appMachine = createMachine({
     },
     BROWSE_PANELS_CLOSED: {
       actions: assign({ searchPanelOpen: false, sortPanelOpen: false }),
+    },
+    LIST_REFRESH: {
+      actions: assign(({ context }) => ({ listVersion: context.listVersion + 1 })),
     },
   },
 });

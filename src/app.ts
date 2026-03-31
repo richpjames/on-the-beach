@@ -89,6 +89,9 @@ function formCtx() {
 export async function initialize(): Promise<void> {
   setupAddForm();
   appActor.send({ type: "APP_READY" });
+  document.addEventListener("navigated-to-main", () => {
+    appActor.send({ type: "LIST_REFRESH" });
+  });
 
   const serverState = readServerState();
   if (serverState) {

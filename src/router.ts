@@ -75,6 +75,7 @@ function navigateToMain(): void {
   main.hidden = false;
   const footer = document.querySelector<HTMLElement>(".footer");
   if (footer) footer.hidden = false;
+  document.dispatchEvent(new CustomEvent("navigated-to-main"));
 }
 
 function handleClick(e: MouseEvent): void {
