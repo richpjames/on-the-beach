@@ -1578,7 +1578,7 @@ a:hover {
 }
 
 .stack-dropdown__list {
-  max-height: 110px;
+  max-height: 220px;
   overflow-y: auto;
   overscroll-behavior: contain;
 }

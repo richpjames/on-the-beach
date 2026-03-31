@@ -18,8 +18,21 @@ test.describe("Stack dropdown scroll", () => {
     await page.getByRole("button", { name: "Add" }).click();
     await expect(page.locator(".music-card").first()).toBeVisible({ timeout: 10_000 });
 
-    // Create 8 stacks via API so dropdown definitely needs to scroll
-    for (const name of ["Alpha", "Beta", "Gamma", "Delta", "Epsilon", "Zeta", "Eta", "Theta"]) {
+    // Create 12 stacks via API so dropdown definitely needs to scroll
+    for (const name of [
+      "Alpha",
+      "Beta",
+      "Gamma",
+      "Delta",
+      "Epsilon",
+      "Zeta",
+      "Eta",
+      "Theta",
+      "Iota",
+      "Kappa",
+      "Lambda",
+      "Mu",
+    ]) {
       await request.post("/api/stacks", { data: { name } });
     }
 
@@ -59,7 +72,20 @@ test.describe("Stack dropdown scroll", () => {
     await page.getByRole("button", { name: "Add" }).click();
     await expect(page.locator(".music-card").first()).toBeVisible({ timeout: 10_000 });
 
-    for (const name of ["Alpha", "Beta", "Gamma", "Delta", "Epsilon", "Zeta", "Eta", "Theta"]) {
+    for (const name of [
+      "Alpha",
+      "Beta",
+      "Gamma",
+      "Delta",
+      "Epsilon",
+      "Zeta",
+      "Eta",
+      "Theta",
+      "Iota",
+      "Kappa",
+      "Lambda",
+      "Mu",
+    ]) {
       await request.post("/api/stacks", { data: { name } });
     }
 
