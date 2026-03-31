@@ -8,6 +8,8 @@ import {
   stacks,
   musicItemOrder,
   stackParents,
+  musicLinks,
+  sources,
 } from "../db/schema";
 import { isValidUrl, normalize } from "../utils";
 import { applyOrder, buildContextKey } from "../../shared/music-list-context";
@@ -431,6 +433,108 @@ musicItemRoutes.delete("/:id", async (c) => {
     .delete(musicItems)
     .where(eq(musicItems.id, id))
     .returning({ id: musicItems.id });
+
+  return c.json({ success: result.length > 0 });
+});
+
+// ---------------------------------------------------------------------------
+// GET /:id/links — list all links for a music item
+// ---------------------------------------------------------------------------
+
+musicItemRoutes.get("/:id/links", async (c) => {
+  const id = Number(c.req.param("id"));
+  if (Number.isNaN(id)) return c.json({ error: "Invalid ID" }, 400);
+
+  const rows = await db
+    .select({
+      id: musicLinks.id,
+      url: musicLinks.url,
+      source_name: sources.name,
+      display_name: sources.displayName,
+      is_primary: musicLinks.isPrimary,
+    })
+    .from(musicLinks)
+    .leftJoin(sources, eq(musicLinks.sourceId, sources.id))
+    .where(eq(musicLinks.musicItemId, id));
+
+  return c.json(rows);
+});
+
+// ---------------------------------------------------------------------------
+// POST /:id/links — add a link to a music item
+// ---------------------------------------------------------------------------
+
+musicItemRoutes.post("/:id/links", async (c) => {
+  const id = Number(c.req.param("id"));
+  if (Number.isNaN(id)) return c.json({ error: "Invalid ID" }, 400);
+
+  const body = (await c.req.json()) as { sourceName?: unknown; url?: unknown };
+
+  if (typeof body.url !== "string" || !isValidUrl(body.url)) {
+    return c.json({ error: "Valid url is required" }, 400);
+  }
+  if (typeof body.sourceName !== "string" || !body.sourceName.trim()) {
+    return c.json({ error: "sourceName is required" }, 400);
+  }
+
+  const url = body.url.trim();
+  const rawName = body.sourceName.trim();
+  const name = rawName.toLowerCase().replace(/\s+/g, "_");
+  const displayName = rawName.charAt(0).toUpperCase() + rawName.slice(1);
+
+  // Upsert source — insert if new, reuse if existing
+  await db.insert(sources).values({ name, displayName }).onConflictDoNothing();
+
+  const [source] = await db
+    .select({ id: sources.id, name: sources.name, displayName: sources.displayName })
+    .from(sources)
+    .where(eq(sources.name, name))
+    .limit(1);
+
+  // Check whether this item already has any link (to determine isPrimary)
+  const existing = await db
+    .select({ id: musicLinks.id })
+    .from(musicLinks)
+    .where(eq(musicLinks.musicItemId, id))
+    .limit(1);
+
+  const isPrimary = existing.length === 0;
+
+  const [link] = await db
+    .insert(musicLinks)
+    .values({ musicItemId: id, sourceId: source.id, url, isPrimary })
+    .onConflictDoNothing()
+    .returning({ id: musicLinks.id, url: musicLinks.url, isPrimary: musicLinks.isPrimary });
+
+  if (!link) {
+    return c.json({ error: "Link already exists for this release" }, 409);
+  }
+
+  return c.json(
+    {
+      id: link.id,
+      url: link.url,
+      source_name: source.name,
+      display_name: source.displayName,
+      is_primary: link.isPrimary,
+    },
+    201,
+  );
+});
+
+// ---------------------------------------------------------------------------
+// DELETE /:id/links/:linkId — remove a link from a music item
+// ---------------------------------------------------------------------------
+
+musicItemRoutes.delete("/:id/links/:linkId", async (c) => {
+  const id = Number(c.req.param("id"));
+  const linkId = Number(c.req.param("linkId"));
+  if (Number.isNaN(id) || Number.isNaN(linkId)) return c.json({ error: "Invalid ID" }, 400);
+
+  const result = await db
+    .delete(musicLinks)
+    .where(and(eq(musicLinks.id, linkId), eq(musicLinks.musicItemId, id)))
+    .returning({ id: musicLinks.id });
 
   return c.json({ success: result.length > 0 });
 });

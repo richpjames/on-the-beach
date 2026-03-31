@@ -222,6 +222,13 @@ function renderReleasePage(item: MusicItemFull, cssHref: string): string {
                 ${item.primary_url?.includes("music.apple.com") ? renderAppleMusicButton(item) : ""}
                 ${renderMixcloudEmbedFromMetadata(item)}
                 <div id="secondary-links"></div>
+                ${item.links
+                  .filter((l) => !l.is_primary)
+                  .map(
+                    (l) =>
+                      `<a class="release-page__source-link" href="${escapeHtml(l.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(l.display_name ?? l.source_name ?? "Link")}</a>`,
+                  )
+                  .join("")}
               </div>
 
               <div id="edit-mode" hidden>
@@ -240,6 +247,18 @@ function renderReleasePage(item: MusicItemFull, cssHref: string): string {
                     <input type="file" id="artwork-file-input" accept="image/*" style="display:none" />
                     <button type="button" class="btn" id="artwork-upload-btn">Replace image</button>
                     <input class="input" type="text" id="edit-artwork-url" value="${escapeHtml(item.artwork_url ?? "")}" placeholder="Artwork URL" />
+                  </div>
+                  <div class="release-page__edit-links">
+                    <div class="release-page__edit-stacks-header">Links</div>
+                    <div id="link-list"></div>
+                    <div class="release-page__edit-link-add">
+                      <div class="release-page__source-picker">
+                        <input class="input" type="text" id="link-source-input" placeholder="Source" autocomplete="off" />
+                        <div id="source-dropdown" class="release-page__source-dropdown" hidden></div>
+                      </div>
+                      <input class="input" type="url" id="link-url-input" placeholder="URL" />
+                      <button type="button" class="btn" id="add-link-btn">Add</button>
+                    </div>
                   </div>
                   <div class="release-page__edit-actions">
                     <button type="button" class="btn btn--primary" id="save-btn">Save changes</button>
@@ -564,6 +583,92 @@ function renderReleasePage(item: MusicItemFull, cssHref: string): string {
 
       renderStackChips();
       loadStacks();
+
+      // ── Links ────────────────────────────────────────────────────────────
+      let itemLinks = ${JSON.stringify(item.links)};
+
+      function renderLinkList() {
+        const el = document.getElementById('link-list');
+        if (!el) return;
+        el.innerHTML = itemLinks.map(link =>
+          '<div class="release-page__link-row">' +
+          '<span class="release-page__link-source">' + htmlEsc(link.display_name || link.source_name || 'Link') + '</span>' +
+          '<a class="release-page__link-url" href="' + htmlEsc(link.url) + '" target="_blank" rel="noopener noreferrer">' + htmlEsc(link.url) + '</a>' +
+          '<button type="button" class="btn release-page__link-remove" data-lid="' + link.id + '" title="Remove">×</button>' +
+          '</div>'
+        ).join('');
+        el.querySelectorAll('.release-page__link-remove').forEach(btn => {
+          btn.addEventListener('click', () => removeLink(parseInt(btn.dataset.lid)));
+        });
+      }
+
+      async function removeLink(linkId) {
+        const res = await fetch('/api/music-items/' + ITEM_ID + '/links/' + linkId, { method: 'DELETE' });
+        if (res.ok) {
+          itemLinks = itemLinks.filter(l => l.id !== linkId);
+          renderLinkList();
+        }
+      }
+
+      // ── Source combobox ──────────────────────────────────────────────────
+      let allSources = [];
+      const sourceInput = document.getElementById('link-source-input');
+      const sourceDropdown = document.getElementById('source-dropdown');
+
+      function renderSourceDropdown(query) {
+        const q = query.toLowerCase();
+        const matches = q
+          ? allSources.filter(s => s.displayName.toLowerCase().includes(q))
+          : allSources;
+        if (!matches.length) { sourceDropdown.hidden = true; return; }
+        sourceDropdown.innerHTML = matches.map(s =>
+          '<div class="release-page__source-dropdown-item" data-value="' + htmlEsc(s.displayName) + '">' +
+          htmlEsc(s.displayName) + '</div>'
+        ).join('');
+        sourceDropdown.querySelectorAll('.release-page__source-dropdown-item').forEach(item => {
+          item.addEventListener('mousedown', e => {
+            e.preventDefault();
+            sourceInput.value = item.dataset.value;
+            sourceDropdown.hidden = true;
+          });
+        });
+        sourceDropdown.hidden = false;
+      }
+
+      sourceInput?.addEventListener('input', () => renderSourceDropdown(sourceInput.value));
+      sourceInput?.addEventListener('focus', () => renderSourceDropdown(sourceInput.value));
+      sourceInput?.addEventListener('blur', () => { setTimeout(() => { sourceDropdown.hidden = true; }, 150); });
+
+      async function loadSources() {
+        const res = await fetch('/api/release/sources');
+        if (!res.ok) return;
+        allSources = await res.json();
+      }
+
+      document.getElementById('add-link-btn')?.addEventListener('click', async () => {
+        const urlInput = document.getElementById('link-url-input');
+        const sourceName = sourceInput.value.trim();
+        const url = urlInput.value.trim();
+        if (!sourceName || !url) return;
+        const res = await fetch('/api/music-items/' + ITEM_ID + '/links', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ sourceName, url }),
+        });
+        if (res.ok) {
+          const link = await res.json();
+          itemLinks.push(link);
+          renderLinkList();
+          sourceInput.value = '';
+          urlInput.value = '';
+        } else {
+          const err = await res.json().catch(() => ({}));
+          alert(err.error || 'Failed to add link');
+        }
+      });
+
+      renderLinkList();
+      loadSources();
 
       // ── Apple Music secondary link lookup ────────────────────────────────
       const PLAYABLE_SOURCES = new Set(['bandcamp','spotify','soundcloud','youtube','apple_music','tidal','deezer','mixcloud']);

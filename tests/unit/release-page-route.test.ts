@@ -39,6 +39,7 @@ const baseItem = {
   primary_source: null,
   primary_link_metadata: null,
   stacks: [{ id: 1, name: "favourites" }],
+  links: [],
 };
 
 describe("GET /r/:id", () => {

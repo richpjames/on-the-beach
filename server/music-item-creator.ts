@@ -96,22 +96,49 @@ export async function getSourceId(sourceName: string): Promise<number | null> {
 export type { ItemWithStacks } from "./hydrate-item-stacks";
 export { hydrateItemStacks } from "./hydrate-item-stacks";
 
-/** Fetch a single full item by its id, including stacks. */
+/** Fetch a single full item by its id, including stacks and all links. */
 export async function fetchFullItem(id: number): Promise<MusicItemFull | null> {
   const rows = await fullItemSelect().where(eq(musicItems.id, id));
   if (!rows[0]) return null;
 
-  const stackRows = await db
-    .select({ musicItemId: musicItemStacks.musicItemId, id: stacks.id, name: stacks.name })
-    .from(musicItemStacks)
-    .innerJoin(stacks, eq(stacks.id, musicItemStacks.stackId))
-    .where(eq(musicItemStacks.musicItemId, id));
+  const [stackRows, linkRows] = await Promise.all([
+    db
+      .select({ musicItemId: musicItemStacks.musicItemId, id: stacks.id, name: stacks.name })
+      .from(musicItemStacks)
+      .innerJoin(stacks, eq(stacks.id, musicItemStacks.stackId))
+      .where(eq(musicItemStacks.musicItemId, id)),
+    db
+      .select({
+        id: musicLinks.id,
+        url: musicLinks.url,
+        source_name: sources.name,
+        display_name: sources.displayName,
+        is_primary: musicLinks.isPrimary,
+      })
+      .from(musicLinks)
+      .leftJoin(sources, eq(musicLinks.sourceId, sources.id))
+      .where(eq(musicLinks.musicItemId, id)),
+  ]);
 
   const item = {
     ...(rows[0] as unknown as MusicItemFull),
     stacks: [] as Array<{ id: number; name: string }>,
+    links: [] as Array<{
+      id: number;
+      url: string;
+      source_name: string | null;
+      display_name: string | null;
+      is_primary: boolean;
+    }>,
   };
   item.stacks = stackRows.map((r) => ({ id: r.id, name: r.name }));
+  item.links = linkRows.map((r) => ({
+    id: r.id,
+    url: r.url,
+    source_name: r.source_name,
+    display_name: r.display_name,
+    is_primary: r.is_primary,
+  }));
   return item;
 }
 
@@ -395,8 +422,8 @@ const scrapingMachine = setup({
     resolve: fromPromise<ResolveOutput, { url: string; overrides?: Partial<CreateMusicItemInput> }>(
       async ({ input }) => resolveReleaseCandidates(input.url, input.overrides),
     ),
-    checkDuplicates: fromPromise<MusicItemFull[], { normalizedUrl: string }>(
-      async ({ input }) => fetchItemsByUrl(input.normalizedUrl),
+    checkDuplicates: fromPromise<MusicItemFull[], { normalizedUrl: string }>(async ({ input }) =>
+      fetchItemsByUrl(input.normalizedUrl),
     ),
     insert: fromPromise<
       CreateResult[],

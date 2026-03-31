@@ -346,6 +346,14 @@ export function createReleaseRoutes(
     }
   });
 
+  routes.get("/sources", async (c) => {
+    const rows = await db
+      .select({ id: sources.id, name: sources.name, displayName: sources.displayName })
+      .from(sources)
+      .orderBy(sources.displayName);
+    return c.json(rows);
+  });
+
   return routes;
 }
 
