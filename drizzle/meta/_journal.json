@@ -43,6 +43,13 @@
       "when": 1772804672249,
       "tag": "0005_bandcamp_embed_metadata",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1775070675355,
+      "tag": "0006_lethal_darkhawk",
+      "breakpoints": true
     }
   ]
 }
