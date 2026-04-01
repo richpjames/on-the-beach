@@ -57,3 +57,13 @@ describe("DELETE /api/music-items/:id/reminder", () => {
     expect(res.status).toBe(400);
   });
 });
+
+describe("GET /api/music-items/reminders/pending", () => {
+  test("returns 200 with items array", async () => {
+    const app = makeApp();
+    const res = await app.request("http://localhost/api/music-items/reminders/pending");
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(Array.isArray(body.items)).toBe(true);
+  });
+});

@@ -267,4 +267,26 @@ export class ApiClient {
       return {};
     }
   }
+
+  async setReminder(itemId: number, remindAt: string): Promise<void> {
+    await this.request(
+      `/api/music-items/${itemId}/reminder`,
+      "Set reminder",
+      this.jsonRequest("PUT", { remindAt }),
+    );
+  }
+
+  async clearReminder(itemId: number): Promise<void> {
+    await this.request(`/api/music-items/${itemId}/reminder`, "Clear reminder", {
+      method: "DELETE",
+    });
+  }
+
+  async getPendingReminders(): Promise<Array<{ id: number; title: string }>> {
+    const data = await this.requestJson<{ items: Array<{ id: number; title: string }> }>(
+      "/api/music-items/reminders/pending",
+      "Get pending reminders",
+    );
+    return data.items;
+  }
 }
