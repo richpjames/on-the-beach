@@ -61,6 +61,8 @@ export interface MusicItem {
   catalogue_number: string | null;
   musicbrainz_release_id: string | null;
   musicbrainz_artist_id: string | null;
+  remind_at: string | null;
+  reminder_pending: boolean;
 }
 
 export interface MusicLink {
