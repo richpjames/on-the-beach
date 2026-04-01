@@ -538,3 +538,43 @@ musicItemRoutes.delete("/:id/links/:linkId", async (c) => {
 
   return c.json({ success: result.length > 0 });
 });
+
+// PUT /api/music-items/:id/reminder
+musicItemRoutes.put("/:id/reminder", async (c) => {
+  const id = Number(c.req.param("id"));
+  if (!Number.isInteger(id) || id <= 0) {
+    return c.json({ error: "Invalid id" }, 400);
+  }
+
+  const body = await c.req.json().catch(() => null);
+  if (!body || typeof body.remindAt !== "string") {
+    return c.json({ error: "remindAt is required" }, 400);
+  }
+
+  const date = new Date(body.remindAt);
+  if (isNaN(date.getTime())) {
+    return c.json({ error: "remindAt must be a valid date" }, 400);
+  }
+
+  await db
+    .update(musicItems)
+    .set({ remindAt: date, updatedAt: new Date() })
+    .where(eq(musicItems.id, id));
+
+  return c.json({ ok: true });
+});
+
+// DELETE /api/music-items/:id/reminder
+musicItemRoutes.delete("/:id/reminder", async (c) => {
+  const id = Number(c.req.param("id"));
+  if (!Number.isInteger(id) || id <= 0) {
+    return c.json({ error: "Invalid id" }, 400);
+  }
+
+  await db
+    .update(musicItems)
+    .set({ remindAt: null, reminderPending: false, updatedAt: new Date() })
+    .where(eq(musicItems.id, id));
+
+  return c.json({ ok: true });
+});
