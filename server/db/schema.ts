@@ -53,6 +53,8 @@ export const musicItems = sqliteTable(
     catalogueNumber: text("catalogue_number"),
     musicbrainzReleaseId: text("musicbrainz_release_id"),
     musicbrainzArtistId: text("musicbrainz_artist_id"),
+    remindAt: integer("remind_at", { mode: "timestamp" }),
+    reminderPending: integer("reminder_pending", { mode: "boolean" }).notNull().default(false),
   },
   (table) => [
     index("idx_music_items_listen_status").on(table.listenStatus),
