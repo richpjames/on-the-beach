@@ -9,6 +9,7 @@ import { releasePageRoutes } from "./routes/release-page";
 import { mainPageRoutes } from "./routes/main-page";
 import { rssRoutes } from "./routes/rss";
 import { getUploadsDir, rewriteUploadsRequestPath } from "./uploads";
+import { processReminders } from "./reminders";
 
 const app = new Hono();
 const uploadsDir = getUploadsDir();
@@ -37,6 +38,14 @@ app.use(
     root: uploadsDir,
     rewriteRequestPath: rewriteUploadsRequestPath,
   }),
+);
+
+// ---------- Reminder cron ----------
+// Run reminder processing on startup and then every hour
+processReminders().catch((err) => console.error("[reminders] startup run failed:", err));
+setInterval(
+  () => processReminders().catch((err) => console.error("[reminders] interval run failed:", err)),
+  60 * 60 * 1000,
 );
 
 // ---------- Test-only routes ----------
