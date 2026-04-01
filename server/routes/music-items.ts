@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { eq, and, inArray, sql, desc, asc } from "drizzle-orm";
+import { eq, and, inArray, sql, desc, asc, lte } from "drizzle-orm";
 import { db } from "../db/index";
 import {
   musicItems,
@@ -362,6 +362,29 @@ musicItemRoutes.put("/order", async (c) => {
     });
 
   return c.json({ success: true });
+});
+
+// ---------------------------------------------------------------------------
+// GET /reminders/pending — consume pending reminders (clears the flag)
+// ---------------------------------------------------------------------------
+
+// GET /api/music-items/reminders/pending
+// Returns items with reminder_pending=true and clears the flag (consume semantics)
+musicItemRoutes.get("/reminders/pending", async (c) => {
+  const pending = await db
+    .select({ id: musicItems.id, title: musicItems.title })
+    .from(musicItems)
+    .where(eq(musicItems.reminderPending, true));
+
+  if (pending.length > 0) {
+    const ids = pending.map((r) => r.id);
+    await db
+      .update(musicItems)
+      .set({ reminderPending: false, updatedAt: new Date() })
+      .where(inArray(musicItems.id, ids));
+  }
+
+  return c.json({ items: pending });
 });
 
 // ---------------------------------------------------------------------------
