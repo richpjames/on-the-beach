@@ -89,6 +89,19 @@ function formCtx() {
 export async function initialize(): Promise<void> {
   setupAddForm();
   appActor.send({ type: "APP_READY" });
+
+  // Check for items that were moved back to to-listen by the reminder cron
+  api
+    .getPendingReminders()
+    .then((items) => {
+      if (items.length > 0) {
+        appActor.send({ type: "REMINDERS_READY", itemIds: items.map((i) => i.id) });
+      }
+    })
+    .catch(() => {
+      // Non-critical — ignore failures silently
+    });
+
   document.addEventListener("navigated-to-main", () => {
     appActor.send({ type: "LIST_REFRESH" });
   });
