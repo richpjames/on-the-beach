@@ -29,7 +29,8 @@ export type AppEvent =
   | { type: "SORT_PANEL_TOGGLED" }
   | { type: "BROWSE_PANELS_CLOSED" }
   | { type: "ITEM_CREATED" }
-  | { type: "LIST_REFRESH" };
+  | { type: "LIST_REFRESH" }
+  | { type: "REMINDERS_READY"; itemIds: number[] };
 
 export const appMachine = createMachine({
   types: {} as { context: AppContext; events: AppEvent },
@@ -125,5 +126,6 @@ export const appMachine = createMachine({
     LIST_REFRESH: {
       actions: assign(({ context }) => ({ listVersion: context.listVersion + 1 })),
     },
+    REMINDERS_READY: {},
   },
 });

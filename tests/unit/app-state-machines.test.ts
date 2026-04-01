@@ -65,6 +65,13 @@ describe("app state machine", () => {
     expect(ctx.currentStack).toBeNull();
     expect(ctx.stacks.map((stack) => stack.id)).toEqual([3]);
   });
+
+  it("accepts REMINDERS_READY event without error", () => {
+    const actor = createActor(appMachine).start();
+    // Should not throw — event is a no-op for now
+    actor.send({ type: "REMINDERS_READY", itemIds: [1, 2] });
+    expect(actor.getSnapshot().context.isReady).toBe(false); // unchanged
+  });
 });
 
 describe("add form state machine", () => {
