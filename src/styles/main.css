@@ -1491,6 +1491,12 @@ select.input {
   font-style: italic;
 }
 
+@media (max-width: 520px) {
+  .badge--source {
+    display: none;
+  }
+}
+
 /* ═══════════════════════════════════════════════════
    STATUS SELECT — Compact Windows dropdown
 ═══════════════════════════════════════════════════ */
