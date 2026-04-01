@@ -163,6 +163,17 @@ function renderNotFoundPage(): string {
 </html>`;
 }
 
+function reminderDateValue(item: MusicItemFull): string {
+  if (item.remind_at) {
+    const d = new Date(item.remind_at as unknown as string | Date);
+    return d.toISOString().slice(0, 10);
+  }
+  if (item.year) {
+    return `${item.year}-01-01`;
+  }
+  return "";
+}
+
 function renderReleasePage(item: MusicItemFull, cssHref: string): string {
   const statusOptions = [
     { value: "to-listen", label: "To Listen" },
@@ -279,6 +290,13 @@ function renderReleasePage(item: MusicItemFull, cssHref: string): string {
               <div class="release-page__status">
                 <label for="status-select">Status</label>
                 <select id="status-select" class="status-select">${statusOptions}</select>
+              </div>
+
+              <div class="release-page__reminder">
+                <label for="remind-at">Remind me on</label>
+                <input class="input" type="date" id="remind-at" value="${escapeHtml(reminderDateValue(item))}" />
+                <button type="button" class="btn btn--primary" id="set-reminder-btn">Set reminder</button>
+                ${item.remind_at ? `<button type="button" class="btn" id="clear-reminder-btn">Clear</button>` : ""}
               </div>
 
               <div class="release-page__footer">
@@ -818,6 +836,26 @@ function renderReleasePage(item: MusicItemFull, cssHref: string): string {
           }
         });
       }
+
+      document.getElementById('set-reminder-btn').addEventListener('click', async () => {
+        const input = document.getElementById('remind-at');
+        const remindAt = input.value;
+        if (!remindAt) return;
+        const res = await fetch('/api/music-items/' + ITEM_ID + '/reminder', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ remindAt }),
+        });
+        if (!res.ok) { alert('Failed to set reminder'); return; }
+        input.dataset.saved = remindAt;
+      });
+
+      document.getElementById('clear-reminder-btn')?.addEventListener('click', async () => {
+        const res = await fetch('/api/music-items/' + ITEM_ID + '/reminder', { method: 'DELETE' });
+        if (!res.ok) { alert('Failed to clear reminder'); return; }
+        document.getElementById('remind-at').value = '';
+        document.getElementById('clear-reminder-btn').remove();
+      });
     </script>
   </body>
 </html>`;

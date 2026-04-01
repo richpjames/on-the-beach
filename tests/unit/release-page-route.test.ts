@@ -406,4 +406,33 @@ describe("YouTube embed", () => {
     expect(html).toContain('href="https://www.youtube.com/playlist?list=PLE31AAD9114F343C4"');
     expect(html).toContain("YouTube");
   });
+
+  test("HTML contains reminder section", async () => {
+    mockFetchItem.mockResolvedValue(baseItem);
+    const app = makeApp();
+    const res = await app.request("http://localhost/r/42");
+    const html = await res.text();
+    expect(html).toContain("remind-at");
+    expect(html).toContain("Remind me");
+  });
+
+  test("prefills reminder date from item year when available", async () => {
+    mockFetchItem.mockResolvedValue({ ...baseItem, year: 2026, remind_at: null });
+    const app = makeApp();
+    const res = await app.request("http://localhost/r/42");
+    const html = await res.text();
+    expect(html).toContain('value="2026-01-01"');
+  });
+
+  test("prefills reminder date from remind_at when set", async () => {
+    mockFetchItem.mockResolvedValue({
+      ...baseItem,
+      remind_at: new Date("2026-06-15T00:00:00.000Z"),
+      reminder_pending: false,
+    });
+    const app = makeApp();
+    const res = await app.request("http://localhost/r/42");
+    const html = await res.text();
+    expect(html).toContain('value="2026-06-15"');
+  });
 });
