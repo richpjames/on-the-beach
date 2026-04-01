@@ -38,6 +38,8 @@ const baseItem = {
   primary_url: null,
   primary_source: null,
   primary_link_metadata: null,
+  remind_at: null,
+  reminder_pending: false,
   stacks: [{ id: 1, name: "favourites" }],
   links: [],
 };
