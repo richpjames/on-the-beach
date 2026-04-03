@@ -23,6 +23,7 @@ import {
   hydrateItemStacks,
 } from "../music-item-creator";
 import { UnsupportedMusicLinkError } from "../scraper";
+import { fetchAndStoreSuggestion } from "../suggestions";
 import type {
   CreateMusicItemInput,
   UpdateMusicItemInput,
@@ -323,6 +324,14 @@ musicItemRoutes.post("/", async (c) => {
       return c.json({ error: "Invalid URL" }, 400);
     } else {
       result = await createMusicItemDirect(input);
+    }
+    if (result.item.listen_status === "to-listen" && result.item.artist_name) {
+      void fetchAndStoreSuggestion({
+        id: result.item.id,
+        artist_name: result.item.artist_name,
+        year: result.item.year,
+        musicbrainz_artist_id: result.item.musicbrainz_artist_id,
+      });
     }
     return c.json(result.item, 201);
   } catch (err) {
