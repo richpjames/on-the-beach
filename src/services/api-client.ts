@@ -222,6 +222,15 @@ export class ApiClient {
     return this.requestJson<StackWithCount[]>("/api/stacks", "listStacks");
   }
 
+  async getStackChildren(
+    stackId: number,
+  ): Promise<Array<{ id: number; name: string; item_count: number }>> {
+    return this.requestJson<Array<{ id: number; name: string; item_count: number }>>(
+      `/api/stacks/${stackId}/children`,
+      "getStackChildren",
+    );
+  }
+
   async getStacksForItem(musicItemId: number): Promise<Stack[]> {
     return this.requestJson<Stack[]>(`/api/stacks/items/${musicItemId}`, "getStacksForItem");
   }
