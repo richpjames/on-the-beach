@@ -53,6 +53,101 @@ function parseLabelInfo(labelInfo: unknown): {
   return { label, catalogueNumber };
 }
 
+export interface SuggestedRelease {
+  title: string;
+  itemType: string;
+  year: number | null;
+  musicbrainzReleaseId: string | null;
+}
+
+interface MbArtistRelease {
+  id?: unknown;
+  title?: unknown;
+  date?: unknown;
+  "primary-type"?: unknown;
+}
+
+interface MbArtistReleasesResponse {
+  releases?: unknown[];
+}
+
+interface MbArtistSearchResponse {
+  artists?: Array<{ id?: unknown }>;
+}
+
+async function fetchArtistMbid(artistName: string): Promise<string | null> {
+  const params = new URLSearchParams({ query: artistName, limit: "1", fmt: "json" });
+  const url = `${MB_API_BASE}/artist?${params}`;
+  try {
+    const response = await fetch(url, {
+      headers: { "User-Agent": USER_AGENT, Accept: "application/json" },
+    });
+    if (!response.ok) return null;
+    const data = (await response.json()) as MbArtistSearchResponse;
+    const first = data.artists?.[0];
+    return typeof first?.id === "string" ? first.id : null;
+  } catch {
+    return null;
+  }
+}
+
+async function fetchArtistReleases(mbid: string): Promise<MbArtistRelease[]> {
+  const params = new URLSearchParams({ inc: "releases", fmt: "json" });
+  const url = `${MB_API_BASE}/artist/${mbid}?${params}`;
+  const response = await fetch(url, {
+    headers: { "User-Agent": USER_AGENT, Accept: "application/json" },
+  });
+  if (!response.ok) return [];
+  const data = (await response.json()) as MbArtistReleasesResponse;
+  return Array.isArray(data.releases) ? (data.releases as MbArtistRelease[]) : [];
+}
+
+export async function findSuggestedRelease(opts: {
+  mbArtistId: string | null;
+  artistName: string;
+  trackedTitles: Set<string>;
+  sourceYear: number | null;
+}): Promise<SuggestedRelease | null> {
+  const { mbArtistId, artistName, trackedTitles, sourceYear } = opts;
+
+  try {
+    const mbid = mbArtistId ?? (await fetchArtistMbid(artistName));
+    if (!mbid) return null;
+
+    const releases = await fetchArtistReleases(mbid);
+    if (releases.length === 0) return null;
+
+    const candidates = releases.filter((r) => {
+      if (typeof r.title !== "string" || !r.title) return false;
+      return !trackedTitles.has(r.title.toLowerCase().trim());
+    });
+
+    if (candidates.length === 0) return null;
+
+    const withYear = candidates.map((r) => ({
+      title: r.title as string,
+      year: parseYear(r.date),
+      musicbrainzReleaseId: typeof r.id === "string" ? r.id : null,
+      itemType: typeof r["primary-type"] === "string" ? r["primary-type"].toLowerCase() : "album",
+    }));
+
+    if (sourceYear === null) {
+      withYear.sort((a, b) => (b.year ?? 0) - (a.year ?? 0));
+      return withYear[0] ?? null;
+    }
+
+    withYear.sort(
+      (a, b) =>
+        Math.abs((a.year ?? sourceYear) - sourceYear) -
+        Math.abs((b.year ?? sourceYear) - sourceYear),
+    );
+
+    return withYear[0] ?? null;
+  } catch {
+    return null;
+  }
+}
+
 export async function lookupRelease(
   artist: string,
   title: string,
