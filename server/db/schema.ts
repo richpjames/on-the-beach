@@ -135,7 +135,6 @@ export const stackParents = sqliteTable(
   },
   (table) => [
     primaryKey({ columns: [table.parentStackId, table.childStackId] }),
-    unique("stack_parents_child_stack_unique").on(table.childStackId),
     index("idx_stack_parents_parent_stack_id").on(table.parentStackId),
     index("idx_stack_parents_child_stack_id").on(table.childStackId),
   ],
