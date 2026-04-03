@@ -454,6 +454,27 @@ function renderMainPage(opts: {
           </div>
         </div>
       </div>
+      <div id="suggestion-picker-modal" class="link-picker" hidden>
+        <div class="link-picker__backdrop" data-suggestion-picker-close="true"></div>
+        <div
+          class="link-picker__dialog"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="suggestion-picker-title"
+        >
+          <div class="link-picker__header">
+            <h2 id="suggestion-picker-title">You might also like</h2>
+            <p id="suggestion-picker-message"></p>
+          </div>
+          <div id="suggestion-picker-list" class="link-picker__list" style="overflow-y: visible"></div>
+          <div class="link-picker__actions">
+            <button type="button" id="suggestion-picker-dismiss" class="btn btn--ghost">Dismiss</button>
+            <button type="button" id="suggestion-picker-accept" class="btn btn--primary">
+              Add to list
+            </button>
+          </div>
+        </div>
+      </div>
       <footer class="footer">
         <span id="app-version">v${escapeHtml(opts.appVersion)}</span>
       </footer>
