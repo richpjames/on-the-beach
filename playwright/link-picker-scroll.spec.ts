@@ -39,7 +39,7 @@ test.describe("Link picker scroll", () => {
     await page.getByPlaceholder("search or paste a link").fill("https://example.com/newsletter");
     await page.getByRole("button", { name: "Add" }).click();
 
-    const dialog = page.locator(".link-picker__dialog");
+    const dialog = page.locator("#link-picker-modal .link-picker__dialog");
     await expect(dialog).toBeVisible({ timeout: 10_000 });
 
     // The dialog must not overflow the viewport
@@ -49,13 +49,13 @@ test.describe("Link picker scroll", () => {
     expect(dialogBox!.y + dialogBox!.height).toBeLessThanOrEqual(viewportHeight);
 
     // The "Select all" row must have positive height (must not collapse to zero)
-    const listHeader = page.locator(".link-picker__list-header");
+    const listHeader = page.locator("#link-picker-modal .link-picker__list-header");
     const listHeaderBox = await listHeader.boundingBox();
     expect(listHeaderBox).not.toBeNull();
     expect(listHeaderBox!.height).toBeGreaterThan(0);
 
     // The list must be scrollable (content taller than visible area)
-    const listEl = page.locator(".link-picker__list");
+    const listEl = page.locator("#link-picker-modal .link-picker__list");
     const { scrollHeight, clientHeight } = await listEl.evaluate((el) => ({
       scrollHeight: el.scrollHeight,
       clientHeight: el.clientHeight,
