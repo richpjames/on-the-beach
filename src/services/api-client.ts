@@ -263,12 +263,18 @@ export class ApiClient {
     );
   }
 
-  async setStackParent(stackId: number, parentStackId: number | null): Promise<void> {
+  async addStackParent(stackId: number, parentStackId: number): Promise<void> {
     await this.request(
       `/api/stacks/${stackId}/parent`,
-      "setStackParent",
+      "addStackParent",
       this.jsonRequest("PATCH", { parentStackId }),
     );
+  }
+
+  async removeStackParent(stackId: number, parentStackId: number): Promise<void> {
+    await this.request(`/api/stacks/${stackId}/parent/${parentStackId}`, "removeStackParent", {
+      method: "DELETE",
+    });
   }
 
   // ── Release Scan ────────────────────────────────────────────

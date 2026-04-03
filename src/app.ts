@@ -137,7 +137,7 @@ function initializeUI(hasServerData: boolean): void {
   setupBrowseControls();
   setupStackBar();
   setupStackManagePanel();
-  setupStackParentLinker();
+
   setupLinkPicker();
   setupEventDelegation();
   setupMusicListReorder();
@@ -740,11 +740,6 @@ async function renderStackBar(): Promise<void> {
     deleteBtn.hidden = !hasSelection;
     deleteBtn.disabled = !hasSelection;
     deleteBtn.title = hasSelection ? `Delete "${selectedStack.name}"` : "Delete selected stack";
-  }
-
-  const list = document.getElementById("music-list");
-  if (list instanceof HTMLElement) {
-    renderStackParentLinker(list);
   }
 
   syncStackFeedLinks();
@@ -1631,7 +1626,6 @@ async function renderMusicListView(): Promise<void> {
   container.innerHTML = renderMusicList(result.items, appCtx().currentFilter, appCtx().searchQuery);
   setupMusicListReorder();
   musicListSortable?.option("disabled", isBrowseOrderLocked());
-  renderStackParentLinker(container);
   syncCustomListScrollbar();
   requestAnimationFrame(() => {
     syncCustomListScrollbar();
@@ -1727,96 +1721,6 @@ function setupStackManagePanel(): void {
       await deleteStackById(stackId);
     }
   });
-}
-
-function setupStackParentLinker(): void {
-  document.addEventListener("click", async (event) => {
-    const target = event.target as HTMLElement;
-    const linkButton = target.closest("#stack-parent-link-btn");
-    if (!(linkButton instanceof HTMLButtonElement)) {
-      return;
-    }
-
-    const parentSelect = document.getElementById("stack-parent-select");
-    const currentStack = appCtx().currentStack;
-    if (!(parentSelect instanceof HTMLSelectElement) || currentStack === null) {
-      return;
-    }
-
-    const parentStackId = Number(parentSelect.value);
-    if (!Number.isInteger(parentStackId) || parentStackId <= 0) {
-      return;
-    }
-
-    try {
-      await api.setStackParent(currentStack, parentStackId);
-      parentSelect.value = "";
-      await renderStackBar();
-      if (appCtx().stackManageOpen) {
-        await renderStackManagePanel();
-      }
-      await renderMusicListView();
-    } catch (error) {
-      console.error("Failed to add list to list:", error);
-      alert("Failed to add list to list. It may create a cycle.");
-    }
-  });
-}
-
-function renderStackParentLinker(list: HTMLElement): void {
-  const existing = list.querySelector("#stack-parent-linker");
-  if (existing instanceof HTMLElement) {
-    existing.remove();
-  }
-
-  if (appCtx().currentStack === null) {
-    return;
-  }
-
-  const currentStack = appCtx().stacks.find((stack) => stack.id === appCtx().currentStack);
-  if (!currentStack) {
-    return;
-  }
-
-  const parentCandidates = appCtx().stacks.filter((stack) => stack.id !== appCtx().currentStack);
-
-  const options =
-    (parentCandidates.length === 0
-      ? '<option value="">No other lists</option>'
-      : '<option value="">Parent list...</option>') +
-    parentCandidates.map((stack) => `<option value="${stack.id}">${stack.name}</option>`).join("");
-
-  const linker = document.createElement("div");
-  linker.id = "stack-parent-linker";
-  linker.className = "music-list__parent-linker";
-  linker.innerHTML = `
-      <select id="stack-parent-select" class="input" aria-label="Parent list">
-        ${options}
-      </select>
-      <button
-        type="button"
-        id="stack-parent-link-btn"
-        class="btn btn--ghost"
-        title="Add current list to parent list"
-      >
-        +
-      </button>
-    `;
-
-  const parentSelect = linker.querySelector("#stack-parent-select");
-  const linkButton = linker.querySelector("#stack-parent-link-btn");
-  if (!(parentSelect instanceof HTMLSelectElement) || !(linkButton instanceof HTMLButtonElement)) {
-    return;
-  }
-
-  const hasCandidates = parentCandidates.length > 0;
-  parentSelect.disabled = !hasCandidates;
-  linkButton.disabled = !hasCandidates;
-  if (currentStack.parent_stack_ids.length > 0) {
-    parentSelect.value = String(currentStack.parent_stack_ids[0]);
-  }
-
-  list.appendChild(linker);
 }
 
 function renderAddFormStackChipsView(): void {

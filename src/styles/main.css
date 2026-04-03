@@ -855,31 +855,6 @@ select.input {
   min-height: 0;
 }
 
-.music-list__parent-linker {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 4px;
-  padding: 4px 8px 6px;
-  border-top: 1px solid #0a0a1a;
-  background: var(--playlist-bg-alt);
-}
-
-.music-list__parent-linker .input {
-  width: 180px;
-  height: 20px;
-  font-size: 11px;
-  padding: 1px 4px;
-}
-
-#stack-parent-link-btn {
-  min-width: 20px;
-  width: 20px;
-  height: 20px;
-  padding: 0;
-  font-size: 13px;
-  line-height: 1;
-}
 
 .music-scrollbar {
   display: grid;
