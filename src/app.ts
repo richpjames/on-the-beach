@@ -30,6 +30,7 @@ import {
   renderStackDropdownContent,
   renderStackManageList,
   renderStackRenameEditor,
+  renderSuggestionBanner,
 } from "./ui/view/templates";
 import { buildStackFeedHref, buildStackFeedTitle } from "../shared/rss";
 
@@ -1088,11 +1089,50 @@ function setupEventDelegation(): void {
         return;
       }
 
-      await api.updateListenStatus(itemContext.itemId, target.value as ListenStatus);
+      const result = await api.updateListenStatus(itemContext.itemId, target.value as ListenStatus);
       await renderMusicListView();
+
+      if (target.value === "listened" && result?.suggestion) {
+        showSuggestionBanner(result.suggestion, itemContext.itemId);
+      }
       return;
     }
   });
+}
+
+let activeSuggestionBanner: HTMLElement | null = null;
+
+function showSuggestionBanner(
+  suggestion: import("./types").ItemSuggestion,
+  sourceItemId: number,
+): void {
+  dismissSuggestionBanner();
+
+  const musicList = document.getElementById("music-list");
+  if (!musicList) return;
+
+  const wrapper = document.createElement("div");
+  wrapper.innerHTML = renderSuggestionBanner(suggestion, sourceItemId);
+  const bannerEl = wrapper.firstElementChild as HTMLElement;
+
+  musicList.insertAdjacentElement("beforebegin", bannerEl);
+  activeSuggestionBanner = bannerEl;
+
+  bannerEl.querySelector(".suggestion-banner__accept")?.addEventListener("click", async () => {
+    dismissSuggestionBanner();
+    await api.acceptSuggestion(sourceItemId);
+    appActor.send({ type: "LIST_REFRESH" });
+  });
+
+  bannerEl.querySelector(".suggestion-banner__dismiss")?.addEventListener("click", async () => {
+    dismissSuggestionBanner();
+    await api.dismissSuggestion(sourceItemId);
+  });
+}
+
+function dismissSuggestionBanner(): void {
+  activeSuggestionBanner?.remove();
+  activeSuggestionBanner = null;
 }
 
 function resolveItemContext(target: HTMLElement): ItemContext | null {
