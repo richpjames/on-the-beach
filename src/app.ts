@@ -1269,17 +1269,24 @@ async function persistMusicListOrder(): Promise<void> {
     return;
   }
 
-  const itemIds = Array.from(list.querySelectorAll<HTMLElement>("[data-item-id]"))
-    .map((card) => Number(card.dataset.itemId))
-    .filter((id) => Number.isInteger(id) && id > 0);
+  const entries: string[] = [];
+  for (const el of list.querySelectorAll<HTMLElement>("[data-item-id], [data-child-stack-id]")) {
+    if (el.dataset.itemId) {
+      const id = Number(el.dataset.itemId);
+      if (Number.isInteger(id) && id > 0) entries.push(`i:${id}`);
+    } else if (el.dataset.childStackId) {
+      const id = Number(el.dataset.childStackId);
+      if (Number.isInteger(id) && id > 0) entries.push(`s:${id}`);
+    }
+  }
 
-  if (itemIds.length === 0) {
+  if (entries.length === 0) {
     return;
   }
 
   const contextKey = buildContextKey(appCtx().currentFilter, appCtx().currentStack);
   try {
-    await api.saveOrder(contextKey, itemIds);
+    await api.saveOrderEntries(contextKey, entries);
   } catch (error) {
     console.error("Failed to persist reordered items:", error);
     await renderMusicListView();

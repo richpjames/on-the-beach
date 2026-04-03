@@ -196,6 +196,14 @@ export class ApiClient {
     );
   }
 
+  async saveOrderEntries(contextKey: string, entries: string[]): Promise<void> {
+    await this.request(
+      "/api/music-items/order",
+      "saveOrderEntries",
+      this.jsonRequest("PUT", { contextKey, entries }),
+    );
+  }
+
   // ── Stacks ───────────────────────────────────────────────────
 
   async createStack(name: string, parentStackId?: number | null): Promise<Stack> {
