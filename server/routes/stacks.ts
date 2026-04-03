@@ -87,6 +87,29 @@ stackRoutes.get("/", async (c) => {
   );
 });
 
+// GET /:id/children — list direct child stacks with item counts
+stackRoutes.get("/:id/children", async (c) => {
+  const stackId = parseId(c.req.param("id"));
+  if (stackId === null) {
+    return c.json({ error: "Invalid stack ID" }, 400);
+  }
+
+  const rows = await db
+    .select({
+      id: stacks.id,
+      name: stacks.name,
+      item_count: count(musicItemStacks.musicItemId),
+    })
+    .from(stackParents)
+    .innerJoin(stacks, eq(stacks.id, stackParents.childStackId))
+    .leftJoin(musicItemStacks, eq(stacks.id, musicItemStacks.stackId))
+    .where(eq(stackParents.parentStackId, stackId))
+    .groupBy(stacks.id)
+    .orderBy(asc(stacks.name));
+
+  return c.json(rows);
+});
+
 // POST / — create a new stack
 stackRoutes.post("/", async (c) => {
   const body = await c.req.json<{ name: string; parentStackId?: number | null }>();
