@@ -140,3 +140,23 @@ export const stackParents = sqliteTable(
     index("idx_stack_parents_child_stack_id").on(table.childStackId),
   ],
 );
+
+export const itemSuggestions = sqliteTable(
+  "item_suggestions",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    sourceItemId: integer("source_item_id")
+      .notNull()
+      .references(() => musicItems.id, { onDelete: "cascade" }),
+    title: text("title").notNull(),
+    artistName: text("artist_name").notNull(),
+    itemType: text("item_type").notNull().default("album"),
+    year: integer("year"),
+    musicbrainzReleaseId: text("musicbrainz_release_id"),
+    status: text("status").notNull().default("pending"),
+    createdAt: integer("created_at", { mode: "timestamp" })
+      .notNull()
+      .$defaultFn(() => new Date()),
+  },
+  (table) => [index("idx_item_suggestions_source_item_id").on(table.sourceItemId)],
+);
