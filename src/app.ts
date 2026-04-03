@@ -30,7 +30,6 @@ import {
   renderStackDropdownContent,
   renderStackManageList,
   renderStackRenameEditor,
-  renderSuggestionBanner,
 } from "./ui/view/templates";
 import { buildStackFeedHref, buildStackFeedTitle } from "../shared/rss";
 
@@ -1093,46 +1092,91 @@ function setupEventDelegation(): void {
       await renderMusicListView();
 
       if (target.value === "listened" && result?.suggestion) {
-        showSuggestionBanner(result.suggestion, itemContext.itemId);
+        showSuggestionPicker(result.suggestion, itemContext.itemId);
       }
       return;
     }
   });
 }
 
-let activeSuggestionBanner: HTMLElement | null = null;
-
-function showSuggestionBanner(
+function showSuggestionPicker(
   suggestion: import("./types").ItemSuggestion,
   sourceItemId: number,
 ): void {
-  dismissSuggestionBanner();
+  const modal = document.getElementById("suggestion-picker-modal");
+  const list = document.getElementById("suggestion-picker-list");
+  const message = document.getElementById("suggestion-picker-message");
+  const acceptBtn = document.getElementById("suggestion-picker-accept");
+  const dismissBtn = document.getElementById("suggestion-picker-dismiss");
+  if (!modal || !list || !message || !acceptBtn || !dismissBtn) return;
 
-  const musicList = document.getElementById("music-list");
-  if (!musicList) return;
+  message.textContent = `Also by ${suggestion.artistName}`;
+  const yearStr = suggestion.year ? ` (${suggestion.year})` : "";
+  const artworkUrl = suggestion.musicbrainzReleaseId
+    ? `https://coverartarchive.org/release/${encodeURIComponent(suggestion.musicbrainzReleaseId)}/front-250`
+    : null;
+  list.innerHTML = `
+    <button
+      type="button"
+      class="link-picker__candidate is-selected"
+      aria-pressed="true"
+    >
+      ${
+        artworkUrl
+          ? `<img
+              src="${escapeHtml(artworkUrl)}"
+              alt="${escapeHtml(suggestion.title)}"
+              class="suggestion-picker__artwork"
+              onerror="this.style.display='none'"
+            />`
+          : ""
+      }
+      <span class="link-picker__candidate-main">
+        <span class="link-picker__candidate-title">${escapeHtml(suggestion.title)}${escapeHtml(yearStr)}</span>
+        <span class="link-picker__candidate-artist">${escapeHtml(suggestion.artistName)}</span>
+      </span>
+      <span class="link-picker__candidate-meta">
+        <span class="badge badge--source">${escapeHtml(suggestion.itemType)}</span>
+      </span>
+    </button>
+  `;
+  modal.hidden = false;
 
-  const wrapper = document.createElement("div");
-  wrapper.innerHTML = renderSuggestionBanner(suggestion, sourceItemId);
-  const bannerEl = wrapper.firstElementChild as HTMLElement;
-
-  musicList.insertAdjacentElement("beforebegin", bannerEl);
-  activeSuggestionBanner = bannerEl;
-
-  bannerEl.querySelector(".suggestion-banner__accept")?.addEventListener("click", async () => {
-    dismissSuggestionBanner();
+  const onAccept = async () => {
+    cleanup();
     await api.acceptSuggestion(sourceItemId);
     appActor.send({ type: "LIST_REFRESH" });
-  });
+  };
 
-  bannerEl.querySelector(".suggestion-banner__dismiss")?.addEventListener("click", async () => {
-    dismissSuggestionBanner();
+  const onDismiss = async () => {
+    cleanup();
     await api.dismissSuggestion(sourceItemId);
-  });
-}
+  };
 
-function dismissSuggestionBanner(): void {
-  activeSuggestionBanner?.remove();
-  activeSuggestionBanner = null;
+  const onBackdrop = (e: Event) => {
+    if ((e.target as HTMLElement).dataset.suggestionPickerClose === "true") {
+      onDismiss();
+    }
+  };
+
+  const onEscape = (e: KeyboardEvent) => {
+    if (e.key === "Escape" && !modal.hidden) {
+      onDismiss();
+    }
+  };
+
+  function cleanup() {
+    modal!.hidden = true;
+    acceptBtn!.removeEventListener("click", onAccept);
+    dismissBtn!.removeEventListener("click", onDismiss);
+    modal!.removeEventListener("click", onBackdrop);
+    document.removeEventListener("keydown", onEscape);
+  }
+
+  acceptBtn.addEventListener("click", onAccept);
+  dismissBtn.addEventListener("click", onDismiss);
+  modal.addEventListener("click", onBackdrop);
+  document.addEventListener("keydown", onEscape);
 }
 
 function resolveItemContext(target: HTMLElement): ItemContext | null {

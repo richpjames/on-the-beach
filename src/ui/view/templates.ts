@@ -285,20 +285,3 @@ export function escapeHtml(text: string): string {
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#39;");
 }
-
-export function renderSuggestionBanner(
-  suggestion: import("../../types").ItemSuggestion,
-  sourceItemId: number,
-): string {
-  const yearStr = suggestion.year ? ` (${suggestion.year})` : "";
-  return `
-    <div class="suggestion-banner" data-source-item-id="${sourceItemId}" data-suggestion-id="${suggestion.id}">
-      <span class="suggestion-banner__text">
-        Also by <strong>${escapeHtml(suggestion.artistName)}</strong>:
-        <em>${escapeHtml(suggestion.title)}</em>${escapeHtml(yearStr)}
-      </span>
-      <button type="button" class="btn btn--primary suggestion-banner__accept">Add to list</button>
-      <button type="button" class="btn btn--ghost suggestion-banner__dismiss">Dismiss</button>
-    </div>
-  `;
-}
