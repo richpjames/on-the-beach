@@ -303,8 +303,19 @@ musicItemRoutes.get("/", async (c) => {
 
   let finalItems: typeof enriched = enriched;
   if (orderRow && requestedSort === "default" && !search) {
-    const orderedIds = JSON.parse(orderRow.itemIds) as number[];
-    finalItems = applyOrder(enriched, orderedIds);
+    const parsed = JSON.parse(orderRow.itemIds);
+    if (Array.isArray(parsed) && parsed.length > 0) {
+      if (typeof parsed[0] === "number") {
+        // Legacy format: plain item IDs
+        finalItems = applyOrder(enriched, parsed as number[]);
+      } else {
+        // New format: extract item IDs in order, ignore stack entries for item sorting
+        const itemIds = (parsed as string[])
+          .filter((e: string) => e.startsWith("i:"))
+          .map((e: string) => Number(e.slice(2)));
+        finalItems = applyOrder(enriched, itemIds);
+      }
+    }
   }
 
   return c.json({ items: finalItems, total: finalItems.length });
@@ -357,21 +368,31 @@ musicItemRoutes.post("/", async (c) => {
 // ---------------------------------------------------------------------------
 
 musicItemRoutes.put("/order", async (c) => {
-  const body = (await c.req.json()) as { contextKey?: string; itemIds?: number[] };
+  const body = (await c.req.json()) as {
+    contextKey?: string;
+    itemIds?: number[];
+    entries?: string[];
+  };
 
-  if (!body.contextKey || !Array.isArray(body.itemIds)) {
-    return c.json({ error: "contextKey and itemIds are required" }, 400);
+  if (!body.contextKey) {
+    return c.json({ error: "contextKey is required" }, 400);
+  }
+
+  let serialized: string;
+  if (body.entries) {
+    serialized = JSON.stringify(body.entries);
+  } else if (body.itemIds) {
+    serialized = JSON.stringify(body.itemIds);
+  } else {
+    return c.json({ error: "entries or itemIds are required" }, 400);
   }
 
   await db
     .insert(musicItemOrder)
-    .values({
-      contextKey: body.contextKey,
-      itemIds: JSON.stringify(body.itemIds),
-    })
+    .values({ contextKey: body.contextKey, itemIds: serialized })
     .onConflictDoUpdate({
       target: musicItemOrder.contextKey,
-      set: { itemIds: JSON.stringify(body.itemIds) },
+      set: { itemIds: serialized },
     });
 
   return c.json({ success: true });
