@@ -149,6 +149,10 @@ export class ApiClient {
       params.set("sort", filters.sort);
     }
 
+    if (filters?.hasReminder) {
+      params.set("hasReminder", "true");
+    }
+
     const qs = params.toString();
     return this.requestJson<PaginatedResult<MusicItemFull>>(
       `/api/music-items${qs ? `?${qs}` : ""}`,
