@@ -34,3 +34,7 @@ eval/results/*.json
 
 # Eval pending review (user data, not for commit)
 eval/fixtures/pending-review.json
+
+# Playwright MCP snapshots and screenshots
+.playwright-mcp/
+*.png
