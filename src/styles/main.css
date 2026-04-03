@@ -2049,6 +2049,14 @@ a:hover {
   bottom: calc(var(--taskbar-height) + 8px);
   right: 12px;
   width: 480px;
+  max-width: calc(100vw - 24px);
+  height: 263px;
+  min-width: 240px;
+  min-height: 80px;
+  display: flex;
+  flex-direction: column;
+  resize: both;
+  overflow: hidden;
   background: var(--chrome);
   border-width: 2px;
   border-style: solid;
@@ -2117,26 +2125,24 @@ a:hover {
 
 .player-window__body {
   line-height: 0;
+  flex: 1;
+  overflow: hidden;
 }
 
 .player-window__body iframe {
   display: block;
   width: 100%;
-  height: 241px;
+  height: 100%;
   border: 0;
 }
 
-.player-window--apple-music .player-window__body iframe {
-  height: 450px;
+.player-window--apple-music {
+  height: 472px;
 }
 
 .player-window--video {
   width: 480px;
-}
-
-.player-window--video .player-window__body iframe {
-  height: auto;
-  aspect-ratio: 16 / 9;
+  height: 292px;
 }
 
 /* ─── Release Permalink Page ────────────────────────────────────────────── */
