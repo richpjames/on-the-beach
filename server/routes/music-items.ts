@@ -31,6 +31,7 @@ import type {
   ListenStatus,
   MusicItemSort,
   PurchaseIntent,
+  ItemType,
 } from "../../src/types";
 
 export const musicItemRoutes = new Hono();
@@ -499,7 +500,7 @@ musicItemRoutes.post("/:id/suggestion/accept", async (c) => {
   const result = await createMusicItemDirect({
     title: suggestion.title,
     artistName: suggestion.artistName,
-    itemType: suggestion.itemType as import("../../src/types").ItemType,
+    itemType: suggestion.itemType as ItemType,
     listenStatus: "to-listen",
     year: suggestion.year ?? undefined,
     musicbrainzReleaseId: suggestion.musicbrainzReleaseId ?? undefined,
