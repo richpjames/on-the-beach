@@ -2,7 +2,7 @@ import { assign, createMachine } from "xstate";
 import type { ListenStatus, MusicItemSort, StackWithCount } from "../../types";
 
 export interface AppContext {
-  currentFilter: ListenStatus | "all";
+  currentFilter: ListenStatus | "all" | "scheduled";
   currentStack: number | null;
   searchQuery: string;
   currentSort: MusicItemSort;
@@ -17,7 +17,7 @@ export interface AppContext {
 
 export type AppEvent =
   | { type: "APP_READY" }
-  | { type: "FILTER_SELECTED"; filter: ListenStatus | "all" }
+  | { type: "FILTER_SELECTED"; filter: ListenStatus | "all" | "scheduled" }
   | { type: "STACK_SELECTED"; stackId: number }
   | { type: "STACK_SELECTED_ALL" }
   | { type: "SEARCH_UPDATED"; query: string }

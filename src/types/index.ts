@@ -137,6 +137,7 @@ export interface MusicItemFilters {
   search?: string;
   stackId?: number;
   sort?: MusicItemSort;
+  hasReminder?: boolean;
 }
 
 export interface PaginatedResult<T> {

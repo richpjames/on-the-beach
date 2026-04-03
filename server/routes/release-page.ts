@@ -839,6 +839,7 @@ function renderReleasePage(item: MusicItemFull, cssHref: string): string {
 
       document.getElementById('set-reminder-btn').addEventListener('click', async () => {
         const input = document.getElementById('remind-at');
+        const btn = document.getElementById('set-reminder-btn');
         const remindAt = input.value;
         if (!remindAt) return;
         const res = await fetch('/api/music-items/' + ITEM_ID + '/reminder', {
@@ -848,6 +849,13 @@ function renderReleasePage(item: MusicItemFull, cssHref: string): string {
         });
         if (!res.ok) { alert('Failed to set reminder'); return; }
         input.dataset.saved = remindAt;
+        const originalText = btn.textContent;
+        btn.textContent = 'Saved!';
+        btn.classList.add('btn--saved');
+        setTimeout(() => {
+          btn.textContent = originalText;
+          btn.classList.remove('btn--saved');
+        }, 2000);
       });
 
       document.getElementById('clear-reminder-btn')?.addEventListener('click', async () => {

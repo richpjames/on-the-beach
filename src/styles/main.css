@@ -749,8 +749,41 @@ select.input {
 .browse-tools__panel {
   display: contents;
 }
+.browse-tools__search-wrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
 .browse-tools__search {
   width: min(240px, 42vw);
+}
+
+/* Hide native Safari clear button — we use our own */
+.browse-tools__search::-webkit-search-cancel-button {
+  display: none;
+}
+
+.browse-tools__search-clear {
+  position: absolute;
+  right: 4px;
+  background: none;
+  border: none;
+  padding: 0 2px;
+  cursor: pointer;
+  font-size: 11px;
+  color: var(--chrome-darker);
+  line-height: 1;
+}
+
+.browse-tools__search-clear:hover {
+  color: #000;
+}
+
+.btn--saved {
+  background: #5a9;
+  border-color: #4a8;
+  color: #fff;
 }
 
 .browse-tools__sort {
@@ -1274,6 +1307,10 @@ select.input {
 
   .browse-tools__panel.is-open {
     display: block;
+  }
+
+  .browse-tools__panel--search .browse-tools__search-wrap {
+    width: 100%;
   }
 
   .browse-tools__panel--search .browse-tools__search {

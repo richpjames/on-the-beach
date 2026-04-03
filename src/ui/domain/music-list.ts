@@ -2,7 +2,7 @@ import type { ListenStatus, MusicItemFilters, MusicItemSort } from "../../types"
 import { applyOrder, buildContextKey } from "../../../shared/music-list-context";
 import { STATUS_LABELS } from "./status";
 
-export type FilterSelection = ListenStatus | "all";
+export type FilterSelection = ListenStatus | "all" | "scheduled";
 
 export function buildMusicItemFilters(
   currentFilter: FilterSelection,
@@ -13,7 +13,9 @@ export function buildMusicItemFilters(
   const filters: MusicItemFilters = {};
   const trimmedSearch = searchQuery.trim();
 
-  if (currentFilter !== "all") {
+  if (currentFilter === "scheduled") {
+    filters.hasReminder = true;
+  } else if (currentFilter !== "all") {
     filters.listenStatus = currentFilter;
   }
 
@@ -42,6 +44,10 @@ export function getEmptyStateMessage(currentFilter: FilterSelection, searchQuery
 
   if (currentFilter === "all") {
     return "No music tracked yet. Paste a link above to get started!";
+  }
+
+  if (currentFilter === "scheduled") {
+    return "No scheduled items.";
   }
 
   const labels = STATUS_LABELS as Partial<Record<ListenStatus, string>>;

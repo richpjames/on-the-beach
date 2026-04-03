@@ -310,6 +310,7 @@ function renderMainPage(opts: {
               <button class="filter-btn" data-filter="all">All</button>
               <button class="filter-btn active" data-filter="to-listen">To Listen</button>
               <button class="filter-btn" data-filter="listened">Listened</button>
+              <button class="filter-btn" data-filter="scheduled">Scheduled</button>
             </div>
             <div class="browse-tools">
               <div class="browse-tools__mobile-actions">
@@ -345,13 +346,22 @@ function renderMainPage(opts: {
                 </button>
               </div>
               <div id="browse-search-panel" class="browse-tools__panel browse-tools__panel--search">
-                <input
-                  type="search"
-                  id="browse-search"
-                  class="input browse-tools__search"
-                  placeholder="Search releases or lists..."
-                  aria-label="Search releases or lists"
-                />
+                <div class="browse-tools__search-wrap">
+                  <input
+                    type="search"
+                    id="browse-search"
+                    class="input browse-tools__search"
+                    placeholder="Search releases or lists..."
+                    aria-label="Search releases or lists"
+                  />
+                  <button
+                    type="button"
+                    id="search-clear-btn"
+                    class="browse-tools__search-clear"
+                    aria-label="Clear search"
+                    style="display:none"
+                  >&#x2715;</button>
+                </div>
               </div>
               <div id="browse-sort-panel" class="browse-tools__panel browse-tools__panel--sort">
                 <label class="browse-tools__sort" for="browse-sort">

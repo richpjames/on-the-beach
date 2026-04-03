@@ -608,7 +608,7 @@ function setupFilterBar(): void {
 
     appActor.send({
       type: "FILTER_SELECTED",
-      filter: target.dataset.filter as ListenStatus | "all",
+      filter: target.dataset.filter as ListenStatus | "all" | "scheduled",
     });
   });
 }
@@ -620,16 +620,32 @@ function setupBrowseControls(): void {
   const searchToggle = document.getElementById("browse-search-toggle");
   const sortToggle = document.getElementById("browse-sort-toggle");
 
+  const searchClearBtn = document.getElementById("search-clear-btn");
+
   if (searchInput instanceof HTMLInputElement) {
+    const updateClearBtn = () => {
+      if (searchClearBtn) {
+        searchClearBtn.style.display = searchInput.value ? "" : "none";
+      }
+    };
+
     searchInput.addEventListener("input", () => {
       appActor.send({
         type: "SEARCH_UPDATED",
         query: searchInput.value,
       });
+      updateClearBtn();
 
       if (appCtx().stackManageOpen) {
         void renderStackManagePanel();
       }
+    });
+
+    searchClearBtn?.addEventListener("click", () => {
+      searchInput.value = "";
+      appActor.send({ type: "SEARCH_UPDATED", query: "" });
+      updateClearBtn();
+      searchInput.focus();
     });
   }
 

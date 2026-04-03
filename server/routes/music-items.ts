@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { eq, and, inArray, sql, desc, asc, lte } from "drizzle-orm";
+import { eq, and, inArray, isNotNull, sql, desc, asc, lte } from "drizzle-orm";
 import { db } from "../db/index";
 import {
   musicItems,
@@ -172,7 +172,7 @@ async function applyArtistUpdate(
 // ---------------------------------------------------------------------------
 
 musicItemRoutes.get("/", async (c) => {
-  const { listenStatus, purchaseIntent, search, sort, stackId } = c.req.query();
+  const { listenStatus, purchaseIntent, search, sort, stackId, hasReminder } = c.req.query();
   const parsedStackId = stackId ? Number(stackId) : null;
   if (parsedStackId !== null && (!Number.isInteger(parsedStackId) || parsedStackId <= 0)) {
     return c.json({ error: "Invalid stack ID" }, 400);
@@ -187,7 +187,9 @@ musicItemRoutes.get("/", async (c) => {
   // Start building conditions
   const conditions = [];
 
-  if (listenStatus) {
+  if (hasReminder === "true") {
+    conditions.push(isNotNull(musicItems.remindAt));
+  } else if (listenStatus) {
     const statuses = listenStatus.split(",") as ListenStatus[];
     conditions.push(inArray(musicItems.listenStatus, statuses));
   }
