@@ -52,11 +52,16 @@ async function fetchInitialStacks(): Promise<StackWithCount[]> {
     })
     .from(stackParents);
 
-  const parentByChild = new Map(parentRows.map((r) => [r.child_stack_id, r.parent_stack_id]));
+  const parentsByChild = new Map<number, number[]>();
+  for (const r of parentRows) {
+    const existing = parentsByChild.get(r.child_stack_id) ?? [];
+    existing.push(r.parent_stack_id);
+    parentsByChild.set(r.child_stack_id, existing);
+  }
 
   return rows.map((row) => ({
     ...row,
-    parent_stack_id: parentByChild.get(row.id) ?? null,
+    parent_stack_ids: parentsByChild.get(row.id) ?? [],
   }));
 }
 
