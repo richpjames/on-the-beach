@@ -10,38 +10,49 @@ async function stackExists(stackId: number): Promise<boolean> {
   return row !== undefined;
 }
 
-async function getParentByChildMap(): Promise<Map<number, number>> {
+async function getParentsByChildMap(): Promise<Map<number, number[]>> {
   const rows = await db
     .select({
       parent_stack_id: stackParents.parentStackId,
       child_stack_id: stackParents.childStackId,
     })
     .from(stackParents);
-  return new Map(rows.map((row) => [row.child_stack_id, row.parent_stack_id]));
+  const map = new Map<number, number[]>();
+  for (const row of rows) {
+    const existing = map.get(row.child_stack_id) ?? [];
+    existing.push(row.parent_stack_id);
+    map.set(row.child_stack_id, existing);
+  }
+  return map;
 }
 
 async function wouldCreateCycle(childStackId: number, parentStackId: number): Promise<boolean> {
-  const parentByChild = await getParentByChildMap();
-  let current: number | undefined = parentStackId;
+  const parentsByChild = await getParentsByChildMap();
+  const visited = new Set<number>();
+  const queue = [parentStackId];
 
-  while (current !== undefined) {
+  while (queue.length > 0) {
+    const current = queue.shift()!;
     if (current === childStackId) {
       return true;
     }
-
-    current = parentByChild.get(current);
+    if (visited.has(current)) {
+      continue;
+    }
+    visited.add(current);
+    const parents = parentsByChild.get(current) ?? [];
+    queue.push(...parents);
   }
 
   return false;
 }
 
-async function parentStackIdForStack(stackId: number): Promise<number | null> {
-  const parent = await db
+async function parentStackIdsForStack(stackId: number): Promise<number[]> {
+  const rows = await db
     .select({ parentStackId: stackParents.parentStackId })
     .from(stackParents)
-    .where(eq(stackParents.childStackId, stackId))
-    .get();
-  return parent?.parentStackId ?? null;
+    .where(eq(stackParents.childStackId, stackId));
+  return rows.map((r) => r.parentStackId);
 }
 
 function parseId(value: string): number | null {
@@ -67,11 +78,11 @@ stackRoutes.get("/", async (c) => {
     .groupBy(stacks.id)
     .orderBy(asc(stacks.name));
 
-  const parentByChild = await getParentByChildMap();
+  const parentsByChild = await getParentsByChildMap();
   return c.json(
     rows.map((row) => ({
       ...row,
-      parent_stack_id: parentByChild.get(row.id) ?? null,
+      parent_stack_ids: parentsByChild.get(row.id) ?? [],
     })),
   );
 });
@@ -104,7 +115,7 @@ stackRoutes.post("/", async (c) => {
   return c.json(
     {
       ...created,
-      parent_stack_id: parentStackId,
+      parent_stack_ids: parentStackId !== null ? [parentStackId] : [],
     },
     201,
   );
@@ -136,7 +147,7 @@ stackRoutes.patch("/:id", async (c) => {
 
   return c.json({
     ...updated,
-    parent_stack_id: await parentStackIdForStack(updated.id),
+    parent_stack_ids: await parentStackIdsForStack(updated.id),
   });
 });
 
@@ -187,10 +198,29 @@ stackRoutes.patch("/:id/parent", async (c) => {
     }
   }
 
-  await db.delete(stackParents).where(eq(stackParents.childStackId, childStackId));
   if (parentStackId !== null) {
-    await db.insert(stackParents).values({ parentStackId, childStackId });
+    await db.insert(stackParents).values({ parentStackId, childStackId }).onConflictDoNothing();
   }
+
+  return c.json({ success: true });
+});
+
+// DELETE /:id/parent/:parentId — remove a specific parent relationship
+stackRoutes.delete("/:id/parent/:parentId", async (c) => {
+  const childStackId = parseId(c.req.param("id"));
+  const parentStackId = parseId(c.req.param("parentId"));
+  if (childStackId === null || parentStackId === null) {
+    return c.json({ error: "Invalid stack ID" }, 400);
+  }
+
+  await db
+    .delete(stackParents)
+    .where(
+      and(
+        eq(stackParents.childStackId, childStackId),
+        eq(stackParents.parentStackId, parentStackId),
+      ),
+    );
 
   return c.json({ success: true });
 });
@@ -207,15 +237,19 @@ stackRoutes.get("/items/:itemId", async (c) => {
       id: stacks.id,
       name: stacks.name,
       created_at: stacks.createdAt,
-      parent_stack_id: stackParents.parentStackId,
     })
     .from(stacks)
     .innerJoin(musicItemStacks, eq(stacks.id, musicItemStacks.stackId))
-    .leftJoin(stackParents, eq(stackParents.childStackId, stacks.id))
     .where(eq(musicItemStacks.musicItemId, itemId))
     .orderBy(asc(stacks.name));
 
-  return c.json(rows);
+  const parentsByChild = await getParentsByChildMap();
+  return c.json(
+    rows.map((row) => ({
+      ...row,
+      parent_stack_ids: parentsByChild.get(row.id) ?? [],
+    })),
+  );
 });
 
 // POST /items/:itemId — set stacks for a music item (replace all)

@@ -202,7 +202,7 @@ export interface Stack {
   id: number;
   name: string;
   created_at: string;
-  parent_stack_id: number | null;
+  parent_stack_ids: number[];
 }
 
 export interface StackWithCount extends Stack {

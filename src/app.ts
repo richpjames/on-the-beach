@@ -1805,8 +1805,8 @@ function renderStackParentLinker(list: HTMLElement): void {
   const hasCandidates = parentCandidates.length > 0;
   parentSelect.disabled = !hasCandidates;
   linkButton.disabled = !hasCandidates;
-  if (currentStack.parent_stack_id !== null) {
-    parentSelect.value = String(currentStack.parent_stack_id);
+  if (currentStack.parent_stack_ids.length > 0) {
+    parentSelect.value = String(currentStack.parent_stack_ids[0]);
   }
 
   list.appendChild(linker);
