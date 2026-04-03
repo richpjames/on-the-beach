@@ -59,9 +59,9 @@ function load(
   npLabelEl.textContent = label;
 
   npBtnEl.hidden = false;
-  delete npBtnEl.dataset.minimized;
-  windowEl.hidden = false;
-  windowEl.removeAttribute("aria-hidden");
+  npBtnEl.dataset.minimized = "true";
+  windowEl.hidden = true;
+  windowEl.setAttribute("aria-hidden", "true");
 }
 
 function stop(): void {
