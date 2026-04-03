@@ -294,7 +294,7 @@ export function renderSuggestionBanner(
   return `
     <div class="suggestion-banner" data-source-item-id="${sourceItemId}" data-suggestion-id="${suggestion.id}">
       <span class="suggestion-banner__text">
-        Also by <strong>${escapeHtml(suggestion.artist_name)}</strong>:
+        Also by <strong>${escapeHtml(suggestion.artistName)}</strong>:
         <em>${escapeHtml(suggestion.title)}</em>${escapeHtml(yearStr)}
       </span>
       <button type="button" class="btn btn--primary suggestion-banner__accept">Add to list</button>

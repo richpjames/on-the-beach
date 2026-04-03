@@ -106,11 +106,12 @@ export class ApiClient {
   }
 
   async updateMusicItem(id: number, input: UpdateMusicItemInput): Promise<MusicItemFull | null> {
-    return this.requestJsonOrNull<MusicItemFull>(
+    const result = await this.requestJsonOrNull<{ item: MusicItemFull }>(
       `/api/music-items/${id}`,
       "updateMusicItem",
       this.jsonRequest("PATCH", input),
     );
+    return result?.item ?? null;
   }
 
   async deleteMusicItem(id: number): Promise<boolean> {

@@ -210,12 +210,12 @@ export interface StackWithCount extends Stack {
 
 export interface ItemSuggestion {
   id: number;
-  source_item_id: number;
+  sourceItemId: number;
   title: string;
-  artist_name: string;
-  item_type: string;
+  artistName: string;
+  itemType: string;
   year: number | null;
-  musicbrainz_release_id: string | null;
+  musicbrainzReleaseId: string | null;
   status: string;
-  created_at: string;
+  createdAt: string;
 }
