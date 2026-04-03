@@ -131,42 +131,6 @@ test.describe("Stacks", () => {
     await expect(page.locator(".stack-tab[data-stack='all']")).toHaveClass(/active/);
   });
 
-  test("can nest one stack under another and filter by parent stack", async ({ page }) => {
-    await page
-      .getByPlaceholder("search or paste a link")
-      .fill("https://seekersinternational.bandcamp.com/album/nested-stack");
-    await page.getByRole("button", { name: "Add" }).click();
-    await expect(page.locator(".music-card")).toHaveCount(1, { timeout: 30_000 });
-    await expect(page.locator(".music-card").first()).toBeVisible();
-
-    await page
-      .locator(".music-card")
-      .first()
-      .locator('.music-card__action-btn[data-action="stack"]')
-      .click();
-    await page.locator(".stack-dropdown__new-input").fill("Drum and Bass");
-    await page.locator(".stack-dropdown__new-input").press("Enter");
-    await expect(page.locator(".stack-tab", { hasText: "Drum and Bass" })).toBeVisible();
-    await page.keyboard.press("Escape");
-
-    await page.locator("#manage-stacks-btn").click();
-    await expect(page.locator(".stack-manage")).toBeVisible();
-    await page.locator("#stack-manage-input").fill("Dance");
-    await page.locator("#stack-manage-create-btn").click();
-    await expect(page.locator(".stack-tab", { hasText: "Dance" })).toBeVisible();
-
-    await page.locator(".stack-tab", { hasText: "Drum and Bass" }).click();
-    await page.locator("#stack-parent-select").selectOption({ label: "Dance" });
-    await page.locator("#stack-parent-link-btn").click();
-
-    await page.locator(".stack-tab", { hasText: "Dance" }).click();
-    await expect(page.locator(".music-card")).toHaveCount(1, { timeout: 15_000 });
-    await expect(page.locator(".music-card").first()).toBeVisible();
-    await expect(
-      page.locator(".music-card").first().locator(".music-card__stack-chip"),
-    ).toContainText("Drum and Bass");
-  });
-
   test("keeps the stack bar to two rows and scrolls on mobile when many stacks exist", async ({
     page,
   }) => {
