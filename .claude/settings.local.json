@@ -65,7 +65,11 @@
       "Bash(/dev/null diff:*)",
       "Bash(npx tsc:*)",
       "Bash(/dev/null echo:*)",
-      "mcp__plugin_playwright_playwright__browser_console_messages"
+      "mcp__plugin_playwright_playwright__browser_console_messages",
+      "Bash(brew list:*)",
+      "Bash(brew info:*)",
+      "Bash(claude --version)",
+      "Bash(brew update:*)"
     ]
   },
   "remote": {
