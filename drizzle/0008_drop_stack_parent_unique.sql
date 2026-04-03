@@ -1,0 +1,1 @@
+DROP INDEX `stack_parents_child_stack_unique`;
