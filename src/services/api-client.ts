@@ -12,6 +12,7 @@ import type {
   UploadImageResult,
   LookupReleaseResult,
   RecognizeResult,
+  ItemSuggestion,
 } from "../types";
 
 export class AmbiguousLinkApiError extends Error {
@@ -154,8 +155,29 @@ export class ApiClient {
     );
   }
 
-  async updateListenStatus(id: number, status: ListenStatus): Promise<MusicItemFull | null> {
-    return this.updateMusicItem(id, { listenStatus: status });
+  async updateListenStatus(
+    id: number,
+    status: ListenStatus,
+  ): Promise<{ item: MusicItemFull; suggestion: ItemSuggestion | null } | null> {
+    return this.requestJsonOrNull<{ item: MusicItemFull; suggestion: ItemSuggestion | null }>(
+      `/api/music-items/${id}`,
+      "updateListenStatus",
+      this.jsonRequest("PATCH", { listenStatus: status }),
+    );
+  }
+
+  async acceptSuggestion(sourceItemId: number): Promise<MusicItemFull> {
+    return this.requestJson<MusicItemFull>(
+      `/api/music-items/${sourceItemId}/suggestion/accept`,
+      "acceptSuggestion",
+      { method: "POST" },
+    );
+  }
+
+  async dismissSuggestion(sourceItemId: number): Promise<void> {
+    await this.request(`/api/music-items/${sourceItemId}/suggestion/dismiss`, "dismissSuggestion", {
+      method: "POST",
+    });
   }
 
   async saveOrder(contextKey: string, itemIds: number[]): Promise<void> {

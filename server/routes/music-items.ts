@@ -10,6 +10,7 @@ import {
   stackParents,
   musicLinks,
   sources,
+  itemSuggestions,
 } from "../db/schema";
 import { isValidUrl, normalize } from "../utils";
 import { applyOrder, buildContextKey } from "../../shared/music-list-context";
@@ -448,7 +449,17 @@ musicItemRoutes.patch("/:id", async (c) => {
     return c.json({ error: "Not found" }, 404);
   }
 
-  return c.json(item);
+  let suggestion = null;
+  if (input.listenStatus === "listened") {
+    suggestion =
+      (await db
+        .select()
+        .from(itemSuggestions)
+        .where(and(eq(itemSuggestions.sourceItemId, id), eq(itemSuggestions.status, "pending")))
+        .get()) ?? null;
+  }
+
+  return c.json({ item, suggestion });
 });
 
 // ---------------------------------------------------------------------------
@@ -467,6 +478,55 @@ musicItemRoutes.delete("/:id", async (c) => {
     .returning({ id: musicItems.id });
 
   return c.json({ success: result.length > 0 });
+});
+
+// ---------------------------------------------------------------------------
+// POST /:id/suggestion/accept — accept a pending suggestion
+// ---------------------------------------------------------------------------
+
+musicItemRoutes.post("/:id/suggestion/accept", async (c) => {
+  const id = Number(c.req.param("id"));
+  if (Number.isNaN(id)) return c.json({ error: "Invalid ID" }, 400);
+
+  const suggestion = await db
+    .select()
+    .from(itemSuggestions)
+    .where(and(eq(itemSuggestions.sourceItemId, id), eq(itemSuggestions.status, "pending")))
+    .get();
+
+  if (!suggestion) return c.json({ error: "No pending suggestion" }, 404);
+
+  const result = await createMusicItemDirect({
+    title: suggestion.title,
+    artistName: suggestion.artistName,
+    itemType: suggestion.itemType as import("../../src/types").ItemType,
+    listenStatus: "to-listen",
+    year: suggestion.year ?? undefined,
+    musicbrainzReleaseId: suggestion.musicbrainzReleaseId ?? undefined,
+  });
+
+  await db
+    .update(itemSuggestions)
+    .set({ status: "accepted" })
+    .where(eq(itemSuggestions.id, suggestion.id));
+
+  return c.json(result.item, 201);
+});
+
+// ---------------------------------------------------------------------------
+// POST /:id/suggestion/dismiss — dismiss a pending suggestion
+// ---------------------------------------------------------------------------
+
+musicItemRoutes.post("/:id/suggestion/dismiss", async (c) => {
+  const id = Number(c.req.param("id"));
+  if (Number.isNaN(id)) return c.json({ error: "Invalid ID" }, 400);
+
+  await db
+    .update(itemSuggestions)
+    .set({ status: "dismissed" })
+    .where(and(eq(itemSuggestions.sourceItemId, id), eq(itemSuggestions.status, "pending")));
+
+  return c.json({ success: true });
 });
 
 // ---------------------------------------------------------------------------

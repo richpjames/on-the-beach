@@ -207,3 +207,15 @@ export interface Stack {
 export interface StackWithCount extends Stack {
   item_count: number;
 }
+
+export interface ItemSuggestion {
+  id: number;
+  source_item_id: number;
+  title: string;
+  artist_name: string;
+  item_type: string;
+  year: number | null;
+  musicbrainz_release_id: string | null;
+  status: string;
+  created_at: string;
+}
