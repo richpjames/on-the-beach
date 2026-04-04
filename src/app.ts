@@ -150,13 +150,15 @@ export async function initialize(): Promise<void> {
     });
   }
 
-  // Initialize stack selection from URL on page load
+  initializeUI(serverState !== null);
+
+  // Initialize stack selection from URL on page load — must run after initializeUI()
+  // sets up the XState subscription, as XState v5 does not emit to new subscribers
+  // retroactively.
   const stackMatch = location.pathname.match(/^\/s\/(\d+)\//);
   if (stackMatch) {
     appActor.send({ type: "STACK_SELECTED", stackId: Number(stackMatch[1]) });
   }
-
-  initializeUI(serverState !== null);
 
   const versionEl = document.getElementById("app-version");
   if (versionEl) {
