@@ -1,4 +1,4 @@
-import { Hono } from "hono";
+import { Hono, type Context } from "hono";
 import { eq, inArray, count, asc, desc } from "drizzle-orm";
 import { db } from "../db/index";
 import { musicItems, musicItemStacks, stacks, musicItemOrder, stackParents } from "../db/schema";
@@ -591,7 +591,7 @@ export function createMainPageRoutes(): Hono {
   const routes = new Hono();
   const isDev = process.env.NODE_ENV !== "production";
 
-  routes.get("/", async (c) => {
+  async function serveMainPage(c: Context) {
     const [initialItems, initialStacks, { cssHref, scriptSrc }] = await Promise.all([
       fetchInitialItems(),
       fetchInitialStacks(),
@@ -617,7 +617,10 @@ export function createMainPageRoutes(): Hono {
         appVersion: pkg.version,
       }),
     );
-  });
+  }
+
+  routes.get("/", serveMainPage);
+  routes.get("/s/:id/:name", serveMainPage);
 
   return routes;
 }
