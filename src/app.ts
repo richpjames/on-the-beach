@@ -26,6 +26,8 @@ import {
   escapeHtml,
   renderAddFormStackChips,
   renderAmbiguousLinkCandidates,
+  renderBreadcrumbs,
+  renderFolderRow,
   renderMusicList,
   renderStackDropdownContent,
   renderStackManageList,
@@ -144,6 +146,53 @@ function initializeUI(hasServerData: boolean): void {
   setupCustomListScrollbar();
   setupCustomStackScrollbar();
   setupCustomLinkPickerScrollbar();
+
+  // Folder row click → navigate into child stack
+  document.addEventListener("click", (event) => {
+    const target = event.target as HTMLElement;
+
+    // Navigate into folder
+    const folderRow = target.closest(".folder-row");
+    if (
+      folderRow instanceof HTMLElement &&
+      folderRow.dataset.childStackId &&
+      !target.closest("button")
+    ) {
+      const stackId = Number(folderRow.dataset.childStackId);
+      if (Number.isInteger(stackId) && stackId > 0) {
+        appActor.send({ type: "STACK_SELECTED", stackId });
+      }
+      return;
+    }
+
+    // Breadcrumb click
+    const breadcrumbBtn = target.closest("[data-breadcrumb-stack]");
+    if (breadcrumbBtn instanceof HTMLElement && breadcrumbBtn.dataset.breadcrumbStack) {
+      const stackId = Number(breadcrumbBtn.dataset.breadcrumbStack);
+      if (Number.isInteger(stackId) && stackId > 0) {
+        appActor.send({ type: "STACK_SELECTED", stackId });
+      }
+      return;
+    }
+  });
+
+  // Remove child stack from parent
+  document.addEventListener("click", async (event) => {
+    const target = event.target as HTMLElement;
+    const removeBtn = target.closest("[data-remove-child-stack]");
+    if (!(removeBtn instanceof HTMLElement)) return;
+
+    const childStackId = Number(removeBtn.dataset.removeChildStack);
+    const currentStack = appCtx().currentStack;
+    if (!Number.isInteger(childStackId) || currentStack === null) return;
+
+    try {
+      await api.removeStackParent(childStackId, currentStack);
+      await renderMusicListView();
+    } catch (error) {
+      console.error("Failed to remove child stack:", error);
+    }
+  });
 
   if (hasServerData) {
     syncStackFeedLinks();
@@ -1211,14 +1260,14 @@ function setupMusicListReorder(): void {
   }
 
   musicListSortable = Sortable.create(list, {
-    draggable: ".music-card",
+    draggable: ".music-card, .folder-row",
     animation: 160,
     fallbackTolerance: 4,
     invertSwap: true,
     swapThreshold: 0.35,
     // Keep interactive controls clickable while making the card body draggable.
     filter:
-      "button:not(.music-card__reorder-handle),input,select,textarea,[data-action],.music-card__menu-item",
+      "button:not(.music-card__reorder-handle):not(.folder-row__reorder-handle),input,select,textarea,[data-action],.music-card__menu-item",
     preventOnFilter: false,
     ghostClass: "music-card--drag-ghost",
     chosenClass: "music-card--drag-chosen",
@@ -1249,7 +1298,7 @@ function syncMusicListReorderMode(): void {
   }
 
   const handleSelector = musicListReorderMediaQuery?.matches
-    ? ".music-card__reorder-handle"
+    ? ".music-card__reorder-handle, .folder-row__reorder-handle"
     : undefined;
   musicListSortable.option("handle", handleSelector);
 }
@@ -1604,6 +1653,24 @@ function syncCustomLinkPickerScrollbar(): void {
   linkPickerThumbEl.style.top = `${thumbTop}px`;
 }
 
+function buildBreadcrumbTrail(stackId: number): Array<{ id: number; name: string }> {
+  const trail: Array<{ id: number; name: string }> = [];
+  let current = stackId;
+  const stacks = appCtx().stacks;
+  const visited = new Set<number>();
+
+  while (true) {
+    const stack = stacks.find((s) => s.id === current);
+    if (!stack || visited.has(current)) break;
+    visited.add(current);
+    trail.unshift({ id: stack.id, name: stack.name });
+    if (stack.parent_stack_ids.length === 0) break;
+    current = stack.parent_stack_ids[0];
+  }
+
+  return trail;
+}
+
 async function renderMusicListView(): Promise<void> {
   const container = document.getElementById("music-list");
   if (!container) {
@@ -1623,7 +1690,22 @@ async function renderMusicListView(): Promise<void> {
   );
   const result = await api.listMusicItems(filters);
 
-  container.innerHTML = renderMusicList(result.items, appCtx().currentFilter, appCtx().searchQuery);
+  const currentStack = appCtx().currentStack;
+  let childStacks: Array<{ id: number; name: string; item_count: number }> = [];
+  if (currentStack !== null) {
+    childStacks = await api.getStackChildren(currentStack);
+  }
+
+  // Build breadcrumb trail
+  const breadcrumbHtml =
+    currentStack !== null ? renderBreadcrumbs(buildBreadcrumbTrail(currentStack)) : "";
+
+  // Render mixed list: breadcrumbs + folder rows + music items
+  const folderRowsHtml = childStacks.map((s) => renderFolderRow(s)).join("");
+  const itemsHtml = renderMusicList(result.items, appCtx().currentFilter, appCtx().searchQuery);
+
+  container.innerHTML = breadcrumbHtml + folderRowsHtml + itemsHtml;
+
   setupMusicListReorder();
   musicListSortable?.option("disabled", isBrowseOrderLocked());
   syncCustomListScrollbar();

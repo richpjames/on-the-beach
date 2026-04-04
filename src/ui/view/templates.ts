@@ -277,6 +277,54 @@ export function renderStarRating(itemId: number, rating: number | null, cssClass
   });
 }
 
+export function renderFolderRow(child: { id: number; name: string; item_count: number }): string {
+  return `
+    <article class="folder-row" data-child-stack-id="${child.id}">
+      <div class="folder-row__icon">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+          <path d="M10 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z"/>
+        </svg>
+      </div>
+      <div class="folder-row__content">
+        <span class="folder-row__name">${escapeHtml(child.name)}</span>
+        <span class="folder-row__count">(${child.item_count} items)</span>
+      </div>
+      <div class="folder-row__actions">
+        <button type="button" class="btn btn--ghost folder-row__reorder-handle" title="Reorder" aria-label="Reorder ${escapeHtml(child.name)}">
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor" aria-hidden="true">
+            <rect x="2" y="2" width="2" height="2"></rect>
+            <rect x="2" y="6" width="2" height="2"></rect>
+            <rect x="2" y="10" width="2" height="2"></rect>
+            <rect x="8" y="2" width="2" height="2"></rect>
+            <rect x="8" y="6" width="2" height="2"></rect>
+            <rect x="8" y="10" width="2" height="2"></rect>
+          </svg>
+        </button>
+        <button type="button" class="btn btn--ghost btn--danger folder-row__remove-btn" data-remove-child-stack="${child.id}" title="Remove from this list">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="18" y1="6" x2="6" y2="18"></line>
+            <line x1="6" y1="6" x2="18" y2="18"></line>
+          </svg>
+        </button>
+      </div>
+    </article>
+  `;
+}
+
+export function renderBreadcrumbs(trail: Array<{ id: number; name: string }>): string {
+  if (trail.length === 0) return "";
+
+  const crumbs = trail
+    .map((crumb, index) =>
+      index < trail.length - 1
+        ? `<button type="button" class="breadcrumb__link" data-breadcrumb-stack="${crumb.id}">${escapeHtml(crumb.name)}</button>`
+        : `<span class="breadcrumb__current">${escapeHtml(crumb.name)}</span>`,
+    )
+    .join('<span class="breadcrumb__sep"> &gt; </span>');
+
+  return `<nav class="breadcrumb" aria-label="List navigation">${crumbs}</nav>`;
+}
+
 export function escapeHtml(text: string): string {
   return text
     .replace(/&/g, "&amp;")

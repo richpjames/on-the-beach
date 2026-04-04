@@ -2778,3 +2778,82 @@ a:hover {
   align-items: flex-start;
   gap: 10px;
 }
+
+/* Folder rows */
+.folder-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: var(--playlist-bg-alt);
+  border-bottom: 1px solid var(--border-color);
+  cursor: pointer;
+}
+
+.folder-row:hover {
+  background: var(--playlist-hover-bg);
+}
+
+.folder-row__icon {
+  color: var(--text-secondary);
+  flex-shrink: 0;
+}
+
+.folder-row__content {
+  flex: 1;
+  min-width: 0;
+}
+
+.folder-row__name {
+  color: var(--text-primary);
+  font-weight: 500;
+}
+
+.folder-row__count {
+  color: var(--text-secondary);
+  font-size: 0.85em;
+  margin-left: 6px;
+}
+
+.folder-row__actions {
+  display: flex;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.folder-row--drag-ghost {
+  opacity: 0.4;
+}
+
+.folder-row--drag-chosen {
+  opacity: 0.8;
+}
+
+/* Breadcrumbs */
+.breadcrumb {
+  padding: 6px 12px;
+  font-size: 0.85em;
+  color: var(--text-secondary);
+  border-bottom: 1px solid var(--border-color);
+}
+
+.breadcrumb__link {
+  background: none;
+  border: none;
+  color: var(--link-color);
+  cursor: pointer;
+  padding: 0;
+  font: inherit;
+}
+
+.breadcrumb__link:hover {
+  text-decoration: underline;
+}
+
+.breadcrumb__sep {
+  margin: 0 4px;
+}
+
+.breadcrumb__current {
+  color: var(--text-primary);
+}
