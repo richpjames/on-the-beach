@@ -90,7 +90,8 @@ if (isDev) {
       req.url?.startsWith("/api/") ||
       req.url?.startsWith("/uploads/") ||
       req.url === "/r" ||
-      req.url?.startsWith("/r/")
+      req.url?.startsWith("/r/") ||
+      req.url?.startsWith("/s/")
     ) {
       honoListener(req, res);
       return;
