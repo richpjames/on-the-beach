@@ -97,8 +97,16 @@ async function fetchInitialItems(): Promise<MusicItemFull[]> {
     .get();
 
   if (orderRow) {
-    const orderedIds = JSON.parse(orderRow.itemIds) as number[];
-    return applyOrder(enriched, orderedIds) as unknown as MusicItemFull[];
+    const parsed = JSON.parse(orderRow.itemIds);
+    if (Array.isArray(parsed) && parsed.length > 0) {
+      if (typeof parsed[0] === "number") {
+        return applyOrder(enriched, parsed as number[]) as unknown as MusicItemFull[];
+      }
+      const itemIds = (parsed as string[])
+        .filter((e: string) => e.startsWith("i:"))
+        .map((e: string) => Number(e.slice(2)));
+      return applyOrder(enriched, itemIds) as unknown as MusicItemFull[];
+    }
   }
 
   return enriched as unknown as MusicItemFull[];
