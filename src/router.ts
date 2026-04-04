@@ -107,11 +107,18 @@ function handleClick(e: MouseEvent): void {
 }
 
 function handlePopstate(): void {
-  if (/^\/r\/\d+/.test(location.pathname)) {
-    void navigateToRelease(location.pathname);
-  } else {
-    navigateToMain();
+  const { pathname } = location;
+  if (/^\/r\/\d+/.test(pathname)) {
+    void navigateToRelease(pathname);
+    return;
   }
+  navigateToMain();
+  const stackMatch = pathname.match(/^\/s\/(\d+)\//);
+  document.dispatchEvent(
+    new CustomEvent("navigate-to-stack", {
+      detail: { stackId: stackMatch ? Number(stackMatch[1]) : null },
+    }),
+  );
 }
 
 export function initRouter(): void {
