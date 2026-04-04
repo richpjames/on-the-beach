@@ -2857,3 +2857,54 @@ a:hover {
 .breadcrumb__current {
   color: var(--text-primary);
 }
+
+/* Add-list button */
+.add-child-stack-btn {
+  display: block;
+  padding: 4px 10px;
+  margin: 4px 12px;
+  font-size: 0.85em;
+}
+
+/* Child stack picker */
+.child-stack-picker {
+  background: var(--playlist-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  max-height: 200px;
+  overflow-y: auto;
+  margin: 0 12px 4px;
+}
+
+.child-stack-picker__item {
+  display: flex;
+  justify-content: space-between;
+  width: 100%;
+  padding: 8px 12px;
+  background: none;
+  border: none;
+  border-bottom: 1px solid var(--border-color);
+  color: var(--text-primary);
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+}
+
+.child-stack-picker__item:hover {
+  background: var(--playlist-hover-bg);
+}
+
+.child-stack-picker__item:last-child {
+  border-bottom: none;
+}
+
+.child-stack-picker__count {
+  color: var(--text-secondary);
+  font-size: 0.85em;
+}
+
+.child-stack-picker__empty {
+  padding: 12px;
+  color: var(--text-secondary);
+  text-align: center;
+}

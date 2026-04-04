@@ -325,6 +325,25 @@ export function renderBreadcrumbs(trail: Array<{ id: number; name: string }>): s
   return `<nav class="breadcrumb" aria-label="List navigation">${crumbs}</nav>`;
 }
 
+export function renderChildStackPicker(
+  candidates: Array<{ id: number; name: string; item_count: number }>,
+): string {
+  if (candidates.length === 0) {
+    return '<div class="child-stack-picker__empty">No lists available to add.</div>';
+  }
+
+  return candidates
+    .map(
+      (stack) => `
+      <button type="button" class="child-stack-picker__item" data-picker-stack-id="${stack.id}">
+        <span class="child-stack-picker__name">${escapeHtml(stack.name)}</span>
+        <span class="child-stack-picker__count">${stack.item_count} items</span>
+      </button>
+    `,
+    )
+    .join("");
+}
+
 export function escapeHtml(text: string): string {
   return text
     .replace(/&/g, "&amp;")

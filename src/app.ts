@@ -27,6 +27,7 @@ import {
   renderAddFormStackChips,
   renderAmbiguousLinkCandidates,
   renderBreadcrumbs,
+  renderChildStackPicker,
   renderFolderRow,
   renderMusicList,
   renderStackDropdownContent,
@@ -191,6 +192,62 @@ function initializeUI(hasServerData: boolean): void {
       await renderMusicListView();
     } catch (error) {
       console.error("Failed to remove child stack:", error);
+    }
+  });
+
+  // Add-list button click → show picker
+  document.addEventListener("click", async (event) => {
+    const target = event.target as HTMLElement;
+
+    if (target.closest("#add-child-stack-btn")) {
+      const currentStack = appCtx().currentStack;
+      if (currentStack === null) return;
+
+      // Toggle picker
+      const existingPicker = document.querySelector(".child-stack-picker");
+      if (existingPicker) {
+        existingPicker.remove();
+        return;
+      }
+
+      const existingChildren = await api.getStackChildren(currentStack);
+      const existingChildIds = new Set(existingChildren.map((c) => c.id));
+
+      const candidates = appCtx().stacks.filter(
+        (s) => s.id !== currentStack && !existingChildIds.has(s.id),
+      );
+
+      const picker = document.createElement("div");
+      picker.className = "child-stack-picker";
+      picker.innerHTML = renderChildStackPicker(candidates);
+      const btn = document.getElementById("add-child-stack-btn");
+      if (btn) btn.after(picker);
+      return;
+    }
+
+    // Picker item click → add child stack
+    const pickerItem = target.closest("[data-picker-stack-id]");
+    if (pickerItem instanceof HTMLElement) {
+      const childStackId = Number(pickerItem.dataset.pickerStackId);
+      const currentStack = appCtx().currentStack;
+      if (!Number.isInteger(childStackId) || currentStack === null) return;
+
+      try {
+        await api.addStackParent(childStackId, currentStack);
+        document.querySelector(".child-stack-picker")?.remove();
+        await renderMusicListView();
+      } catch (error) {
+        console.error("Failed to add child stack:", error);
+        alert("Failed to add list. It may create a cycle.");
+      }
+      return;
+    }
+  });
+
+  // Close picker on Escape
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") {
+      document.querySelector(".child-stack-picker")?.remove();
     }
   });
 
@@ -1704,7 +1761,12 @@ async function renderMusicListView(): Promise<void> {
   const folderRowsHtml = childStacks.map((s) => renderFolderRow(s)).join("");
   const itemsHtml = renderMusicList(result.items, appCtx().currentFilter, appCtx().searchQuery);
 
-  container.innerHTML = breadcrumbHtml + folderRowsHtml + itemsHtml;
+  const addListBtnHtml =
+    currentStack !== null
+      ? `<button type="button" id="add-child-stack-btn" class="btn btn--ghost add-child-stack-btn" title="Add a list into this list">+ Add list</button>`
+      : "";
+
+  container.innerHTML = breadcrumbHtml + addListBtnHtml + folderRowsHtml + itemsHtml;
 
   setupMusicListReorder();
   musicListSortable?.option("disabled", isBrowseOrderLocked());
