@@ -89,6 +89,30 @@ function formCtx() {
   return addFormActor.getSnapshot().context;
 }
 
+function slugify(name: string): string {
+  return name
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
+function buildStackPath(stack: { id: number; name: string }): string {
+  return `/s/${stack.id}/${slugify(stack.name)}`;
+}
+
+function selectStack(stackId: number): void {
+  appActor.send({ type: "STACK_SELECTED", stackId });
+  const stack = appCtx().stacks.find((s) => s.id === stackId);
+  if (stack) {
+    history.pushState({}, "", buildStackPath(stack));
+  }
+}
+
+function selectAllStacks(): void {
+  appActor.send({ type: "STACK_SELECTED_ALL" });
+  history.pushState({}, "", "/");
+}
+
 export async function initialize(): Promise<void> {
   setupAddForm();
   appActor.send({ type: "APP_READY" });
@@ -109,12 +133,27 @@ export async function initialize(): Promise<void> {
     appActor.send({ type: "LIST_REFRESH" });
   });
 
+  document.addEventListener("navigate-to-stack", (event) => {
+    const { stackId } = (event as CustomEvent<{ stackId: number | null }>).detail;
+    if (stackId !== null) {
+      appActor.send({ type: "STACK_SELECTED", stackId });
+    } else {
+      appActor.send({ type: "STACK_SELECTED_ALL" });
+    }
+  });
+
   const serverState = readServerState();
   if (serverState) {
     appActor.send({
       type: "STACKS_LOADED",
       stacks: serverState.stacks,
     });
+  }
+
+  // Initialize stack selection from URL on page load
+  const stackMatch = location.pathname.match(/^\/s\/(\d+)\//);
+  if (stackMatch) {
+    appActor.send({ type: "STACK_SELECTED", stackId: Number(stackMatch[1]) });
   }
 
   initializeUI(serverState !== null);
@@ -161,7 +200,7 @@ function initializeUI(hasServerData: boolean): void {
     ) {
       const stackId = Number(folderRow.dataset.childStackId);
       if (Number.isInteger(stackId) && stackId > 0) {
-        appActor.send({ type: "STACK_SELECTED", stackId });
+        selectStack(stackId);
       }
       return;
     }
@@ -171,7 +210,7 @@ function initializeUI(hasServerData: boolean): void {
     if (breadcrumbBtn instanceof HTMLElement && breadcrumbBtn.dataset.breadcrumbStack) {
       const stackId = Number(breadcrumbBtn.dataset.breadcrumbStack);
       if (Number.isInteger(stackId) && stackId > 0) {
-        appActor.send({ type: "STACK_SELECTED", stackId });
+        selectStack(stackId);
       }
       return;
     }
@@ -894,12 +933,9 @@ function setupStackBar(): void {
     }
 
     if (tab.dataset.stack === "all") {
-      appActor.send({ type: "STACK_SELECTED_ALL" });
+      selectAllStacks();
     } else if (tab.dataset.stackId) {
-      appActor.send({
-        type: "STACK_SELECTED",
-        stackId: Number(tab.dataset.stackId),
-      });
+      selectStack(Number(tab.dataset.stackId));
     }
   });
 }
