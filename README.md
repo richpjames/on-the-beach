@@ -8,13 +8,17 @@ A full-stack music tracker for collecting links and keeping tabs on listening st
 - Metadata auto-populated by scraping OG tags, JSON-LD, and oEmbed APIs
 - Track listening status (To Listen, Listening, Listened, Revisit, Done)
 - Rate releases and track purchase intent
-- Organise items into named **Stacks** (collections)
+- Organise items into named **Stacks** (collections) with hierarchical nesting to any depth
+- Navigate nested stacks via breadcrumb trail and inline folder rows
+- Multi-parent stack support (DAG — one list can live inside several others)
+- Direct shareable URLs per stack (`/s/:id/:name`)
 - Track physical media details (format, label, year, country, catalogue number)
 - Scan release covers with Mistral AI (OCR or vision mode)
 - Upload and store cover artwork
-- Ingest music links automatically from emails via embedded SMTP server or HTTP webhook
+- Ingest music links automatically via HTTP webhook
 - Filter the list by status, stack, or source
 - Full-text search
+- "You may also like" suggestions (via Cover Art Archive) when marking items as listened
 
 ## Tech Stack
 
@@ -23,7 +27,6 @@ A full-stack music tracker for collecting links and keeping tabs on listening st
 - **Database**: SQLite via `better-sqlite3` + Drizzle ORM
 - **Frontend**: Vite + TypeScript (SPA)
 - **AI**: Mistral (cover scanning)
-- **Email**: smtp-server + mailparser (SMTP ingest)
 
 ## Getting Started
 
@@ -57,7 +60,6 @@ bun run test:unit       # Unit tests (Bun test)
 bun run test:e2e        # Smoke E2E tests (Playwright)
 bun run test:visual     # Visual regression tests (Playwright screenshot comparison)
 bun run test:visual:update  # Re-generate baseline screenshots after intentional UI changes
-bun run test:e2e:full   # Full E2E suite (Playwright)
 bun run db:generate     # Generate Drizzle migrations
 bun run db:migrate      # Apply migrations
 bun run db:studio       # Open Drizzle Studio
