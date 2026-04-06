@@ -1227,6 +1227,7 @@ select.input {
     height: 32px;
     padding: 0 12px;
     font-size: 12px;
+    flex-shrink: 0;
   }
 
   .filter-bar {
@@ -1234,6 +1235,8 @@ select.input {
     gap: 4px;
     flex-wrap: nowrap;
     align-items: center;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
   }
 
   .filter-bar::before {
