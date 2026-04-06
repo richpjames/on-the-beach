@@ -475,12 +475,16 @@ musicItemRoutes.patch("/:id", async (c) => {
 
   let suggestion = null;
   if (input.listenStatus === "listened") {
-    suggestion =
-      (await db
-        .select()
-        .from(itemSuggestions)
-        .where(and(eq(itemSuggestions.sourceItemId, id), eq(itemSuggestions.status, "pending")))
-        .get()) ?? null;
+    try {
+      suggestion =
+        (await db
+          .select()
+          .from(itemSuggestions)
+          .where(and(eq(itemSuggestions.sourceItemId, id), eq(itemSuggestions.status, "pending")))
+          .get()) ?? null;
+    } catch {
+      // Non-critical — suggestion lookup must not block the status update
+    }
   }
 
   return c.json({ item, suggestion });
