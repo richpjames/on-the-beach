@@ -11,6 +11,7 @@
  */
 
 let activeBackdropEl: HTMLElement | null = null;
+let mainPageTitle: string = document.title;
 
 function runScripts(sourceDoc: Document): void {
   // Execute inline scripts as type="module" so each has its own lexical scope.
@@ -50,6 +51,8 @@ async function navigateToRelease(path: string): Promise<void> {
   }
 
   releaseView.innerHTML = remoteMain.innerHTML;
+  const remoteTitle = doc.querySelector("title");
+  if (remoteTitle) document.title = remoteTitle.textContent ?? mainPageTitle;
   document.body.classList.toggle(
     "release-page-body",
     doc.body.classList.contains("release-page-body"),
@@ -71,6 +74,7 @@ function navigateToMain(): void {
   releaseView.innerHTML = "";
   activeBackdropEl?.remove();
   activeBackdropEl = null;
+  document.title = mainPageTitle;
   document.body.classList.remove("release-page-body");
   main.hidden = false;
   const footer = document.querySelector<HTMLElement>(".footer");
