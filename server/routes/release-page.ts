@@ -691,7 +691,8 @@ function renderReleasePage(item: MusicItemFull, cssHref: string): string {
       // ── Apple Music secondary link lookup ────────────────────────────────
       const PLAYABLE_SOURCES = new Set(['bandcamp','spotify','soundcloud','youtube','apple_music','tidal','deezer','mixcloud']);
       const primarySource = ${JSON.stringify(item.primary_source)};
-      if (!primarySource || !PLAYABLE_SOURCES.has(primarySource)) {
+      const hasAppleMusicSecondary = ${JSON.stringify(item.links.some((l) => l.source_name === "apple_music" && !l.is_primary))};
+      if (!hasAppleMusicSecondary && (!primarySource || !PLAYABLE_SOURCES.has(primarySource))) {
         fetch('/api/release/apple-music-lookup/' + ITEM_ID, { method: 'POST' })
           .then(r => r.ok ? r.json() : null)
           .then(data => {
