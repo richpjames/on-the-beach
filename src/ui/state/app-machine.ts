@@ -1,11 +1,17 @@
 import { assign, createMachine } from "xstate";
-import type { ListenStatus, MusicItemSort, StackWithCount } from "../../types";
+import type {
+  ListenStatus,
+  MusicItemSort,
+  MusicItemSortDirection,
+  StackWithCount,
+} from "../../types";
 
 export interface AppContext {
   currentFilter: ListenStatus | "all" | "scheduled";
   currentStack: number | null;
   searchQuery: string;
   currentSort: MusicItemSort;
+  currentSortDirection: MusicItemSortDirection;
   stacks: StackWithCount[];
   isReady: boolean;
   stackManageOpen: boolean;
@@ -22,6 +28,7 @@ export type AppEvent =
   | { type: "STACK_SELECTED_ALL" }
   | { type: "SEARCH_UPDATED"; query: string }
   | { type: "SORT_UPDATED"; sort: MusicItemSort }
+  | { type: "SORT_DIRECTION_UPDATED"; direction: MusicItemSortDirection }
   | { type: "STACKS_LOADED"; stacks: StackWithCount[] }
   | { type: "STACK_MANAGE_TOGGLED" }
   | { type: "STACK_DELETED"; stackId: number }
@@ -38,7 +45,8 @@ export const appMachine = createMachine({
     currentFilter: "to-listen",
     currentStack: null,
     searchQuery: "",
-    currentSort: "default",
+    currentSort: "date-added",
+    currentSortDirection: "desc",
     stacks: [],
     isReady: false,
     stackManageOpen: false,
@@ -82,6 +90,12 @@ export const appMachine = createMachine({
     SORT_UPDATED: {
       actions: assign(({ context, event }) => ({
         currentSort: event.sort,
+        listVersion: context.listVersion + 1,
+      })),
+    },
+    SORT_DIRECTION_UPDATED: {
+      actions: assign(({ context, event }) => ({
+        currentSortDirection: event.direction,
         listVersion: context.listVersion + 1,
       })),
     },
