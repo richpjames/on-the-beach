@@ -3,7 +3,13 @@ export type ListenStatus = "to-listen" | "listened";
 export type PurchaseIntent = "no" | "maybe" | "want" | "owned";
 export type ItemType = "album" | "ep" | "single" | "track" | "mix" | "compilation";
 export type PhysicalFormat = "vinyl" | "cd" | "cassette" | "minidisc" | "other";
-export type MusicItemSort = "default" | "artist-name" | "release-name" | "star-rating";
+export type MusicItemSort =
+  | "date-added"
+  | "date-listened"
+  | "artist-name"
+  | "release-name"
+  | "star-rating";
+export type MusicItemSortDirection = "asc" | "desc";
 
 export type SourceName =
   | "bandcamp"
@@ -137,6 +143,7 @@ export interface MusicItemFilters {
   search?: string;
   stackId?: number;
   sort?: MusicItemSort;
+  sortDirection?: MusicItemSortDirection;
   hasReminder?: boolean;
 }
 
