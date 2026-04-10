@@ -380,12 +380,20 @@ function renderMainPage(opts: {
                 <label class="browse-tools__sort" for="browse-sort">
                   <span>Sort</span>
                   <select id="browse-sort" class="input">
-                    <option value="default">Default</option>
-                    <option value="artist-name">Artist A-Z</option>
-                    <option value="release-name">Release A-Z</option>
-                    <option value="star-rating">Star Rating</option>
+                    <option value="date-added">Date added</option>
+                    <option value="date-listened" id="sort-option-date-listened" hidden>Date listened</option>
+                    <option value="artist-name">Artist A–Z</option>
+                    <option value="release-name">Release A–Z</option>
+                    <option value="star-rating">Star rating</option>
                   </select>
                 </label>
+                <button
+                  type="button"
+                  id="sort-direction-btn"
+                  class="btn btn--ghost browse-tools__direction-btn"
+                  aria-label="Sort direction: newest first"
+                  data-direction="desc"
+                >↓ Newest first</button>
               </div>
             </div>
           </div>
