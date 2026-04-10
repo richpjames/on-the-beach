@@ -852,7 +852,7 @@ function setupBrowseControls(): void {
 
       // Show/hide date-listened option
       if (sortOptionDateListened instanceof HTMLOptionElement) {
-        sortOptionDateListened.hidden = newSort !== "date-listened";
+        sortOptionDateListened.hidden = appCtx().currentFilter !== "listened";
       }
 
       // Update direction button label
