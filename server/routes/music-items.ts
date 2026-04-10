@@ -29,7 +29,6 @@ import type {
   CreateMusicItemInput,
   UpdateMusicItemInput,
   ListenStatus,
-  MusicItemSort,
   PurchaseIntent,
   ItemType,
 } from "../../src/types";
@@ -172,17 +171,29 @@ async function applyArtistUpdate(
 // ---------------------------------------------------------------------------
 
 musicItemRoutes.get("/", async (c) => {
-  const { listenStatus, purchaseIntent, search, sort, stackId, hasReminder } = c.req.query();
+  const { listenStatus, purchaseIntent, search, sort, sortDirection, stackId, hasReminder } =
+    c.req.query();
   const parsedStackId = stackId ? Number(stackId) : null;
   if (parsedStackId !== null && (!Number.isInteger(parsedStackId) || parsedStackId <= 0)) {
     return c.json({ error: "Invalid stack ID" }, 400);
   }
 
-  const requestedSort: MusicItemSort =
-    sort === "artist-name" || sort === "release-name" || sort === "star-rating" ? sort : "default";
-  if (sort && sort !== "artist-name" && sort !== "release-name" && sort !== "star-rating") {
+  const validSorts = [
+    "date-added",
+    "date-listened",
+    "artist-name",
+    "release-name",
+    "star-rating",
+  ] as const;
+  type ValidSort = (typeof validSorts)[number];
+  const requestedSort: ValidSort = validSorts.includes(sort as ValidSort)
+    ? (sort as ValidSort)
+    : "date-added";
+  if (sort && !validSorts.includes(sort as ValidSort)) {
     return c.json({ error: "Invalid sort" }, 400);
   }
+
+  const dir = sortDirection === "asc" ? "asc" : "desc";
 
   // Start building conditions
   const conditions = [];
@@ -240,33 +251,37 @@ musicItemRoutes.get("/", async (c) => {
   if (requestedSort === "artist-name") {
     query = query.orderBy(
       sql`CASE WHEN ${artists.normalizedName} IS NULL OR ${artists.normalizedName} = '' THEN 1 ELSE 0 END`,
-      asc(artists.normalizedName),
-      asc(musicItems.normalizedTitle),
+      dir === "asc" ? asc(artists.normalizedName) : desc(artists.normalizedName),
+      dir === "asc" ? asc(musicItems.normalizedTitle) : desc(musicItems.normalizedTitle),
       desc(musicItems.id),
     );
   } else if (requestedSort === "release-name") {
     query = query.orderBy(
-      asc(musicItems.normalizedTitle),
+      dir === "asc" ? asc(musicItems.normalizedTitle) : desc(musicItems.normalizedTitle),
       sql`CASE WHEN ${artists.normalizedName} IS NULL OR ${artists.normalizedName} = '' THEN 1 ELSE 0 END`,
-      asc(artists.normalizedName),
+      dir === "asc" ? asc(artists.normalizedName) : desc(artists.normalizedName),
       desc(musicItems.id),
     );
   } else if (requestedSort === "star-rating") {
     query = query.orderBy(
       sql`CASE WHEN ${musicItems.rating} IS NULL THEN 1 ELSE 0 END`,
-      desc(musicItems.rating),
+      dir === "asc" ? asc(musicItems.rating) : desc(musicItems.rating),
       sql`CASE WHEN ${artists.normalizedName} IS NULL OR ${artists.normalizedName} = '' THEN 1 ELSE 0 END`,
       asc(artists.normalizedName),
       asc(musicItems.normalizedTitle),
       desc(musicItems.id),
     );
-  } else {
-    // For listened items, sort by when they were marked listened; otherwise by when added.
-    // Both timestamps are only second-resolution in SQLite, so break ties by id.
-    const isListenedOnly = listenStatus === "listened" || listenStatus === "done";
+  } else if (requestedSort === "date-listened") {
     query = query.orderBy(
-      isListenedOnly ? desc(musicItems.listenedAt) : desc(musicItems.createdAt),
-      desc(musicItems.id),
+      sql`CASE WHEN ${musicItems.listenedAt} IS NULL THEN 1 ELSE 0 END`,
+      dir === "asc" ? asc(musicItems.listenedAt) : desc(musicItems.listenedAt),
+      dir === "asc" ? asc(musicItems.id) : desc(musicItems.id),
+    );
+  } else {
+    // date-added (default)
+    query = query.orderBy(
+      dir === "asc" ? asc(musicItems.createdAt) : desc(musicItems.createdAt),
+      dir === "asc" ? asc(musicItems.id) : desc(musicItems.id),
     );
   }
 
