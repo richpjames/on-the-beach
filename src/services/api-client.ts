@@ -145,8 +145,11 @@ export class ApiClient {
       params.set("stackId", String(filters.stackId));
     }
 
-    if (filters?.sort && filters.sort !== "default") {
+    if (filters?.sort) {
       params.set("sort", filters.sort);
+    }
+    if (filters?.sortDirection) {
+      params.set("sortDirection", filters.sortDirection);
     }
 
     if (filters?.hasReminder) {
