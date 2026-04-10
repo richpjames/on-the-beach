@@ -8,3 +8,5 @@ This project uses Bun, not node.
 ### On pushing
 - Create a PR
 - check the the Github checks for the branch have passed. If they fail investigate and fix the error.
+
+- When making visual changes always consider how they will look on smaller screens (mobiles/tablets etc).

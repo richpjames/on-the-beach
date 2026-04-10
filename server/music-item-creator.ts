@@ -46,6 +46,8 @@ export function fullItemSelect() {
       country: musicItems.country,
       genre: musicItems.genre,
       catalogue_number: musicItems.catalogueNumber,
+      musicbrainz_release_id: musicItems.musicbrainzReleaseId,
+      musicbrainz_artist_id: musicItems.musicbrainzArtistId,
       artist_name: artists.name,
       primary_url: musicLinks.url,
       primary_source: sources.name,
