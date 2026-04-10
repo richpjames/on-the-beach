@@ -69,7 +69,17 @@
       "Bash(brew list:*)",
       "Bash(brew info:*)",
       "Bash(claude --version)",
-      "Bash(brew update:*)"
+      "Bash(brew update:*)",
+      "Bash(npm run:*)",
+      "Bash(sqlite3 /Users/rich/Developer/on-the-beach/on_the_beach.db \".schema item_suggestions\")",
+      "Skill(commit-commands:commit-push-pr)",
+      "Skill(commit-commands:commit-push-pr:*)",
+      "Bash(sqlite3 /Users/rich/Developer/on-the-beach/on_the_beach.db \"SELECT * FROM __drizzle_migrations ORDER BY id;\")",
+      "Bash(sqlite3 /Users/rich/Developer/on-the-beach/on_the_beach.db ':*)",
+      "mcp__plugin_playwright_playwright__browser_snapshot",
+      "Bash(pkill -f \"bun --watch server/index.ts\")",
+      "Bash(npm test:*)",
+      "Read(//tmp/**)"
     ]
   },
   "remote": {
