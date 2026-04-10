@@ -97,16 +97,29 @@ describe("app domain helpers", () => {
     });
   });
 
-  it("returns API filter object only when needed", () => {
-    expect(buildMusicItemFilters("all", null)).toBeUndefined();
-    expect(buildMusicItemFilters("listened", null)).toEqual({ listenStatus: "listened" });
-    expect(buildMusicItemFilters("all", 7)).toEqual({ stackId: 7 });
+  it("always includes sort and sortDirection in API filter object", () => {
+    expect(buildMusicItemFilters("all", null)).toEqual({
+      sort: "date-added",
+      sortDirection: "desc",
+    });
+    expect(buildMusicItemFilters("listened", null)).toEqual({
+      listenStatus: "listened",
+      sort: "date-added",
+      sortDirection: "desc",
+    });
+    expect(buildMusicItemFilters("all", 7)).toEqual({
+      stackId: 7,
+      sort: "date-added",
+      sortDirection: "desc",
+    });
     expect(buildMusicItemFilters("all", null, "  dub  ", "artist-name")).toEqual({
       search: "dub",
       sort: "artist-name",
+      sortDirection: "desc",
     });
     expect(buildMusicItemFilters("all", null, "", "star-rating")).toEqual({
       sort: "star-rating",
+      sortDirection: "desc",
     });
   });
 
