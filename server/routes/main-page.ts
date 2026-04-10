@@ -378,7 +378,6 @@ function renderMainPage(opts: {
               </div>
               <div id="browse-sort-panel" class="browse-tools__panel browse-tools__panel--sort">
                 <label class="browse-tools__sort" for="browse-sort">
-                  <span>Sort</span>
                   <select id="browse-sort" class="input">
                     <option value="date-added">Date added</option>
                     <option value="date-listened" id="sort-option-date-listened" hidden>Date listened</option>
