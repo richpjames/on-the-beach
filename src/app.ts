@@ -752,6 +752,10 @@ function syncDateListenedOption(): void {
   if (!isListened && sel.value === "date-listened") {
     sel.value = "date-added";
     appActor.send({ type: "SORT_UPDATED", sort: "date-added" });
+    const btn = document.getElementById("sort-direction-btn");
+    if (btn instanceof HTMLButtonElement) {
+      updateSortDirectionBtn(btn, "date-added", appCtx().currentSortDirection);
+    }
   }
 }
 
@@ -866,7 +870,7 @@ function setupBrowseControls(): void {
     sortDirectionBtn.addEventListener("click", () => {
       const next = appCtx().currentSortDirection === "desc" ? "asc" : "desc";
       appActor.send({ type: "SORT_DIRECTION_UPDATED", direction: next });
-      updateSortDirectionBtn(sortDirectionBtn, appCtx().currentSort, next);
+      updateSortDirectionBtn(sortDirectionBtn, appCtx().currentSort, appCtx().currentSortDirection);
     });
   }
 
