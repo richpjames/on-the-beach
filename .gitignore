@@ -38,3 +38,5 @@ eval/fixtures/pending-review.json
 # Playwright MCP snapshots and screenshots
 .playwright-mcp/
 *.png
+
+uploads
