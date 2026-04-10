@@ -1251,6 +1251,14 @@ select.input {
     position: relative;
   }
 
+  .filter-section {
+    background: #d4d0c8;
+  }
+
+  .filter-section:has(#browse-sort-panel.is-open) {
+    padding-bottom: 46px; /* make room for the floating sort panel */
+  }
+
   .browse-tools {
     min-height: 0;
     padding: 4px 3px;
