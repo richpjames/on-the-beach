@@ -9,4 +9,5 @@ CREATE TABLE `item_suggestions` (
   `status` text NOT NULL DEFAULT 'pending',
   `created_at` integer NOT NULL
 );
+--> statement-breakpoint
 CREATE INDEX `idx_item_suggestions_source_item_id` ON `item_suggestions` (`source_item_id`);
