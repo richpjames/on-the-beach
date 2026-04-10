@@ -1,4 +1,9 @@
-import type { ListenStatus, MusicItemFilters, MusicItemSort } from "../../types";
+import type {
+  ListenStatus,
+  MusicItemFilters,
+  MusicItemSort,
+  MusicItemSortDirection,
+} from "../../types";
 import { applyOrder, buildContextKey } from "../../../shared/music-list-context";
 import { STATUS_LABELS } from "./status";
 
@@ -9,6 +14,7 @@ export function buildMusicItemFilters(
   currentStack: number | null,
   searchQuery = "",
   currentSort: MusicItemSort = "default",
+  currentSortDirection: MusicItemSortDirection = "desc",
 ): MusicItemFilters | undefined {
   const filters: MusicItemFilters = {};
   const trimmedSearch = searchQuery.trim();
@@ -27,9 +33,8 @@ export function buildMusicItemFilters(
     filters.search = trimmedSearch;
   }
 
-  if (currentSort !== "default") {
-    filters.sort = currentSort;
-  }
+  filters.sort = currentSort;
+  filters.sortDirection = currentSortDirection;
 
   return Object.keys(filters).length > 0 ? filters : undefined;
 }
