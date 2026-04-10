@@ -6,6 +6,7 @@ import type {
   ListenStatus,
   MusicItemFull,
   MusicItemSort,
+  MusicItemSortDirection,
   StackWithCount,
 } from "./types";
 import { getCoverScanErrorMessage } from "./ui/domain/add-form";
@@ -741,6 +742,19 @@ function loadImage(dataUrl: string): Promise<HTMLImageElement> {
   });
 }
 
+function syncDateListenedOption(): void {
+  const opt = document.getElementById("sort-option-date-listened");
+  const sel = document.getElementById("browse-sort");
+  if (!(opt instanceof HTMLOptionElement) || !(sel instanceof HTMLSelectElement)) return;
+  const isListened = appCtx().currentFilter === "listened";
+  opt.hidden = !isListened;
+  // If date-listened is selected but filter changed away from listened, reset to date-added
+  if (!isListened && sel.value === "date-listened") {
+    sel.value = "date-added";
+    appActor.send({ type: "SORT_UPDATED", sort: "date-added" });
+  }
+}
+
 function setupFilterBar(): void {
   const filterBar = document.getElementById("filter-bar");
   if (!filterBar) {
@@ -757,7 +771,37 @@ function setupFilterBar(): void {
       type: "FILTER_SELECTED",
       filter: target.dataset.filter as ListenStatus | "all" | "scheduled",
     });
+    syncDateListenedOption();
   });
+}
+
+function updateSortDirectionBtn(
+  btn: HTMLButtonElement,
+  sort: MusicItemSort,
+  direction: MusicItemSortDirection,
+): void {
+  const isDate = sort === "date-added" || sort === "date-listened";
+  const isRating = sort === "star-rating";
+  if (isDate) {
+    btn.textContent = direction === "desc" ? "↓ Newest first" : "↑ Oldest first";
+    btn.setAttribute(
+      "aria-label",
+      direction === "desc" ? "Sort direction: newest first" : "Sort direction: oldest first",
+    );
+  } else if (isRating) {
+    btn.textContent = direction === "desc" ? "↓ Highest first" : "↑ Lowest first";
+    btn.setAttribute(
+      "aria-label",
+      direction === "desc" ? "Sort direction: highest first" : "Sort direction: lowest first",
+    );
+  } else {
+    btn.textContent = direction === "asc" ? "↑ A–Z" : "↓ Z–A";
+    btn.setAttribute(
+      "aria-label",
+      direction === "asc" ? "Sort direction: A to Z" : "Sort direction: Z to A",
+    );
+  }
+  btn.dataset.direction = direction;
 }
 
 function setupBrowseControls(): void {
@@ -768,6 +812,8 @@ function setupBrowseControls(): void {
   const sortToggle = document.getElementById("browse-sort-toggle");
 
   const searchClearBtn = document.getElementById("search-clear-btn");
+  const sortDirectionBtn = document.getElementById("sort-direction-btn");
+  const sortOptionDateListened = document.getElementById("sort-option-date-listened");
 
   if (searchInput instanceof HTMLInputElement) {
     const updateClearBtn = () => {
@@ -798,10 +844,29 @@ function setupBrowseControls(): void {
 
   if (sortSelect instanceof HTMLSelectElement) {
     sortSelect.addEventListener("change", () => {
+      const newSort = sortSelect.value as MusicItemSort;
       appActor.send({
         type: "SORT_UPDATED",
-        sort: sortSelect.value as MusicItemSort,
+        sort: newSort,
       });
+
+      // Show/hide date-listened option
+      if (sortOptionDateListened instanceof HTMLOptionElement) {
+        sortOptionDateListened.hidden = newSort !== "date-listened";
+      }
+
+      // Update direction button label
+      if (sortDirectionBtn instanceof HTMLButtonElement) {
+        updateSortDirectionBtn(sortDirectionBtn, newSort, appCtx().currentSortDirection);
+      }
+    });
+  }
+
+  if (sortDirectionBtn instanceof HTMLButtonElement) {
+    sortDirectionBtn.addEventListener("click", () => {
+      const next = appCtx().currentSortDirection === "desc" ? "asc" : "desc";
+      appActor.send({ type: "SORT_DIRECTION_UPDATED", direction: next });
+      updateSortDirectionBtn(sortDirectionBtn, appCtx().currentSort, next);
     });
   }
 
@@ -838,7 +903,11 @@ function getNormalizedSearchQuery(): string {
 }
 
 function isBrowseOrderLocked(): boolean {
-  return getNormalizedSearchQuery().length > 0 || appCtx().currentSort !== "default";
+  return (
+    getNormalizedSearchQuery().length > 0 ||
+    appCtx().currentSort !== "date-added" ||
+    appCtx().currentSortDirection !== "desc"
+  );
 }
 
 async function renderStackBar(): Promise<void> {
@@ -1782,6 +1851,7 @@ async function renderMusicListView(): Promise<void> {
     appCtx().currentStack,
     appCtx().searchQuery,
     appCtx().currentSort,
+    appCtx().currentSortDirection,
   );
   const result = await api.listMusicItems(filters);
 
