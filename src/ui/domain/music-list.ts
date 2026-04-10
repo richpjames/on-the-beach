@@ -13,7 +13,7 @@ export function buildMusicItemFilters(
   currentFilter: FilterSelection,
   currentStack: number | null,
   searchQuery = "",
-  currentSort: MusicItemSort = "default",
+  currentSort: MusicItemSort = "date-added",
   currentSortDirection: MusicItemSortDirection = "desc",
 ): MusicItemFilters | undefined {
   const filters: MusicItemFilters = {};
