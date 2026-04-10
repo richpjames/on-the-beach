@@ -3,10 +3,20 @@ import { Hono } from "hono";
 
 const mockCreateMany = mock();
 
-// Mock createMusicItemFromUrl before importing the route
+// Mock the entire music-item-creator module before importing any route.
+// All named exports must be present: bun's mock.module() persists across
+// the full test run, so a partial mock will break any later test file
+// that imports a route which uses a non-mocked export.
 mock.module("../../server/music-item-creator", () => ({
   createMusicItemsFromUrl: mockCreateMany,
+  createMusicItemFromUrl: mock(),
+  createMusicItemDirect: mock(),
   fetchFullItem: mock(),
+  fullItemSelect: mock(),
+  getOrCreateArtist: mock(),
+  getSourceId: mock(),
+  hydrateItemStacks: mock(),
+  AmbiguousLinkSelectionError: class AmbiguousLinkSelectionError extends Error {},
 }));
 
 // Import after mock is set up
