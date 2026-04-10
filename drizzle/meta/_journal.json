@@ -54,6 +54,13 @@
     {
       "idx": 7,
       "version": "6",
+      "when": 1775150000000,
+      "tag": "0007_item_suggestions",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "6",
       "when": 1775243975137,
       "tag": "0008_drop_stack_parent_unique",
       "breakpoints": true
