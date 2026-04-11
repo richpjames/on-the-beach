@@ -68,7 +68,8 @@ function youTubeEmbedSrc(url: string): string | null {
 function youTubePlayerAttrs(item: MusicItemFull): string {
   const src = item.primary_url ? youTubeEmbedSrc(item.primary_url) : null;
   if (!src) return "";
-  return ` data-src="${src}" data-title="${escapeHtml(item.title)}" data-artist="${escapeHtml(item.artist_name ?? "")}" data-player-type="video"`;
+  const href = item.primary_url ? ` data-href="${escapeHtml(item.primary_url)}"` : "";
+  return ` data-src="${src}" data-title="${escapeHtml(item.title)}" data-artist="${escapeHtml(item.artist_name ?? "")}" data-player-type="video"${href}`;
 }
 
 function renderYouTubeButton(item: MusicItemFull): string {
@@ -88,11 +89,12 @@ function renderBandcampEmbed(item: MusicItemFull): string {
   const title = escapeHtml(item.title);
   const artist = escapeHtml(item.artist_name ?? "");
 
+  const href = item.primary_url ? `\n    data-href="${escapeHtml(item.primary_url)}"` : "";
   return `<button
     class="release-page__listen-btn"
     data-src="${src}"
     data-title="${title}"
-    data-artist="${artist}"
+    data-artist="${artist}"${href}
   >▶ Listen</button>`;
 }
 
@@ -109,6 +111,7 @@ function renderAppleMusicButton(item: MusicItemFull): string {
     data-src="${escapeHtml(src)}"
     data-title="${title}"
     data-artist="${artist}"
+    data-href="${escapeHtml(item.primary_url)}"
   >▶ Listen</button>`;
   } catch {
     return "";
@@ -413,7 +416,10 @@ function renderReleasePage(item: MusicItemFull, cssHref: string): string {
       document.querySelectorAll('.release-page__listen-btn').forEach(btn => {
         btn.addEventListener('click', () => {
           const src = btn.dataset.src;
-          if (src) {
+          if (!src) return;
+          if (window.matchMedia('(pointer: coarse)').matches && btn.dataset.href) {
+            window.open(btn.dataset.href, '_blank', 'noopener,noreferrer');
+          } else {
             window.__player?.load(
               src,
               btn.dataset.title ?? '',
