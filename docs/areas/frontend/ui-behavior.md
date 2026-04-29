@@ -1,123 +1,110 @@
-# UI Capabilities
+# Capabilities
 
-A flat catalogue of what the application makes possible. Grouped by subject, not by screen — order does not imply priority.
+What the application makes possible. No description of screens, controls, layout, or interactions.
 
-## What an item is
+## The data model
 
-Every tracked release is a single item with these attributes, all optional except a title:
+Every tracked release carries:
 
 - Title, artist
-- Release type: album, EP, single, track, or mix
+- Release type — one of: album, EP, single, track, mix
 - Year, label, country, genre, catalogue number
 - Free-text notes
-- Cover artwork (uploaded image or external URL)
-- One or more source links (Bandcamp, Spotify, SoundCloud, YouTube, Apple Music, Mixcloud, Discogs, Tidal, Deezer, "physical", or a free-form source name); one link is designated primary
-- A listening status: To Listen or Listened
-- A star rating from 0.5 to 5 in half-star steps, or unrated
-- A reminder date
-- Membership in zero or more stacks
-- A position within each browsing context where it appears
-- Provenance metadata from MusicBrainz when matched (release id, artist id)
+- Cover artwork (uploaded file or external URL)
+- One or more source links from any of: Bandcamp, Spotify, SoundCloud, YouTube, Apple Music, Mixcloud, Discogs, Tidal, Deezer, "physical", or an arbitrary source name. One link is designated primary.
+- A listening status — one of: To Listen, Listened
+- A star rating in half-star increments from 0.5 to 5, or unrated
+- A reminder date, or none
+- Membership in any number of stacks
+- A position within each filter-and-stack combination it appears in
+- MusicBrainz release id and artist id when matched
 
-## Adding items
+## Creating items
 
-The app supports five distinct ways of bringing items in:
+Items can come from any of:
 
-- From a pasted URL, with title, artist, artwork, and other metadata extracted via OG tags, JSON-LD, oEmbed, and source-specific scraping.
-- From a photograph of a release cover, with artist, title, year, label, country, and catalogue number extracted via OCR / vision.
-- From a microphone recording of music currently playing (up to 15 seconds), with the matched track auto-created.
-- By manual entry of any subset of fields.
-- By inbound HTTP webhook (e.g. an email forwarding service) authenticated with a shared secret.
+- A pasted URL — title, artist, artwork, and other metadata extracted via OG tags, JSON-LD, oEmbed, and source-specific scraping.
+- A cover photograph — artist, title, year, label, country, and catalogue number extracted via OCR / vision.
+- A microphone recording up to 15 seconds long — the matched track is identified and added.
+- Direct entry of any subset of fields.
+- An authenticated inbound HTTP webhook (e.g. an email forwarder).
 
-Additional behaviours when adding:
+In addition:
 
-- A single link that the source resolves to several releases can be expanded into one item per chosen release in one operation.
-- Newly created items have any blank metadata fields back-filled from MusicBrainz when artist + title are known.
-- An item's primary source is detected from the URL when not specified.
+- A single URL that resolves to several releases can produce one item per chosen release in one operation.
+- Any blank metadata fields on a new item are back-filled from MusicBrainz when artist + title are known.
+- The primary source is inferred from a URL when not specified.
 
-## Editing items
+## Mutating items
 
-Every attribute on an existing item can be changed:
+For an existing item the application can:
 
-- All metadata fields (title, artist, year, label, country, genre, catalogue number, notes, artwork URL).
-- Artwork can be replaced by uploading a new image or pointing at a new URL.
-- Additional source links can be attached; existing links can be removed.
-- Listening status can be set to To Listen or Listened.
-- Star rating can be set, changed, or cleared.
-- Stack memberships can be added or removed.
-- A reminder date can be set or cleared.
-- The item can be deleted outright.
+- Change any metadata field.
+- Replace artwork by upload or URL.
+- Attach further source links and remove existing ones.
+- Set the listening status.
+- Set, change, or clear the star rating.
+- Add or remove stack memberships.
+- Set or clear the reminder date.
+- Delete the item.
 
-## Stacks (collections)
+## Stacks
 
-Stacks are user-defined groupings of items.
+Stacks are named groupings of items.
 
 - Stacks can be created, renamed, and deleted. Deleting a stack does not delete its items.
-- An item can belong to any number of stacks simultaneously.
-- A stack can contain other stacks. Nesting has no depth limit.
-- A stack can be nested under several parent stacks at once (the structure is a DAG, not a tree). Cycles are rejected.
+- An item can belong to any number of stacks at once.
+- Stacks can contain other stacks; nesting has no depth limit.
+- A stack can have several parent stacks at once — the structure is a DAG, not a tree. Cycles are rejected.
 - Each stack has a stable, shareable URL.
-- Each stack publishes an RSS feed.
-- The contents of a stack appear together with any nested child stacks when it is browsed.
-- The order of items inside a given browsing context is preserved across sessions.
+- Each stack publishes an RSS feed. A primary feed exists for the whole catalogue.
 
-## Browsing
+## Filtering, sorting, ordering
 
-The library can be narrowed and ordered along several axes simultaneously:
+The catalogue can be narrowed and ordered along these axes, used independently or together:
 
-- Status filter: all items, To Listen, Listened, or Scheduled (items with a future reminder).
-- Stack filter: any one stack, or no stack filter.
-- Free-text search across release titles, artists, and stack names.
-- Sort by: date added, date listened (when viewing Listened), artist, release name, or star rating.
-- Sort direction: ascending or descending.
-- Manual reordering within the current context (filter + stack), saved per context. Manual order applies when sorted by date added descending with no active search.
-
-When a stack is open, the browse view shows breadcrumbs back through that stack's parents and lists nested child stacks alongside its items.
-
-## Listening
-
-The app provides inline playback for these sources:
-
-- Bandcamp (albums and individual tracks)
-- YouTube (videos and playlists)
-- Apple Music
-- Mixcloud
-
-Playback continues uninterrupted while navigating between the library and individual release pages. On touch devices, playable releases open in the source's own app or tab instead of embedding.
-
-For releases whose primary source is not directly playable, the app attempts to find and attach an Apple Music link automatically.
-
-## Suggestions
-
-When an item is marked Listened, the app can offer another release by the same artist (sourced from MusicBrainz / Cover Art Archive). The suggestion can be added to the library as a new item or dismissed.
+- By listening status, including a "scheduled" view of items with a future reminder.
+- By a single stack.
+- By free-text query against release titles, artists, and stack names.
+- By date added, date listened, artist, release name, or star rating — ascending or descending.
+- By manual order. Manual order is stored per filter-plus-stack combination and is used when sorting by date added descending with no active query.
 
 ## Reminders
 
-- Any item can carry a reminder date.
-- When a reminder's date is reached, the item is automatically moved back to "To Listen".
-- Items with a future reminder can be browsed as a group.
+- Any item can carry a future reminder date.
+- When a reminder's date is reached the item is automatically returned to "To Listen".
+- Items with a future reminder can be selected as a group.
 
 ## Ratings
 
-- Items can be rated in half-star increments from 0.5 to 5 stars.
+- Items can be rated in half-star increments from 0.5 to 5.
 - A rating can be cleared back to unrated.
-- Ratings can be used to sort the library.
+- Ratings are usable as a sort key.
+
+## Listening
+
+The application can play back content from Bandcamp, YouTube (videos and playlists), Apple Music, and Mixcloud. Playback persists across changes of context. On touch devices, playback opens in the source's own application instead of being embedded.
+
+For releases whose primary source is not directly playable, the application can discover and attach an Apple Music link automatically.
+
+## Suggestions
+
+When an item is marked Listened the application can propose another release by the same artist (sourced from MusicBrainz / Cover Art Archive). The proposal can be accepted as a new item or dismissed.
 
 ## Sharing and feeds
 
-- Every stack has a shareable URL that opens the library scoped to that stack.
-- Every stack is also exposed as an RSS feed.
-- A primary feed for the whole library is also published.
+- Each stack is reachable at a stable URL.
+- Each stack publishes an RSS feed; a primary feed covers the whole catalogue.
 
-## Inbound integrations
+## External integrations
 
-- A configured email-forwarding webhook can create items from forwarded messages.
-- The application can be configured against custom Mistral models for both link extraction and cover scanning.
+- An HTTP webhook authenticated by a shared secret accepts inbound payloads from email-forwarding providers.
+- The model used for both link extraction and cover scanning is independently configurable.
 
-## What persists per user
+## What persists
 
-- All items and their metadata.
+- Items and all their metadata.
 - Uploaded artwork files.
-- Stack definitions, stack nesting, and item-to-stack memberships.
-- Listening status, ratings, reminders, and notes.
-- Manual ordering per browsing context.
+- Stacks, stack-to-stack nesting, and item-to-stack memberships.
+- Listening status, ratings, reminders, notes.
+- Manual ordering per filter-and-stack combination.
