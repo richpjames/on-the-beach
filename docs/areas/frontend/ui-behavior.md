@@ -1,110 +1,109 @@
 # Capabilities
 
-What the application makes possible. No description of screens, controls, layout, or interactions.
+## Item attributes
 
-## The data model
-
-Every tracked release carries:
+Each item carries:
 
 - Title, artist
-- Release type — one of: album, EP, single, track, mix
+- Type: one of album, EP, single, track, mix
 - Year, label, country, genre, catalogue number
-- Free-text notes
-- Cover artwork (uploaded file or external URL)
-- One or more source links from any of: Bandcamp, Spotify, SoundCloud, YouTube, Apple Music, Mixcloud, Discogs, Tidal, Deezer, "physical", or an arbitrary source name. One link is designated primary.
-- A listening status — one of: To Listen, Listened
-- A star rating in half-star increments from 0.5 to 5, or unrated
-- A reminder date, or none
-- Membership in any number of stacks
-- A position within each filter-and-stack combination it appears in
-- MusicBrainz release id and artist id when matched
+- Notes
+- Cover artwork — uploaded file or external URL
+- One or more source links from any of: Bandcamp, Spotify, SoundCloud, YouTube, Apple Music, Mixcloud, Discogs, Tidal, Deezer, "physical", or an arbitrary source name; one is designated primary
+- Listening status: one of To Listen, Listened
+- Star rating in half-star increments from 0.5 to 5, or unrated
+- Reminder date, or none
+- Membership in zero or more stacks
+- An ordinal position per filter-and-stack combination
+- MusicBrainz release id, MusicBrainz artist id (when a match exists)
 
-## Creating items
+## Item creation sources
 
-Items can come from any of:
+Items can originate from any of:
 
-- A pasted URL — title, artist, artwork, and other metadata extracted via OG tags, JSON-LD, oEmbed, and source-specific scraping.
-- A cover photograph — artist, title, year, label, country, and catalogue number extracted via OCR / vision.
-- A microphone recording up to 15 seconds long — the matched track is identified and added.
-- Direct entry of any subset of fields.
-- An authenticated inbound HTTP webhook (e.g. an email forwarder).
+- A URL — with metadata extracted via OG tags, JSON-LD, oEmbed, and source-specific scraping
+- A cover photograph — with OCR / vision extracting artist, title, year, label, country, catalogue number
+- A microphone recording up to 15 seconds long — with song recognition
+- A populated set of fields supplied directly
+- An authenticated inbound HTTP webhook
 
-In addition:
+Additional creation behaviours:
 
-- A single URL that resolves to several releases can produce one item per chosen release in one operation.
-- Any blank metadata fields on a new item are back-filled from MusicBrainz when artist + title are known.
-- The primary source is inferred from a URL when not specified.
+- A URL that resolves to several releases can produce one item per release in a single operation.
+- Blank metadata fields on a new item are back-filled from MusicBrainz when artist + title are known.
+- The primary source is inferred from the URL when not specified.
 
-## Mutating items
+## Per-item operations
 
-For an existing item the application can:
-
-- Change any metadata field.
-- Replace artwork by upload or URL.
-- Attach further source links and remove existing ones.
-- Set the listening status.
-- Set, change, or clear the star rating.
-- Add or remove stack memberships.
-- Set or clear the reminder date.
-- Delete the item.
+- Modify any metadata field
+- Replace artwork (upload or URL)
+- Attach or remove source links
+- Set listening status
+- Set, change, or clear the star rating
+- Add or remove stack memberships
+- Set or clear the reminder date
+- Delete the item
 
 ## Stacks
 
-Stacks are named groupings of items.
+- Create, rename, delete
+- Deleting a stack does not delete its items
+- Many-to-many between items and stacks
+- A stack can contain other stacks
+- No nesting depth limit
+- A stack can have multiple parent stacks — structure is a DAG
+- Cycles are rejected
+- Each stack has a stable URL
+- Each stack has an RSS feed
+- A primary RSS feed exists for the whole catalogue
 
-- Stacks can be created, renamed, and deleted. Deleting a stack does not delete its items.
-- An item can belong to any number of stacks at once.
-- Stacks can contain other stacks; nesting has no depth limit.
-- A stack can have several parent stacks at once — the structure is a DAG, not a tree. Cycles are rejected.
-- Each stack has a stable, shareable URL.
-- Each stack publishes an RSS feed. A primary feed exists for the whole catalogue.
+## Catalogue queries
 
-## Filtering, sorting, ordering
+The catalogue can be narrowed and ordered along these axes, in any combination:
 
-The catalogue can be narrowed and ordered along these axes, used independently or together:
-
-- By listening status, including a "scheduled" view of items with a future reminder.
-- By a single stack.
-- By free-text query against release titles, artists, and stack names.
-- By date added, date listened, artist, release name, or star rating — ascending or descending.
-- By manual order. Manual order is stored per filter-plus-stack combination and is used when sorting by date added descending with no active query.
+- By listening status
+- To items with a future reminder
+- By a single stack
+- By free-text query across release titles, artists, and stack names
+- By date added, date listened, artist, release name, or star rating — ascending or descending
+- By a manual order, persisted per filter-and-stack combination
 
 ## Reminders
 
-- Any item can carry a future reminder date.
-- When a reminder's date is reached the item is automatically returned to "To Listen".
-- Items with a future reminder can be selected as a group.
+- Any item can carry a future reminder date
+- When that date is reached, the item's status reverts to To Listen automatically
 
-## Ratings
+## Playback
 
-- Items can be rated in half-star increments from 0.5 to 5.
-- A rating can be cleared back to unrated.
-- Ratings are usable as a sort key.
+The application can play content from:
 
-## Listening
-
-The application can play back content from Bandcamp, YouTube (videos and playlists), Apple Music, and Mixcloud. Playback persists across changes of context. On touch devices, playback opens in the source's own application instead of being embedded.
-
-For releases whose primary source is not directly playable, the application can discover and attach an Apple Music link automatically.
+- Bandcamp (album, track)
+- YouTube (video, playlist)
+- Apple Music
+- Mixcloud
 
 ## Suggestions
 
-When an item is marked Listened the application can propose another release by the same artist (sourced from MusicBrainz / Cover Art Archive). The proposal can be accepted as a new item or dismissed.
+- When an item's status becomes Listened, the application can propose another release by the same artist (via MusicBrainz / Cover Art Archive)
+- The proposal can be turned into a new item, or discarded
 
-## Sharing and feeds
+## Auto-discovery
 
-- Each stack is reachable at a stable URL.
-- Each stack publishes an RSS feed; a primary feed covers the whole catalogue.
+- For items whose primary source is not directly playable, the application can locate and attach an Apple Music link
 
-## External integrations
+## Inbound integrations
 
-- An HTTP webhook authenticated by a shared secret accepts inbound payloads from email-forwarding providers.
-- The model used for both link extraction and cover scanning is independently configurable.
+- An HTTP webhook authenticated by a shared secret accepts payloads from email-forwarding providers
 
-## What persists
+## Configuration
 
-- Items and all their metadata.
-- Uploaded artwork files.
-- Stacks, stack-to-stack nesting, and item-to-stack memberships.
-- Listening status, ratings, reminders, notes.
-- Manual ordering per filter-and-stack combination.
+- The model used for link extraction is independently configurable
+- The model used for cover scanning is independently configurable
+
+## Persistence
+
+- Items and all their metadata
+- Uploaded artwork files
+- Stacks, stack-to-stack nesting, and item-to-stack memberships
+- Listening status, ratings, reminders, notes
+- Manual ordering per filter-and-stack combination
