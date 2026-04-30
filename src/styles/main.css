@@ -2641,7 +2641,6 @@ a:hover {
   border-width: 2px;
   border-style: solid;
   border-color: var(--chrome-dark) var(--chrome-white) var(--chrome-white) var(--chrome-dark);
-  overflow: hidden;
 }
 
 #link-list {
