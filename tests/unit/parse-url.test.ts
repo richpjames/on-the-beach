@@ -54,6 +54,27 @@ describe("extractYouTubePlaylistId", () => {
   });
 });
 
+describe("parseUrl - soundcloud", () => {
+  test("identifies soundcloud track link", () => {
+    const result = parseUrl("https://soundcloud.com/mike-omara/spring26");
+
+    expect(result.source).toBe("soundcloud");
+    expect(result.potentialArtist).toBe("mike omara");
+    expect(result.potentialTitle).toBe("spring26");
+  });
+
+  test("identifies mobile m.soundcloud.com links", () => {
+    const result = parseUrl(
+      "https://m.soundcloud.com/mike-omara/spring26?ref=clipboard&p=a&c=1&si=2500729ecc264ec5a83ce9e92e4fe0ca&utm_source=clipboard&utm_medium=text&utm_campaign=social_sharing",
+    );
+
+    expect(result.source).toBe("soundcloud");
+    expect(result.potentialArtist).toBe("mike omara");
+    expect(result.potentialTitle).toBe("spring26");
+    expect(result.normalizedUrl).toBe("https://m.soundcloud.com/mike-omara/spring26");
+  });
+});
+
 describe("parseUrl - nts", () => {
   test("identifies NTS episode link", () => {
     const result = parseUrl(
