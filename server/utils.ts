@@ -27,7 +27,7 @@ const URL_PATTERNS: Array<{
   },
   {
     source: "soundcloud",
-    pattern: /^https?:\/\/(?:www\.)?soundcloud\.com\/([^/]+)(?:\/([^/?]+))?/,
+    pattern: /^https?:\/\/(?:(?:www|m)\.)?soundcloud\.com\/([^/]+)(?:\/([^/?]+))?/,
     extractor: (match) => ({
       potentialArtist: match[1]?.replace(/-/g, " "),
       potentialTitle: match[2]?.replace(/-/g, " "),
