@@ -63,7 +63,7 @@ describe("parseUrl - soundcloud", () => {
     expect(result.potentialTitle).toBe("spring26");
   });
 
-  test("identifies mobile m.soundcloud.com links", () => {
+  test("identifies mobile m.soundcloud.com links and strips the m. prefix", () => {
     const result = parseUrl(
       "https://m.soundcloud.com/mike-omara/spring26?ref=clipboard&p=a&c=1&si=2500729ecc264ec5a83ce9e92e4fe0ca&utm_source=clipboard&utm_medium=text&utm_campaign=social_sharing",
     );
@@ -71,7 +71,23 @@ describe("parseUrl - soundcloud", () => {
     expect(result.source).toBe("soundcloud");
     expect(result.potentialArtist).toBe("mike omara");
     expect(result.potentialTitle).toBe("spring26");
-    expect(result.normalizedUrl).toBe("https://m.soundcloud.com/mike-omara/spring26");
+    expect(result.normalizedUrl).toBe("https://soundcloud.com/mike-omara/spring26");
+  });
+});
+
+describe("parseUrl - generic mobile subdomain handling", () => {
+  test("strips m. from mixcloud links", () => {
+    const result = parseUrl("https://m.mixcloud.com/somebody/some-show/");
+
+    expect(result.source).toBe("mixcloud");
+    expect(result.normalizedUrl).toBe("https://mixcloud.com/somebody/some-show/");
+  });
+
+  test("strips m. from discogs links", () => {
+    const result = parseUrl("https://m.discogs.com/release/123456");
+
+    expect(result.source).toBe("discogs");
+    expect(result.normalizedUrl).toBe("https://discogs.com/release/123456");
   });
 });
 
