@@ -27,7 +27,7 @@ const URL_PATTERNS: Array<{
   },
   {
     source: "soundcloud",
-    pattern: /^https?:\/\/(?:(?:www|m)\.)?soundcloud\.com\/([^/]+)(?:\/([^/?]+))?/,
+    pattern: /^https?:\/\/(?:www\.)?soundcloud\.com\/([^/]+)(?:\/([^/?]+))?/,
     extractor: (match) => ({
       potentialArtist: match[1]?.replace(/-/g, " "),
       potentialTitle: match[2]?.replace(/-/g, " "),
@@ -84,8 +84,12 @@ const URL_PATTERNS: Array<{
   },
 ];
 
+function stripMobileSubdomain(url: string): string {
+  return url.replace(/^(https?:\/\/)m\./i, "$1");
+}
+
 export function parseUrl(url: string): ParsedUrl {
-  const trimmedUrl = url.trim();
+  const trimmedUrl = stripMobileSubdomain(url.trim());
 
   for (const { source, pattern, normalizer, extractor } of URL_PATTERNS) {
     const match = trimmedUrl.match(pattern);
