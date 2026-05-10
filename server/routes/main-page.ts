@@ -2,15 +2,19 @@ import { Hono, type Context } from "hono";
 import { eq, inArray, count, asc, desc } from "drizzle-orm";
 import { db } from "../db/index";
 import { musicItems, musicItemStacks, stacks, musicItemOrder, stackParents } from "../db/schema";
-import { fullItemSelect, hydrateItemStacks } from "../music-item-creator";
+import { fullItemSelect } from "../queries/full-item-select";
+import { hydrateItemStacks } from "../hydrate-item-stacks";
+import { collectDescendantStackIds } from "./music-items";
 import { applyOrder, buildContextKey } from "../../shared/music-list-context";
 import { renderPrimaryFeedAlternateLinks, renderStackFeedAlternateLinks } from "../../shared/rss";
 import { renderMusicList } from "../../src/ui/view/templates";
+import type { FilterSelection } from "../../src/ui/domain/music-list";
 import type { MusicItemFull, StackWithCount } from "../../src/types";
 import { getPageAssets } from "../page-assets";
 import pkg from "../../package.json";
 
 const DEFAULT_FILTER = "to-listen" as const;
+const STACK_DEFAULT_FILTER: FilterSelection = "all";
 
 function escapeHtml(str: string): string {
   return str
@@ -65,10 +69,44 @@ async function fetchInitialStacks(): Promise<StackWithCount[]> {
   }));
 }
 
-async function fetchInitialItems(): Promise<MusicItemFull[]> {
-  const items = await fullItemSelect()
-    .where(eq(musicItems.listenStatus, DEFAULT_FILTER))
-    .orderBy(desc(musicItems.createdAt), desc(musicItems.id));
+/**
+ * Fetch the items to render in the SSR'd music list.
+ *
+ * Mirrors what the client-side `renderMusicListView` does after hydration:
+ * - On `/`, the default filter is "to-listen" and there is no stack scope, so
+ *   we filter strictly by `listen_status = 'to-listen'`. Listed items must
+ *   never appear in this view.
+ * - On `/s/:id/:name`, the JS state machine forces `currentFilter` to "all"
+ *   and scopes by `stackId`, so the SSR mirrors that: items are restricted to
+ *   the stack (and its descendants) regardless of listen status.
+ */
+async function fetchInitialItems(stackId: number | null): Promise<MusicItemFull[]> {
+  const filter: FilterSelection = stackId === null ? DEFAULT_FILTER : STACK_DEFAULT_FILTER;
+
+  let baseQuery = fullItemSelect().$dynamic();
+
+  // Apply listen-status filter only when we're not scoping by stack. On stack
+  // pages the JS view shows all statuses, so the SSR must too — otherwise the
+  // first paint shows global to-listen items that get replaced with the real
+  // (mixed-status) stack contents a moment later.
+  if (filter !== "all") {
+    baseQuery = baseQuery.where(eq(musicItems.listenStatus, filter));
+  }
+
+  if (stackId !== null) {
+    const stackIds = await collectDescendantStackIds(stackId);
+    const memberships = await db
+      .select({ musicItemId: musicItemStacks.musicItemId })
+      .from(musicItemStacks)
+      .where(inArray(musicItemStacks.stackId, stackIds));
+    const itemIds = [...new Set(memberships.map((m) => m.musicItemId))];
+
+    if (itemIds.length === 0) return [];
+
+    baseQuery = baseQuery.where(inArray(musicItems.id, itemIds));
+  }
+
+  const items = await baseQuery.orderBy(desc(musicItems.createdAt), desc(musicItems.id));
 
   if (items.length === 0) return [];
 
@@ -89,7 +127,7 @@ async function fetchInitialItems(): Promise<MusicItemFull[]> {
 
   const enriched = hydrateItemStacks(items, stackRows);
 
-  const contextKey = buildContextKey(DEFAULT_FILTER, null);
+  const contextKey = buildContextKey(filter, stackId);
   const orderRow = await db
     .select()
     .from(musicItemOrder)
@@ -112,9 +150,25 @@ async function fetchInitialItems(): Promise<MusicItemFull[]> {
   return enriched as unknown as MusicItemFull[];
 }
 
+function renderFilterBarButtons(activeFilter: FilterSelection): string {
+  const buttons: Array<{ value: FilterSelection; label: string }> = [
+    { value: "all", label: "All" },
+    { value: "to-listen", label: "To Listen" },
+    { value: "listened", label: "Listened" },
+    { value: "scheduled", label: "Scheduled" },
+  ];
+  return buttons
+    .map(
+      ({ value, label }) =>
+        `<button class="filter-btn${value === activeFilter ? " active" : ""}" data-filter="${value}">${label}</button>`,
+    )
+    .join("\n              ");
+}
+
 function renderMainPage(opts: {
   musicListHtml: string;
   stackBarTabsHtml: string;
+  filterBarHtml: string;
   stacksJson: string;
   cssHref: string;
   scriptSrc: string;
@@ -320,10 +374,7 @@ function renderMainPage(opts: {
         <section class="filter-section">
           <div class="browse-controls">
             <div id="filter-bar" class="filter-bar">
-              <button class="filter-btn" data-filter="all">All</button>
-              <button class="filter-btn active" data-filter="to-listen">To Listen</button>
-              <button class="filter-btn" data-filter="listened">Listened</button>
-              <button class="filter-btn" data-filter="scheduled">Scheduled</button>
+              ${opts.filterBarHtml}
             </div>
             <div class="browse-tools">
               <div class="browse-tools__mobile-actions">
@@ -599,14 +650,22 @@ export function createMainPageRoutes(): Hono {
   const isDev = process.env.NODE_ENV !== "production";
 
   async function serveMainPage(c: Context) {
+    const stackIdParam = c.req.param("id");
+    const stackId = stackIdParam ? Number(stackIdParam) : null;
+    const validStackId =
+      stackId !== null && Number.isInteger(stackId) && stackId > 0 ? stackId : null;
+    const activeFilter: FilterSelection =
+      validStackId === null ? DEFAULT_FILTER : STACK_DEFAULT_FILTER;
+
     const [initialItems, initialStacks, { cssHref, scriptSrc }] = await Promise.all([
-      fetchInitialItems(),
+      fetchInitialItems(validStackId),
       fetchInitialStacks(),
       getPageAssets(),
     ]);
 
-    const musicListHtml = renderMusicList(initialItems, DEFAULT_FILTER, "");
+    const musicListHtml = renderMusicList(initialItems, activeFilter, "");
     const stackBarTabsHtml = initialStacks.map((s) => renderStackTab(s)).join("");
+    const filterBarHtml = renderFilterBarButtons(activeFilter);
     const stacksJson = safeJson({ stacks: initialStacks });
     const primaryRssAlternateLinksHtml = renderPrimaryFeedAlternateLinks();
     const rssAlternateLinksHtml = renderStackFeedAlternateLinks(initialStacks);
@@ -615,6 +674,7 @@ export function createMainPageRoutes(): Hono {
       renderMainPage({
         musicListHtml,
         stackBarTabsHtml,
+        filterBarHtml,
         stacksJson,
         cssHref,
         scriptSrc,
