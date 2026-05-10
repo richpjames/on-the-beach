@@ -15,7 +15,6 @@ mock.module("../../server/music-item-creator", () => ({
   fullItemSelect: mock(),
   getOrCreateArtist: mock(),
   getSourceId: mock(),
-  hydrateItemStacks: mock(),
   AmbiguousLinkSelectionError: class AmbiguousLinkSelectionError extends Error {},
 }));
 

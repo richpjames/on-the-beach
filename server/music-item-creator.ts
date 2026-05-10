@@ -58,7 +58,11 @@ export async function getSourceId(sourceName: string): Promise<number | null> {
 }
 
 export type { ItemWithStacks } from "./hydrate-item-stacks";
-export { hydrateItemStacks } from "./hydrate-item-stacks";
+// `hydrateItemStacks` is intentionally not re-exported. Importing it from this
+// module would let `mock.module(".../music-item-creator")` (used by ingest
+// tests) shadow the real implementation, which then breaks unrelated tests
+// that import the helper from `./hydrate-item-stacks` directly. New code
+// should import it from `./hydrate-item-stacks`.
 
 /** Fetch a single full item by its id, including stacks and all links. */
 export async function fetchFullItem(id: number): Promise<MusicItemFull | null> {
