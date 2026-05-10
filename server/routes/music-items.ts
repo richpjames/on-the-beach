@@ -21,8 +21,8 @@ import {
   getOrCreateArtist,
   createMusicItemFromUrl,
   createMusicItemDirect,
-  hydrateItemStacks,
 } from "../music-item-creator";
+import { hydrateItemStacks } from "../hydrate-item-stacks";
 import { UnsupportedMusicLinkError } from "../scraper";
 import { fetchAndStoreSuggestion } from "../suggestions";
 import type {
