@@ -142,6 +142,39 @@ describe("parseUrl - nts", () => {
   });
 });
 
+describe("parseUrl - pitchfork", () => {
+  test("identifies a Pitchfork album review URL", () => {
+    const result = parseUrl(
+      "https://pitchfork.com/reviews/albums/mahito-yokota-koji-kondo-super-mario-galaxy-super-mario-galaxy-2/",
+    );
+
+    expect(result.source).toBe("pitchfork");
+    expect(result.normalizedUrl).toBe(
+      "https://pitchfork.com/reviews/albums/mahito-yokota-koji-kondo-super-mario-galaxy-super-mario-galaxy-2/",
+    );
+  });
+
+  test("does not extract artist or title from the slug (ambiguous)", () => {
+    const result = parseUrl(
+      "https://pitchfork.com/reviews/albums/mahito-yokota-koji-kondo-super-mario-galaxy-super-mario-galaxy-2/",
+    );
+
+    expect(result.potentialArtist).toBeUndefined();
+    expect(result.potentialTitle).toBeUndefined();
+  });
+
+  test("matches www.pitchfork.com hosts and strips query params", () => {
+    const result = parseUrl(
+      "https://www.pitchfork.com/reviews/albums/some-artist-some-album/?utm_source=twitter",
+    );
+
+    expect(result.source).toBe("pitchfork");
+    expect(result.normalizedUrl).toBe(
+      "https://www.pitchfork.com/reviews/albums/some-artist-some-album/",
+    );
+  });
+});
+
 describe("parseUrl - apple music", () => {
   test("identifies apple music release link and extracts title", () => {
     const result = parseUrl("https://music.apple.com/es/album/el-poder-verde/1810282984?l=en-GB");

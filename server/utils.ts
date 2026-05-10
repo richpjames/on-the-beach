@@ -82,6 +82,13 @@ const URL_PATTERNS: Array<{
       potentialTitle: match[2]?.replace(/-/g, " "),
     }),
   },
+  {
+    // Pitchfork review slugs concatenate artist(s) and album with hyphens, so
+    // they can't be split reliably from the URL alone — leave artist/title for
+    // the page scraper to recover from OG tags / JSON-LD.
+    source: "pitchfork",
+    pattern: /^https?:\/\/(?:www\.)?pitchfork\.com\/reviews\/albums\/[^/?]+/,
+  },
 ];
 
 function stripMobileSubdomain(url: string): string {
