@@ -15,6 +15,8 @@ import {
   extractMixcloudEmbedUrl,
   searchAppleMusic,
   parseNtsOg,
+  parsePitchforkOg,
+  parsePitchforkJsonLd,
   parseCanonicalUrl,
 } from "../../server/scraper";
 
@@ -305,6 +307,79 @@ describe("parseMixcloudJsonLd", () => {
   });
 });
 
+describe("parsePitchforkOg", () => {
+  test("splits single-artist 'Artist: Album Album Review | Pitchfork' format", () => {
+    const result = parsePitchforkOg({
+      ogTitle: "Water From Your Eyes: It's a Beautiful Place Album Review | Pitchfork",
+      ogImage: "https://media.pitchfork.com/photos/cover.jpg",
+    });
+
+    expect(result.potentialArtist).toBe("Water From Your Eyes");
+    expect(result.potentialTitle).toBe("It's a Beautiful Place");
+    expect(result.imageUrl).toBe("https://media.pitchfork.com/photos/cover.jpg");
+    expect(result.itemType).toBe("album");
+  });
+
+  test("joins multi-artist 'Artist1 / Artist2: Album ...' with a comma", () => {
+    const result = parsePitchforkOg({
+      ogTitle:
+        "Mahito Yokota / Koji Kondo: Super Mario Galaxy / Super Mario Galaxy 2 Album Review | Pitchfork",
+    });
+
+    expect(result.potentialArtist).toBe("Mahito Yokota, Koji Kondo");
+    expect(result.potentialTitle).toBe("Super Mario Galaxy / Super Mario Galaxy 2");
+  });
+
+  test("falls back to the full stripped title when no colon is present", () => {
+    const result = parsePitchforkOg({ ogTitle: "Some Page | Pitchfork" });
+    expect(result.potentialArtist).toBeUndefined();
+    expect(result.potentialTitle).toBe("Some Page");
+  });
+});
+
+describe("parsePitchforkJsonLd", () => {
+  test("extracts artist, album, and year from a Review/MusicAlbum JSON-LD", () => {
+    const html = `
+      <html><head>
+        <script type="application/ld+json">
+          {
+            "@context":"https://schema.org",
+            "@type":"Review",
+            "itemReviewed":{
+              "@type":"MusicAlbum",
+              "name":"Super Mario Galaxy / Super Mario Galaxy 2",
+              "byArtist":[
+                {"@type":"MusicGroup","name":"Mahito Yokota"},
+                {"@type":"MusicGroup","name":"Koji Kondo"}
+              ],
+              "datePublished":"2025-04-22",
+              "image":"https://media.pitchfork.com/photos/cover.jpg"
+            }
+          }
+        </script>
+      </head></html>
+    `;
+
+    const result = parsePitchforkJsonLd(html);
+    expect(result.potentialArtist).toBe("Mahito Yokota, Koji Kondo");
+    expect(result.potentialTitle).toBe("Super Mario Galaxy / Super Mario Galaxy 2");
+    expect(result.year).toBe(2025);
+    expect(result.imageUrl).toBe("https://media.pitchfork.com/photos/cover.jpg");
+    expect(result.itemType).toBe("album");
+  });
+
+  test("returns empty object when no Review JSON-LD present", () => {
+    const html = `
+      <html><head>
+        <script type="application/ld+json">{"@type":"WebPage","name":"Pitchfork"}</script>
+      </head></html>
+    `;
+    const result = parsePitchforkJsonLd(html);
+    expect(result.potentialArtist).toBeUndefined();
+    expect(result.potentialTitle).toBeUndefined();
+  });
+});
+
 describe("parseDefaultOg", () => {
   test("uses og:title as potentialTitle", () => {
     const result = parseDefaultOg({
@@ -501,6 +576,75 @@ describe("scrapeUrl", () => {
     expect(result!.potentialTitle).toBe("new rap music january 2026");
     expect(result!.potentialArtist).toBe("andrew");
     expect(result!.imageUrl).toBe("https://mixcloud.com/cover.jpg");
+    mock.restore();
+  });
+
+  test("prefers Pitchfork JSON-LD over og:title for multi-artist reviews", async () => {
+    const html = `
+      <html><head>
+        <meta property="og:title" content="Mahito Yokota / Koji Kondo: Super Mario Galaxy / Super Mario Galaxy 2 Album Review | Pitchfork" />
+        <meta property="og:image" content="https://media.pitchfork.com/photos/og-cover.jpg" />
+        <script type="application/ld+json">
+          {
+            "@context":"https://schema.org",
+            "@type":"Review",
+            "itemReviewed":{
+              "@type":"MusicAlbum",
+              "name":"Super Mario Galaxy / Super Mario Galaxy 2",
+              "byArtist":[
+                {"@type":"MusicGroup","name":"Mahito Yokota"},
+                {"@type":"MusicGroup","name":"Koji Kondo"}
+              ],
+              "datePublished":"2025-04-22"
+            }
+          }
+        </script>
+      </head><body></body></html>
+    `;
+
+    spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      new Response(html, {
+        headers: { "content-type": "text/html; charset=utf-8" },
+      }),
+    );
+
+    const result = await scrapeUrl(
+      "https://pitchfork.com/reviews/albums/mahito-yokota-koji-kondo-super-mario-galaxy-super-mario-galaxy-2/",
+      "pitchfork",
+    );
+
+    expect(result).not.toBeNull();
+    expect(result!.potentialArtist).toBe("Mahito Yokota, Koji Kondo");
+    expect(result!.potentialTitle).toBe("Super Mario Galaxy / Super Mario Galaxy 2");
+    expect(result!.year).toBe(2025);
+    expect(result!.imageUrl).toBe("https://media.pitchfork.com/photos/og-cover.jpg");
+    expect(result!.itemType).toBe("album");
+    mock.restore();
+  });
+
+  test("falls back to Pitchfork og:title when JSON-LD is missing", async () => {
+    const html = `
+      <html><head>
+        <meta property="og:title" content="Water From Your Eyes: It&#39;s a Beautiful Place Album Review | Pitchfork" />
+        <meta property="og:image" content="https://media.pitchfork.com/photos/og-cover.jpg" />
+      </head><body></body></html>
+    `;
+
+    spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      new Response(html, {
+        headers: { "content-type": "text/html; charset=utf-8" },
+      }),
+    );
+
+    const result = await scrapeUrl(
+      "https://pitchfork.com/reviews/albums/water-from-your-eyes-its-a-beautiful-place/",
+      "pitchfork",
+    );
+
+    expect(result).not.toBeNull();
+    expect(result!.potentialArtist).toBe("Water From Your Eyes");
+    expect(result!.potentialTitle).toBe("It's a Beautiful Place");
+    expect(result!.imageUrl).toBe("https://media.pitchfork.com/photos/og-cover.jpg");
     mock.restore();
   });
 
