@@ -1,10 +1,11 @@
-import { eq, and } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { assign, createActor, fromPromise, setup, waitFor } from "xstate";
 import { db } from "./db/index";
 import { musicItems, artists, musicLinks, sources, musicItemStacks, stacks } from "./db/schema";
 import { parseUrl, isValidUrl, normalize, capitalize } from "./utils";
 import { scrapeUrl, UnsupportedMusicLinkError } from "./scraper";
 import { pickPrimaryReleaseCandidate } from "./link-extractor";
+import { fullItemSelect } from "./queries/full-item-select";
 import type {
   AmbiguousLinkPayload,
   CreateMusicItemInput,
@@ -17,52 +18,11 @@ import type {
 // Helpers (moved from routes/music-items.ts for shared use)
 // ---------------------------------------------------------------------------
 
-/**
- * Build the "full" music-item query that joins artists, primary music_link,
- * and sources to produce the MusicItemFull shape the frontend expects.
- */
-export function fullItemSelect() {
-  return db
-    .select({
-      id: musicItems.id,
-      title: musicItems.title,
-      normalized_title: musicItems.normalizedTitle,
-      item_type: musicItems.itemType,
-      artist_id: musicItems.artistId,
-      listen_status: musicItems.listenStatus,
-      purchase_intent: musicItems.purchaseIntent,
-      price_cents: musicItems.priceCents,
-      currency: musicItems.currency,
-      notes: musicItems.notes,
-      rating: musicItems.rating,
-      created_at: musicItems.createdAt,
-      updated_at: musicItems.updatedAt,
-      listened_at: musicItems.listenedAt,
-      artwork_url: musicItems.artworkUrl,
-      is_physical: musicItems.isPhysical,
-      physical_format: musicItems.physicalFormat,
-      label: musicItems.label,
-      year: musicItems.year,
-      country: musicItems.country,
-      genre: musicItems.genre,
-      catalogue_number: musicItems.catalogueNumber,
-      musicbrainz_release_id: musicItems.musicbrainzReleaseId,
-      musicbrainz_artist_id: musicItems.musicbrainzArtistId,
-      artist_name: artists.name,
-      primary_url: musicLinks.url,
-      primary_source: sources.name,
-      primary_link_metadata: musicLinks.metadata,
-      remind_at: musicItems.remindAt,
-      reminder_pending: musicItems.reminderPending,
-    })
-    .from(musicItems)
-    .leftJoin(artists, eq(musicItems.artistId, artists.id))
-    .leftJoin(
-      musicLinks,
-      and(eq(musicLinks.musicItemId, musicItems.id), eq(musicLinks.isPrimary, true)),
-    )
-    .leftJoin(sources, eq(musicLinks.sourceId, sources.id));
-}
+// Re-exported for backwards compatibility — see ./queries/full-item-select.ts
+// for the actual implementation. New code should prefer importing it from
+// there directly so that mocking this module in tests doesn't accidentally
+// break SSR paths that need the real query builder.
+export { fullItemSelect };
 
 /** Look up an existing artist by normalized name, or create a new one. */
 export async function getOrCreateArtist(name: string): Promise<number> {

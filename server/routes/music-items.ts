@@ -67,7 +67,7 @@ const DIRECT_UPDATE_FIELDS: ReadonlyArray<
   "musicbrainzArtistId",
 ];
 
-async function collectDescendantStackIds(rootStackId: number): Promise<number[]> {
+export async function collectDescendantStackIds(rootStackId: number): Promise<number[]> {
   const links = await db
     .select({
       parentStackId: stackParents.parentStackId,
