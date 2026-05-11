@@ -123,6 +123,42 @@ Coolify deployment runbook: `docs/deployment/coolify-alpha.md`
 
 The app ships as a single Docker container (Dockerfile builds the frontend and starts the Bun server). Use `Dockerfile` build pack, port `3000`, and mount persistent volumes for the database and uploads directories.
 
+## Querying Production From Local
+
+`bun run db:prod -- "<sql>"` runs a **read-only** SQL query against the prod SQLite DB over SSH and returns JSON. Intended for ad-hoc inspection by humans or agents. Writes are refused at three layers (local policy check, SSH-side `sqlite3 -readonly`, plus the engine-level file mode).
+
+**One-time setup:**
+
+1. Add an SSH alias to `~/.ssh/config` for the Coolify host:
+
+   ```
+   Host prod-otb
+     HostName <your-coolify-host>
+     User <ssh-user>
+     IdentityFile ~/.ssh/id_ed25519
+   ```
+
+   Verify with `ssh prod-otb echo ok`.
+
+2. Create `.env.local` at the repo root (gitignored — bun auto-loads it):
+
+   ```
+   PROD_DB_HOST=prod-otb
+   PROD_DB_PATH=/var/lib/docker/volumes/<coolify-volume-name>/_data/on_the_beach.db
+   ```
+
+   Find the exact volume path: `ssh prod-otb 'docker volume ls | grep on-the-beach'` then `ssh prod-otb 'docker volume inspect <name> --format {{.Mountpoint}}'`.
+
+**Usage:**
+
+```bash
+bun run db:prod -- "SELECT name FROM sqlite_master WHERE type='table'"
+bun run db:prod -- "SELECT id, title FROM items ORDER BY created_at DESC LIMIT 10"
+bun run db:prod -- --help
+```
+
+Output is JSON on stdout. Errors and truncation warnings are single-line JSON on stderr. Output is capped at 1 MB to avoid swamping agent context windows — use `LIMIT` and refined `WHERE` clauses.
+
 ## Repo Documentation
 
 Short repo guides now live under `docs/areas/`.

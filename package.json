@@ -19,6 +19,7 @@
     "db:migrate": "drizzle-kit migrate",
     "db:studio": "drizzle-kit studio",
     "db:seed": "bun server/db/seed.ts",
+    "db:prod": "bun scripts/db-prod.ts",
     "lint": "oxlint",
     "format": "oxfmt --write",
     "format:check": "oxfmt --check",
