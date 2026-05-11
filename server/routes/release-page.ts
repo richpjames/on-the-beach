@@ -171,21 +171,27 @@ function reminderDateValue(item: MusicItemFull): string {
     const d = new Date(item.remind_at as unknown as string | Date);
     return d.toISOString().slice(0, 10);
   }
-  if (item.year) {
-    return `${item.year}-01-01`;
-  }
-  return "";
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  const yyyy = tomorrow.getFullYear();
+  const mm = String(tomorrow.getMonth() + 1).padStart(2, "0");
+  const dd = String(tomorrow.getDate()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd}`;
 }
 
 function renderReleasePage(item: MusicItemFull, cssHref: string): string {
+  const isScheduled = item.remind_at != null;
+  const displayedStatus = isScheduled ? "scheduled" : item.listen_status;
   const statusOptions = [
     { value: "to-listen", label: "To Listen" },
     { value: "listened", label: "Listened" },
+    ...(isScheduled ? [{ value: "scheduled", label: "Scheduled" }] : []),
   ]
-    .map(
-      ({ value, label }) =>
-        `<option value="${value}"${item.listen_status === value ? " selected" : ""}>${label}</option>`,
-    )
+    .map(({ value, label }) => {
+      const selected = displayedStatus === value ? " selected" : "";
+      const disabled = value === "scheduled" ? " disabled" : "";
+      return `<option value="${value}"${selected}${disabled}>${label}</option>`;
+    })
     .join("");
 
   const metaFields = [item.year ? String(item.year) : null, item.label, item.country, item.genre]
@@ -331,6 +337,51 @@ function renderReleasePage(item: MusicItemFull, cssHref: string): string {
     </div>
     <script>
       const ITEM_ID = ${item.id};
+      let currentListenStatus = ${JSON.stringify(item.listen_status)};
+      let currentRemindAt = ${JSON.stringify(item.remind_at ? new Date(item.remind_at as unknown as string | Date).toISOString() : null)};
+
+      function syncStatusDropdown() {
+        const select = document.getElementById('status-select');
+        if (!select) return;
+        const existing = select.querySelector('option[value="scheduled"]');
+        if (currentRemindAt && !existing) {
+          const opt = document.createElement('option');
+          opt.value = 'scheduled';
+          opt.textContent = 'Scheduled';
+          opt.disabled = true;
+          select.appendChild(opt);
+        } else if (!currentRemindAt && existing) {
+          existing.remove();
+        }
+        select.value = currentRemindAt ? 'scheduled' : currentListenStatus;
+      }
+
+      function ensureClearReminderBtn() {
+        if (document.getElementById('clear-reminder-btn')) return;
+        const setBtn = document.getElementById('set-reminder-btn');
+        if (!setBtn) return;
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'btn';
+        btn.id = 'clear-reminder-btn';
+        btn.textContent = 'Clear';
+        btn.addEventListener('click', clearReminder);
+        setBtn.insertAdjacentElement('afterend', btn);
+      }
+
+      async function clearReminder() {
+        const res = await fetch('/api/music-items/' + ITEM_ID + '/reminder', { method: 'DELETE' });
+        if (!res.ok) {
+          alert('Failed to clear reminder');
+          syncStatusDropdown();
+          return;
+        }
+        currentRemindAt = null;
+        const input = document.getElementById('remind-at');
+        if (input) input.value = '';
+        document.getElementById('clear-reminder-btn')?.remove();
+        syncStatusDropdown();
+      }
 
       // Init player if not already loaded (direct page load vs SPA navigation)
       if (!window.__player) {
@@ -470,12 +521,19 @@ function renderReleasePage(item: MusicItemFull, cssHref: string): string {
       });
 
       document.getElementById('status-select').addEventListener('change', async (e) => {
+        const newStatus = e.target.value;
+        if (newStatus === 'scheduled') return;
+        const wasScheduled = currentRemindAt !== null;
         const res = await fetch('/api/music-items/' + ITEM_ID, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ listenStatus: e.target.value }),
+          body: JSON.stringify({ listenStatus: newStatus }),
         });
-        if (!res.ok) alert('Failed to update status.');
+        if (!res.ok) { alert('Failed to update status.'); return; }
+        currentListenStatus = newStatus;
+        if (wasScheduled) {
+          await clearReminder();
+        }
       });
 
       document.getElementById('delete-btn').addEventListener('click', async () => {
@@ -856,6 +914,9 @@ function renderReleasePage(item: MusicItemFull, cssHref: string): string {
         });
         if (!res.ok) { alert('Failed to set reminder'); return; }
         input.dataset.saved = remindAt;
+        currentRemindAt = new Date(remindAt).toISOString();
+        ensureClearReminderBtn();
+        syncStatusDropdown();
         const originalText = btn.textContent;
         btn.textContent = 'Saved!';
         btn.classList.add('btn--saved');
@@ -865,12 +926,7 @@ function renderReleasePage(item: MusicItemFull, cssHref: string): string {
         }, 2000);
       });
 
-      document.getElementById('clear-reminder-btn')?.addEventListener('click', async () => {
-        const res = await fetch('/api/music-items/' + ITEM_ID + '/reminder', { method: 'DELETE' });
-        if (!res.ok) { alert('Failed to clear reminder'); return; }
-        document.getElementById('remind-at').value = '';
-        document.getElementById('clear-reminder-btn').remove();
-      });
+      document.getElementById('clear-reminder-btn')?.addEventListener('click', clearReminder);
     </script>
   </body>
 </html>`;
