@@ -111,6 +111,51 @@ describe("GET /r/:id", () => {
     expect(html).toContain("selected");
   });
 
+  test("status select omits Scheduled option when no reminder is set", async () => {
+    mockFetchItem.mockResolvedValue(baseItem);
+    const app = makeApp();
+    const res = await app.request("http://localhost/r/42");
+    const html = await res.text();
+    expect(html).not.toContain('<option value="scheduled"');
+  });
+
+  test("status select shows Scheduled as the disabled+selected option when reminder is set", async () => {
+    mockFetchItem.mockResolvedValue({
+      ...baseItem,
+      remind_at: new Date("2026-06-15T00:00:00.000Z"),
+    });
+    const app = makeApp();
+    const res = await app.request("http://localhost/r/42");
+    const html = await res.text();
+    expect(html).toContain('<option value="scheduled" selected disabled>Scheduled</option>');
+    expect(html).toContain('<option value="to-listen">To Listen</option>');
+  });
+
+  test("status select shows Scheduled regardless of underlying listen_status", async () => {
+    mockFetchItem.mockResolvedValue({
+      ...baseItem,
+      listen_status: "listened" as const,
+      remind_at: new Date("2026-06-15T00:00:00.000Z"),
+    });
+    const app = makeApp();
+    const res = await app.request("http://localhost/r/42");
+    const html = await res.text();
+    expect(html).toContain('<option value="scheduled" selected disabled>Scheduled</option>');
+    expect(html).toContain('<option value="listened">Listened</option>');
+  });
+
+  test("inline script exposes current state for dropdown sync", async () => {
+    mockFetchItem.mockResolvedValue({
+      ...baseItem,
+      remind_at: new Date("2026-06-15T00:00:00.000Z"),
+    });
+    const app = makeApp();
+    const res = await app.request("http://localhost/r/42");
+    const html = await res.text();
+    expect(html).toContain('let currentListenStatus = "to-listen"');
+    expect(html).toContain('let currentRemindAt = "2026-06-15T00:00:00.000Z"');
+  });
+
   test("escapes HTML special characters in title", async () => {
     mockFetchItem.mockResolvedValue({
       ...baseItem,
@@ -416,12 +461,17 @@ describe("YouTube embed", () => {
     expect(html).toContain("Remind me");
   });
 
-  test("prefills reminder date from item year when available", async () => {
+  test("prefills reminder date with tomorrow when no remind_at is set", async () => {
     mockFetchItem.mockResolvedValue({ ...baseItem, year: 2026, remind_at: null });
     const app = makeApp();
     const res = await app.request("http://localhost/r/42");
     const html = await res.text();
-    expect(html).toContain('value="2026-01-01"');
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const yyyy = tomorrow.getFullYear();
+    const mm = String(tomorrow.getMonth() + 1).padStart(2, "0");
+    const dd = String(tomorrow.getDate()).padStart(2, "0");
+    expect(html).toContain(`value="${yyyy}-${mm}-${dd}"`);
   });
 
   test("prefills reminder date from remind_at when set", async () => {
