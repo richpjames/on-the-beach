@@ -79,7 +79,9 @@
       "mcp__plugin_playwright_playwright__browser_snapshot",
       "Bash(pkill -f \"bun --watch server/index.ts\")",
       "Bash(npm test:*)",
-      "Read(//tmp/**)"
+      "Read(//tmp/**)",
+      "Bash(echo \"exit=$?\")",
+      "Bash(grep -E \"Host |HostName \" ~/.ssh/config 2>/dev/null | head -30)"
     ]
   },
   "remote": {
