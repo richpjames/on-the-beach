@@ -2390,6 +2390,7 @@ a:hover {
 .release-page__edit-stacks-list {
   flex: 1;
   overflow-y: auto;
+  max-height: 300px;
 }
 
 .release-page__edit-stacks-new {
