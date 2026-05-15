@@ -1,11 +1,11 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import * as fs from "node:fs";
 
-// Attempt to isolate from the dev DB. Earlier test files in the run may already
-// have imported `server/db/index` with the default path, in which case this
-// assignment is ignored — so every test below also cleans up the rows it inserts.
+// Force-set (not `??=`) so an ambient DATABASE_PATH from the shell can't
+// redirect us at a live DB — `processReminders` runs an unfiltered UPDATE that
+// would otherwise mutate every overdue row in whatever DB it hits.
 const TEST_DB = `/tmp/reminders-test-${Date.now()}-${Math.random().toString(36).slice(2)}.db`;
-process.env.DATABASE_PATH ??= TEST_DB;
+process.env.DATABASE_PATH = TEST_DB;
 for (const suffix of ["", "-shm", "-wal"]) {
   try {
     fs.rmSync(TEST_DB + suffix, { force: true });
