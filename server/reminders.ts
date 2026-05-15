@@ -15,7 +15,12 @@ export async function processReminders(): Promise<void> {
   const ids = overdue.map((r) => r.id);
   await db
     .update(musicItems)
-    .set({ listenStatus: "to-listen", reminderPending: true, updatedAt: new Date() })
+    .set({
+      listenStatus: "to-listen",
+      reminderPending: true,
+      updatedAt: now,
+      addedToListenAt: now,
+    })
     .where(and(lte(musicItems.remindAt, now), eq(musicItems.reminderPending, false)));
 
   console.log(`[reminders] processed ${ids.length} overdue reminder(s): [${ids.join(", ")}]`);

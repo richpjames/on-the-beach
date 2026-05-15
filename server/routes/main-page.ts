@@ -106,7 +106,7 @@ async function fetchInitialItems(stackId: number | null): Promise<MusicItemFull[
     baseQuery = baseQuery.where(inArray(musicItems.id, itemIds));
   }
 
-  const items = await baseQuery.orderBy(desc(musicItems.createdAt), desc(musicItems.id));
+  const items = await baseQuery.orderBy(desc(musicItems.addedToListenAt), desc(musicItems.id));
 
   if (items.length === 0) return [];
 
