@@ -278,9 +278,10 @@ musicItemRoutes.get("/", async (c) => {
       dir === "asc" ? asc(musicItems.id) : desc(musicItems.id),
     );
   } else {
-    // date-added (default)
+    // date-added (default) — sorts by addedToListenAt so cron-fired reminders
+    // bubble to the top of the to-listen list as if freshly added.
     query = query.orderBy(
-      dir === "asc" ? asc(musicItems.createdAt) : desc(musicItems.createdAt),
+      dir === "asc" ? asc(musicItems.addedToListenAt) : desc(musicItems.addedToListenAt),
       dir === "asc" ? asc(musicItems.id) : desc(musicItems.id),
     );
   }

@@ -42,6 +42,9 @@ export const musicItems = sqliteTable(
     updatedAt: integer("updated_at", { mode: "timestamp" })
       .notNull()
       .$defaultFn(() => new Date()),
+    addedToListenAt: integer("added_to_listen_at", { mode: "timestamp" })
+      .notNull()
+      .$defaultFn(() => new Date()),
     listenedAt: integer("listened_at", { mode: "timestamp" }),
     artworkUrl: text("artwork_url"),
     isPhysical: integer("is_physical", { mode: "boolean" }).notNull().default(false),
@@ -61,6 +64,7 @@ export const musicItems = sqliteTable(
     index("idx_music_items_purchase_intent").on(table.purchaseIntent),
     index("idx_music_items_artist_id").on(table.artistId),
     index("idx_music_items_created_at").on(table.createdAt),
+    index("idx_music_items_added_to_listen_at").on(table.addedToListenAt),
   ],
 );
 
