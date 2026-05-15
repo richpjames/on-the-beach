@@ -119,4 +119,53 @@ describe("processReminders", () => {
     const bumped = row?.addedToListenAt instanceof Date ? row.addedToListenAt.getTime() : 0;
     expect(bumped).toBe(past.getTime());
   });
+
+  // An item that was already marked "listened" but still has an overdue
+  // `remindAt` (e.g. user listened early but kept the future reminder) is
+  // intentionally flipped back to "to-listen" so the reminder still surfaces it.
+  test("flips a listened item back to to-listen when its reminder fires", async () => {
+    const { db } = await import("../../server/db/index");
+    const { musicItems } = await import("../../server/db/schema");
+    const { processReminders } = await import("../../server/reminders");
+    const { eq } = await import("drizzle-orm");
+
+    const past = new Date("2020-03-01T00:00:00Z");
+    const dueAt = new Date(Date.now() - 60_000);
+
+    const [inserted] = await db
+      .insert(musicItems)
+      .values({
+        title: "Previously listened",
+        normalizedTitle: "previously listened",
+        listenStatus: "listened",
+        createdAt: past,
+        updatedAt: past,
+        addedToListenAt: past,
+        remindAt: dueAt,
+        reminderPending: false,
+      })
+      .returning({ id: musicItems.id });
+    insertedItemIds.push(inserted.id);
+
+    const before = Date.now() - 1000;
+    await processReminders();
+    const after = Date.now() + 1000;
+
+    const row = await db
+      .select({
+        listenStatus: musicItems.listenStatus,
+        reminderPending: musicItems.reminderPending,
+        addedToListenAt: musicItems.addedToListenAt,
+      })
+      .from(musicItems)
+      .where(eq(musicItems.id, inserted.id))
+      .get();
+
+    expect(row?.listenStatus).toBe("to-listen");
+    expect(row?.reminderPending).toBe(true);
+
+    const bumped = row?.addedToListenAt instanceof Date ? row.addedToListenAt.getTime() : 0;
+    expect(bumped).toBeGreaterThanOrEqual(before);
+    expect(bumped).toBeLessThanOrEqual(after);
+  });
 });
