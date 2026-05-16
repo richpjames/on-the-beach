@@ -573,12 +573,30 @@ select.input {
 }
 
 .stack-bar {
-  display: flex;
+  display: grid;
+  grid-template-rows: repeat(2, auto);
+  grid-auto-flow: column;
+  grid-auto-columns: max-content;
+  align-items: end;
+  align-content: end;
+  justify-content: start;
   gap: 2px;
-  flex-wrap: wrap;
-  align-items: flex-end;
   background: var(--chrome);
   padding: 4px 4px 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+
+.stack-bar::-webkit-scrollbar {
+  display: none;
+}
+
+.stack-bar > [data-stack="all"] {
+  grid-column: 1;
+  grid-row: 1;
 }
 
 .stack-tab {
@@ -594,7 +612,7 @@ select.input {
   cursor: pointer;
   transition: none;
   position: relative;
-  top: 2px;
+  top: 0;
 }
 
 .stack-tab:hover {
@@ -612,7 +630,8 @@ select.input {
 
 .stack-tab--manage {
   padding: 2px 8px;
-  margin-left: auto;
+  grid-column: 1;
+  grid-row: 2;
 }
 
 .stack-tab--delete {
@@ -630,7 +649,69 @@ select.input {
 }
 
 .stack-scrollbar {
-  display: none;
+  display: grid;
+  grid-template-columns: 19px minmax(0, 1fr) 19px;
+  align-items: stretch;
+  background: #d4d4d4;
+  border-top: 1px solid #7b7b7b;
+}
+
+.stack-scrollbar__button {
+  width: 19px;
+  height: 19px;
+  border-width: 2px;
+  border-style: solid;
+  border-color: #ffffff #565656 #111111 #ffffff;
+  background: #c6c6c6;
+  color: #111111;
+  font-size: 9px;
+  line-height: 1;
+  font-family: "Tahoma", sans-serif;
+  padding: 0;
+  cursor: pointer;
+}
+
+.stack-scrollbar__button:active {
+  border-color: #565656 #ffffff #ffffff #565656;
+}
+
+.stack-scrollbar__track {
+  position: relative;
+  min-width: 0;
+  background-color: #d9d9d9;
+  background-image:
+    radial-gradient(#b5b5b5 0.75px, transparent 0.85px),
+    radial-gradient(#f1f1f1 0.75px, transparent 0.85px);
+  background-size: 2px 2px;
+  background-position:
+    0 0,
+    1px 1px;
+}
+
+.stack-scrollbar__thumb {
+  position: absolute;
+  top: 1px;
+  bottom: 1px;
+  left: 0;
+  min-width: 42px;
+  background: #c4c4c4;
+  border-width: 2px;
+  border-style: solid;
+  border-color: #ffffff #4d4d4d #222222 #ffffff;
+  box-shadow:
+    inset 1px 1px 0 #d9d9d9,
+    inset -1px -1px 0 #9a9a9a;
+  cursor: grab;
+}
+
+.stack-scrollbar__thumb:active {
+  cursor: grabbing;
+}
+
+.stack-scrollbar.is-disabled .stack-scrollbar__thumb,
+.stack-scrollbar.is-disabled .stack-scrollbar__button {
+  opacity: 0.45;
+  cursor: default;
 }
 
 /* ═══════════════════════════════════════════════════
@@ -1022,102 +1103,6 @@ select.input {
 
   body:not(.release-page-body) .main {
     flex: 0 0 auto;
-  }
-
-  .stack-bar {
-    display: grid;
-    grid-template-rows: repeat(2, auto);
-    grid-auto-flow: column;
-    grid-auto-columns: max-content;
-    align-items: end;
-    align-content: end;
-    justify-content: start;
-    overflow-x: auto;
-    overflow-y: hidden;
-    overscroll-behavior-x: contain;
-    -webkit-overflow-scrolling: touch;
-    scrollbar-width: none;
-  }
-
-  .stack-bar::-webkit-scrollbar {
-    display: none;
-  }
-
-  .stack-bar > [data-stack="all"] {
-    grid-column: 1;
-    grid-row: 1;
-  }
-
-  .stack-tab--manage {
-    grid-column: 1;
-    grid-row: 2;
-    margin-left: 0;
-  }
-
-  .stack-scrollbar {
-    display: grid;
-    grid-template-columns: 19px minmax(0, 1fr) 19px;
-    align-items: stretch;
-    background: #d4d4d4;
-    border-top: 1px solid #7b7b7b;
-  }
-
-  .stack-scrollbar__button {
-    width: 19px;
-    height: 19px;
-    border-width: 2px;
-    border-style: solid;
-    border-color: #ffffff #565656 #111111 #ffffff;
-    background: #c6c6c6;
-    color: #111111;
-    font-size: 9px;
-    line-height: 1;
-    font-family: "Tahoma", sans-serif;
-    padding: 0;
-    cursor: pointer;
-  }
-
-  .stack-scrollbar__button:active {
-    border-color: #565656 #ffffff #ffffff #565656;
-  }
-
-  .stack-scrollbar__track {
-    position: relative;
-    min-width: 0;
-    background-color: #d9d9d9;
-    background-image:
-      radial-gradient(#b5b5b5 0.75px, transparent 0.85px),
-      radial-gradient(#f1f1f1 0.75px, transparent 0.85px);
-    background-size: 2px 2px;
-    background-position:
-      0 0,
-      1px 1px;
-  }
-
-  .stack-scrollbar__thumb {
-    position: absolute;
-    top: 1px;
-    bottom: 1px;
-    left: 0;
-    min-width: 42px;
-    background: #c4c4c4;
-    border-width: 2px;
-    border-style: solid;
-    border-color: #ffffff #4d4d4d #222222 #ffffff;
-    box-shadow:
-      inset 1px 1px 0 #d9d9d9,
-      inset -1px -1px 0 #9a9a9a;
-    cursor: grab;
-  }
-
-  .stack-scrollbar__thumb:active {
-    cursor: grabbing;
-  }
-
-  .stack-scrollbar.is-disabled .stack-scrollbar__thumb,
-  .stack-scrollbar.is-disabled .stack-scrollbar__button {
-    opacity: 0.45;
-    cursor: default;
   }
 
   .music-scrollbar {

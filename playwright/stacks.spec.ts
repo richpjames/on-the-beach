@@ -131,54 +131,53 @@ test.describe("Stacks", () => {
     await expect(page.locator(".stack-tab[data-stack='all']")).toHaveClass(/active/);
   });
 
-  test("keeps the stack bar to two rows and scrolls on mobile when many stacks exist", async ({
-    page,
-  }) => {
-    await page.setViewportSize({ width: 390, height: 844 });
-    await page.goto("/");
-    await expect(page.getByPlaceholder("search or paste a link")).toBeVisible();
-
-    await page.locator("#manage-stacks-btn").click();
-    await expect(page.locator(".stack-manage")).toBeVisible();
-
-    for (let index = 1; index <= 12; index += 1) {
-      const stackName = `Long Stack ${index}`;
-      await page.locator("#stack-manage-input").fill(stackName);
-      await page.locator("#stack-manage-create-btn").click();
-      await expect(page.locator(".stack-manage__item", { hasText: stackName })).toBeVisible();
-      await expect(page.locator(".stack-tab", { hasText: stackName })).toHaveCount(1);
-    }
-
-    await expect(page.locator(".stack-tab", { hasText: "Long Stack 12" })).toHaveCount(1);
-    const stackBarMetrics = await page.locator("#stack-bar").evaluate((element) => {
-      const tabs = Array.from(element.querySelectorAll(".stack-tab")).filter((tab) => {
-        const htmlTab = tab as HTMLElement;
-        return !htmlTab.hidden;
-      });
-
-      const topPositions = tabs.map((tab) =>
-        Math.round((tab as HTMLElement).getBoundingClientRect().top),
-      );
-      const rowPositions: number[] = [];
-      const rowTolerance = 4;
-
-      for (const top of topPositions.sort((left, right) => left - right)) {
-        const matchesExistingRow = rowPositions.some(
-          (rowTop) => Math.abs(rowTop - top) <= rowTolerance,
-        );
-
-        if (!matchesExistingRow) {
-          rowPositions.push(top);
-        }
+  for (const { name, width, height } of [
+    { name: "mobile", width: 390, height: 844 },
+    { name: "desktop", width: 1280, height: 800 },
+  ]) {
+    test(`keeps the stack bar to two rows and scrolls on ${name} when many stacks exist`, async ({
+      page,
+      request,
+    }) => {
+      for (let index = 1; index <= 30; index += 1) {
+        await request.post("/api/stacks", { data: { name: `Long Stack ${index}` } });
       }
 
-      return {
-        rowCount: rowPositions.length,
-        scrollsHorizontally: element.scrollWidth > element.clientWidth,
-      };
-    });
+      await page.setViewportSize({ width, height });
+      await page.goto("/");
+      await expect(page.getByPlaceholder("search or paste a link")).toBeVisible();
+      await expect(page.locator(".stack-tab", { hasText: "Long Stack 30" })).toHaveCount(1);
 
-    expect(stackBarMetrics.rowCount).toBeLessThanOrEqual(2);
-    expect(stackBarMetrics.scrollsHorizontally).toBe(true);
-  });
+      const stackBarMetrics = await page.locator("#stack-bar").evaluate((element) => {
+        const tabs = Array.from(element.querySelectorAll(".stack-tab")).filter((tab) => {
+          const htmlTab = tab as HTMLElement;
+          return !htmlTab.hidden;
+        });
+
+        const topPositions = tabs.map((tab) =>
+          Math.round((tab as HTMLElement).getBoundingClientRect().top),
+        );
+        const rowPositions: number[] = [];
+        const rowTolerance = 4;
+
+        for (const top of topPositions.sort((left, right) => left - right)) {
+          const matchesExistingRow = rowPositions.some(
+            (rowTop) => Math.abs(rowTop - top) <= rowTolerance,
+          );
+
+          if (!matchesExistingRow) {
+            rowPositions.push(top);
+          }
+        }
+
+        return {
+          rowCount: rowPositions.length,
+          scrollsHorizontally: element.scrollWidth > element.clientWidth,
+        };
+      });
+
+      expect(stackBarMetrics.rowCount).toBeLessThanOrEqual(2);
+      expect(stackBarMetrics.scrollsHorizontally).toBe(true);
+    });
+  }
 });
