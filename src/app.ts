@@ -964,6 +964,27 @@ async function renderStackBar(): Promise<void> {
 
   syncStackFeedLinks();
   syncCustomStackScrollbar();
+  scrollActiveStackTabIntoView();
+}
+
+function scrollActiveStackTabIntoView(): void {
+  const bar = document.getElementById("stack-bar");
+  if (!(bar instanceof HTMLElement)) {
+    return;
+  }
+
+  const activeBtn = bar.querySelector(".stack-tab.active");
+  if (!(activeBtn instanceof HTMLElement)) {
+    return;
+  }
+
+  const tabLeft = activeBtn.offsetLeft;
+  const tabRight = tabLeft + activeBtn.offsetWidth;
+  if (tabLeft < bar.scrollLeft) {
+    bar.scrollLeft = tabLeft;
+  } else if (tabRight > bar.scrollLeft + bar.clientWidth) {
+    bar.scrollLeft = tabRight - bar.clientWidth;
+  }
 }
 
 function syncStackFeedLinks(): void {
@@ -1152,9 +1173,8 @@ function syncCustomStackScrollbar(): void {
     return;
   }
 
-  const isMobile = window.matchMedia("(max-width: 520px)").matches;
   const scrollRange = stackBarEl.scrollWidth - stackBarEl.clientWidth;
-  const hasOverflow = isMobile && scrollRange > 0;
+  const hasOverflow = scrollRange > 0;
 
   stackBarScrollbarEl.classList.toggle("is-disabled", !hasOverflow);
 
