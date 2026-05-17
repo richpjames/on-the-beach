@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { eq, and, inArray, isNotNull, sql, desc, asc, lte } from "drizzle-orm";
+import { eq, and, inArray, isNotNull, isNull, sql, desc, asc, lte } from "drizzle-orm";
 import { db } from "../db/index";
 import {
   musicItems,
@@ -202,7 +202,10 @@ musicItemRoutes.get("/", async (c) => {
     conditions.push(isNotNull(musicItems.remindAt));
   } else if (listenStatus) {
     const statuses = listenStatus.split(",") as ListenStatus[];
-    conditions.push(inArray(musicItems.listenStatus, statuses));
+    // Scheduled items (remind_at IS NOT NULL) belong to the "Scheduled" filter
+    // only — exclude them from listen-status buckets so a scheduled item never
+    // shows up under "To Listen"/"Listened" with a misleading label.
+    conditions.push(and(inArray(musicItems.listenStatus, statuses), isNull(musicItems.remindAt))!);
   }
 
   if (purchaseIntent) {

@@ -1,5 +1,5 @@
 import { Hono, type Context } from "hono";
-import { eq, inArray, count, asc, desc } from "drizzle-orm";
+import { eq, inArray, count, asc, desc, and, isNull } from "drizzle-orm";
 import { db } from "../db/index";
 import { musicItems, musicItemStacks, stacks, musicItemOrder, stackParents } from "../db/schema";
 import { fullItemSelect } from "../queries/full-item-select";
@@ -89,8 +89,14 @@ async function fetchInitialItems(stackId: number | null): Promise<MusicItemFull[
   // pages the JS view shows all statuses, so the SSR must too — otherwise the
   // first paint shows global to-listen items that get replaced with the real
   // (mixed-status) stack contents a moment later.
+  //
+  // Scheduled items (remind_at IS NOT NULL) are owned by the "Scheduled"
+  // filter — exclude them here so they don't double up under "To Listen" with
+  // a label the release page then contradicts.
   if (filter !== "all") {
-    baseQuery = baseQuery.where(eq(musicItems.listenStatus, filter));
+    baseQuery = baseQuery.where(
+      and(eq(musicItems.listenStatus, filter), isNull(musicItems.remindAt)),
+    );
   }
 
   if (stackId !== null) {

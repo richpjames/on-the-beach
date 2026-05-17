@@ -61,6 +61,43 @@ describe("SSR /", () => {
     }
   });
 
+  test("excludes scheduled items (remind_at set) from the to-listen view", async () => {
+    const { db } = await import("../../server/db/index");
+    const { musicItems } = await import("../../server/db/schema");
+    const { createMainPageRoutes } = await import("../../server/routes/main-page");
+
+    const inserted = await db
+      .insert(musicItems)
+      .values([
+        {
+          title: "ScheduledItem",
+          normalizedTitle: "scheduleditem",
+          listenStatus: "to-listen",
+          remindAt: new Date("2030-01-01T00:00:00Z"),
+        },
+        {
+          title: "PlainToListen",
+          normalizedTitle: "plaintolisten",
+          listenStatus: "to-listen",
+        },
+      ])
+      .returning({ id: musicItems.id, title: musicItems.title });
+
+    const scheduledId = inserted.find((i) => i.title === "ScheduledItem")!.id;
+    const plainId = inserted.find((i) => i.title === "PlainToListen")!.id;
+
+    const app = createMainPageRoutes();
+    const res = await app.request("http://localhost/");
+    const html = await res.text();
+
+    const renderedIds = [
+      ...new Set([...html.matchAll(/data-item-id="(\d+)"/g)].map((m) => Number(m[1]))),
+    ];
+
+    expect(renderedIds).toContain(plainId);
+    expect(renderedIds).not.toContain(scheduledId);
+  });
+
   test("filter-bar marks 'To Listen' as the active filter", async () => {
     const { createMainPageRoutes } = await import("../../server/routes/main-page");
 
