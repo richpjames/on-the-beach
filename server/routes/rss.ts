@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { db } from "../db/index";
 import { musicItems, artists, musicLinks, sources, stacks, musicItemStacks } from "../db/schema";
-import { eq, and, inArray } from "drizzle-orm";
+import { eq, and, inArray, isNull } from "drizzle-orm";
 import type { MusicItemFull } from "../../src/types";
 import type { PrimaryFeedKey } from "../../shared/rss";
 
@@ -268,7 +268,9 @@ async function defaultFetchPrimaryFeedItems(feed: PrimaryFeedKey): Promise<Music
             and(eq(musicLinks.musicItemId, musicItems.id), eq(musicLinks.isPrimary, 1)),
           )
           .leftJoin(sources, eq(sources.id, musicLinks.sourceId))
-          .where(eq(musicItems.listenStatus, feed))
+          // Scheduled items (remind_at IS NOT NULL) belong to the Scheduled
+          // bucket only — keep them out of the to-listen/listened feeds.
+          .where(and(eq(musicItems.listenStatus, feed), isNull(musicItems.remindAt)))
           .orderBy(musicItems.createdAt);
 
   return rows.map((row) => ({
