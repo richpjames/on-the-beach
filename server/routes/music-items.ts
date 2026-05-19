@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { eq, and, inArray, isNotNull, sql, desc, asc, lte } from "drizzle-orm";
+import { eq, and, inArray, sql, desc, asc, lte, gt } from "drizzle-orm";
 import { db } from "../db/index";
 import {
   musicItems,
@@ -16,12 +16,12 @@ import { isValidUrl, normalize } from "../utils";
 import { applyOrder, buildContextKey } from "../../shared/music-list-context";
 import {
   AmbiguousLinkSelectionError,
-  fullItemSelect,
   fetchFullItem,
   getOrCreateArtist,
   createMusicItemFromUrl,
   createMusicItemDirect,
 } from "../music-item-creator";
+import { fullItemSelect } from "../queries/full-item-select";
 import { hydrateItemStacks } from "../hydrate-item-stacks";
 import { UnsupportedMusicLinkError } from "../scraper";
 import { fetchAndStoreSuggestion } from "../suggestions";
@@ -199,7 +199,7 @@ musicItemRoutes.get("/", async (c) => {
   const conditions = [];
 
   if (hasReminder === "true") {
-    conditions.push(isNotNull(musicItems.remindAt));
+    conditions.push(gt(musicItems.remindAt, new Date()));
   } else if (listenStatus) {
     const statuses = listenStatus.split(",") as ListenStatus[];
     conditions.push(inArray(musicItems.listenStatus, statuses));
