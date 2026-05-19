@@ -179,6 +179,7 @@ function readServerState(): { stacks: StackWithCount[] } | null {
 
 function initializeUI(hasServerData: boolean): void {
   setupFilterBar();
+  setupPickRandom();
   setupBrowseControls();
   setupStackBar();
   setupStackManagePanel();
@@ -767,7 +768,7 @@ function setupFilterBar(): void {
 
   filterBar.addEventListener("click", (event) => {
     const target = event.target as HTMLElement;
-    if (!target.classList.contains("filter-btn")) {
+    if (!target.classList.contains("filter-btn") || !target.dataset.filter) {
       return;
     }
 
@@ -776,6 +777,42 @@ function setupFilterBar(): void {
       filter: target.dataset.filter as ListenStatus | "all" | "scheduled",
     });
     syncDateListenedOption();
+  });
+}
+
+function setupPickRandom(): void {
+  const btn = document.getElementById("pick-random-btn");
+  if (!(btn instanceof HTMLButtonElement)) {
+    return;
+  }
+
+  btn.addEventListener("click", async () => {
+    if (btn.disabled) return;
+    const originalText = btn.textContent ?? "🎲 Pick One";
+    btn.disabled = true;
+    try {
+      const filters = buildMusicItemFilters("to-listen", appCtx().currentStack);
+      const result = await api.listMusicItems(filters);
+      if (result.items.length === 0) {
+        btn.textContent = "🎲 Nothing yet";
+        setTimeout(() => {
+          btn.textContent = originalText;
+          btn.disabled = false;
+        }, 1500);
+        return;
+      }
+      const picked = result.items[Math.floor(Math.random() * result.items.length)];
+      const link = document.createElement("a");
+      link.href = `/r/${picked.id}`;
+      link.style.display = "none";
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+    } finally {
+      if (btn.textContent === originalText) {
+        btn.disabled = false;
+      }
+    }
   });
 }
 

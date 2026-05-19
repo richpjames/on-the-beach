@@ -163,12 +163,14 @@ function renderFilterBarButtons(activeFilter: FilterSelection): string {
     { value: "listened", label: "Listened" },
     { value: "scheduled", label: "Scheduled" },
   ];
-  return buttons
+  const filterButtons = buttons
     .map(
       ({ value, label }) =>
         `<button class="filter-btn${value === activeFilter ? " active" : ""}" data-filter="${value}">${label}</button>`,
     )
     .join("\n              ");
+  const pickRandomButton = `<button type="button" id="pick-random-btn" class="filter-btn filter-btn--action" title="Pick a random item from To Listen" aria-label="Pick a random item from To Listen">🎲 Pick One</button>`;
+  return `${filterButtons}\n              ${pickRandomButton}`;
 }
 
 function renderMainPage(opts: {
