@@ -29,6 +29,9 @@ export const test = base.extend<{}, WorkerFixtures>({
         ...process.env,
         NODE_ENV: "test",
         DATABASE_PATH: databasePath,
+        // Block server-side calls to external lookup APIs (iTunes etc.) so
+        // tests never depend on third-party availability or timing.
+        OTB_DISABLE_EXTERNAL_LOOKUPS: "1",
       };
 
       clearDatabaseFiles(databasePath);
