@@ -1152,6 +1152,10 @@ export async function searchAppleMusic(
   artist: string | null,
   timeoutMs = 8000,
 ): Promise<string | null> {
+  // Test environments set this to keep the release page deterministic — the
+  // visual snapshot can't depend on whether iTunes responds in time.
+  if (process.env.OTB_DISABLE_EXTERNAL_LOOKUPS) return null;
+
   try {
     const term = [artist, title].filter(Boolean).join(" ");
     const searchUrl = `https://itunes.apple.com/search?term=${encodeURIComponent(term)}&media=music&entity=album,musicTrack,mix&limit=10`;
