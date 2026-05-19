@@ -776,6 +776,20 @@ select.input {
   font-weight: bold;
 }
 
+.filter-btn--action {
+  margin-left: auto;
+  font-weight: bold;
+}
+
+.filter-btn--action:active:not(:disabled) {
+  border-color: var(--chrome-darker) var(--chrome-white) var(--chrome-white) var(--chrome-darker);
+}
+
+.filter-btn--action:disabled {
+  cursor: default;
+  color: var(--chrome-dark);
+}
+
 .browse-tools {
   display: flex;
   align-items: center;
@@ -1228,6 +1242,10 @@ select.input {
     font-size: 10px;
     padding: 0 8px 0 2px;
     flex-shrink: 0;
+  }
+
+  .filter-btn--action {
+    margin-left: 0;
   }
 
   .browse-controls {
