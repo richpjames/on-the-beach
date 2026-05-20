@@ -233,6 +233,14 @@ async function mockCoverScanRoutes(
     });
   });
 
+  await page.route("**/api/release/apple-music-lookup/*", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ url: null }),
+    });
+  });
+
   await page.route(`**${uploadedArtworkUrl}`, async (route) => {
     await route.fulfill({
       status: 200,
