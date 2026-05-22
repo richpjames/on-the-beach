@@ -2,6 +2,9 @@ import { describe, it, expect, mock, beforeEach, afterEach } from "bun:test";
 import { Hono } from "hono";
 
 const mockCreateMany = mock();
+const mockCreateDirect = mock();
+const mockSaveImage = mock();
+const mockScan = mock();
 
 // Mock the entire music-item-creator module before importing any route.
 // All named exports must be present: bun's mock.module() persists across
@@ -10,7 +13,7 @@ const mockCreateMany = mock();
 mock.module("../../server/music-item-creator", () => ({
   createMusicItemsFromUrl: mockCreateMany,
   createMusicItemFromUrl: mock(),
-  createMusicItemDirect: mock(),
+  createMusicItemDirect: mockCreateDirect,
   fetchFullItem: mock(),
   fullItemSelect: mock(),
   getOrCreateArtist: mock(),
@@ -18,12 +21,12 @@ mock.module("../../server/music-item-creator", () => ({
   AmbiguousLinkSelectionError: class AmbiguousLinkSelectionError extends Error {},
 }));
 
-// Import after mock is set up
-const { ingestRoutes } = await import("../../server/routes/ingest");
+// Import after mocks are set up
+const { createIngestRoutes } = await import("../../server/routes/ingest");
 
 function makeApp() {
   const app = new Hono();
-  app.route("/api/ingest", ingestRoutes);
+  app.route("/api/ingest", createIngestRoutes({ scanPhoto: mockScan, savePhoto: mockSaveImage }));
   return app;
 }
 
@@ -395,5 +398,261 @@ describe("POST /api/ingest/email", () => {
     const body = await res.json();
     expect(body.items_created).toBe(2);
     expect(body.items).toHaveLength(2);
+  });
+});
+
+function makePhotoRequest(
+  app: Hono,
+  body: Record<string, unknown>,
+  opts?: { apiKey?: string; raw?: string },
+) {
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+  };
+  if (opts?.apiKey) {
+    headers.Authorization = `Bearer ${opts.apiKey}`;
+  }
+
+  return app.request("http://localhost/api/ingest/photo", {
+    method: "POST",
+    headers,
+    body: opts?.raw ?? JSON.stringify(body),
+  });
+}
+
+describe("POST /api/ingest/photo", () => {
+  const originalEnv = { ...process.env };
+  const validBase64 = "YWJjZA==";
+
+  beforeEach(() => {
+    process.env.INGEST_API_KEY = "test-secret";
+    delete process.env.INGEST_ENABLED;
+    mockCreateDirect.mockReset();
+    mockSaveImage.mockReset();
+    mockSaveImage.mockResolvedValue("/uploads/abc.jpg");
+    mockScan.mockReset();
+    mockScan.mockResolvedValue(null);
+  });
+
+  afterEach(() => {
+    process.env = { ...originalEnv };
+  });
+
+  it("returns 503 when INGEST_API_KEY is not set", async () => {
+    delete process.env.INGEST_API_KEY;
+    const app = makeApp();
+    const res = await makePhotoRequest(app, { imageBase64: validBase64 }, { apiKey: "anything" });
+    expect(res.status).toBe(503);
+    const body = await res.json();
+    expect(body.error).toBe("Ingest not configured");
+  });
+
+  it("returns 503 when INGEST_ENABLED is false", async () => {
+    process.env.INGEST_ENABLED = "false";
+    const app = makeApp();
+    const res = await makePhotoRequest(
+      app,
+      { imageBase64: validBase64 },
+      { apiKey: "test-secret" },
+    );
+    expect(res.status).toBe(503);
+    const body = await res.json();
+    expect(body.error).toBe("Ingest disabled");
+  });
+
+  it("returns 401 when no Authorization header is provided", async () => {
+    const app = makeApp();
+    const res = await makePhotoRequest(app, { imageBase64: validBase64 });
+    expect(res.status).toBe(401);
+  });
+
+  it("returns 401 when wrong API key is provided", async () => {
+    const app = makeApp();
+    const res = await makePhotoRequest(app, { imageBase64: validBase64 }, { apiKey: "wrong-key" });
+    expect(res.status).toBe(401);
+  });
+
+  it("returns 400 when imageBase64 is missing", async () => {
+    const app = makeApp();
+    const res = await makePhotoRequest(app, {}, { apiKey: "test-secret" });
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.error).toContain("imageBase64");
+    expect(mockSaveImage).not.toHaveBeenCalled();
+  });
+
+  it("returns 400 for invalid base64", async () => {
+    const app = makeApp();
+    const res = await makePhotoRequest(
+      app,
+      { imageBase64: "not!!base64" },
+      { apiKey: "test-secret" },
+    );
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.error).toContain("base64");
+    expect(mockSaveImage).not.toHaveBeenCalled();
+  });
+
+  it("returns 400 for invalid JSON body", async () => {
+    const app = makeApp();
+    const res = await makePhotoRequest(app, {}, { apiKey: "test-secret", raw: "{not-json" });
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.error).toBe("Invalid JSON payload");
+  });
+
+  it("creates an item using scanned metadata when scan succeeds", async () => {
+    mockScan.mockResolvedValue({
+      artist: "Boards of Canada",
+      title: "Geogaddi",
+      artistConfidence: 0.95,
+      titleConfidence: 0.92,
+      year: 2002,
+      label: "Warp",
+      country: "GB",
+      catalogueNumber: "WARP101",
+    });
+    mockCreateDirect.mockResolvedValue({
+      item: { id: 42, title: "Geogaddi" },
+      created: true,
+    });
+
+    const app = makeApp();
+    const res = await makePhotoRequest(
+      app,
+      { imageBase64: validBase64 },
+      { apiKey: "test-secret" },
+    );
+
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.received).toBe(true);
+    expect(body.items_created).toBe(1);
+    expect(body.items[0]).toEqual({
+      id: 42,
+      title: "Geogaddi",
+      artworkUrl: "/uploads/abc.jpg",
+    });
+    expect(body.scan).toEqual({
+      artist: "Boards of Canada",
+      title: "Geogaddi",
+      artistConfidence: 0.95,
+      titleConfidence: 0.92,
+    });
+
+    expect(mockSaveImage).toHaveBeenCalledWith(validBase64);
+    expect(mockScan).toHaveBeenCalledWith(validBase64);
+    expect(mockCreateDirect).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: "Geogaddi",
+        artistName: "Boards of Canada",
+        artworkUrl: "/uploads/abc.jpg",
+        year: 2002,
+        label: "Warp",
+        country: "GB",
+        catalogueNumber: "WARP101",
+      }),
+    );
+  });
+
+  it("creates an item even when scan returns null", async () => {
+    mockScan.mockResolvedValue(null);
+    mockCreateDirect.mockResolvedValue({
+      item: { id: 7, title: "Untitled" },
+      created: true,
+    });
+
+    const app = makeApp();
+    const res = await makePhotoRequest(
+      app,
+      { imageBase64: validBase64 },
+      { apiKey: "test-secret" },
+    );
+
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.items_created).toBe(1);
+    expect(body.items[0].id).toBe(7);
+    expect(body.scan).toBeNull();
+    expect(mockCreateDirect).toHaveBeenCalledWith(
+      expect.objectContaining({
+        artworkUrl: "/uploads/abc.jpg",
+      }),
+    );
+  });
+
+  it("still creates an item when scan throws", async () => {
+    mockScan.mockRejectedValue(new Error("vision API down"));
+    mockCreateDirect.mockResolvedValue({
+      item: { id: 9, title: "Untitled" },
+      created: true,
+    });
+
+    const app = makeApp();
+    const res = await makePhotoRequest(
+      app,
+      { imageBase64: validBase64 },
+      { apiKey: "test-secret" },
+    );
+
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.items_created).toBe(1);
+    expect(body.scan).toBeNull();
+  });
+
+  it("includes notes and from in the created item's notes", async () => {
+    mockScan.mockResolvedValue(null);
+    mockCreateDirect.mockResolvedValue({
+      item: { id: 1, title: "Untitled" },
+      created: true,
+    });
+
+    const app = makeApp();
+    await makePhotoRequest(
+      app,
+      { imageBase64: validBase64, notes: "Record shop find", from: "phone" },
+      { apiKey: "test-secret" },
+    );
+
+    expect(mockCreateDirect).toHaveBeenCalledWith(
+      expect.objectContaining({
+        notes: "Record shop find — Via photo from phone",
+      }),
+    );
+  });
+
+  it("returns 500 when image save fails", async () => {
+    mockSaveImage.mockRejectedValue(new Error("disk full"));
+
+    const app = makeApp();
+    const res = await makePhotoRequest(
+      app,
+      { imageBase64: validBase64 },
+      { apiKey: "test-secret" },
+    );
+
+    expect(res.status).toBe(500);
+    const body = await res.json();
+    expect(body.error).toBe("Failed to save image");
+    expect(mockCreateDirect).not.toHaveBeenCalled();
+  });
+
+  it("returns 422 when item creation fails", async () => {
+    mockScan.mockResolvedValue(null);
+    mockCreateDirect.mockRejectedValue(new Error("DB error"));
+
+    const app = makeApp();
+    const res = await makePhotoRequest(
+      app,
+      { imageBase64: validBase64 },
+      { apiKey: "test-secret" },
+    );
+
+    expect(res.status).toBe(422);
+    const body = await res.json();
+    expect(body.error).toBe("Failed to create item");
+    expect(body.artworkUrl).toBe("/uploads/abc.jpg");
   });
 });
