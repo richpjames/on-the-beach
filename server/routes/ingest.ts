@@ -183,19 +183,47 @@ export function createIngestRoutes(deps: IngestRoutesDeps = {}): Hono {
       return c.json({ error: "Unauthorized" }, 401);
     }
 
-    let body: unknown;
-    try {
-      body = await c.req.json();
-    } catch (err) {
-      console.error("[api] POST /api/ingest/photo invalid JSON:", err);
-      return c.json({ error: "Invalid JSON payload" }, 400);
+    let imageBase64: unknown;
+    let notes: unknown;
+    let from: unknown;
+
+    const contentType = c.req.header("Content-Type") ?? "";
+
+    if (contentType.includes("multipart/form-data")) {
+      // iPhone Shortcuts and other clients send the photo as a file field.
+      let form: Record<string, string | File>;
+      try {
+        form = (await c.req.parseBody()) as Record<string, string | File>;
+      } catch (err) {
+        console.error("[api] POST /api/ingest/photo invalid form data:", err);
+        return c.json({ error: "Invalid form data" }, 400);
+      }
+
+      const file = form.photo ?? form.image ?? form.file;
+      if (!(file instanceof File)) {
+        return c.json({ error: "photo file is required" }, 400);
+      }
+
+      const buffer = Buffer.from(await file.arrayBuffer());
+      imageBase64 = buffer.toString("base64");
+      notes = form.notes;
+      from = form.from;
+    } else {
+      let body: unknown;
+      try {
+        body = await c.req.json();
+      } catch (err) {
+        console.error("[api] POST /api/ingest/photo invalid JSON:", err);
+        return c.json({ error: "Invalid JSON payload" }, 400);
+      }
+
+      if (!body || typeof body !== "object") {
+        return c.json({ error: "Invalid JSON payload" }, 400);
+      }
+
+      ({ imageBase64, notes, from } = body as Record<string, unknown>);
     }
 
-    if (!body || typeof body !== "object") {
-      return c.json({ error: "Invalid JSON payload" }, 400);
-    }
-
-    const { imageBase64, notes, from } = body as Record<string, unknown>;
     const validation = validateImageBase64(imageBase64);
     if (!validation.ok) {
       return c.json({ error: validation.error }, 400);

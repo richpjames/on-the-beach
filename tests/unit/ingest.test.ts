@@ -655,4 +655,63 @@ describe("POST /api/ingest/photo", () => {
     expect(body.error).toBe("Failed to create item");
     expect(body.artworkUrl).toBe("/uploads/abc.jpg");
   });
+
+  it("accepts multipart/form-data with a photo file", async () => {
+    mockScan.mockResolvedValue({
+      artist: "Aphex Twin",
+      title: "Selected Ambient Works 85-92",
+      artistConfidence: 0.99,
+      titleConfidence: 0.97,
+    });
+    mockCreateDirect.mockResolvedValue({
+      item: { id: 5, title: "Selected Ambient Works 85-92" },
+      created: true,
+    });
+
+    const imageBytes = new Uint8Array([1, 2, 3, 4]);
+    const expectedBase64 = Buffer.from(imageBytes).toString("base64");
+
+    const form = new FormData();
+    form.append("photo", new File([imageBytes], "cover.jpg", { type: "image/jpeg" }));
+    form.append("notes", "Record shop find");
+    form.append("from", "iphone");
+
+    const app = makeApp();
+    const res = await app.request("http://localhost/api/ingest/photo", {
+      method: "POST",
+      headers: { Authorization: "Bearer test-secret" },
+      body: form,
+    });
+
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.items_created).toBe(1);
+    expect(body.items[0].id).toBe(5);
+    expect(mockSaveImage).toHaveBeenCalledWith(expectedBase64);
+    expect(mockScan).toHaveBeenCalledWith(expectedBase64);
+    expect(mockCreateDirect).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: "Selected Ambient Works 85-92",
+        artistName: "Aphex Twin",
+        notes: "Record shop find — Via photo from iphone",
+      }),
+    );
+  });
+
+  it("returns 400 when multipart upload has no photo file", async () => {
+    const form = new FormData();
+    form.append("notes", "missing the file");
+
+    const app = makeApp();
+    const res = await app.request("http://localhost/api/ingest/photo", {
+      method: "POST",
+      headers: { Authorization: "Bearer test-secret" },
+      body: form,
+    });
+
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.error).toContain("photo");
+    expect(mockSaveImage).not.toHaveBeenCalled();
+  });
 });
