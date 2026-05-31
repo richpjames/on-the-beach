@@ -39,6 +39,7 @@ const STRONG_MUSIC_TERMS = [
   "tracks",
   "single",
   "vinyl",
+  "vol",
   "discography",
   "ep",
   "lp",
@@ -68,6 +69,11 @@ export class UnsupportedMusicLinkError extends Error {
 export interface MusicSignalResult {
   isMusicRelated: boolean;
   matchedTerms: string[];
+}
+
+export interface MusicSignalContext {
+  url?: string;
+  og?: OgData;
 }
 
 export function parseOgTags(html: string): OgData {
@@ -136,8 +142,24 @@ function stripHtmlForAnalysis(html: string): string {
   ).trim();
 }
 
-export function detectMusicRelatedHtml(html: string): MusicSignalResult {
-  const text = stripHtmlForAnalysis(html).toLowerCase();
+function buildMusicSignalText(html: string, { url, og }: MusicSignalContext): string {
+  const parts = [stripHtmlForAnalysis(html)];
+  if (og?.ogTitle) parts.push(og.ogTitle);
+  if (og?.ogDescription) parts.push(og.ogDescription);
+  if (og?.ogSiteName) parts.push(og.ogSiteName);
+  if (og?.title) parts.push(og.title);
+  if (url) {
+    const pathname = new URL(url).pathname;
+    parts.push(decodeURIComponent(pathname).replace(/[-_/]+/g, " "));
+  }
+  return parts.join(" ");
+}
+
+export function detectMusicRelatedHtml(
+  html: string,
+  context: MusicSignalContext = {},
+): MusicSignalResult {
+  const text = buildMusicSignalText(html, context).toLowerCase();
   const matchedTerms = new Set<string>();
 
   for (const term of STRONG_MUSIC_TERMS) {
@@ -176,7 +198,7 @@ function buildUnknownPageSnippet(url: string, html: string): string {
 }
 
 async function scrapeUnknownUrl(url: string, html: string, og: OgData): Promise<ScrapedMetadata> {
-  const signal = detectMusicRelatedHtml(html);
+  const signal = detectMusicRelatedHtml(html, { url, og });
   if (!signal.isMusicRelated) {
     throw new UnsupportedMusicLinkError("Link does not appear to be music-related");
   }
