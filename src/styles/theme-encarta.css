@@ -1,0 +1,451 @@
+/* ═══════════════════════════════════════════════════════════════════
+   ENCARTA OVERLAY — 90s CD-ROM multimedia chrome.
+   Navy + cream + gold + red. Gradient pill buttons. Book-tab stacks.
+   Hint of disc-iridescence on the title bar.
+   Applies only when <html data-theme="encarta">.
+═══════════════════════════════════════════════════════════════════ */
+
+html[data-theme="encarta"] {
+  --enc-navy: #0e2c4f;
+  --enc-navy-dark: #061830;
+  --enc-navy-mid: #143f70;
+  --enc-navy-light: #2a5a8a;
+  --enc-cream: #f5ead0;
+  --enc-cream-soft: #fbf3dd;
+  --enc-cream-deep: #e6d3a0;
+  --enc-red: #c83a2e;
+  --enc-red-dark: #8a1f15;
+  --enc-red-bright: #e75240;
+  --enc-gold: #d9a93b;
+  --enc-gold-bright: #f0c95a;
+  --enc-ink: #1a1410;
+
+  --enc-radius: 6px;
+  --enc-radius-lg: 10px;
+  --enc-radius-pill: 999px;
+
+  --enc-font: "Verdana", "Trebuchet MS", system-ui, sans-serif;
+  --enc-font-display: "Trebuchet MS", "Verdana", system-ui, sans-serif;
+
+  /* re-point palette vars used elsewhere */
+  --playlist-bg: #fbf3dd;
+  --playlist-bg-alt: #f3e6bc;
+  --playlist-text: #1a1410;
+  --playlist-text-hover: #061830;
+  --playlist-selected-bg: #c83a2e;
+  --playlist-selected-text: #fff8e8;
+}
+
+/* ─── Desktop background ─────────────────────────────────────── */
+html[data-theme="encarta"] {
+  background-color: #0a1e36;
+  background-image:
+    radial-gradient(ellipse at top, #1a4170 0%, #0a1e36 60%, #04101f 100%);
+}
+
+/* ─── Window frame ──────────────────────────────────────────── */
+html[data-theme="encarta"] body {
+  font-family: var(--enc-font);
+  font-size: 13px;
+  color: var(--enc-ink);
+  background: var(--enc-cream-soft);
+  border: 2px solid var(--enc-gold);
+  border-radius: var(--enc-radius-lg);
+  box-shadow:
+    0 14px 40px rgba(0, 0, 0, 0.45),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.4);
+  line-height: 1.45;
+}
+
+/* ─── Title bar — navy gradient with disc-iridescent shimmer ─── */
+html[data-theme="encarta"] .header {
+  background:
+    linear-gradient(180deg, var(--enc-navy-light) 0%, var(--enc-navy) 55%, var(--enc-navy-dark) 100%);
+  border: none;
+  border-bottom: 2px solid var(--enc-gold);
+  padding: 8px 12px;
+  color: var(--enc-cream);
+  position: relative;
+  overflow: hidden;
+}
+
+/* Mario-64-disc iridescence: subtle rainbow conic shimmer */
+html[data-theme="encarta"] .header::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    conic-gradient(
+      from 210deg at 80% 50%,
+      transparent 0deg,
+      rgba(232, 73, 100, 0.18) 60deg,
+      rgba(232, 180, 73, 0.18) 110deg,
+      rgba(73, 232, 145, 0.16) 160deg,
+      rgba(73, 145, 232, 0.18) 210deg,
+      rgba(189, 73, 232, 0.16) 260deg,
+      transparent 320deg
+    );
+  mix-blend-mode: screen;
+  opacity: 0.55;
+  pointer-events: none;
+}
+
+html[data-theme="encarta"] .header h1 {
+  color: var(--enc-cream);
+  font-family: var(--enc-font-display);
+  font-weight: bold;
+  font-size: 15px;
+  letter-spacing: 0.02em;
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.6);
+  position: relative;
+  z-index: 1;
+}
+
+html[data-theme="encarta"] .header h1::before {
+  content: "✦";
+  color: var(--enc-gold-bright);
+  margin-right: 6px;
+  font-size: 12px;
+}
+
+html[data-theme="encarta"] .header__subtitle {
+  color: var(--enc-gold-bright);
+  font-style: italic;
+  font-size: 11px;
+  font-family: var(--enc-font);
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.4);
+  position: relative;
+  z-index: 1;
+}
+
+html[data-theme="encarta"] .header__winbuttons {
+  position: relative;
+  z-index: 1;
+}
+
+html[data-theme="encarta"] .header__winbtn {
+  background: linear-gradient(180deg, #3a6ea0 0%, #0e2c4f 100%);
+  border: 1px solid var(--enc-navy-dark);
+  border-radius: 4px;
+  color: var(--enc-cream);
+  font-family: var(--enc-font);
+  font-weight: bold;
+  font-size: 11px;
+  width: 22px;
+  height: 20px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.25);
+}
+
+html[data-theme="encarta"] .header__winbtn--close {
+  background: linear-gradient(180deg, var(--enc-red-bright) 0%, var(--enc-red-dark) 100%);
+  border-color: var(--enc-red-dark);
+}
+
+/* ─── Content area ──────────────────────────────────────────── */
+html[data-theme="encarta"] .main {
+  background: var(--enc-cream-soft);
+  padding: 10px;
+  gap: 10px;
+}
+
+/* ─── Add form panel ────────────────────────────────────────── */
+html[data-theme="encarta"] .add-section {
+  background: linear-gradient(180deg, var(--enc-cream) 0%, var(--enc-cream-deep) 100%);
+  border: 1px solid var(--enc-gold);
+  border-radius: var(--enc-radius);
+  padding: 10px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6);
+}
+
+html[data-theme="encarta"] .add-form__primary {
+  gap: 8px;
+  align-items: stretch;
+}
+
+/* ─── Inputs ────────────────────────────────────────────────── */
+html[data-theme="encarta"] .input {
+  background: #ffffff;
+  border: 1px solid var(--enc-navy);
+  border-radius: var(--enc-radius);
+  padding: 0 10px;
+  height: 30px;
+  font-family: var(--enc-font);
+  font-size: 13px;
+  color: var(--enc-ink);
+  box-shadow: inset 0 1px 2px rgba(14, 44, 79, 0.15);
+}
+
+html[data-theme="encarta"] .input::placeholder {
+  color: #998a6a;
+  font-style: italic;
+}
+
+html[data-theme="encarta"] .input:focus {
+  outline: 2px solid var(--enc-gold);
+  outline-offset: 0;
+  border-color: var(--enc-navy-mid);
+}
+
+/* ─── Buttons — chunky gradient navy ────────────────────────── */
+html[data-theme="encarta"] .btn {
+  background: linear-gradient(180deg, var(--enc-navy-light) 0%, var(--enc-navy) 100%);
+  border: 1px solid var(--enc-navy-dark);
+  border-radius: var(--enc-radius);
+  color: var(--enc-cream);
+  font-family: var(--enc-font-display);
+  font-weight: bold;
+  font-size: 12px;
+  height: 30px;
+  padding: 0 16px;
+  min-width: 64px;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.25),
+    0 1px 2px rgba(0, 0, 0, 0.2);
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.35);
+  transition: filter 0.08s ease;
+}
+
+html[data-theme="encarta"] .btn:hover {
+  filter: brightness(1.12);
+}
+
+html[data-theme="encarta"] .btn:active {
+  background: linear-gradient(180deg, var(--enc-navy) 0%, var(--enc-navy-light) 100%);
+  padding: 1px 15px 0 17px;
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.4);
+}
+
+/* Primary Add — saturated red */
+html[data-theme="encarta"] .btn--primary,
+html[data-theme="encarta"] #add-form-submit {
+  background: linear-gradient(180deg, var(--enc-red-bright) 0%, var(--enc-red-dark) 100%);
+  border-color: var(--enc-red-dark);
+  color: #fff8e8;
+}
+
+html[data-theme="encarta"] #add-form-submit:disabled {
+  opacity: 0.45;
+}
+
+/* ─── Stack tabs — book tabs ────────────────────────────────── */
+html[data-theme="encarta"] .stack-bar {
+  background: transparent;
+  padding: 6px 4px 0;
+  gap: 4px;
+}
+
+html[data-theme="encarta"] .stack-tab {
+  background: linear-gradient(180deg, var(--enc-cream) 0%, var(--enc-cream-deep) 100%);
+  border: 1px solid var(--enc-gold);
+  border-bottom: none;
+  border-radius: var(--enc-radius) var(--enc-radius) 0 0;
+  color: var(--enc-navy);
+  font-family: var(--enc-font-display);
+  font-weight: bold;
+  font-size: 12px;
+  padding: 6px 16px 7px;
+  top: 0;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.5);
+}
+
+html[data-theme="encarta"] .stack-tab:hover {
+  background: linear-gradient(180deg, #fff8e0 0%, var(--enc-cream) 100%);
+  color: var(--enc-navy);
+}
+
+html[data-theme="encarta"] .stack-tab.active {
+  background: linear-gradient(180deg, #fff 0%, var(--enc-cream) 100%);
+  border-color: var(--enc-red);
+  border-bottom: none;
+  color: var(--enc-red);
+  font-weight: bold;
+  z-index: 2;
+}
+
+html[data-theme="encarta"] .stack-tab--manage {
+  padding: 6px 10px;
+}
+
+/* ─── Filter bar ────────────────────────────────────────────── */
+html[data-theme="encarta"] .filter-bar {
+  background: linear-gradient(180deg, var(--enc-cream-deep) 0%, #d4ba78 100%);
+  border: 1px solid var(--enc-navy);
+  border-radius: var(--enc-radius);
+  padding: 6px;
+  gap: 4px;
+  align-items: center;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.4);
+}
+
+html[data-theme="encarta"] .filter-bar::before {
+  content: none;
+}
+
+html[data-theme="encarta"] .filter-btn {
+  background: linear-gradient(180deg, #fdf6e0 0%, #e6d39c 100%);
+  border: 1px solid var(--enc-navy);
+  border-radius: var(--enc-radius-pill);
+  color: var(--enc-navy);
+  font-family: var(--enc-font-display);
+  font-weight: bold;
+  font-size: 12px;
+  height: 26px;
+  padding: 0 14px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.5);
+}
+
+html[data-theme="encarta"] .filter-btn:hover {
+  background: linear-gradient(180deg, #fffaeb 0%, #f2dfa8 100%);
+}
+
+html[data-theme="encarta"] .filter-btn.active {
+  background: linear-gradient(180deg, var(--enc-red-bright) 0%, var(--enc-red-dark) 100%);
+  border-color: var(--enc-red-dark);
+  color: var(--enc-cream);
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.35);
+}
+
+html[data-theme="encarta"] .filter-btn--action {
+  background: linear-gradient(180deg, var(--enc-gold-bright) 0%, var(--enc-gold) 100%);
+  border-color: var(--enc-navy);
+  color: var(--enc-navy);
+}
+
+/* ─── Browse tools (search + sort panel) ────────────────────── */
+html[data-theme="encarta"] .browse-tools {
+  background: linear-gradient(180deg, var(--enc-cream-deep) 0%, #d4ba78 100%);
+  border: 1px solid var(--enc-navy);
+  border-radius: var(--enc-radius);
+  padding: 6px;
+  gap: 6px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.4);
+}
+
+html[data-theme="encarta"] .browse-tools__sort {
+  color: var(--enc-navy);
+  font-family: var(--enc-font);
+  font-weight: bold;
+  font-size: 12px;
+}
+
+html[data-theme="encarta"] .browse-tools__icon-btn {
+  background: linear-gradient(180deg, #fdf6e0 0%, #e6d39c 100%);
+  border: 1px solid var(--enc-navy);
+  border-radius: var(--enc-radius);
+  color: var(--enc-navy);
+  width: 28px;
+  height: 28px;
+}
+
+/* ─── Playlist surface ──────────────────────────────────────── */
+html[data-theme="encarta"] .music-list,
+html[data-theme="encarta"] .music-list-shell {
+  background: var(--enc-cream-soft);
+  border: 1px solid var(--enc-gold);
+  border-radius: var(--enc-radius);
+}
+
+html[data-theme="encarta"] .music-list {
+  color: var(--enc-ink);
+}
+
+/* PLAYLIST title strip (".list-section::before") */
+html[data-theme="encarta"] .list-section {
+  border: 1px solid var(--enc-gold);
+  border-radius: var(--enc-radius);
+  overflow: hidden;
+}
+
+html[data-theme="encarta"] .list-section::before {
+  background: linear-gradient(180deg, var(--enc-navy-light) 0%, var(--enc-navy) 100%);
+  color: var(--enc-cream);
+  border-bottom: 1px solid var(--enc-gold);
+  font-family: var(--enc-font-display);
+  font-weight: bold;
+  letter-spacing: 0.18em;
+}
+
+/* Row text — dark on cream */
+html[data-theme="encarta"] .music-card__title {
+  color: var(--enc-navy);
+  font-family: var(--enc-font);
+  font-weight: bold;
+}
+
+html[data-theme="encarta"] .music-card__artist {
+  color: var(--enc-red-dark);
+  font-family: var(--enc-font);
+}
+
+html[data-theme="encarta"] .music-card:hover {
+  background: var(--enc-cream-deep);
+}
+
+html[data-theme="encarta"] .music-card:nth-child(even) {
+  background: rgba(217, 169, 59, 0.08);
+}
+
+/* ─── Custom scrollbars: hide chrome chisel ─────────────────── */
+html[data-theme="encarta"] .stack-scrollbar,
+html[data-theme="encarta"] .music-scrollbar {
+  background: var(--enc-cream-deep);
+  border-color: var(--enc-gold);
+}
+
+html[data-theme="encarta"] .stack-scrollbar__button,
+html[data-theme="encarta"] .music-scrollbar__button {
+  background: linear-gradient(180deg, var(--enc-navy-light) 0%, var(--enc-navy) 100%);
+  border: 1px solid var(--enc-navy-dark);
+  border-radius: 3px;
+  color: var(--enc-cream);
+}
+
+html[data-theme="encarta"] .stack-scrollbar__thumb,
+html[data-theme="encarta"] .music-scrollbar__thumb {
+  background: linear-gradient(180deg, var(--enc-navy-mid) 0%, var(--enc-navy) 100%);
+  border: 1px solid var(--enc-navy-dark);
+  border-radius: 3px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.3);
+}
+
+html[data-theme="encarta"] .stack-scrollbar__track,
+html[data-theme="encarta"] .music-scrollbar__track {
+  background: var(--enc-cream);
+  background-image: none;
+}
+
+/* ─── Footer / taskbar ──────────────────────────────────────── */
+html[data-theme="encarta"] .footer {
+  background: linear-gradient(180deg, var(--enc-navy-light) 0%, var(--enc-navy-dark) 100%);
+  color: var(--enc-cream);
+  border-top: 1px solid var(--enc-gold);
+  font-family: var(--enc-font);
+}
+
+html[data-theme="encarta"] .footer::before {
+  background: var(--enc-gold-bright);
+  box-shadow: 0 0 6px var(--enc-gold-bright);
+}
+
+/* Taskbar (Start bar at bottom of viewport) */
+html[data-theme="encarta"] #taskbar {
+  background: linear-gradient(180deg, var(--enc-navy-light) 0%, var(--enc-navy) 50%, var(--enc-navy-dark) 100%);
+  border-top: 2px solid var(--enc-gold);
+  color: var(--enc-cream);
+}
+
+html[data-theme="encarta"] .taskbar__start,
+html[data-theme="encarta"] .taskbar__task {
+  background: linear-gradient(180deg, var(--enc-gold-bright) 0%, var(--enc-gold) 100%);
+  border: 1px solid var(--enc-navy-dark);
+  border-radius: var(--enc-radius);
+  color: var(--enc-navy);
+  font-family: var(--enc-font-display);
+  font-weight: bold;
+}
+
+html[data-theme="encarta"] .taskbar__clock {
+  color: var(--enc-gold-bright);
+  font-family: var(--enc-font);
+  font-weight: bold;
+}
