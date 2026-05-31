@@ -427,6 +427,42 @@ describe("detectMusicRelatedHtml", () => {
 
     expect(result.isMusicRelated).toBe(false);
   });
+
+  test("uses OG metadata when visible body is chrome-only (Shopify product page)", () => {
+    // Shopify-style page where the truncated body is dominated by nav + currency picker,
+    // but og:description carries the music signal. Mirrors what scrapeUnknownUrl passes in.
+    const html = `<html><body>
+      <nav>Shop Artists News Events About</nav>
+      <p>United States USD $ Germany EUR €</p>
+    </body></html>`;
+    const result = detectMusicRelatedHtml(html, {
+      url: "https://igetrvng.com/products/reflections-vol-3-water-poems",
+      og: {
+        ogTitle: "Reflections Vol. 3: Water Poems",
+        ogDescription: "dreamlike songs and soundscapes flow into a unified stream",
+        ogSiteName: "RVNG Intl.",
+      },
+    });
+    expect(result.isMusicRelated).toBe(true);
+    expect(result.matchedTerms).toEqual(expect.arrayContaining(["songs", "stream"]));
+  });
+
+  test("uses URL path slug as a music signal", () => {
+    const html = `<html><body><p>welcome</p></body></html>`;
+    const result = detectMusicRelatedHtml(html, {
+      url: "https://example.com/album/some-record-2024",
+    });
+    expect(result.isMusicRelated).toBe(true);
+    expect(result.matchedTerms).toContain("album");
+  });
+
+  test("still rejects non-music pages even with url+og context", () => {
+    const result = detectMusicRelatedHtml(`<html><body><h1>Spring sale</h1></body></html>`, {
+      url: "https://example.com/sale/spring",
+      og: { ogTitle: "Spring Sale", ogDescription: "Big discounts on bags and shoes." },
+    });
+    expect(result.isMusicRelated).toBe(false);
+  });
 });
 
 describe("scrapeUrl", () => {
