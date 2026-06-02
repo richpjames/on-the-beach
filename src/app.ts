@@ -1512,7 +1512,9 @@ function setupMusicListReorder(): void {
     },
   });
 
-  musicListReorderMediaQuery = window.matchMedia("(max-width: 520px)");
+  // Use a drag handle on narrow screens and on touch devices (e.g. iPad), so a
+  // swipe anywhere on a card scrolls the list instead of starting a reorder.
+  musicListReorderMediaQuery = window.matchMedia("(max-width: 520px), (pointer: coarse)");
   musicListReorderMediaQuery.addEventListener("change", handleMusicListReorderMediaChange);
   syncMusicListReorderMode();
 }
@@ -1617,19 +1619,22 @@ function setupCustomListScrollbar(): void {
     button.addEventListener("click", () => {
       scrollByStep(delta);
     });
-    button.addEventListener("mousedown", () => {
+    // Pointer events cover both mouse and touch, so press-and-hold repeat
+    // scrolling works on iPad as well as desktop.
+    button.addEventListener("pointerdown", () => {
       startRepeatScroll(delta);
     });
-    button.addEventListener("mouseup", stopRepeatScroll);
-    button.addEventListener("mouseleave", stopRepeatScroll);
+    button.addEventListener("pointerup", stopRepeatScroll);
+    button.addEventListener("pointercancel", stopRepeatScroll);
+    button.addEventListener("pointerleave", stopRepeatScroll);
   };
 
   bindScrollButton(upButton, -40);
   bindScrollButton(downButton, 40);
-  document.addEventListener("mouseup", stopRepeatScroll);
+  document.addEventListener("pointerup", stopRepeatScroll);
   window.addEventListener("blur", stopRepeatScroll);
 
-  track.addEventListener("mousedown", (event) => {
+  track.addEventListener("pointerdown", (event) => {
     if (event.target === thumb) {
       return;
     }
@@ -1643,7 +1648,7 @@ function setupCustomListScrollbar(): void {
     list.scrollBy({ top: direction * Math.max(80, list.clientHeight * 0.8), behavior: "auto" });
   });
 
-  const onDragMove = (event: MouseEvent): void => {
+  const onDragMove = (event: PointerEvent): void => {
     if (!listThumbDrag || !musicListEl || !musicListTrackEl || !musicListThumbEl) {
       return;
     }
@@ -1670,19 +1675,23 @@ function setupCustomListScrollbar(): void {
 
   const onDragEnd = (): void => {
     listThumbDrag = null;
-    document.removeEventListener("mousemove", onDragMove);
+    document.removeEventListener("pointermove", onDragMove);
   };
 
-  thumb.addEventListener("mousedown", (event) => {
+  thumb.addEventListener("pointerdown", (event) => {
     event.preventDefault();
+    if (event.pointerId !== undefined && typeof thumb.setPointerCapture === "function") {
+      thumb.setPointerCapture(event.pointerId);
+    }
     const trackRect = track.getBoundingClientRect();
     const thumbRect = thumb.getBoundingClientRect();
     listThumbDrag = {
       startY: event.clientY,
       startTop: thumbRect.top - trackRect.top,
     };
-    document.addEventListener("mousemove", onDragMove);
-    document.addEventListener("mouseup", onDragEnd, { once: true });
+    document.addEventListener("pointermove", onDragMove);
+    document.addEventListener("pointerup", onDragEnd, { once: true });
+    document.addEventListener("pointercancel", onDragEnd, { once: true });
   });
 
   list.addEventListener("scroll", () => {

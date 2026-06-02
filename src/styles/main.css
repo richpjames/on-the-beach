@@ -956,6 +956,9 @@ select.input {
   grid-template-rows: 19px minmax(0, 1fr) 19px;
   background: #d4d4d4;
   border-left: 1px solid #7b7b7b;
+  /* Let the scrollbar handle its own touch gestures (thumb drag / track tap)
+     instead of the browser treating them as page scrolls. */
+  touch-action: none;
 }
 
 .music-scrollbar__button {
@@ -1429,6 +1432,14 @@ select.input {
 
 .music-card__reorder-handle:active {
   cursor: grabbing;
+}
+
+/* On touch devices (e.g. iPad) expose the reorder handle so dragging the handle
+   reorders, while a swipe on the rest of the card scrolls the list. */
+@media (pointer: coarse) {
+  .music-card .music-card__reorder-handle {
+    display: inline-flex;
+  }
 }
 
 .music-card__menu-toggle {
