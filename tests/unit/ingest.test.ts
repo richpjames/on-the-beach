@@ -1,24 +1,25 @@
 import { describe, it, expect, mock, beforeEach, afterEach } from "bun:test";
 import { Hono } from "hono";
+// Imported before mock.module so the real exports can be passed through below.
+import * as realCreator from "../../server/music-item-creator";
 
 const mockCreateMany = mock();
 const mockCreateDirect = mock();
 const mockSaveImage = mock();
 const mockScan = mock();
 
-// Mock the entire music-item-creator module before importing any route.
-// All named exports must be present: bun's mock.module() persists across
-// the full test run, so a partial mock will break any later test file
-// that imports a route which uses a non-mocked export.
+// Mock the music-item-creator module before importing any route, overriding
+// only the functions the ingest routes call. bun's mock.module() persists
+// process-wide for the rest of the test run, and `fullItemSelect` is a
+// re-export from server/queries/full-item-select — replacing it with a bare
+// mock() can clobber the origin module's binding for every later importer
+// (this broke the main-page SSR tests on CI, where this file runs first).
+// Passing the real values through keeps other test files working regardless
+// of file execution order.
 mock.module("../../server/music-item-creator", () => ({
+  ...realCreator,
   createMusicItemsFromUrl: mockCreateMany,
-  createMusicItemFromUrl: mock(),
   createMusicItemDirect: mockCreateDirect,
-  fetchFullItem: mock(),
-  fullItemSelect: mock(),
-  getOrCreateArtist: mock(),
-  getSourceId: mock(),
-  AmbiguousLinkSelectionError: class AmbiguousLinkSelectionError extends Error {},
 }));
 
 // Import after mocks are set up
