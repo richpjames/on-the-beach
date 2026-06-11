@@ -1,0 +1,6 @@
+# Bun configuration
+[test]
+# Bind unit tests to a throwaway SQLite file before any test module imports
+# the db layer — otherwise the first import wins and tests write to the real
+# on_the_beach.db dev database. See tests/unit/preload.ts.
+preload = ["./tests/unit/preload.ts"]

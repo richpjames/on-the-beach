@@ -163,14 +163,14 @@ export function renderStackManageList(stacks: StackWithCount[]): string {
       (stack) => `
       <div class="stack-manage__item" data-manage-stack-id="${stack.id}">
         <span class="stack-manage__name">${escapeHtml(stack.name)}</span>
-        <span class="stack-manage__count">${stack.item_count} items</span>
+        <span class="stack-manage__count">${formatItemCount(stack.item_count)}</span>
         ${
           stack.parent_stack_ids.length === 0
             ? ""
             : `<span class="stack-manage__parent-chip" title="Has parent list">nested</span>`
         }
-        <button class="stack-manage__rename-btn">rename</button>
-        <button class="stack-manage__delete-btn">delete</button>
+        <button class="stack-manage__rename-btn">Rename</button>
+        <button class="stack-manage__delete-btn">Delete</button>
       </div>
     `,
     )
@@ -180,7 +180,7 @@ export function renderStackManageList(stacks: StackWithCount[]): string {
 export function renderStackRenameEditor(currentName: string): string {
   return `
     <input type="text" class="stack-manage__rename-input input" value="${escapeHtml(currentName)}">
-    <button class="stack-manage__rename-confirm">save</button>
+    <button class="stack-manage__rename-confirm">Save</button>
   `;
 }
 
@@ -287,7 +287,7 @@ export function renderFolderRow(child: { id: number; name: string; item_count: n
       </div>
       <div class="folder-row__content">
         <span class="folder-row__name">${escapeHtml(child.name)}</span>
-        <span class="folder-row__count">(${child.item_count} items)</span>
+        <span class="folder-row__count">(${formatItemCount(child.item_count)})</span>
       </div>
       <div class="folder-row__actions">
         <button type="button" class="btn btn--ghost folder-row__reorder-handle" title="Reorder" aria-label="Reorder ${escapeHtml(child.name)}">
@@ -337,11 +337,15 @@ export function renderChildStackPicker(
       (stack) => `
       <button type="button" class="child-stack-picker__item" data-picker-stack-id="${stack.id}">
         <span class="child-stack-picker__name">${escapeHtml(stack.name)}</span>
-        <span class="child-stack-picker__count">${stack.item_count} items</span>
+        <span class="child-stack-picker__count">${formatItemCount(stack.item_count)}</span>
       </button>
     `,
     )
     .join("");
+}
+
+export function formatItemCount(count: number): string {
+  return count === 1 ? "1 item" : `${count} items`;
 }
 
 export function escapeHtml(text: string): string {
