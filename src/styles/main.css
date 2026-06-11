@@ -1642,6 +1642,8 @@ a:hover {
   top: 100%;
   right: 0;
   z-index: 100;
+  /* When scrolled into view in page flow, clear the fixed taskbar. */
+  scroll-margin-bottom: calc(var(--taskbar-height) + 8px);
   min-width: 160px;
   background: var(--chrome);
   border-width: 2px;

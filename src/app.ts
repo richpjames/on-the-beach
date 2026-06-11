@@ -2083,6 +2083,11 @@ async function showAddFormStackDropdown(): Promise<void> {
     },
     shouldIgnoreOutsideClick: (target) => target.closest("#add-form-stack-btn") !== null,
   });
+
+  // The picker sits in page flow near the bottom of the expanded form, so on
+  // small screens the dropdown can open past the fold; the page scrolls, so
+  // just bring it into view.
+  picker.querySelector(".stack-dropdown")?.scrollIntoView({ block: "nearest" });
 }
 
 async function renderStackDropdown(cardEl: HTMLElement, itemId: number): Promise<void> {
