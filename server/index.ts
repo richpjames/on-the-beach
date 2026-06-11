@@ -57,6 +57,9 @@ if (process.env.NODE_ENV === "test") {
 // ---------- Environment ----------
 const isDev = process.env.NODE_ENV !== "production";
 const preferredPort = Number(process.env.PORT) || 3000;
+// Optional bind host override (e.g. HOST=0.0.0.0 for environments without IPv6).
+// Unset keeps the platform default (dual-stack wildcard).
+const bindHost = process.env.HOST || undefined;
 
 async function findAvailablePort(startPort: number): Promise<number> {
   const { createServer } = await import("node:net");
@@ -64,7 +67,7 @@ async function findAvailablePort(startPort: number): Promise<number> {
     const probe = createServer();
     probe.once("error", () => resolve(findAvailablePort(startPort + 1)));
     probe.once("listening", () => probe.close(() => resolve(startPort)));
-    probe.listen(startPort);
+    probe.listen({ port: startPort, host: bindHost });
   });
 }
 
@@ -108,7 +111,7 @@ if (isDev) {
   });
   viteHandle = vite.middlewares.handle.bind(vite.middlewares);
 
-  server.listen(port, () => {
+  server.listen({ port, host: bindHost }, () => {
     console.log(`Dev server running on http://localhost:${port}`);
     console.log(`Uploads dir: ${uploadsDir}`);
   });
@@ -120,6 +123,7 @@ if (isDev) {
 
   Bun.serve({
     port,
+    hostname: bindHost,
     fetch: app.fetch,
   });
   console.log(`Server running on http://localhost:${port}`);
