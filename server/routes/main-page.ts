@@ -208,6 +208,18 @@ function renderMainPage(opts: {
     ${opts.primaryRssAlternateLinksHtml}
     ${opts.rssAlternateLinksHtml}
     <link rel="stylesheet" href="${escapeHtml(opts.cssHref)}" />
+    <script>
+      // Apply theme before paint. ?theme=polish persists via localStorage;
+      // default render stays classic Win98.
+      (function () {
+        try {
+          var p = new URLSearchParams(location.search).get("theme");
+          var t = p || localStorage.getItem("theme") || "classic";
+          if (p) localStorage.setItem("theme", p);
+          if (t && t !== "classic") document.documentElement.dataset.theme = t;
+        } catch (e) {}
+      })();
+    </script>
   </head>
   <body>
       <header class="header">

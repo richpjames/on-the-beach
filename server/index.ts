@@ -64,7 +64,7 @@ async function findAvailablePort(startPort: number): Promise<number> {
     const probe = createServer();
     probe.once("error", () => resolve(findAvailablePort(startPort + 1)));
     probe.once("listening", () => probe.close(() => resolve(startPort)));
-    probe.listen(startPort);
+    probe.listen(startPort, "0.0.0.0");
   });
 }
 
@@ -85,13 +85,14 @@ if (isDev) {
   // avoiding the "Port undefined" error that occurs when Vite tries to derive the port itself.
   let viteHandle: ((req: unknown, res: unknown) => void) | null = null;
   const server = createHttpServer((req, res) => {
+    const pathname = (req.url ?? "/").split("?")[0];
     if (
-      req.url === "/" ||
-      req.url?.startsWith("/api/") ||
-      req.url?.startsWith("/uploads/") ||
-      req.url === "/r" ||
-      req.url?.startsWith("/r/") ||
-      req.url?.startsWith("/s/")
+      pathname === "/" ||
+      pathname.startsWith("/api/") ||
+      pathname.startsWith("/uploads/") ||
+      pathname === "/r" ||
+      pathname.startsWith("/r/") ||
+      pathname.startsWith("/s/")
     ) {
       honoListener(req, res);
       return;
@@ -108,7 +109,7 @@ if (isDev) {
   });
   viteHandle = vite.middlewares.handle.bind(vite.middlewares);
 
-  server.listen(port, () => {
+  server.listen(port, "0.0.0.0", () => {
     console.log(`Dev server running on http://localhost:${port}`);
     console.log(`Uploads dir: ${uploadsDir}`);
   });
