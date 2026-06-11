@@ -553,8 +553,9 @@ select.input {
   color: var(--chrome-darker);
   cursor: pointer;
   padding: 0;
-  width: 16px;
-  height: 16px;
+  /* Hit area, not glyph size: 24px minimum (WCAG 2.5.8); glyph stays 15px. */
+  width: 24px;
+  height: 24px;
   line-height: 1;
   font-size: 15px;
   display: inline-flex;
@@ -722,15 +723,15 @@ select.input {
 }
 
 .stack-scrollbar {
-  grid-template-columns: 19px minmax(0, 1fr) 19px;
+  grid-template-columns: 24px minmax(0, 1fr) 24px;
   align-items: stretch;
   border-top: 1px solid var(--chrome-dark);
 }
 
 .stack-scrollbar__button,
 .music-scrollbar__button {
-  width: 19px;
-  height: 19px;
+  width: 24px;
+  height: 24px;
   border-width: 2px;
   border-style: solid;
   border-color: var(--bevel-raised);
@@ -1022,7 +1023,7 @@ select.input {
 
 .music-list-shell {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 19px;
+  grid-template-columns: minmax(0, 1fr) 24px;
   align-items: stretch;
   background: var(--playlist-bg);
   flex: 1;
@@ -1031,7 +1032,7 @@ select.input {
 
 
 .music-scrollbar {
-  grid-template-rows: 19px minmax(0, 1fr) 19px;
+  grid-template-rows: 24px minmax(0, 1fr) 24px;
   border-left: 1px solid var(--chrome-dark);
   /* Let the scrollbar handle its own touch gestures (thumb drag / track tap)
      instead of the browser treating them as page scrolls. */
@@ -1141,8 +1142,9 @@ select.input {
     --text-xs: 11px;
     --text-base: 12px;
     --text-md: 13px;
-    --control-h: 32px;
-    --control-h-sm: 28px;
+    --control-h: 40px;
+    --control-h-sm: 36px;
+    --touch-icon: 44px;
   }
 
   body:not(.release-page-body) {
@@ -1257,21 +1259,17 @@ select.input {
     flex-shrink: 0;
   }
 
+  /* Wrap instead of horizontal scroll: every filter (and Pick One) stays
+     visible — an off-screen control with no scroll affordance is invisible. */
   .filter-bar {
     gap: var(--space-2);
-    flex-wrap: nowrap;
+    flex-wrap: wrap;
     align-items: center;
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
   }
 
   .filter-bar::before {
     padding: 0 var(--space-4) 0 var(--space-1);
     flex-shrink: 0;
-  }
-
-  .filter-btn--action {
-    margin-left: 0;
   }
 
   .browse-controls {
@@ -1353,6 +1351,7 @@ select.input {
 
   .stack-tab {
     padding: 4px 12px 5px;
+    min-height: var(--control-h-sm);
     top: 0;
     white-space: nowrap;
   }
@@ -1418,6 +1417,7 @@ select.input {
 
 .music-card__action-btn {
   display: inline-flex;
+  min-height: 24px;
 }
 
 .music-card__reorder-handle {
@@ -1439,8 +1439,29 @@ select.input {
 /* On touch devices (e.g. iPad) expose the reorder handle so dragging the handle
    reorders, while a swipe on the rest of the card scrolls the list. */
 @media (pointer: coarse) {
+  /* Touch at any width (incl. tablets in the desktop layout): 44px icon
+     targets and finger-sized star/action hit areas. */
+  :root {
+    --touch-icon: 44px;
+  }
+
   .music-card .music-card__reorder-handle {
     display: inline-flex;
+  }
+
+  .music-card__action-btn {
+    min-width: var(--touch-icon);
+    min-height: 36px;
+  }
+
+  .rating-stars__star {
+    width: 32px;
+    height: 32px;
+  }
+
+  .rating-stars.star-rating--large .rating-stars__star {
+    width: 44px;
+    height: 44px;
   }
 }
 
