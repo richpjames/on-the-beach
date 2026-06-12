@@ -640,7 +640,28 @@ function renderMainPage(opts: {
       </div>
 
     <div id="taskbar">
-      <button id="taskbar-start" class="taskbar__start">🪟 Start</button>
+      <div id="start-menu" class="start-menu" hidden>
+        <div class="start-menu__banner" aria-hidden="true">On The Beach</div>
+        <div class="start-menu__items" role="menu">
+          <button type="button" class="start-menu__item" role="menuitem" data-start-action="add">
+            <span class="start-menu__icon" aria-hidden="true">💿</span>Add a release
+          </button>
+          <button type="button" class="start-menu__item" role="menuitem" data-start-action="pick">
+            <span class="start-menu__icon" aria-hidden="true">🎲</span>Pick One
+          </button>
+          <button type="button" class="start-menu__item" role="menuitem" data-start-action="search">
+            <span class="start-menu__icon" aria-hidden="true">🔍</span>Search
+          </button>
+          <button type="button" class="start-menu__item" role="menuitem" data-start-action="stacks">
+            <span class="start-menu__icon" aria-hidden="true">🗂️</span>Manage stacks
+          </button>
+          <div class="start-menu__divider" role="separator"></div>
+          <a class="start-menu__item" role="menuitem" href="/feed/to-listen.rss">
+            <span class="start-menu__icon" aria-hidden="true">📡</span>RSS feed
+          </a>
+        </div>
+      </div>
+      <button id="taskbar-start" class="taskbar__start" aria-haspopup="menu" aria-expanded="false">🪟 Start</button>
       <button id="taskbar-np-btn" class="taskbar__task" hidden>
         <span aria-hidden="true">♫</span>
         <span id="taskbar-np-label"></span>

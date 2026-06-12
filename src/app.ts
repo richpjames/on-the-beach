@@ -180,6 +180,7 @@ function readServerState(): { stacks: StackWithCount[] } | null {
 function initializeUI(hasServerData: boolean): void {
   setupFilterBar();
   setupPickRandom();
+  setupStartMenu();
   setupBrowseControls();
   setupStackBar();
   setupStackManagePanel();
@@ -777,6 +778,91 @@ function setupFilterBar(): void {
       filter: target.dataset.filter as ListenStatus | "all" | "scheduled",
     });
     syncDateListenedOption();
+  });
+}
+
+function setupStartMenu(): void {
+  const startBtn = document.getElementById("taskbar-start");
+  const menu = document.getElementById("start-menu");
+  if (!(startBtn instanceof HTMLButtonElement) || !(menu instanceof HTMLElement)) {
+    return;
+  }
+
+  const close = (): void => {
+    menu.hidden = true;
+    startBtn.setAttribute("aria-expanded", "false");
+  };
+
+  startBtn.addEventListener("click", () => {
+    const opening = menu.hidden;
+    menu.hidden = !opening;
+    startBtn.setAttribute("aria-expanded", String(opening));
+  });
+
+  document.addEventListener("click", (event) => {
+    if (menu.hidden) return;
+    const target = event.target;
+    if (target instanceof Node && (menu.contains(target) || startBtn.contains(target))) {
+      return;
+    }
+    close();
+  });
+
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && !menu.hidden) {
+      close();
+    }
+  });
+
+  menu.addEventListener("click", (event) => {
+    const item = (event.target as HTMLElement).closest<HTMLElement>("[data-start-action]");
+    if (!item) return;
+    close();
+
+    switch (item.dataset.startAction) {
+      case "add": {
+        const input = document.getElementById("url-input");
+        if (input instanceof HTMLInputElement) {
+          input.scrollIntoView({ block: "center" });
+          input.focus();
+        }
+        break;
+      }
+      case "pick": {
+        document.getElementById("pick-random-btn")?.click();
+        break;
+      }
+      case "search": {
+        // Defer past the current click event — the document-level
+        // outside-click handler would close the panel this opens.
+        setTimeout(() => {
+          const toggle = document.getElementById("browse-search-toggle");
+          const search = document.getElementById("browse-search");
+          // On small screens the search input lives behind a toggle; open
+          // the panel first, then focus.
+          if (toggle instanceof HTMLElement && toggle.offsetParent !== null) {
+            if (toggle.getAttribute("aria-expanded") !== "true") {
+              toggle.click();
+            }
+          } else {
+            search?.scrollIntoView({ block: "center" });
+          }
+          if (search instanceof HTMLInputElement) {
+            search.focus();
+          }
+        }, 0);
+        break;
+      }
+      case "stacks": {
+        const manageBtn = document.getElementById("manage-stacks-btn");
+        const panel = document.getElementById("stack-manage");
+        if (manageBtn instanceof HTMLElement && panel instanceof HTMLElement && panel.hidden) {
+          manageBtn.click();
+        }
+        panel?.scrollIntoView({ block: "nearest" });
+        break;
+      }
+    }
   });
 }
 
