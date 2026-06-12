@@ -2057,9 +2057,88 @@ a:hover {
   font-weight: bold;
   font-size: var(--text-base);
   background: var(--chrome);
-  cursor: default;
+  cursor: pointer;
   padding: 0 8px;
   text-align: left;
+}
+
+#taskbar-start[aria-expanded="true"] {
+  border-color: var(--bevel-sunken);
+  background: var(--chrome-mid);
+}
+
+/* ── Start menu ── */
+.start-menu {
+  position: absolute;
+  bottom: calc(100% + 1px);
+  left: 2px;
+  display: flex;
+  min-width: 220px;
+  background: var(--chrome);
+  border-width: 2px;
+  border-style: solid;
+  border-color: var(--bevel-raised);
+  box-shadow: var(--shadow-menu);
+}
+
+.start-menu[hidden] {
+  display: none;
+}
+
+.start-menu__banner {
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+  background: linear-gradient(0deg, var(--win-blue), #0a2a5c);
+  color: #ffffff;
+  font-family: var(--font-display);
+  font-weight: bold;
+  font-size: var(--text-lg);
+  letter-spacing: 0.12em;
+  padding: var(--space-4) var(--space-1);
+  text-align: right;
+  user-select: none;
+}
+
+.start-menu__items {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  padding: var(--space-1);
+}
+
+.start-menu__item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  min-height: var(--touch-icon);
+  padding: var(--space-2) var(--space-6) var(--space-2) var(--space-3);
+  border: none;
+  background: transparent;
+  color: #000000;
+  font-family: var(--font-ui);
+  font-size: var(--text-md);
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.start-menu__item:hover,
+.start-menu__item:focus-visible {
+  background: var(--win-blue);
+  color: #ffffff;
+  outline: none;
+}
+
+.start-menu__icon {
+  width: 20px;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+.start-menu__divider {
+  border-top: 1px solid var(--chrome-dark);
+  border-bottom: 1px solid var(--chrome-white);
+  margin: var(--space-1) var(--space-2);
 }
 
 #taskbar-start:active {
