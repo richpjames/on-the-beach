@@ -633,6 +633,32 @@ select.input {
   margin-bottom: 0;
 }
 
+/* Desktop/tablet: stack tabs and the filter toolbar read as one browse
+   panel — a single raised frame, no gap — and the stack scrollbar only
+   appears when the tabs actually overflow. (Small screens dock the filter
+   section at the bottom instead; see the mobile block.) */
+@media (min-width: 521px) {
+  .stack-scrollbar.is-disabled {
+    display: none;
+  }
+
+  .stack-section {
+    background: var(--chrome-panel);
+    border-width: 2px 2px 0 2px;
+    border-style: solid;
+    border-color: var(--bevel-raised);
+  }
+
+  .filter-section {
+    margin-top: calc(-1 * var(--space-2));
+    background: var(--chrome-panel);
+    border-width: 0 2px 2px 2px;
+    border-style: solid;
+    border-color: var(--bevel-raised);
+    padding: var(--space-1) var(--space-2) var(--space-2);
+  }
+}
+
 .stack-bar-shell {
   display: flex;
   flex-direction: column;
