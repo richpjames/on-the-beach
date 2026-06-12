@@ -2,7 +2,7 @@ import Case from "case";
 import type { LinkReleaseCandidate, MusicItemFull, StackWithCount } from "../../types";
 import { renderStarRatingControl } from "../components/star-rating";
 import type { FilterSelection } from "../domain/music-list";
-import { getEmptyStateMessage } from "../domain/music-list";
+import { getEmptyStateHint, getEmptyStateMessage } from "../domain/music-list";
 import { STATUS_LABELS } from "../domain/status";
 
 export function renderMusicList(
@@ -12,9 +12,12 @@ export function renderMusicList(
 ): string {
   if (items.length === 0) {
     const message = escapeHtml(getEmptyStateMessage(currentFilter, searchQuery));
+    const hint = getEmptyStateHint(currentFilter, searchQuery);
     return `
       <div class="empty-state">
-        <p>${message}</p>
+        <img class="empty-state__mascot" src="/favicon-32x32.png" alt="" width="64" height="64" />
+        <p class="empty-state__headline">${message}<span class="empty-state__cursor" aria-hidden="true"></span></p>
+        ${hint ? `<p class="empty-state__hint">${escapeHtml(hint)}</p>` : ""}
       </div>
     `;
   }
