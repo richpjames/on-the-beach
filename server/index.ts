@@ -54,6 +54,14 @@ if (process.env.NODE_ENV === "test") {
   app.route("/api/__test__", testRoutes);
 }
 
+// ---------- Preview deployments ----------
+// Preview environments start with an empty database; PREVIEW_SEED=1 fills it
+// with demo content so the preview is explorable. No-op once data exists.
+if (process.env.PREVIEW_SEED === "1") {
+  const { seedPreviewData } = await import("./preview-seed");
+  await seedPreviewData();
+}
+
 // ---------- Environment ----------
 const isDev = process.env.NODE_ENV !== "production";
 const preferredPort = Number(process.env.PORT) || 3000;
