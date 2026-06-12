@@ -1557,6 +1557,16 @@ select.input {
   justify-content: center;
 }
 
+.music-card.music-card--roulette {
+  background: var(--win-blue);
+  box-shadow: inset 0 0 0 2px var(--accent);
+}
+
+.music-card--roulette .music-card__title,
+.music-card--roulette .music-card__artist {
+  color: #ffffff;
+}
+
 .music-card__menu-panel {
   position: absolute;
   top: calc(100% + 4px);
