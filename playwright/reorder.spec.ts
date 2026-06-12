@@ -80,9 +80,11 @@ test.describe("Reorder (touch)", () => {
     await expect
       .poll(() => getCardTitles(page))
       .toEqual([initialTitles[0], initialTitles[2], initialTitles[1]]);
+    await waitForListSettled(page);
 
     await dragCardByIndexWithTouchHandle(page, 2, 1, "before");
     await expect.poll(() => getCardTitles(page)).toEqual(initialTitles);
+    await waitForListSettled(page);
 
     await dragCardByIndexWithTouchHandle(page, 0, 2, "after");
     await expect.poll(() => getCardTitles(page)).toEqual(expectedTitles);
@@ -95,6 +97,38 @@ test.describe("Reorder (touch)", () => {
 
 async function getCardTitles(page: Page): Promise<string[]> {
   return page.locator(".music-card .music-card__title").allTextContents();
+}
+
+/**
+ * The app re-renders the list after persisting a reorder, replacing card
+ * nodes. The title poll can pass against the pre-render DOM, so a drag
+ * started immediately afterwards may grab a handle that is replaced
+ * mid-gesture and silently no-op. Wait for childList mutations to stop
+ * before the next drag.
+ */
+async function waitForListSettled(page: Page): Promise<void> {
+  await page.evaluate(
+    () =>
+      new Promise<void>((resolve) => {
+        const list = document.querySelector(".music-list");
+        if (!list) {
+          resolve();
+          return;
+        }
+        let timer = window.setTimeout(() => {
+          observer.disconnect();
+          resolve();
+        }, 250);
+        const observer = new MutationObserver(() => {
+          window.clearTimeout(timer);
+          timer = window.setTimeout(() => {
+            observer.disconnect();
+            resolve();
+          }, 250);
+        });
+        observer.observe(list, { childList: true, subtree: true });
+      }),
+  );
 }
 
 async function dragCardByIndexWithMouse(
