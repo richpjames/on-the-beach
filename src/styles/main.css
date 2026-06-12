@@ -1231,6 +1231,13 @@ select.input {
     padding-bottom: 100px;
   }
 
+  /* scrollIntoView targets (roulette, reorder) must land clear of the fixed
+     dock and taskbar overlay. */
+  .music-card {
+    scroll-margin-top: var(--space-4);
+    scroll-margin-bottom: 150px;
+  }
+
   body:not(.release-page-body) .main {
     flex: 0 0 auto;
   }
@@ -1545,6 +1552,10 @@ select.input {
   .rating-stars.star-rating--large .rating-stars__star {
     width: 44px;
     height: 44px;
+  }
+
+  .clock-popup .clock-popup__item {
+    min-height: 36px;
   }
 }
 
