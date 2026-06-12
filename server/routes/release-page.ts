@@ -287,15 +287,6 @@ function renderReleasePage(item: MusicItemFull, cssHref: string): string {
                 </div>
               </div>
 
-              <div class="release-page__edit-stacks">
-                <div class="release-page__edit-stacks-header">Stacks</div>
-                <div id="stack-chips" class="release-page__stacks release-page__stacks--inline"></div>
-                <div id="stack-picker-list" class="release-page__edit-stacks-list"></div>
-                <div class="release-page__edit-stacks-new">
-                  <input type="text" class="input stack-dropdown__new-input" id="new-stack-input" placeholder="New stack…" />
-                </div>
-              </div>
-
               <div class="release-page__status">
                 <label for="status-select">Status</label>
                 <select id="status-select" class="status-select">${statusOptions}</select>
@@ -306,6 +297,15 @@ function renderReleasePage(item: MusicItemFull, cssHref: string): string {
                 <input class="input" type="date" id="remind-at" value="${escapeHtml(reminderDateValue(item))}" />
                 <button type="button" class="btn btn--primary" id="set-reminder-btn">Set reminder</button>
                 ${item.remind_at ? `<button type="button" class="btn" id="clear-reminder-btn">Clear</button>` : ""}
+              </div>
+
+              <div class="release-page__edit-stacks">
+                <div class="release-page__edit-stacks-header">Stacks</div>
+                <div id="stack-chips" class="release-page__stacks release-page__stacks--inline"></div>
+                <div id="stack-picker-list" class="release-page__edit-stacks-list"></div>
+                <div class="release-page__edit-stacks-new">
+                  <input type="text" class="input stack-dropdown__new-input" id="new-stack-input" placeholder="New stack…" />
+                </div>
               </div>
 
               <div class="release-page__footer">
