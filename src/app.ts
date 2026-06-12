@@ -180,6 +180,7 @@ function readServerState(): { stacks: StackWithCount[] } | null {
 function initializeUI(hasServerData: boolean): void {
   setupFilterBar();
   setupPickRandom();
+  setupClockReminders();
   setupBrowseControls();
   setupStackBar();
   setupStackManagePanel();
@@ -778,6 +779,86 @@ function setupFilterBar(): void {
     });
     syncDateListenedOption();
   });
+}
+
+function setupClockReminders(): void {
+  const clockBtn = document.getElementById("taskbar-clock");
+  const popup = document.getElementById("clock-popup");
+  const list = document.getElementById("clock-popup-list");
+  if (
+    !(clockBtn instanceof HTMLButtonElement) ||
+    !(popup instanceof HTMLElement) ||
+    !(list instanceof HTMLElement)
+  ) {
+    return;
+  }
+
+  const close = (): void => {
+    popup.hidden = true;
+    clockBtn.setAttribute("aria-expanded", "false");
+  };
+
+  const renderReminders = async (): Promise<void> => {
+    list.innerHTML = '<div class="clock-popup__empty">Loading…</div>';
+    const result = await api.listMusicItems({ hasReminder: true });
+    const upcoming = result.items
+      .filter((item) => item.remind_at)
+      .sort((a, b) => (a.remind_at! < b.remind_at! ? -1 : 1))
+      .slice(0, 6);
+
+    if (upcoming.length === 0) {
+      list.innerHTML =
+        '<div class="clock-popup__empty">No reminders scheduled. Set one from a release page.</div>';
+      return;
+    }
+
+    const now = Date.now();
+    list.innerHTML = upcoming
+      .map((item) => {
+        const when = new Date(item.remind_at!);
+        const due = when.getTime() <= now;
+        const date = when.toLocaleDateString("en-GB", {
+          weekday: "short",
+          day: "numeric",
+          month: "short",
+        });
+        const label = `${item.artist_name ? `${item.artist_name} — ` : ""}${item.title}`;
+        return `
+          <a class="clock-popup__item${due ? " clock-popup__item--due" : ""}" href="/r/${item.id}">
+            <span class="clock-popup__date">${due ? "⏰ " : ""}${escapeHtml(date)}</span>
+            <span class="clock-popup__label">${escapeHtml(label)}</span>
+          </a>
+        `;
+      })
+      .join("");
+  };
+
+  clockBtn.addEventListener("click", () => {
+    const opening = popup.hidden;
+    popup.hidden = !opening;
+    clockBtn.setAttribute("aria-expanded", String(opening));
+    if (opening) {
+      void renderReminders();
+    }
+  });
+
+  document.addEventListener("click", (event) => {
+    if (popup.hidden) return;
+    const target = event.target;
+    if (target instanceof Node && (popup.contains(target) || clockBtn.contains(target))) {
+      return;
+    }
+    close();
+  });
+
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && !popup.hidden) {
+      close();
+    }
+  });
+
+  // Navigating away via a reminder link should leave the popup closed.
+  list.addEventListener("click", () => close());
 }
 
 function setupPickRandom(): void {
