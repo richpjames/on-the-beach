@@ -645,7 +645,11 @@ function renderMainPage(opts: {
         <span aria-hidden="true">♫</span>
         <span id="taskbar-np-label"></span>
       </button>
-      <span id="taskbar-clock" class="taskbar__clock"></span>
+      <div id="clock-popup" class="clock-popup" hidden>
+        <div class="clock-popup__title">📅 Scheduled reminders</div>
+        <div id="clock-popup-list" class="clock-popup__list"></div>
+      </div>
+      <button id="taskbar-clock" class="taskbar__clock" aria-haspopup="true" aria-expanded="false" title="Scheduled reminders"></button>
     </div>
     <script id="__initial_state__" type="application/json">${opts.stacksJson}</script>${viteClient}
     <script type="module" src="${escapeHtml(opts.scriptSrc)}"></script>

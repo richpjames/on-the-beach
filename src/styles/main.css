@@ -1463,6 +1463,10 @@ select.input {
     width: 44px;
     height: 44px;
   }
+
+  .clock-popup .clock-popup__item {
+    min-height: 36px;
+  }
 }
 
 .music-card__menu-toggle {
@@ -2100,6 +2104,83 @@ a:hover {
   padding: 0 8px;
   display: flex;
   align-items: center;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+
+.taskbar__clock[aria-expanded="true"] {
+  background: var(--chrome-mid);
+}
+
+/* ── Clock popup: upcoming scheduled reminders ── */
+.clock-popup {
+  position: absolute;
+  bottom: calc(100% + 1px);
+  right: 2px;
+  min-width: 250px;
+  max-width: min(92vw, 320px);
+  background: var(--chrome);
+  border-width: 2px;
+  border-style: solid;
+  border-color: var(--bevel-raised);
+  box-shadow: var(--shadow-menu);
+  padding: var(--space-1);
+}
+
+.clock-popup__title {
+  background: linear-gradient(90deg, var(--win-blue), #0a2a5c);
+  color: #ffffff;
+  font-weight: bold;
+  font-size: var(--text-xs);
+  padding: var(--space-1) var(--space-3);
+  margin-bottom: var(--space-1);
+}
+
+.clock-popup__item {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-3);
+  width: 100%;
+  min-height: var(--control-h-sm);
+  padding: var(--space-2) var(--space-3);
+  color: #000000;
+  font-size: var(--text-base);
+  text-decoration: none;
+}
+
+.clock-popup__item:hover,
+.clock-popup__item:focus-visible {
+  background: var(--win-blue);
+  color: #ffffff;
+  outline: none;
+}
+
+.clock-popup__date {
+  font-weight: bold;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.clock-popup__item--due .clock-popup__date {
+  color: var(--led-red, #c0392b);
+}
+
+.clock-popup__item--due:hover .clock-popup__date,
+.clock-popup__item--due:focus-visible .clock-popup__date {
+  color: #ffd3cc;
+}
+
+.clock-popup__label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.clock-popup__empty {
+  padding: var(--space-3);
+  font-size: var(--text-base);
+  color: var(--chrome-dark);
 }
 
 /* ═══════════════════════════════════════════════════
