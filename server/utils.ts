@@ -83,6 +83,13 @@ const URL_PATTERNS: Array<{
     }),
   },
   {
+    // The Lot Radio episode URLs are /shows/{category}/{date-slug}; neither
+    // segment is a usable artist/title, so leave extraction to the OG parser
+    // (the page exposes clean og:title / og:image, just deep in the body).
+    source: "lot_radio",
+    pattern: /^https?:\/\/(?:www\.)?thelotradio\.com\/shows\/[^/]+\/[^/?]+/,
+  },
+  {
     // Pitchfork review slugs concatenate artist(s) and album with hyphens, so
     // they can't be split reliably from the URL alone — leave artist/title for
     // the page scraper to recover from OG tags / JSON-LD.

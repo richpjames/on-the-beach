@@ -22,6 +22,7 @@ export type SourceName =
   | "deezer"
   | "mixcloud"
   | "nts"
+  | "lot_radio"
   | "pitchfork"
   | "physical"
   | "unknown";

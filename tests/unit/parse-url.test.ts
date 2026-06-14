@@ -142,6 +142,37 @@ describe("parseUrl - nts", () => {
   });
 });
 
+describe("parseUrl - the lot radio", () => {
+  test("identifies a Lot Radio episode link", () => {
+    const result = parseUrl("https://www.thelotradio.com/shows/special-guests/2026-05-09-1800");
+
+    expect(result.source).toBe("lot_radio");
+  });
+
+  test("matches thelotradio.com without www prefix", () => {
+    const result = parseUrl("https://thelotradio.com/shows/special-guests/2026-05-09-1800");
+
+    expect(result.source).toBe("lot_radio");
+  });
+
+  test("strips query params from normalized URL", () => {
+    const result = parseUrl(
+      "https://www.thelotradio.com/shows/special-guests/2026-05-09-1800?utm_source=x",
+    );
+
+    expect(result.normalizedUrl).toBe(
+      "https://www.thelotradio.com/shows/special-guests/2026-05-09-1800",
+    );
+  });
+
+  test("does not extract artist or title from the date/category slug", () => {
+    const result = parseUrl("https://www.thelotradio.com/shows/special-guests/2026-05-09-1800");
+
+    expect(result.potentialArtist).toBeUndefined();
+    expect(result.potentialTitle).toBeUndefined();
+  });
+});
+
 describe("parseUrl - pitchfork", () => {
   test("identifies a Pitchfork album review URL", () => {
     const result = parseUrl(

@@ -15,6 +15,7 @@ import {
   extractMixcloudEmbedUrl,
   searchAppleMusic,
   parseNtsOg,
+  parseLotRadioOg,
   parsePitchforkOg,
   parsePitchforkJsonLd,
   parseCanonicalUrl,
@@ -463,6 +464,44 @@ describe("detectMusicRelatedHtml", () => {
     });
     expect(result.isMusicRelated).toBe(false);
   });
+
+  test("treats an og:video HLS stream as a music signal when body is chrome-only", () => {
+    // Mirrors The Lot Radio: nav-only visible text, no music vocabulary, but an
+    // og:video pointing at an HLS audio stream.
+    const html = `<html><body><nav>Live Index Shows Artists Calendar Events About Shop</nav></body></html>`;
+    const result = detectMusicRelatedHtml(html, {
+      url: "https://www.thelotradio.com/shows/special-guests/2026-05-09-1800",
+      og: {
+        ogTitle: "Actress - The Lot Radio",
+        metaTags: {
+          "og:video":
+            "https://link.storjshare.io/raw/abc/thelot-archive/episodes/xyz/hls/index.m3u8",
+        },
+      },
+    });
+    expect(result.isMusicRelated).toBe(true);
+    expect(result.matchedTerms).toContain("media:stream");
+  });
+
+  test("treats music.* og:type as a music signal", () => {
+    const result = detectMusicRelatedHtml(
+      `<html><body><nav>Home About Contact</nav></body></html>`,
+      {
+        og: { ogTitle: "Some Set", metaTags: { "og:type": "music.radio_station" } },
+      },
+    );
+    expect(result.isMusicRelated).toBe(true);
+  });
+
+  test("does not treat a non-streaming og:video as a music signal", () => {
+    const result = detectMusicRelatedHtml(`<html><body><h1>Spring sale</h1></body></html>`, {
+      og: {
+        ogTitle: "Spring Sale",
+        metaTags: { "og:video": "https://example.com/promo.html" },
+      },
+    });
+    expect(result.isMusicRelated).toBe(false);
+  });
 });
 
 describe("scrapeUrl", () => {
@@ -573,6 +612,33 @@ describe("scrapeUrl", () => {
     );
     const result = await scrapeUrl("https://example.com", "unknown", 50);
     expect(result).toBeNull();
+    mock.restore();
+  });
+
+  test("reads Lot Radio OG tags from the body (not just the head)", async () => {
+    // The Lot Radio is a Next.js app that streams its og:* tags deep into the
+    // body, long after </head>. The scraper must keep reading past the head.
+    const html = `<html><head><title>The Lot Radio</title></head><body>
+      <nav>Live Index Shows Artists Calendar</nav>
+      <meta property="og:title" content="Actress - The Lot Radio" />
+      <meta property="og:image" content="https://www.thelotradio.com/shows/special-guests/2026-05-09-1800/og" />
+      <meta property="og:video" content="https://link.storjshare.io/raw/abc/hls/index.m3u8" />
+    </body></html>`;
+
+    spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      new Response(html, { headers: { "content-type": "text/html; charset=utf-8" } }),
+    );
+
+    const result = await scrapeUrl(
+      "https://www.thelotradio.com/shows/special-guests/2026-05-09-1800",
+      "lot_radio",
+    );
+    expect(result).not.toBeNull();
+    expect(result!.potentialTitle).toBe("Actress");
+    expect(result!.itemType).toBe("mix");
+    expect(result!.imageUrl).toBe(
+      "https://www.thelotradio.com/shows/special-guests/2026-05-09-1800/og",
+    );
     mock.restore();
   });
 
@@ -1158,6 +1224,40 @@ describe("parseNtsOg", () => {
     const og = { ogTitle: "Tropic Of Cancer - 6th March 2026" };
     const result = parseNtsOg(og);
     expect(result.potentialTitle).toBe("Tropic Of Cancer - 6th March 2026");
+    expect(result.itemType).toBe("mix");
+  });
+});
+
+describe("parseLotRadioOg", () => {
+  test("strips '- The Lot Radio' suffix from title", () => {
+    const result = parseLotRadioOg({ ogTitle: "Actress - The Lot Radio" });
+    expect(result.potentialTitle).toBe("Actress");
+  });
+
+  test("strips '| The Lot Radio' suffix from title", () => {
+    const result = parseLotRadioOg({ ogTitle: "Special Guests | The Lot Radio" });
+    expect(result.potentialTitle).toBe("Special Guests");
+  });
+
+  test("strips 'on The Lot Radio' suffix from title", () => {
+    const result = parseLotRadioOg({ ogTitle: "Actress on The Lot Radio" });
+    expect(result.potentialTitle).toBe("Actress");
+  });
+
+  test("sets itemType to mix and returns og:image", () => {
+    const result = parseLotRadioOg({
+      ogTitle: "Actress - The Lot Radio",
+      ogImage: "https://www.thelotradio.com/shows/special-guests/2026-05-09-1800/og",
+    });
+    expect(result.itemType).toBe("mix");
+    expect(result.imageUrl).toBe(
+      "https://www.thelotradio.com/shows/special-guests/2026-05-09-1800/og",
+    );
+  });
+
+  test("handles title with no Lot Radio suffix", () => {
+    const result = parseLotRadioOg({ ogTitle: "Actress" });
+    expect(result.potentialTitle).toBe("Actress");
     expect(result.itemType).toBe("mix");
   });
 });

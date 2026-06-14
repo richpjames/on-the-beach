@@ -29,7 +29,10 @@ export interface ScrapedMetadata {
 type OgParser = (og: OgData) => ScrapedMetadata;
 
 const MAX_HEAD_BYTES = 100_000;
-const MAX_UNKNOWN_HTML_BYTES = 250_000;
+// Some JS-rendered pages (e.g. Next.js apps) stream their <meta> tags and real
+// content deep into the body, well past the old 250KB cap. Read further before
+// giving up so OG tags and music vocabulary aren't truncated away.
+const MAX_UNKNOWN_HTML_BYTES = 500_000;
 const UNKNOWN_TEXT_SNIPPET_CHARS = 24_000;
 
 const STRONG_MUSIC_TERMS = [
@@ -137,6 +140,11 @@ function stripHtmlForAnalysis(html: string): string {
       .replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi, " ")
       .replace(/<noscript\b[^>]*>[\s\S]*?<\/noscript>/gi, " ")
       .replace(/<svg\b[^>]*>[\s\S]*?<\/svg>/gi, " ")
+      // A truncated read can end mid-<script>/<style> with no closing tag. The
+      // paired patterns above can't remove it, so strip from the dangling
+      // opening tag to end-of-input — otherwise raw JS/JSON (e.g. a Next.js RSC
+      // payload) leaks into the "visible text" and skews music detection.
+      .replace(/<(?:script|style)\b[^>]*>[\s\S]*$/i, " ")
       .replace(/<[^>]+>/g, " ")
       .replace(/\s+/g, " "),
   ).trim();
@@ -153,6 +161,35 @@ function buildMusicSignalText(html: string, { url, og }: MusicSignalContext): st
     parts.push(decodeURIComponent(pathname).replace(/[-_/]+/g, " "));
   }
   return parts.join(" ");
+}
+
+// Audio/streaming media file extensions. An og:video/og:audio that points at one
+// of these is a strong "this page plays music/audio" signal even when the visible
+// text is just site chrome (common on JS-rendered radio/DJ-set pages).
+const MEDIA_STREAM_PATTERN = /\.(?:m3u8|mpd|mp3|m4a|aac|ogg|oga|wav|flac)(?:[?#]|$)/i;
+
+/**
+ * Detect structured "this is audio/music media" hints from OG/meta tags. These
+ * survive body truncation because they live alongside other meta tags, and they
+ * catch pages whose only music vocabulary is locked inside scripts/JSON.
+ */
+export function detectMediaSignal(og: OgData | undefined): boolean {
+  const meta = og?.metaTags;
+  if (!meta) return false;
+
+  const ogType = meta["og:type"]?.toLowerCase() ?? "";
+  if (ogType.startsWith("music.") || ogType.startsWith("music:")) return true;
+
+  if (meta["og:audio"] || meta["og:audio:url"] || meta["music:song"] || meta["music:musician"]) {
+    return true;
+  }
+
+  const video =
+    meta["og:video"] ||
+    meta["og:video:url"] ||
+    meta["og:video:secure_url"] ||
+    meta["twitter:player:stream"];
+  return Boolean(video && MEDIA_STREAM_PATTERN.test(video));
 }
 
 export function detectMusicRelatedHtml(
@@ -177,8 +214,13 @@ export function detectMusicRelatedHtml(
   const strongMatchCount = STRONG_MUSIC_TERMS.filter((term) => matchedTerms.has(term)).length;
   const weakMatchCount = WEAK_MUSIC_TERMS.filter((term) => matchedTerms.has(term)).length;
 
+  const hasMediaSignal = detectMediaSignal(context.og);
+  if (hasMediaSignal) {
+    matchedTerms.add("media:stream");
+  }
+
   return {
-    isMusicRelated: strongMatchCount > 0 || weakMatchCount >= 2,
+    isMusicRelated: hasMediaSignal || strongMatchCount > 0 || weakMatchCount >= 2,
     matchedTerms: [...matchedTerms],
   };
 }
@@ -940,12 +982,30 @@ export function parseNtsOg(og: OgData): ScrapedMetadata {
   };
 }
 
+// The Lot Radio og:title is "{Artist/Show} - The Lot Radio" (occasionally with a
+// "| The Lot Radio" / "on The Lot Radio" suffix). Like NTS, episodes are DJ sets,
+// so they map to itemType "mix".
+export function parseLotRadioOg(og: OgData): ScrapedMetadata {
+  const rawTitle = og.ogTitle || og.title || "";
+  const title = rawTitle
+    .replace(/\s*[-|]\s*The Lot Radio\s*$/i, "")
+    .replace(/\s+on\s+The Lot Radio\s*$/i, "")
+    .trim();
+
+  return {
+    potentialTitle: title || undefined,
+    imageUrl: og.ogImage,
+    itemType: "mix",
+  };
+}
+
 export const SOURCE_PARSERS: Partial<Record<SourceName, OgParser>> = {
   bandcamp: parseBandcampOg,
   soundcloud: parseSoundcloudOg,
   apple_music: parseAppleMusicOg,
   mixcloud: parseMixcloudOg,
   nts: parseNtsOg,
+  lot_radio: parseLotRadioOg,
   pitchfork: parsePitchforkOg,
 };
 
@@ -1027,15 +1087,18 @@ export async function scrapeUrl(
 
     let html = "";
     const decoder = new TextDecoder();
-    // Bandcamp needs body content too (TralbumData JS is in the body)
-    const maxBytes =
-      source === "unknown" || source === "bandcamp" ? MAX_UNKNOWN_HTML_BYTES : MAX_HEAD_BYTES;
+    // Some sources need body content, not just the <head>:
+    //  - bandcamp: TralbumData JS lives in the body
+    //  - lot_radio: Next.js streams its og:* tags deep into the body
+    //  - unknown: arbitrary pages whose music signal may be anywhere
+    const readsBody = source === "unknown" || source === "bandcamp" || source === "lot_radio";
+    const maxBytes = readsBody ? MAX_UNKNOWN_HTML_BYTES : MAX_HEAD_BYTES;
 
     while (html.length < maxBytes) {
       const { done, value } = await reader.read();
       if (done) break;
       html += decoder.decode(value, { stream: true });
-      if (source === "unknown" || source === "bandcamp") {
+      if (readsBody) {
         if (html.includes("</body>")) break;
       } else if (html.includes("</head>")) {
         break;
