@@ -19,6 +19,12 @@
 - Cover Art Archive fetches can save richer artwork when a MusicBrainz release ID is found.
 - Apple Music links can be backfilled for playable releases.
 
+## Apple Music backfill
+
+- `server/apple-music-backfill.ts` holds the shared backfill logic. `backfillAppleMusicLink` looks up a release on the iTunes Search API and saves a confident match as a secondary Apple Music link. It is idempotent: it skips releases whose primary link is already Apple Music and leaves any existing Apple Music link untouched.
+- When a non-Apple-Music item is added (via the API, email/link ingest, or photo ingest) `scheduleAppleMusicBackfill` runs the lookup in the background, so a playable Apple Music link is usually ready before the release page is opened.
+- `POST /api/release/apple-music-lookup/:id` exposes the same logic on demand and is still used as a lazy fallback from the release page for older items.
+
 ## Frontend tie-in
 
 `src/ui/state/add-form-machine.ts` runs upload and scan in parallel, then uses MusicBrainz lookup as a non-fatal enrichment step before final item creation.

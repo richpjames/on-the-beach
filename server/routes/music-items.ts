@@ -25,6 +25,7 @@ import {
 import { hydrateItemStacks } from "../hydrate-item-stacks";
 import { UnsupportedMusicLinkError } from "../scraper";
 import { fetchAndStoreSuggestion } from "../suggestions";
+import { scheduleAppleMusicBackfill } from "../apple-music-backfill";
 import type {
   CreateMusicItemInput,
   UpdateMusicItemInput,
@@ -366,6 +367,12 @@ musicItemRoutes.post("/", async (c) => {
         year: result.item.year,
         musicbrainz_artist_id: result.item.musicbrainz_artist_id,
       });
+    }
+    // Newly added non-Apple-Music releases get an Apple Music link backfilled in
+    // the background, so a playable secondary link is ready by the time the
+    // release page is opened. No-ops if the primary link is already Apple Music.
+    if (result.created) {
+      scheduleAppleMusicBackfill(result.item.id);
     }
     return c.json(result.item, 201);
   } catch (err) {
