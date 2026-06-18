@@ -1,5 +1,4 @@
 import { Hono } from "hono";
-import { eq, and } from "drizzle-orm";
 import { extractReleaseInfo, extractReleaseInfoFromWebContext } from "../vision";
 import { getWebContext } from "../google-vision";
 import { lookupRelease } from "../musicbrainz";
@@ -8,11 +7,28 @@ import { createScanEnricher } from "../scan-enricher";
 import type { ScanResult } from "../../src/types";
 import type { MusicBrainzFields } from "../musicbrainz";
 import { saveImageFromBase64, validateImageBase64 } from "../uploads";
-import { searchAppleMusic } from "../scraper";
-import { parseUrl } from "../utils";
 import { db } from "../db/index";
-import { musicItems, musicLinks, sources, artists } from "../db/schema";
+import { sources } from "../db/schema";
 import { recognizeAudio, isAcrCloudConfigured } from "../acrcloud";
+import {
+  backfillAppleMusicLink,
+  defaultAppleMusicBackfillDeps,
+  PLAYABLE_SOURCES,
+  type ItemInfoForLookup,
+  type FetchItemForLookupFn,
+  type GetExistingAppleMusicLinkFn,
+  type SaveAppleMusicLinkFn,
+  type SearchAppleMusicFn,
+} from "../apple-music-backfill";
+
+export { PLAYABLE_SOURCES };
+export type {
+  ItemInfoForLookup,
+  FetchItemForLookupFn,
+  GetExistingAppleMusicLinkFn,
+  SaveAppleMusicLinkFn,
+  SearchAppleMusicFn,
+};
 
 interface ScanRequestBody {
   imageBase64?: unknown;
@@ -31,94 +47,6 @@ export type FetchCoverArtFn = (
   saveImage: SaveReleaseImageFn,
 ) => Promise<string | null>;
 
-export type SearchAppleMusicFn = (title: string, artist: string | null) => Promise<string | null>;
-
-export interface ItemInfoForLookup {
-  title: string;
-  artistName: string | null;
-  primarySource: string | null;
-  primaryUrl: string | null;
-}
-
-export type FetchItemForLookupFn = (id: number) => Promise<ItemInfoForLookup | null>;
-
-export type SaveAppleMusicLinkFn = (itemId: number, url: string) => Promise<void>;
-
-export type GetExistingAppleMusicLinkFn = (itemId: number) => Promise<string | null>;
-
-export const PLAYABLE_SOURCES = new Set([
-  "bandcamp",
-  "spotify",
-  "soundcloud",
-  "youtube",
-  "apple_music",
-  "tidal",
-  "deezer",
-  "mixcloud",
-]);
-
-async function defaultFetchItemForLookup(id: number): Promise<ItemInfoForLookup | null> {
-  const rows = await db
-    .select({
-      title: musicItems.title,
-      artistName: artists.name,
-      primarySource: sources.name,
-      primaryUrl: musicLinks.url,
-    })
-    .from(musicItems)
-    .leftJoin(artists, eq(musicItems.artistId, artists.id))
-    .leftJoin(
-      musicLinks,
-      and(eq(musicLinks.musicItemId, musicItems.id), eq(musicLinks.isPrimary, true)),
-    )
-    .leftJoin(sources, eq(musicLinks.sourceId, sources.id))
-    .where(eq(musicItems.id, id))
-    .limit(1);
-
-  const row = rows[0];
-  if (!row) return null;
-
-  return {
-    title: row.title,
-    artistName: row.artistName ?? null,
-    primarySource: row.primarySource ?? null,
-    primaryUrl: row.primaryUrl ?? null,
-  };
-}
-
-async function defaultGetExistingAppleMusicLink(itemId: number): Promise<string | null> {
-  const rows = await db
-    .select({ url: musicLinks.url })
-    .from(musicLinks)
-    .innerJoin(sources, eq(musicLinks.sourceId, sources.id))
-    .where(and(eq(musicLinks.musicItemId, itemId), eq(sources.name, "apple_music")))
-    .limit(1);
-
-  return rows[0]?.url ?? null;
-}
-
-async function defaultSaveAppleMusicLink(itemId: number, url: string): Promise<void> {
-  const sourceRows = await db
-    .select({ id: sources.id })
-    .from(sources)
-    .where(eq(sources.name, "apple_music"))
-    .limit(1);
-
-  const sourceId = sourceRows[0]?.id ?? null;
-
-  try {
-    await db.insert(musicLinks).values({
-      musicItemId: itemId,
-      sourceId,
-      url,
-      isPrimary: false,
-      metadata: null,
-    });
-  } catch {
-    // Likely a unique constraint violation — link already exists
-  }
-}
-
 export function createReleaseRoutes(
   scanReleaseCover: ExtractReleaseInfoFn = createScanEnricher(
     extractReleaseInfo,
@@ -129,10 +57,10 @@ export function createReleaseRoutes(
   saveImage: SaveReleaseImageFn = saveImageFromBase64,
   lookupReleaseFn: LookupReleaseFn = lookupRelease,
   fetchCoverArtFn: FetchCoverArtFn = fetchAndSaveCoverArt,
-  searchAppleMusicFn: SearchAppleMusicFn = searchAppleMusic,
-  fetchItemForLookupFn: FetchItemForLookupFn = defaultFetchItemForLookup,
-  getExistingAppleMusicLinkFn: GetExistingAppleMusicLinkFn = defaultGetExistingAppleMusicLink,
-  saveAppleMusicLinkFn: SaveAppleMusicLinkFn = defaultSaveAppleMusicLink,
+  searchAppleMusicFn: SearchAppleMusicFn = defaultAppleMusicBackfillDeps.search,
+  fetchItemForLookupFn: FetchItemForLookupFn = defaultAppleMusicBackfillDeps.fetchItem,
+  getExistingAppleMusicLinkFn: GetExistingAppleMusicLinkFn = defaultAppleMusicBackfillDeps.getExistingLink,
+  saveAppleMusicLinkFn: SaveAppleMusicLinkFn = defaultAppleMusicBackfillDeps.saveLink,
 ): Hono {
   const routes = new Hono();
 
@@ -241,32 +169,24 @@ export function createReleaseRoutes(
       return c.json({ error: "Invalid ID" }, 400);
     }
 
-    const item = await fetchItemForLookupFn(id);
-    if (!item) {
-      return c.json({ error: "Not found" }, 404);
+    const result = await backfillAppleMusicLink(id, {
+      fetchItem: fetchItemForLookupFn,
+      getExistingLink: getExistingAppleMusicLinkFn,
+      saveLink: saveAppleMusicLinkFn,
+      search: searchAppleMusicFn,
+    });
+
+    switch (result.status) {
+      case "item_missing":
+        return c.json({ error: "Not found" }, 404);
+      case "skipped":
+        return c.json({ skipped: true }, 200);
+      case "existing":
+      case "added":
+        return c.json({ url: result.url }, 200);
+      case "not_found":
+        return c.json({ url: null }, 200);
     }
-
-    if (
-      item.primaryUrl &&
-      (parseUrl(item.primaryUrl).source === "apple_music" ||
-        item.primaryUrl.includes("music.apple.com"))
-    ) {
-      return c.json({ skipped: true }, 200);
-    }
-
-    const existing = await getExistingAppleMusicLinkFn(id);
-    if (existing) {
-      return c.json({ url: existing }, 200);
-    }
-
-    const appleMusicUrl = await searchAppleMusicFn(item.title, item.artistName);
-    if (!appleMusicUrl) {
-      return c.json({ url: null }, 200);
-    }
-
-    await saveAppleMusicLinkFn(id, appleMusicUrl);
-
-    return c.json({ url: appleMusicUrl }, 200);
   });
 
   routes.post("/recognize", async (c) => {

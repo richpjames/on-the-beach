@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { extractMusicUrls } from "../email-parser";
 import { createMusicItemDirect, createMusicItemsFromUrl } from "../music-item-creator";
+import { scheduleAppleMusicBackfill } from "../apple-music-backfill";
 import { isValidUrl } from "../utils";
 import { saveImageFromBase64, validateImageBase64 } from "../uploads";
 import { createScanEnricher } from "../scan-enricher";
@@ -91,6 +92,7 @@ export function createIngestRoutes(deps: IngestRoutesDeps = {}): Hono {
 
         for (const result of results) {
           if (result.created) {
+            scheduleAppleMusicBackfill(result.item.id);
             items.push({
               id: result.item.id,
               title: result.item.title,
@@ -145,6 +147,7 @@ export function createIngestRoutes(deps: IngestRoutesDeps = {}): Hono {
 
       for (const result of results) {
         if (result.created) {
+          scheduleAppleMusicBackfill(result.item.id);
           items.push({
             id: result.item.id,
             title: result.item.title,
@@ -261,6 +264,8 @@ export function createIngestRoutes(deps: IngestRoutesDeps = {}): Hono {
         musicbrainzArtistId: scan?.musicbrainzArtistId ?? undefined,
         notes: noteParts.length ? noteParts.join(" — ") : undefined,
       });
+
+      scheduleAppleMusicBackfill(result.item.id);
 
       return c.json({
         received: true,
