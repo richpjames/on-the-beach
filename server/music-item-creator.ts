@@ -4,6 +4,7 @@ import { db } from "./db/index";
 import { musicItems, artists, musicLinks, sources, musicItemStacks, stacks } from "./db/schema";
 import { parseUrl, isValidUrl, normalize, capitalize } from "./utils";
 import { scrapeUrl, UnsupportedMusicLinkError } from "./scraper";
+import { enrichAppleMusicLinkInBackground } from "./apple-music-enrichment";
 import { pickPrimaryReleaseCandidate } from "./link-extractor";
 import { fullItemSelect } from "./queries/full-item-select";
 import type {
@@ -234,6 +235,10 @@ async function insertMusicItemWithLink(
   if (!item) {
     throw new Error("Failed to fetch created item");
   }
+
+  // Eagerly look up an Apple Music secondary link in the background so it's
+  // ready by the time the item is viewed. Non-blocking — never delays creation.
+  enrichAppleMusicLinkInBackground(inserted.id, sourceName);
 
   return item;
 }
@@ -614,6 +619,10 @@ export async function createMusicItemDirect(
   if (!item) {
     throw new Error("Failed to fetch created item");
   }
+
+  // Direct items (physical / from-memory) have no primary link, so they're
+  // always eligible for an Apple Music secondary-link lookup. Non-blocking.
+  enrichAppleMusicLinkInBackground(inserted.id, null);
 
   return { item, created: true };
 }
