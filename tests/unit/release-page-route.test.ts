@@ -206,7 +206,7 @@ describe("Apple Music secondary lookup", () => {
     expect(html).toContain("apple-music-lookup");
   });
 
-  test("does not trigger lookup when primary_source is spotify", async () => {
+  test("triggers lookup when primary_source is spotify (any non-Apple-Music item)", async () => {
     mockFetchItem.mockResolvedValue({
       ...baseItem,
       primary_source: "spotify" as const,
@@ -215,10 +215,22 @@ describe("Apple Music secondary lookup", () => {
     const app = makeApp();
     const res = await app.request("http://localhost/r/42");
     const html = await res.text();
-    // The PLAYABLE_SOURCES check means the fetch won't run for spotify
-    // We verify the JS condition won't trigger for spotify
-    expect(html).toContain("PLAYABLE_SOURCES");
-    expect(html).toContain('"spotify"');
+    expect(html).toContain("apple-music-lookup");
+    expect(html).toContain("primarySource !== 'apple_music'");
+  });
+
+  test("does not trigger lookup when primary_source is apple_music", async () => {
+    mockFetchItem.mockResolvedValue({
+      ...baseItem,
+      primary_source: "apple_music" as const,
+      primary_url: "https://music.apple.com/gb/album/abc/123",
+    });
+    const app = makeApp();
+    const res = await app.request("http://localhost/r/42");
+    const html = await res.text();
+    // The condition guards against re-looking-up an item that is itself Apple Music.
+    expect(html).toContain("primarySource !== 'apple_music'");
+    expect(html).toContain('"apple_music"');
   });
 
   test("includes secondary-links container in view mode", async () => {

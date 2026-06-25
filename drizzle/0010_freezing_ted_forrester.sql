@@ -1,0 +1,1 @@
+ALTER TABLE `music_items` ADD `apple_music_lookup_at` integer;
