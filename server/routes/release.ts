@@ -11,24 +11,31 @@ import { db } from "../db/index";
 import { sources } from "../db/schema";
 import { recognizeAudio, isAcrCloudConfigured } from "../acrcloud";
 import {
-  backfillAppleMusicLink,
-  defaultAppleMusicBackfillDeps,
-  PLAYABLE_SOURCES,
-  type ItemInfoForLookup,
-  type FetchItemForLookupFn,
-  type GetExistingAppleMusicLinkFn,
-  type SaveAppleMusicLinkFn,
-  type SearchAppleMusicFn,
-} from "../apple-music-backfill";
+  fetchItemForLookup,
+  getExistingAppleMusicLink,
+  saveAppleMusicLink,
+  searchAppleMusic,
+  stampAppleMusicLookup,
+  lookupAppleMusicForItem,
+} from "../apple-music-enrichment";
+import type {
+  FetchItemForLookupFn,
+  GetExistingAppleMusicLinkFn,
+  SaveAppleMusicLinkFn,
+  SearchAppleMusicFn,
+  StampAppleMusicLookupFn,
+} from "../apple-music-enrichment";
 
-export { PLAYABLE_SOURCES };
+// Re-exported for backwards compatibility; the canonical definitions now live
+// in ../apple-music-enrichment so the eager and backfill paths share them.
 export type {
   ItemInfoForLookup,
   FetchItemForLookupFn,
   GetExistingAppleMusicLinkFn,
   SaveAppleMusicLinkFn,
   SearchAppleMusicFn,
-};
+  StampAppleMusicLookupFn,
+} from "../apple-music-enrichment";
 
 interface ScanRequestBody {
   imageBase64?: unknown;
@@ -47,6 +54,17 @@ export type FetchCoverArtFn = (
   saveImage: SaveReleaseImageFn,
 ) => Promise<string | null>;
 
+export const PLAYABLE_SOURCES = new Set([
+  "bandcamp",
+  "spotify",
+  "soundcloud",
+  "youtube",
+  "apple_music",
+  "tidal",
+  "deezer",
+  "mixcloud",
+]);
+
 export function createReleaseRoutes(
   scanReleaseCover: ExtractReleaseInfoFn = createScanEnricher(
     extractReleaseInfo,
@@ -57,10 +75,11 @@ export function createReleaseRoutes(
   saveImage: SaveReleaseImageFn = saveImageFromBase64,
   lookupReleaseFn: LookupReleaseFn = lookupRelease,
   fetchCoverArtFn: FetchCoverArtFn = fetchAndSaveCoverArt,
-  searchAppleMusicFn: SearchAppleMusicFn = defaultAppleMusicBackfillDeps.search,
-  fetchItemForLookupFn: FetchItemForLookupFn = defaultAppleMusicBackfillDeps.fetchItem,
-  getExistingAppleMusicLinkFn: GetExistingAppleMusicLinkFn = defaultAppleMusicBackfillDeps.getExistingLink,
-  saveAppleMusicLinkFn: SaveAppleMusicLinkFn = defaultAppleMusicBackfillDeps.saveLink,
+  searchAppleMusicFn: SearchAppleMusicFn = searchAppleMusic,
+  fetchItemForLookupFn: FetchItemForLookupFn = fetchItemForLookup,
+  getExistingAppleMusicLinkFn: GetExistingAppleMusicLinkFn = getExistingAppleMusicLink,
+  saveAppleMusicLinkFn: SaveAppleMusicLinkFn = saveAppleMusicLink,
+  stampAppleMusicLookupFn: StampAppleMusicLookupFn = stampAppleMusicLookup,
 ): Hono {
   const routes = new Hono();
 
@@ -169,23 +188,21 @@ export function createReleaseRoutes(
       return c.json({ error: "Invalid ID" }, 400);
     }
 
-    const result = await backfillAppleMusicLink(id, {
+    const outcome = await lookupAppleMusicForItem(id, {
       fetchItem: fetchItemForLookupFn,
-      getExistingLink: getExistingAppleMusicLinkFn,
-      saveLink: saveAppleMusicLinkFn,
+      getExisting: getExistingAppleMusicLinkFn,
       search: searchAppleMusicFn,
+      save: saveAppleMusicLinkFn,
+      stamp: stampAppleMusicLookupFn,
     });
 
-    switch (result.status) {
-      case "item_missing":
+    switch (outcome.kind) {
+      case "not_found":
         return c.json({ error: "Not found" }, 404);
       case "skipped":
         return c.json({ skipped: true }, 200);
-      case "existing":
-      case "added":
-        return c.json({ url: result.url }, 200);
-      case "not_found":
-        return c.json({ url: null }, 200);
+      case "result":
+        return c.json({ url: outcome.url }, 200);
     }
   });
 

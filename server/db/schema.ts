@@ -56,6 +56,10 @@ export const musicItems = sqliteTable(
     catalogueNumber: text("catalogue_number"),
     musicbrainzReleaseId: text("musicbrainz_release_id"),
     musicbrainzArtistId: text("musicbrainz_artist_id"),
+    // Timestamp of the last Apple Music secondary-link lookup attempt. Set on
+    // both a hit and a miss so we don't re-query iTunes on every page view for
+    // items that have no Apple Music match.
+    appleMusicLookupAt: integer("apple_music_lookup_at", { mode: "timestamp" }),
     remindAt: integer("remind_at", { mode: "timestamp" }),
     reminderPending: integer("reminder_pending", { mode: "boolean" }).notNull().default(false),
   },
