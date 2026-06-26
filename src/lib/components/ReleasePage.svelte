@@ -247,18 +247,13 @@
 
   const secondaryLinks = $derived(itemLinks.filter((l) => !l.is_primary));
 
-  // ── Apple Music secondary link lookup ──────────────────────────────────────
-  const PLAYABLE_SOURCES = new Set([
-    "bandcamp",
-    "spotify",
-    "soundcloud",
-    "youtube",
-    "apple_music",
-    "tidal",
-    "deezer",
-    "mixcloud",
-  ]);
-  let appleMusicLookupUrl = $state<string | null>(null);
+  // ── Streaming-service secondary link lookup ────────────────────────────────
+  // Any item not already on the active streaming service is eligible for a
+  // secondary link on it. Usually a no-op for new items (the eager hook has
+  // already populated it); this is the on-view fallback for older items.
+  // The server enforces all skip rules; we only avoid an obviously redundant
+  // request when the active service's link is already shown.
+  let lookupLink = $state<{ url: string; label: string } | null>(null);
 
   onMount(() => {
     api
@@ -274,17 +269,16 @@
       })
       .catch(() => {});
 
-    const hasAppleMusicSecondary = item.links.some(
-      (l) => l.source_name === "apple_music" && !l.is_primary,
+    const hasActiveServiceSecondary = item.links.some(
+      (l) => l.source_name === data.lookupService && !l.is_primary,
     );
-    if (
-      !hasAppleMusicSecondary &&
-      (!item.primary_source || !PLAYABLE_SOURCES.has(item.primary_source))
-    ) {
-      apiFetch(`/api/release/apple-music-lookup/${item.id}`, { method: "POST" })
+    if (!hasActiveServiceSecondary) {
+      apiFetch(`/api/release/secondary-link-lookup/${item.id}`, { method: "POST" })
         .then((r) => (r.ok ? r.json() : null))
         .then((lookup) => {
-          if (lookup?.url) appleMusicLookupUrl = lookup.url;
+          if (lookup?.url) {
+            lookupLink = { url: lookup.url, label: lookup.serviceDisplayName || "Listen" };
+          }
         })
         .catch(() => {});
     }
@@ -398,12 +392,12 @@
             ></iframe>
           {/if}
           <div id="secondary-links">
-            {#if appleMusicLookupUrl}
+            {#if lookupLink}
               <a
                 class="release-page__source-link"
-                href={appleMusicLookupUrl}
+                href={lookupLink.url}
                 target="_blank"
-                rel="noopener noreferrer">Apple Music</a
+                rel="noopener noreferrer">{lookupLink.label}</a
               >
             {/if}
           </div>
