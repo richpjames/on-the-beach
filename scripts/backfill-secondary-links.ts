@@ -1,25 +1,29 @@
 #!/usr/bin/env bun
 /**
- * One-off backfill: look up an Apple Music secondary link for existing items
- * that predate eager enrichment.
+ * One-off backfill: look up a secondary link on the active streaming service
+ * for existing items that predate eager enrichment.
  *
  * Selects items that have never had a lookup attempted (apple_music_lookup_at IS
- * NULL) and aren't themselves Apple Music links, then runs the shared
- * `lookupAppleMusicForItem` against each. Idempotent: every attempt stamps the
- * `apple_music_lookup_at` marker, so re-running only touches items still missing
- * a marker. Rate-limited to stay polite to the iTunes Search API.
+ * NULL — the service-agnostic lookup marker) and don't already have a link on
+ * the active service, then runs the shared `lookupSecondaryLinkForItem` against
+ * each. Idempotent: every attempt stamps the marker, so re-running only touches
+ * items still missing one. Rate-limited to stay polite to the catalogue API.
  *
  * Usage:
- *   bun run scripts/backfill-apple-music.ts [--limit N] [--delay MS] [--dry-run]
+ *   bun run scripts/backfill-secondary-links.ts [--limit N] [--delay MS] [--dry-run]
  *
  *   --limit N    Process at most N items (default: all eligible).
  *   --delay MS   Delay between lookups in ms (default: 1000).
- *   --dry-run    List eligible items without querying iTunes or writing.
+ *   --dry-run    List eligible items without querying the service or writing.
  */
 import { and, eq, isNull, sql } from "drizzle-orm";
 import { db } from "../server/db/index";
 import { musicItems, musicLinks, sources } from "../server/db/schema";
-import { lookupAppleMusicForItem } from "../server/apple-music-enrichment";
+import {
+  lookupSecondaryLinkForItem,
+  LOOKUP_SERVICE_CONFIG,
+} from "../server/secondary-link-enrichment";
+import { getLookupService } from "../server/settings";
 
 interface Args {
   limit: number | null;
@@ -39,7 +43,7 @@ function parseArgs(argv: string[]): Args {
       args.dryRun = true;
     } else if (arg === "--help" || arg === "-h") {
       console.log(
-        "Usage: bun run scripts/backfill-apple-music.ts [--limit N] [--delay MS] [--dry-run]",
+        "Usage: bun run scripts/backfill-secondary-links.ts [--limit N] [--delay MS] [--dry-run]",
       );
       process.exit(0);
     }
@@ -55,23 +59,26 @@ function parseArgs(argv: string[]): Args {
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
-/** Items never attempted that already have an Apple Music link wired up are skipped. */
-async function findEligibleItemIds(limit: number | null): Promise<number[]> {
-  const appleSourceId = db
+/** Items never attempted that don't already have a link on the active service. */
+async function findEligibleItemIds(
+  activeSourceName: string,
+  limit: number | null,
+): Promise<number[]> {
+  const serviceSourceId = db
     .select({ id: sources.id })
     .from(sources)
-    .where(eq(sources.name, "apple_music"));
+    .where(eq(sources.name, activeSourceName));
 
   const query = db
     .select({ id: musicItems.id })
     .from(musicItems)
     .where(
       and(
-        isNull(musicItems.appleMusicLookupAt),
-        // Exclude items that already have any Apple Music link (primary or not).
+        isNull(musicItems.lookupAttemptedAt),
+        // Exclude items that already have a link on the active service.
         sql`${musicItems.id} NOT IN (
           SELECT ${musicLinks.musicItemId} FROM ${musicLinks}
-          WHERE ${musicLinks.sourceId} IN (${appleSourceId})
+          WHERE ${musicLinks.sourceId} IN (${serviceSourceId})
         )`,
       ),
     )
@@ -85,11 +92,15 @@ async function main() {
   const args = parseArgs(process.argv.slice(2));
 
   if (process.env.OTB_DISABLE_EXTERNAL_LOOKUPS && !args.dryRun) {
-    console.error("OTB_DISABLE_EXTERNAL_LOOKUPS is set — iTunes lookups would no-op. Aborting.");
+    console.error("OTB_DISABLE_EXTERNAL_LOOKUPS is set — catalogue lookups would no-op. Aborting.");
     process.exit(1);
   }
 
-  const ids = await findEligibleItemIds(args.limit);
+  const service = await getLookupService();
+  const cfg = LOOKUP_SERVICE_CONFIG[service];
+  console.log(`Active lookup service: ${cfg.displayName} (${service}).`);
+
+  const ids = await findEligibleItemIds(cfg.sourceName, args.limit);
   console.log(`Found ${ids.length} eligible item(s).`);
 
   if (args.dryRun) {
@@ -104,7 +115,7 @@ async function main() {
   for (let i = 0; i < ids.length; i++) {
     const id = ids[i];
     try {
-      const outcome = await lookupAppleMusicForItem(id);
+      const outcome = await lookupSecondaryLinkForItem(id);
       if (outcome.kind === "result" && outcome.url) {
         hits++;
         console.log(`[${i + 1}/${ids.length}] item ${id} → ${outcome.url}`);

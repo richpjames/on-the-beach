@@ -1,6 +1,7 @@
 import { error } from "@sveltejs/kit";
 import type { PageServerLoad } from "./$types";
 import { fetchFullItem } from "../../../../server/music-item-creator";
+import { getLookupService } from "../../../../server/settings";
 import {
   parseUrl,
   extractYouTubeVideoId,
@@ -141,5 +142,6 @@ export const load: PageServerLoad = async ({ params }) => {
     bandcampEmbed: bandcampEmbed(item),
     appleMusicEmbed: appleMusicEmbed(item),
     mixcloudWidgetSrc: mixcloudWidgetSrc(item),
+    lookupService: await getLookupService(),
   };
 };

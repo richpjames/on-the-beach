@@ -6,11 +6,7 @@ const mockExtractReleaseInfo = mock();
 const mockSaveImage = mock();
 const mockLookupRelease = mock();
 const mockFetchCoverArt = mock();
-const mockSearchAppleMusic = mock();
-const mockFetchItemForLookup = mock();
-const mockGetExistingAppleMusicLink = mock();
-const mockSaveAppleMusicLink = mock();
-const mockStampAppleMusicLookup = mock();
+const mockLookupSecondaryLink = mock();
 
 function makeApp(): Hono {
   const app = new Hono();
@@ -21,11 +17,7 @@ function makeApp(): Hono {
       mockSaveImage,
       mockLookupRelease,
       mockFetchCoverArt,
-      mockSearchAppleMusic,
-      mockFetchItemForLookup,
-      mockGetExistingAppleMusicLink,
-      mockSaveAppleMusicLink,
-      mockStampAppleMusicLookup,
+      mockLookupSecondaryLink,
     ),
   );
   return app;
@@ -304,226 +296,76 @@ describe("POST /api/release/lookup", () => {
   });
 });
 
-describe("POST /api/release/apple-music-lookup/:id", () => {
+describe("POST /api/release/secondary-link-lookup/:id", () => {
   beforeEach(() => {
-    mockSearchAppleMusic.mockReset();
-    mockFetchItemForLookup.mockReset();
-    mockGetExistingAppleMusicLink.mockReset();
-    mockSaveAppleMusicLink.mockReset();
-    mockStampAppleMusicLookup.mockReset();
-    mockGetExistingAppleMusicLink.mockResolvedValue(null);
-    mockSaveAppleMusicLink.mockResolvedValue(undefined);
-    mockStampAppleMusicLookup.mockResolvedValue(undefined);
+    mockLookupSecondaryLink.mockReset();
   });
 
   test("returns 400 for non-numeric id", async () => {
     const app = makeApp();
-    const res = await app.request("http://localhost/api/release/apple-music-lookup/abc", {
+    const res = await app.request("http://localhost/api/release/secondary-link-lookup/abc", {
       method: "POST",
     });
     expect(res.status).toBe(400);
+    expect(mockLookupSecondaryLink).not.toHaveBeenCalled();
   });
 
-  test("returns 404 when item not found", async () => {
-    mockFetchItemForLookup.mockResolvedValue(null);
+  test("returns 404 when the lookup reports not_found", async () => {
+    mockLookupSecondaryLink.mockResolvedValue({ kind: "not_found" });
     const app = makeApp();
-    const res = await app.request("http://localhost/api/release/apple-music-lookup/99", {
+    const res = await app.request("http://localhost/api/release/secondary-link-lookup/99", {
       method: "POST",
     });
     expect(res.status).toBe(404);
+    expect(mockLookupSecondaryLink).toHaveBeenCalledWith(99);
   });
 
-  test("searches Apple Music even when primary source is a playable source", async () => {
-    mockFetchItemForLookup.mockResolvedValue({
-      title: "Blue Lines",
-      artistName: "Massive Attack",
-      primarySource: "spotify",
+  test("returns { skipped: true } when the lookup is skipped", async () => {
+    mockLookupSecondaryLink.mockResolvedValue({
+      kind: "skipped",
+      reason: "primary_is_active_service",
     });
     const app = makeApp();
-    const res = await app.request("http://localhost/api/release/apple-music-lookup/1", {
+    const res = await app.request("http://localhost/api/release/secondary-link-lookup/1", {
+      method: "POST",
+    });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ skipped: true });
+  });
+
+  test("returns the url, service and display name on a hit", async () => {
+    mockLookupSecondaryLink.mockResolvedValue({
+      kind: "result",
+      service: "apple_music",
+      serviceDisplayName: "Apple Music",
+      url: "https://music.apple.com/gb/album/blue-lines/456",
+    });
+    const app = makeApp();
+    const res = await app.request("http://localhost/api/release/secondary-link-lookup/1", {
+      method: "POST",
+    });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({
+      url: "https://music.apple.com/gb/album/blue-lines/456",
+      service: "apple_music",
+      serviceDisplayName: "Apple Music",
+    });
+  });
+
+  test("returns null url on a miss", async () => {
+    mockLookupSecondaryLink.mockResolvedValue({
+      kind: "result",
+      service: "spotify",
+      serviceDisplayName: "Spotify",
+      url: null,
+    });
+    const app = makeApp();
+    const res = await app.request("http://localhost/api/release/secondary-link-lookup/2", {
       method: "POST",
     });
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.url).toBeNull();
-    expect(mockSearchAppleMusic).toHaveBeenCalled();
-  });
-
-  test("returns existing Apple Music link without searching again", async () => {
-    mockFetchItemForLookup.mockResolvedValue({
-      title: "Blue Lines",
-      artistName: "Massive Attack",
-      primarySource: "discogs",
-    });
-    mockGetExistingAppleMusicLink.mockResolvedValue(
-      "https://music.apple.com/gb/album/blue-lines/123",
-    );
-    const app = makeApp();
-    const res = await app.request("http://localhost/api/release/apple-music-lookup/1", {
-      method: "POST",
-    });
-    expect(res.status).toBe(200);
-    const body = await res.json();
-    expect(body.url).toBe("https://music.apple.com/gb/album/blue-lines/123");
-    expect(mockSearchAppleMusic).not.toHaveBeenCalled();
-  });
-
-  test("searches Apple Music and saves link when no playable source", async () => {
-    mockFetchItemForLookup.mockResolvedValue({
-      title: "Blue Lines",
-      artistName: "Massive Attack",
-      primarySource: null,
-    });
-    mockSearchAppleMusic.mockResolvedValue("https://music.apple.com/gb/album/blue-lines/456");
-    const app = makeApp();
-    const res = await app.request("http://localhost/api/release/apple-music-lookup/1", {
-      method: "POST",
-    });
-    expect(res.status).toBe(200);
-    const body = await res.json();
-    expect(body.url).toBe("https://music.apple.com/gb/album/blue-lines/456");
-    expect(mockSearchAppleMusic).toHaveBeenCalledWith("Blue Lines", "Massive Attack");
-    expect(mockSaveAppleMusicLink).toHaveBeenCalledWith(
-      1,
-      "https://music.apple.com/gb/album/blue-lines/456",
-    );
-  });
-
-  test("returns null url when Apple Music search finds nothing", async () => {
-    mockFetchItemForLookup.mockResolvedValue({
-      title: "Obscure Album",
-      artistName: "Unknown Artist",
-      primarySource: null,
-    });
-    mockSearchAppleMusic.mockResolvedValue(null);
-    const app = makeApp();
-    const res = await app.request("http://localhost/api/release/apple-music-lookup/2", {
-      method: "POST",
-    });
-    expect(res.status).toBe(200);
-    const body = await res.json();
-    expect(body.url).toBeNull();
-    expect(mockSaveAppleMusicLink).not.toHaveBeenCalled();
-  });
-
-  test("stamps the lookup marker after a miss so it isn't re-queried", async () => {
-    mockFetchItemForLookup.mockResolvedValue({
-      title: "Obscure Album",
-      artistName: "Unknown Artist",
-      primarySource: null,
-    });
-    mockSearchAppleMusic.mockResolvedValue(null);
-    const app = makeApp();
-    await app.request("http://localhost/api/release/apple-music-lookup/2", { method: "POST" });
-    expect(mockStampAppleMusicLookup).toHaveBeenCalledWith(2);
-  });
-
-  test("stamps the lookup marker after a hit", async () => {
-    mockFetchItemForLookup.mockResolvedValue({
-      title: "Blue Lines",
-      artistName: "Massive Attack",
-      primarySource: null,
-    });
-    mockSearchAppleMusic.mockResolvedValue("https://music.apple.com/gb/album/blue-lines/456");
-    const app = makeApp();
-    await app.request("http://localhost/api/release/apple-music-lookup/1", { method: "POST" });
-    expect(mockStampAppleMusicLookup).toHaveBeenCalledWith(1);
-  });
-
-  test("skips searching when a previous lookup was already attempted", async () => {
-    mockFetchItemForLookup.mockResolvedValue({
-      title: "Obscure Album",
-      artistName: "Unknown Artist",
-      primarySource: null,
-      primaryUrl: null,
-      appleMusicLookupAt: new Date("2026-01-01T00:00:00Z"),
-    });
-    const app = makeApp();
-    const res = await app.request("http://localhost/api/release/apple-music-lookup/7", {
-      method: "POST",
-    });
-    const body = await res.json();
-    expect(body.skipped).toBe(true);
-    expect(mockSearchAppleMusic).not.toHaveBeenCalled();
-    expect(mockStampAppleMusicLookup).not.toHaveBeenCalled();
-  });
-
-  test("returns existing link even when a marker is set (marker doesn't hide hits)", async () => {
-    mockFetchItemForLookup.mockResolvedValue({
-      title: "Blue Lines",
-      artistName: "Massive Attack",
-      primarySource: null,
-      appleMusicLookupAt: new Date("2026-01-01T00:00:00Z"),
-    });
-    mockGetExistingAppleMusicLink.mockResolvedValue(
-      "https://music.apple.com/gb/album/blue-lines/123",
-    );
-    const app = makeApp();
-    const res = await app.request("http://localhost/api/release/apple-music-lookup/1", {
-      method: "POST",
-    });
-    const body = await res.json();
-    expect(body.url).toBe("https://music.apple.com/gb/album/blue-lines/123");
-    expect(mockSearchAppleMusic).not.toHaveBeenCalled();
-  });
-
-  test("searches when primary source is discogs (non-playable)", async () => {
-    mockFetchItemForLookup.mockResolvedValue({
-      title: "Some Album",
-      artistName: "Some Artist",
-      primarySource: "discogs",
-    });
-    mockSearchAppleMusic.mockResolvedValue("https://music.apple.com/album/123");
-    const app = makeApp();
-    await app.request("http://localhost/api/release/apple-music-lookup/3", { method: "POST" });
-    expect(mockSearchAppleMusic).toHaveBeenCalled();
-  });
-
-  test("searches Apple Music when primary source is bandcamp", async () => {
-    mockFetchItemForLookup.mockResolvedValue({
-      title: "Some Album",
-      artistName: "Some Artist",
-      primarySource: "bandcamp",
-      primaryUrl: null,
-    });
-    const app = makeApp();
-    const res = await app.request("http://localhost/api/release/apple-music-lookup/3", {
-      method: "POST",
-    });
-    const body = await res.json();
-    expect(body.url).toBeNull();
-    expect(mockSearchAppleMusic).toHaveBeenCalled();
-  });
-
-  test("skips search when primary URL is Apple Music even if primarySource is null", async () => {
-    mockFetchItemForLookup.mockResolvedValue({
-      title: "The Band (Remastered)",
-      artistName: "The Band",
-      primarySource: null,
-      primaryUrl: "https://music.apple.com/es/album/the-band-remastered/1440846597",
-    });
-    const app = makeApp();
-    const res = await app.request("http://localhost/api/release/apple-music-lookup/4", {
-      method: "POST",
-    });
-    const body = await res.json();
-    expect(body.skipped).toBe(true);
-    expect(mockSearchAppleMusic).not.toHaveBeenCalled();
-  });
-
-  test("skips search when primary URL is Apple Music with unusual format not matched by parseUrl", async () => {
-    mockFetchItemForLookup.mockResolvedValue({
-      title: "Some Song",
-      artistName: "Some Artist",
-      primarySource: null,
-      primaryUrl: "https://music.apple.com/us/song/some-song/123456789",
-    });
-    const app = makeApp();
-    const res = await app.request("http://localhost/api/release/apple-music-lookup/5", {
-      method: "POST",
-    });
-    const body = await res.json();
-    expect(body.skipped).toBe(true);
-    expect(mockSearchAppleMusic).not.toHaveBeenCalled();
+    expect(body.service).toBe("spotify");
   });
 });
