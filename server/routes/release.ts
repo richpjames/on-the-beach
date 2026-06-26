@@ -11,31 +11,11 @@ import { db } from "../db/index";
 import { sources } from "../db/schema";
 import { recognizeAudio, isAcrCloudConfigured } from "../acrcloud";
 import {
-  fetchItemForLookup,
-  getExistingAppleMusicLink,
-  saveAppleMusicLink,
-  searchAppleMusic,
-  stampAppleMusicLookup,
-  lookupAppleMusicForItem,
-} from "../apple-music-enrichment";
-import type {
-  FetchItemForLookupFn,
-  GetExistingAppleMusicLinkFn,
-  SaveAppleMusicLinkFn,
-  SearchAppleMusicFn,
-  StampAppleMusicLookupFn,
-} from "../apple-music-enrichment";
+  lookupSecondaryLinkForItem,
+  type SecondaryLookupOutcome,
+} from "../secondary-link-enrichment";
 
-// Re-exported for backwards compatibility; the canonical definitions now live
-// in ../apple-music-enrichment so the eager and backfill paths share them.
-export type {
-  ItemInfoForLookup,
-  FetchItemForLookupFn,
-  GetExistingAppleMusicLinkFn,
-  SaveAppleMusicLinkFn,
-  SearchAppleMusicFn,
-  StampAppleMusicLookupFn,
-} from "../apple-music-enrichment";
+export type LookupSecondaryLinkFn = (itemId: number) => Promise<SecondaryLookupOutcome>;
 
 interface ScanRequestBody {
   imageBase64?: unknown;
@@ -75,11 +55,7 @@ export function createReleaseRoutes(
   saveImage: SaveReleaseImageFn = saveImageFromBase64,
   lookupReleaseFn: LookupReleaseFn = lookupRelease,
   fetchCoverArtFn: FetchCoverArtFn = fetchAndSaveCoverArt,
-  searchAppleMusicFn: SearchAppleMusicFn = searchAppleMusic,
-  fetchItemForLookupFn: FetchItemForLookupFn = fetchItemForLookup,
-  getExistingAppleMusicLinkFn: GetExistingAppleMusicLinkFn = getExistingAppleMusicLink,
-  saveAppleMusicLinkFn: SaveAppleMusicLinkFn = saveAppleMusicLink,
-  stampAppleMusicLookupFn: StampAppleMusicLookupFn = stampAppleMusicLookup,
+  lookupSecondaryLinkFn: LookupSecondaryLinkFn = lookupSecondaryLinkForItem,
 ): Hono {
   const routes = new Hono();
 
@@ -181,20 +157,14 @@ export function createReleaseRoutes(
     }
   });
 
-  routes.post("/apple-music-lookup/:id", async (c) => {
+  routes.post("/secondary-link-lookup/:id", async (c) => {
     const rawId = c.req.param("id");
     const id = Number(rawId);
     if (!Number.isInteger(id) || id <= 0) {
       return c.json({ error: "Invalid ID" }, 400);
     }
 
-    const outcome = await lookupAppleMusicForItem(id, {
-      fetchItem: fetchItemForLookupFn,
-      getExisting: getExistingAppleMusicLinkFn,
-      search: searchAppleMusicFn,
-      save: saveAppleMusicLinkFn,
-      stamp: stampAppleMusicLookupFn,
-    });
+    const outcome = await lookupSecondaryLinkFn(id);
 
     switch (outcome.kind) {
       case "not_found":
@@ -202,7 +172,14 @@ export function createReleaseRoutes(
       case "skipped":
         return c.json({ skipped: true }, 200);
       case "result":
-        return c.json({ url: outcome.url }, 200);
+        return c.json(
+          {
+            url: outcome.url,
+            service: outcome.service,
+            serviceDisplayName: outcome.serviceDisplayName,
+          },
+          200,
+        );
     }
   });
 

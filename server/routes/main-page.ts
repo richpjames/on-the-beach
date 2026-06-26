@@ -566,6 +566,7 @@ function renderMainPage(opts: {
       </div>
       <footer class="footer">
         <span id="app-version">v${escapeHtml(opts.appVersion)}</span>
+        <a class="footer__settings-link" href="/settings">Settings</a>
       </footer>
 
       <div id="release-modal" class="release-modal" hidden>

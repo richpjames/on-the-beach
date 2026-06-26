@@ -7,6 +7,8 @@ import { ingestRoutes } from "./routes/ingest";
 import { releaseRoutes } from "./routes/release";
 import { releasePageRoutes } from "./routes/release-page";
 import { mainPageRoutes } from "./routes/main-page";
+import { settingsRoutes } from "./routes/settings";
+import { settingsPageRoutes } from "./routes/settings-page";
 import { rssRoutes } from "./routes/rss";
 import { getUploadsDir, rewriteUploadsRequestPath } from "./uploads";
 import { processReminders } from "./reminders";
@@ -30,7 +32,9 @@ app.route("/api/music-items", musicItemRoutes);
 app.route("/api/stacks", stackRoutes);
 app.route("/api/ingest", ingestRoutes);
 app.route("/api/release", releaseRoutes);
+app.route("/api/settings", settingsRoutes);
 app.route("/r", releasePageRoutes);
+app.route("/settings", settingsPageRoutes);
 app.route("/feed", rssRoutes);
 app.use(
   "/uploads/*",
@@ -94,6 +98,8 @@ if (isDev) {
       req.url?.startsWith("/uploads/") ||
       req.url === "/r" ||
       req.url?.startsWith("/r/") ||
+      req.url === "/settings" ||
+      req.url?.startsWith("/settings/") ||
       req.url?.startsWith("/s/")
     ) {
       honoListener(req, res);

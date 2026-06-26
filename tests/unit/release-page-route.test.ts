@@ -191,7 +191,7 @@ describe("Apple Music secondary lookup", () => {
     const app = makeApp();
     const res = await app.request("http://localhost/r/42");
     const html = await res.text();
-    expect(html).toContain("apple-music-lookup");
+    expect(html).toContain("secondary-link-lookup");
   });
 
   test("includes lookup script when primary_source is discogs", async () => {
@@ -203,10 +203,33 @@ describe("Apple Music secondary lookup", () => {
     const app = makeApp();
     const res = await app.request("http://localhost/r/42");
     const html = await res.text();
-    expect(html).toContain("apple-music-lookup");
+    expect(html).toContain("secondary-link-lookup");
   });
 
-  test("triggers lookup when primary_source is spotify (any non-Apple-Music item)", async () => {
+  test("does not fetch when the active service's secondary link already exists", async () => {
+    mockFetchItem.mockResolvedValue({
+      ...baseItem,
+      primary_source: "spotify" as const,
+      primary_url: "https://open.spotify.com/album/abc",
+      links: [
+        {
+          id: 1,
+          url: "https://music.apple.com/gb/album/abc/123",
+          source_name: "apple_music",
+          display_name: "Apple Music",
+          is_primary: false,
+        },
+      ],
+    });
+    const app = makeApp();
+    const res = await app.request("http://localhost/r/42");
+    const html = await res.text();
+    // The active service defaults to apple_music, and an apple_music secondary
+    // link is already present, so the client guard is true (no fetch).
+    expect(html).toContain("hasActiveServiceSecondary = true");
+  });
+
+  test("guards the lazy fetch on the active service and is service-aware", async () => {
     mockFetchItem.mockResolvedValue({
       ...baseItem,
       primary_source: "spotify" as const,
@@ -215,22 +238,9 @@ describe("Apple Music secondary lookup", () => {
     const app = makeApp();
     const res = await app.request("http://localhost/r/42");
     const html = await res.text();
-    expect(html).toContain("apple-music-lookup");
-    expect(html).toContain("primarySource !== 'apple_music'");
-  });
-
-  test("does not trigger lookup when primary_source is apple_music", async () => {
-    mockFetchItem.mockResolvedValue({
-      ...baseItem,
-      primary_source: "apple_music" as const,
-      primary_url: "https://music.apple.com/gb/album/abc/123",
-    });
-    const app = makeApp();
-    const res = await app.request("http://localhost/r/42");
-    const html = await res.text();
-    // The condition guards against re-looking-up an item that is itself Apple Music.
-    expect(html).toContain("primarySource !== 'apple_music'");
-    expect(html).toContain('"apple_music"');
+    expect(html).toContain("secondary-link-lookup");
+    expect(html).toContain('LOOKUP_SERVICE = "apple_music"');
+    expect(html).toContain("hasActiveServiceSecondary = false");
   });
 
   test("includes secondary-links container in view mode", async () => {

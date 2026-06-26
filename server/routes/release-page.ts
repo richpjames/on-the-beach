@@ -4,6 +4,7 @@ import type { MusicItemFull } from "../../src/types";
 import { getPageAssets } from "../page-assets";
 import { renderStarRating } from "../../src/ui/view/templates";
 import { parseUrl, extractYouTubeVideoId, extractYouTubePlaylistId } from "../utils";
+import { getLookupService, type LookupService } from "../settings";
 
 export type FetchItemFn = (id: number) => Promise<MusicItemFull | null>;
 
@@ -179,7 +180,11 @@ function reminderDateValue(item: MusicItemFull): string {
   return `${yyyy}-${mm}-${dd}`;
 }
 
-function renderReleasePage(item: MusicItemFull, cssHref: string): string {
+function renderReleasePage(
+  item: MusicItemFull,
+  cssHref: string,
+  lookupService: LookupService,
+): string {
   const isScheduled = item.remind_at != null;
   const displayedStatus = isScheduled ? "scheduled" : item.listen_status;
   const statusOptions = [
@@ -752,14 +757,16 @@ function renderReleasePage(item: MusicItemFull, cssHref: string): string {
       renderLinkList();
       loadSources();
 
-      // ── Apple Music secondary link lookup ────────────────────────────────
-      // Any item that isn't itself an Apple Music link is eligible for an Apple
-      // Music secondary link. Usually a no-op for new items (the eager hook has
+      // ── Streaming-service secondary link lookup ──────────────────────────
+      // Any item not already on the active streaming service is eligible for a
+      // secondary link on it. Usually a no-op for new items (the eager hook has
       // already populated it); this is the on-view fallback for older items.
-      const primarySource = ${JSON.stringify(item.primary_source)};
-      const hasAppleMusicSecondary = ${JSON.stringify(item.links.some((l) => l.source_name === "apple_music" && !l.is_primary))};
-      if (!hasAppleMusicSecondary && primarySource !== 'apple_music') {
-        fetch('/api/release/apple-music-lookup/' + ITEM_ID, { method: 'POST' })
+      // The server enforces all skip rules; we only avoid an obviously
+      // redundant request when the active service's link is already shown.
+      const LOOKUP_SERVICE = ${JSON.stringify(lookupService)};
+      const hasActiveServiceSecondary = ${JSON.stringify(item.links.some((l) => l.source_name === lookupService && !l.is_primary))};
+      if (!hasActiveServiceSecondary) {
+        fetch('/api/release/secondary-link-lookup/' + ITEM_ID, { method: 'POST' })
           .then(r => r.ok ? r.json() : null)
           .then(data => {
             if (!data || !data.url) return;
@@ -770,7 +777,7 @@ function renderReleasePage(item: MusicItemFull, cssHref: string): string {
             a.href = data.url;
             a.target = '_blank';
             a.rel = 'noopener noreferrer';
-            a.textContent = 'Apple Music';
+            a.textContent = data.serviceDisplayName || 'Listen';
             container.appendChild(a);
           })
           .catch(() => {});
@@ -957,7 +964,8 @@ export function createReleasePageRoutes(fetchItem: FetchItemFn = fetchFullItem):
     }
 
     const { cssHref } = await getPageAssets();
-    return c.html(renderReleasePage(item, cssHref));
+    const lookupService = await getLookupService();
+    return c.html(renderReleasePage(item, cssHref, lookupService));
   });
 
   return routes;

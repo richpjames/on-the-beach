@@ -56,10 +56,13 @@ export const musicItems = sqliteTable(
     catalogueNumber: text("catalogue_number"),
     musicbrainzReleaseId: text("musicbrainz_release_id"),
     musicbrainzArtistId: text("musicbrainz_artist_id"),
-    // Timestamp of the last Apple Music secondary-link lookup attempt. Set on
-    // both a hit and a miss so we don't re-query iTunes on every page view for
-    // items that have no Apple Music match.
-    appleMusicLookupAt: integer("apple_music_lookup_at", { mode: "timestamp" }),
+    // Timestamp of the last secondary-link lookup attempt against the active
+    // streaming service. Set on both a hit and a miss so we don't re-query on
+    // every page view for items with no match. Cleared for all items when the
+    // active service is switched (see server/settings.ts) so they're re-queried
+    // against the new service. The column keeps its original name for migration
+    // continuity; the field name is service-agnostic.
+    lookupAttemptedAt: integer("apple_music_lookup_at", { mode: "timestamp" }),
     remindAt: integer("remind_at", { mode: "timestamp" }),
     reminderPending: integer("reminder_pending", { mode: "boolean" }).notNull().default(false),
   },
@@ -147,6 +150,14 @@ export const stackParents = sqliteTable(
     index("idx_stack_parents_child_stack_id").on(table.childStackId),
   ],
 );
+
+export const appSettings = sqliteTable("app_settings", {
+  key: text("key").primaryKey(),
+  value: text("value").notNull(),
+  updatedAt: integer("updated_at", { mode: "timestamp" })
+    .notNull()
+    .$defaultFn(() => new Date()),
+});
 
 export const itemSuggestions = sqliteTable(
   "item_suggestions",
