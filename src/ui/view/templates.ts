@@ -208,11 +208,15 @@ export function renderStackDropdownContent(
   selectedStackIds: Set<number>,
 ): string {
   return `
+    <div class="stack-dropdown__search">
+      <input type="text" class="stack-dropdown__new-input input"
+             placeholder="Search or add a list...">
+    </div>
     <div class="stack-dropdown__list">
       ${stacks
         .map(
           (stack) => `
-        <label class="stack-dropdown__item">
+        <label class="stack-dropdown__item" data-stack-name="${escapeHtml(stack.name.toLowerCase())}">
           <input type="checkbox" class="stack-dropdown__checkbox"
                  data-stack-id="${stack.id}" ${selectedStackIds.has(stack.id) ? "checked" : ""}>
           ${escapeHtml(stack.name)}
@@ -221,10 +225,7 @@ export function renderStackDropdownContent(
         )
         .join("")}
     </div>
-    <div class="stack-dropdown__new">
-      <input type="text" class="stack-dropdown__new-input input"
-             placeholder="New stack...">
-    </div>
+    <p class="stack-dropdown__empty" hidden>Press Enter to create it.</p>
   `;
 }
 

@@ -2317,7 +2317,38 @@ async function openStackDropdown(options: StackDropdownOptions): Promise<void> {
   });
 
   const newInput = dropdown.querySelector(".stack-dropdown__new-input");
+  const listItems = Array.from(dropdown.querySelectorAll<HTMLElement>(".stack-dropdown__item"));
+  const emptyHint = dropdown.querySelector<HTMLElement>(".stack-dropdown__empty");
+
+  const applyFilter = (query: string): HTMLElement | null => {
+    const trimmed = query.trim().toLowerCase();
+    let exactMatch: HTMLElement | null = null;
+    let visibleCount = 0;
+
+    for (const item of listItems) {
+      const name = item.dataset.stackName ?? "";
+      const matches = trimmed === "" || name.includes(trimmed);
+      item.hidden = !matches;
+      if (matches) {
+        visibleCount += 1;
+      }
+      if (name === trimmed) {
+        exactMatch = item;
+      }
+    }
+
+    if (emptyHint) {
+      emptyHint.hidden = trimmed === "" || visibleCount > 0;
+    }
+
+    return exactMatch;
+  };
+
   if (newInput instanceof HTMLInputElement) {
+    newInput.addEventListener("input", () => {
+      applyFilter(newInput.value);
+    });
+
     newInput.addEventListener("keydown", async (event) => {
       if (event.key !== "Enter") {
         return;
@@ -2326,6 +2357,16 @@ async function openStackDropdown(options: StackDropdownOptions): Promise<void> {
       event.preventDefault();
       const name = newInput.value.trim();
       if (!name) {
+        return;
+      }
+
+      const exactMatch = applyFilter(name);
+      const checkbox = exactMatch?.querySelector<HTMLInputElement>(".stack-dropdown__checkbox");
+      if (checkbox) {
+        checkbox.checked = !checkbox.checked;
+        checkbox.dispatchEvent(new Event("change", { bubbles: true }));
+        newInput.value = "";
+        applyFilter("");
         return;
       }
 
