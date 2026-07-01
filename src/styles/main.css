@@ -1679,12 +1679,12 @@ a:hover {
   color: #ffffff;
 }
 
-.stack-dropdown__new {
-  border-top-width: 2px;
-  border-top-style: solid;
-  border-color: var(--chrome-dark) transparent transparent transparent;
-  padding-top: 4px;
-  margin-top: var(--space-1);
+.stack-dropdown__search {
+  border-bottom-width: 2px;
+  border-bottom-style: solid;
+  border-bottom-color: var(--chrome-dark);
+  padding-bottom: 4px;
+  margin-bottom: var(--space-1);
 }
 
 .stack-dropdown__new-input {
@@ -1696,6 +1696,13 @@ a:hover {
   border-color: var(--bevel-field);
   background: #ffffff;
   border-radius: 0;
+}
+
+.stack-dropdown__empty {
+  padding: var(--space-2) var(--space-6);
+  font-size: var(--text-base);
+  color: var(--chrome-dark);
+  margin: 0;
 }
 
 /* ═══════════════════════════════════════════════════

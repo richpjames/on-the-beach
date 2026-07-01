@@ -25,7 +25,17 @@
   } = $props();
 
   let dropdownEl: HTMLElement | undefined = $state();
-  let newStackName = $state("");
+  let query = $state("");
+
+  const trimmedQuery = $derived(query.trim().toLowerCase());
+  const visibleStacks = $derived(
+    trimmedQuery === ""
+      ? stacks
+      : stacks.filter((stack) => stack.name.toLowerCase().includes(trimmedQuery)),
+  );
+  const exactMatch = $derived(
+    stacks.find((stack) => stack.name.toLowerCase() === trimmedQuery),
+  );
 
   onMount(() => {
     if (dropdownEl && flipUpIfClipped) {
@@ -59,13 +69,22 @@
     };
   });
 
-  async function onNewStackKeydown(event: KeyboardEvent): Promise<void> {
+  async function onSearchKeydown(event: KeyboardEvent): Promise<void> {
     if (event.key !== "Enter") return;
     event.preventDefault();
-    const name = newStackName.trim();
+    const name = query.trim();
     if (!name) return;
+
+    // An exact name match toggles that list instead of creating a duplicate.
+    const match = exactMatch;
+    if (match) {
+      await onToggle(match.id, !selectedStackIds.has(match.id));
+      query = "";
+      return;
+    }
+
     await onCreate(name);
-    newStackName = "";
+    query = "";
   }
 </script>
 
@@ -74,8 +93,17 @@
   bind:this={dropdownEl}
   style={anchorTop !== undefined ? `top: ${anchorTop}px` : undefined}
 >
+  <div class="stack-dropdown__search">
+    <input
+      type="text"
+      class="stack-dropdown__new-input input"
+      placeholder="Search or add a list..."
+      bind:value={query}
+      onkeydown={onSearchKeydown}
+    />
+  </div>
   <div class="stack-dropdown__list">
-    {#each stacks as stack (stack.id)}
+    {#each visibleStacks as stack (stack.id)}
       <label class="stack-dropdown__item">
         <input
           type="checkbox"
@@ -88,13 +116,7 @@
       </label>
     {/each}
   </div>
-  <div class="stack-dropdown__new">
-    <input
-      type="text"
-      class="stack-dropdown__new-input input"
-      placeholder="New stack..."
-      bind:value={newStackName}
-      onkeydown={onNewStackKeydown}
-    />
-  </div>
+  {#if trimmedQuery !== "" && visibleStacks.length === 0}
+    <p class="stack-dropdown__empty">Press Enter to create it.</p>
+  {/if}
 </div>
