@@ -60,6 +60,10 @@ export default defineConfig({
   ],
   fullyParallel: true,
   workers: resolveWorkers(),
+  // Retry transient CI timing flakes (e.g. animated drag/reorder under CPU
+  // contention) without masking real failures locally, where a fail should
+  // fail immediately.
+  retries: process.env.CI ? 2 : 0,
   // Remove the platform suffix from snapshot filenames — we always run on Linux
   // in CI, so the suffix adds noise without useful disambiguation.
   snapshotPathTemplate: "{testDir}/{testFileDir}/{testFileName}-snapshots/{arg}-{projectName}{ext}",
