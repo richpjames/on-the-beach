@@ -124,7 +124,7 @@ function applyListenStatusUpdate(setFields: MusicItemUpdateSet, input: UpdateMus
   }
 
   setFields.listenStatus = input.listenStatus;
-  if (input.listenStatus === "listened" || input.listenStatus === "done") {
+  if (input.listenStatus === "listened" || (input.listenStatus as string) === "done") {
     setFields.listenedAt = new Date();
   }
 }
@@ -322,7 +322,7 @@ musicItemRoutes.get("/", async (c) => {
     .get();
 
   let finalItems: typeof enriched = enriched;
-  if (orderRow && requestedSort === "default" && !search) {
+  if (orderRow && (requestedSort as string) === "default" && !search) {
     const parsed = JSON.parse(orderRow.itemIds);
     if (Array.isArray(parsed) && parsed.length > 0) {
       if (typeof parsed[0] === "number") {

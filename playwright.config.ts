@@ -1,26 +1,36 @@
 import { defineConfig, devices } from "@playwright/test";
 import os from "node:os";
 import path from "node:path";
-import { existsSync } from "node:fs";
+import { existsSync, readdirSync } from "node:fs";
 
 // Resolve the locally-cached Chromium binary. CI may not have network access
 // to download the revision expected by the installed playwright-core version,
-// so we fall back to whatever headless-shell revision is already present.
+// so we fall back to whatever chromium/headless-shell revision is already
+// present in the browsers cache (honouring PLAYWRIGHT_BROWSERS_PATH).
 function resolveChromeExecutable(): string | undefined {
-  const cacheRoot = path.join(os.homedir(), ".cache", "ms-playwright");
-  const candidates = [
-    // headless shell variants (newest first preference)
-    path.join(
-      cacheRoot,
-      "chromium_headless_shell-1208",
-      "chrome-headless-shell-linux64",
-      "chrome-headless-shell",
-    ),
-    path.join(cacheRoot, "chromium_headless_shell-1194", "chrome-linux", "headless_shell"),
-    // full chromium fallback
-    path.join(cacheRoot, "chromium-1194", "chrome-linux", "chrome"),
-  ];
-  return candidates.find(existsSync);
+  const cacheRoots = [
+    process.env.PLAYWRIGHT_BROWSERS_PATH,
+    path.join(os.homedir(), ".cache", "ms-playwright"),
+  ].filter((root): root is string => Boolean(root));
+
+  for (const cacheRoot of cacheRoots) {
+    if (!existsSync(cacheRoot)) continue;
+    // Newest revision first, headless shell preferred.
+    const entries = readdirSync(cacheRoot).sort().reverse();
+    for (const prefix of ["chromium_headless_shell-", "chromium-"]) {
+      for (const entry of entries) {
+        if (!entry.startsWith(prefix)) continue;
+        const candidates = [
+          path.join(cacheRoot, entry, "chrome-headless-shell-linux64", "chrome-headless-shell"),
+          path.join(cacheRoot, entry, "chrome-linux", "headless_shell"),
+          path.join(cacheRoot, entry, "chrome-linux", "chrome"),
+        ];
+        const found = candidates.find(existsSync);
+        if (found) return found;
+      }
+    }
+  }
+  return undefined;
 }
 
 function resolveWorkers(): number {
@@ -40,6 +50,8 @@ function resolveWorkers(): number {
 export default defineConfig({
   testDir: "./playwright",
   timeout: 30_000,
+  // Build the SvelteKit app once; workers boot servers from build/index.js.
+  globalSetup: "./playwright/global-setup.ts",
   reporter: [
     ["list"],
     // HTML report is used by the visual-regression workflow to publish diffs to

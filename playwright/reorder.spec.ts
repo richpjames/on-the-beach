@@ -31,10 +31,12 @@ test.describe("Reorder (mouse)", () => {
       .toEqual([initialTitles[0], initialTitles[2], initialTitles[1]]);
 
     // 2) Move the item below it above the one just moved up.
+    await waitForReorderAnimations(page);
     await dragCardByIndexWithMouse(page, 2, 1, "before");
     await expect.poll(() => getCardTitles(page)).toEqual(initialTitles);
 
     // 3) Move the one above the two that moved down by 2 positions.
+    await waitForReorderAnimations(page);
     await dragCardByIndexWithMouse(page, 0, 2, "after");
     await expect.poll(() => getCardTitles(page)).toEqual(expectedTitles);
 
@@ -81,9 +83,11 @@ test.describe("Reorder (touch)", () => {
       .poll(() => getCardTitles(page))
       .toEqual([initialTitles[0], initialTitles[2], initialTitles[1]]);
 
+    await waitForReorderAnimations(page);
     await dragCardByIndexWithTouchHandle(page, 2, 1, "before");
     await expect.poll(() => getCardTitles(page)).toEqual(initialTitles);
 
+    await waitForReorderAnimations(page);
     await dragCardByIndexWithTouchHandle(page, 0, 2, "after");
     await expect.poll(() => getCardTitles(page)).toEqual(expectedTitles);
 
@@ -92,6 +96,24 @@ test.describe("Reorder (touch)", () => {
     await expect.poll(() => getCardTitles(page)).toEqual(expectedTitles);
   });
 });
+
+/**
+ * Sortable suppresses a new drag while the previous drop's animation
+ * (`animation: 160`) is still running, so a drag started inside that window is
+ * silently ignored. Wait for the animation transforms to clear before starting
+ * the next drag.
+ */
+async function waitForReorderAnimations(page: Page): Promise<void> {
+  await expect
+    .poll(() =>
+      page.evaluate(() =>
+        Array.from(document.querySelectorAll<HTMLElement>(".music-card, .folder-row")).every(
+          (el) => !el.style.transform,
+        ),
+      ),
+    )
+    .toBe(true);
+}
 
 async function getCardTitles(page: Page): Promise<string[]> {
   return page.locator(".music-card .music-card__title").allTextContents();

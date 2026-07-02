@@ -14,7 +14,7 @@ Ad-hoc conditionals scattered across event handlers and render functions compoun
 - Multi-step flows (e.g. scan → ambiguous match → confirm → submit)
 - UI panels or modes with more than two positions
 - Retry or polling loops with back-off
-- Any state that depends on the *sequence* of prior events, not just current values
+- Any state that depends on the _sequence_ of prior events, not just current values
 
 A single `isOpen: boolean` does not need a machine. A `scanStatus` that can be idle, scanning, succeeded, or failed does.
 
@@ -33,3 +33,7 @@ Use XState. Machines live under `src/ui/state/`. Each machine should:
 - `add-form-machine.ts` — add-form flow: manual entry, link disambiguation, scan progress, stack selection, submit lifecycle.
 
 New flows follow the same pattern: one file per machine, co-located types, a default export of the machine definition.
+
+## Using machines in Svelte components
+
+Bridge actors into components with `src/lib/use-machine.svelte.ts` (`useMachine`). It returns a reactive `snapshot` plus `send`, renders the initial snapshot during SSR, and starts the actor on the client. Keep components rendering from `snapshot.context`; do not duplicate machine state into component `$state`.

@@ -4,10 +4,10 @@
   "license": "PolyForm-Noncommercial-1.0.0",
   "type": "module",
   "scripts": {
-    "dev": "bun --watch server/index.ts",
-    "build": "vite build",
-    "preview": "vite preview",
-    "typecheck": "tsc --noEmit",
+    "dev": "bunx --bun vite dev",
+    "build": "bunx --bun vite build",
+    "preview": "bun run build && bun build/index.js",
+    "typecheck": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
     "test": "bun test tests/unit",
     "test:unit": "bun test tests/unit",
     "test:unit:watch": "bun test --watch tests/unit",
@@ -28,7 +28,8 @@
     "eval:submit": "bun eval/submit.ts",
     "eval:status": "bun eval/status.ts",
     "eval:results": "bun eval/results.ts",
-    "prepare": "husky"
+    "prepare": "husky",
+    "start": "bun build/index.js"
   },
   "dependencies": {
     "@mistralai/mistralai": "^1.14.1",
@@ -39,8 +40,10 @@
     "xstate": "^5.28.0"
   },
   "devDependencies": {
-    "@hono/node-server": "^1.19.11",
     "@playwright/test": "^1.58.2",
+    "@sveltejs/adapter-node": "^5.5.7",
+    "@sveltejs/kit": "^2.69.0",
+    "@sveltejs/vite-plugin-svelte": "^6",
     "@types/better-sqlite3": "^7.6.13",
     "@types/node": "^25.3.5",
     "@types/sortablejs": "^1.15.9",
@@ -51,8 +54,10 @@
     "lint-staged": "^16.3.2",
     "oxfmt": "^0.34.0",
     "oxlint": "^1.51.0",
+    "svelte": "^5.56.4",
+    "svelte-check": "^4.7.1",
     "typescript": "^5.9.3",
-    "vite": "^6.4.1"
+    "vite": "^7"
   },
   "lint-staged": {
     "*.{js,jsx,ts,tsx}": [

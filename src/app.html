@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="Track music you want to listen to" />
+    <meta name="robots" content="noindex, nofollow" />
+    <link rel="preconnect" href="https://fonts.coollabs.io" />
+    <link
+      href="https://fonts.coollabs.io/css2?family=VT323&family=Share+Tech+Mono&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="icon" href="/favicon.ico" sizes="48x48" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="manifest" href="/site.webmanifest" />
+    %sveltekit.head%
+  </head>
+  <!-- The body class placeholder is swapped by the handle hook so pages that
+       restyle the window chrome (the release page) get their class at SSR time.
+       Content renders directly into <body>: the retro window styling relies on
+       header/main/footer being direct children of body. -->
+  <body class="%otb.body_class%">
+    %sveltekit.body%
+  </body>
+</html>
