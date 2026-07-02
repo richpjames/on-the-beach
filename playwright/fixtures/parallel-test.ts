@@ -112,7 +112,7 @@ async function startWorkerServer(
       PORT: String(port),
     };
 
-    const server = spawn("bun", ["server/index.ts"], {
+    const server = spawn("bun", ["build/index.js"], {
       env,
       stdio: ["ignore", "pipe", "pipe"],
     });
@@ -179,7 +179,9 @@ async function getAvailablePort(): Promise<number> {
 }
 
 function isRetryablePortFailure(message: string): boolean {
-  return message.includes("Is port") && message.includes("in use");
+  return (
+    (message.includes("Is port") && message.includes("in use")) || message.includes("EADDRINUSE")
+  );
 }
 
 async function waitForServer(url: string, timeoutMs: number): Promise<void> {

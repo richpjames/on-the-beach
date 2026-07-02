@@ -29,7 +29,7 @@ function makeMockApi(overrides: Partial<Record<string, unknown>> = {}) {
 
 describe("app state machine", () => {
   it("tracks filter and stack selection", () => {
-    const actor = createActor(appMachine).start();
+    const actor = createActor(appMachine, { input: {} }).start();
 
     actor.send({ type: "APP_READY" });
     actor.send({ type: "FILTER_SELECTED", filter: "listened" });
@@ -49,7 +49,7 @@ describe("app state machine", () => {
   });
 
   it("resets active stack when deleted", () => {
-    const actor = createActor(appMachine).start();
+    const actor = createActor(appMachine, { input: {} }).start();
 
     actor.send({ type: "STACK_SELECTED", stackId: 2 });
     actor.send({
@@ -67,7 +67,7 @@ describe("app state machine", () => {
   });
 
   it("accepts REMINDERS_READY event without error", () => {
-    const actor = createActor(appMachine).start();
+    const actor = createActor(appMachine, { input: {} }).start();
     // Should not throw — event is a no-op for now
     actor.send({ type: "REMINDERS_READY", itemIds: [1, 2] });
     expect(actor.getSnapshot().context.isReady).toBe(false); // unchanged
@@ -535,21 +535,21 @@ describe("add form machine — scan flow", () => {
 
 describe("app machine — browse panels", () => {
   it("opens search panel on first toggle", () => {
-    const actor = createActor(appMachine).start();
+    const actor = createActor(appMachine, { input: {} }).start();
     actor.send({ type: "SEARCH_PANEL_TOGGLED" });
     expect(actor.getSnapshot().context.searchPanelOpen).toBe(true);
     expect(actor.getSnapshot().context.sortPanelOpen).toBe(false);
   });
 
   it("closes search panel on second toggle", () => {
-    const actor = createActor(appMachine).start();
+    const actor = createActor(appMachine, { input: {} }).start();
     actor.send({ type: "SEARCH_PANEL_TOGGLED" });
     actor.send({ type: "SEARCH_PANEL_TOGGLED" });
     expect(actor.getSnapshot().context.searchPanelOpen).toBe(false);
   });
 
   it("opens sort panel and closes search panel", () => {
-    const actor = createActor(appMachine).start();
+    const actor = createActor(appMachine, { input: {} }).start();
     actor.send({ type: "SEARCH_PANEL_TOGGLED" });
     actor.send({ type: "SORT_PANEL_TOGGLED" });
     const ctx = actor.getSnapshot().context;
@@ -558,7 +558,7 @@ describe("app machine — browse panels", () => {
   });
 
   it("BROWSE_PANELS_CLOSED closes all panels", () => {
-    const actor = createActor(appMachine).start();
+    const actor = createActor(appMachine, { input: {} }).start();
     actor.send({ type: "SEARCH_PANEL_TOGGLED" });
     actor.send({ type: "BROWSE_PANELS_CLOSED" });
     const ctx = actor.getSnapshot().context;
@@ -569,7 +569,7 @@ describe("app machine — browse panels", () => {
 
 describe("app machine — version counters", () => {
   it("increments listVersion on FILTER_SELECTED", () => {
-    const actor = createActor(appMachine).start();
+    const actor = createActor(appMachine, { input: {} }).start();
     const v0 = actor.getSnapshot().context.listVersion;
     actor.send({ type: "FILTER_SELECTED", filter: "listened" });
     expect(actor.getSnapshot().context.listVersion).toBe(v0 + 1);
@@ -577,7 +577,7 @@ describe("app machine — version counters", () => {
   });
 
   it("increments both versions on STACK_SELECTED", () => {
-    const actor = createActor(appMachine).start();
+    const actor = createActor(appMachine, { input: {} }).start();
     const v0 = actor.getSnapshot().context.listVersion;
     const s0 = actor.getSnapshot().context.stackBarVersion;
     actor.send({ type: "STACK_SELECTED", stackId: 1 });
@@ -586,28 +586,28 @@ describe("app machine — version counters", () => {
   });
 
   it("increments listVersion on SORT_UPDATED", () => {
-    const actor = createActor(appMachine).start();
+    const actor = createActor(appMachine, { input: {} }).start();
     const v0 = actor.getSnapshot().context.listVersion;
     actor.send({ type: "SORT_UPDATED", sort: "star-rating" });
     expect(actor.getSnapshot().context.listVersion).toBe(v0 + 1);
   });
 
   it("increments both versions on SEARCH_UPDATED", () => {
-    const actor = createActor(appMachine).start();
+    const actor = createActor(appMachine, { input: {} }).start();
     actor.send({ type: "SEARCH_UPDATED", query: "dub" });
     expect(actor.getSnapshot().context.listVersion).toBe(1);
     expect(actor.getSnapshot().context.stackBarVersion).toBe(1);
   });
 
   it("increments both versions on ITEM_CREATED when filter is to-listen", () => {
-    const actor = createActor(appMachine).start();
+    const actor = createActor(appMachine, { input: {} }).start();
     actor.send({ type: "ITEM_CREATED" });
     expect(actor.getSnapshot().context.listVersion).toBe(1);
     expect(actor.getSnapshot().context.stackBarVersion).toBe(1);
   });
 
   it("does not increment listVersion on ITEM_CREATED when filter is listened", () => {
-    const actor = createActor(appMachine).start();
+    const actor = createActor(appMachine, { input: {} }).start();
     actor.send({ type: "FILTER_SELECTED", filter: "listened" });
     const v0 = actor.getSnapshot().context.listVersion;
     const s0 = actor.getSnapshot().context.stackBarVersion;
@@ -617,7 +617,7 @@ describe("app machine — version counters", () => {
   });
 
   it("increments listVersion on ITEM_CREATED when filter is all", () => {
-    const actor = createActor(appMachine).start();
+    const actor = createActor(appMachine, { input: {} }).start();
     actor.send({ type: "FILTER_SELECTED", filter: "all" });
     const v0 = actor.getSnapshot().context.listVersion;
     actor.send({ type: "ITEM_CREATED" });
@@ -625,7 +625,7 @@ describe("app machine — version counters", () => {
   });
 
   it("increments both versions on STACK_DELETED", () => {
-    const actor = createActor(appMachine).start();
+    const actor = createActor(appMachine, { input: {} }).start();
     actor.send({ type: "STACK_DELETED", stackId: 1 });
     expect(actor.getSnapshot().context.listVersion).toBe(1);
     expect(actor.getSnapshot().context.stackBarVersion).toBe(1);

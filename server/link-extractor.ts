@@ -168,7 +168,7 @@ export function parseReleaseCandidatesJson(rawContent: string): ExtractedRelease
         continue;
       }
 
-      const dedupeKey = `${candidate.artist?.toLowerCase() ?? ""}::${candidate.title.toLowerCase()}`;
+      const dedupeKey = `${candidate.artist?.toLowerCase() ?? ""}::${candidate.title?.toLowerCase() ?? ""}`;
       if (seen.has(dedupeKey)) {
         continue;
       }

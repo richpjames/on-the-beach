@@ -164,6 +164,8 @@ export interface ScanResult {
   label?: string | null;
   country?: string | null;
   catalogueNumber?: string | null;
+  musicbrainzReleaseId?: string | null;
+  musicbrainzArtistId?: string | null;
 }
 
 export interface UploadImageResult {

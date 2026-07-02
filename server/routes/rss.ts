@@ -171,7 +171,7 @@ async function defaultFetchStackItems(stackId: number): Promise<MusicItemFull[]>
     .leftJoin(artists, eq(artists.id, musicItems.artistId))
     .leftJoin(
       musicLinks,
-      and(eq(musicLinks.musicItemId, musicItems.id), eq(musicLinks.isPrimary, 1)),
+      and(eq(musicLinks.musicItemId, musicItems.id), eq(musicLinks.isPrimary, true)),
     )
     .leftJoin(sources, eq(sources.id, musicLinks.sourceId))
     .where(inArray(musicItems.id, itemIds))
@@ -191,7 +191,9 @@ async function defaultFetchStackItems(stackId: number): Promise<MusicItemFull[]>
           ? String(row.listened_at)
           : null,
     stacks: [],
-  }));
+    // The RSS renderer only reads the selected columns; the remaining
+    // MusicItemFull fields are not needed for feed output.
+  })) as unknown as MusicItemFull[];
 }
 
 async function defaultFetchPrimaryFeedItems(feed: PrimaryFeedKey): Promise<MusicItemFull[]> {
@@ -229,7 +231,7 @@ async function defaultFetchPrimaryFeedItems(feed: PrimaryFeedKey): Promise<Music
           .leftJoin(artists, eq(artists.id, musicItems.artistId))
           .leftJoin(
             musicLinks,
-            and(eq(musicLinks.musicItemId, musicItems.id), eq(musicLinks.isPrimary, 1)),
+            and(eq(musicLinks.musicItemId, musicItems.id), eq(musicLinks.isPrimary, true)),
           )
           .leftJoin(sources, eq(sources.id, musicLinks.sourceId))
           .orderBy(musicItems.createdAt)
@@ -265,7 +267,7 @@ async function defaultFetchPrimaryFeedItems(feed: PrimaryFeedKey): Promise<Music
           .leftJoin(artists, eq(artists.id, musicItems.artistId))
           .leftJoin(
             musicLinks,
-            and(eq(musicLinks.musicItemId, musicItems.id), eq(musicLinks.isPrimary, 1)),
+            and(eq(musicLinks.musicItemId, musicItems.id), eq(musicLinks.isPrimary, true)),
           )
           .leftJoin(sources, eq(sources.id, musicLinks.sourceId))
           // Scheduled items (remind_at IS NOT NULL) belong to the Scheduled
@@ -287,7 +289,9 @@ async function defaultFetchPrimaryFeedItems(feed: PrimaryFeedKey): Promise<Music
           ? String(row.listened_at)
           : null,
     stacks: [],
-  }));
+    // The RSS renderer only reads the selected columns; the remaining
+    // MusicItemFull fields are not needed for feed output.
+  })) as unknown as MusicItemFull[];
 }
 
 // ---------------------------------------------------------------------------

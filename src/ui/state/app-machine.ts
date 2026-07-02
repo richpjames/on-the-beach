@@ -39,22 +39,28 @@ export type AppEvent =
   | { type: "LIST_REFRESH" }
   | { type: "REMINDERS_READY"; itemIds: number[] };
 
+/** Seed for server-rendered pages (stack scope comes from the URL). */
+export interface AppInput {
+  stacks?: StackWithCount[];
+  currentStack?: number | null;
+}
+
 export const appMachine = createMachine({
-  types: {} as { context: AppContext; events: AppEvent },
-  context: {
-    currentFilter: "to-listen",
-    currentStack: null,
+  types: {} as { context: AppContext; events: AppEvent; input: AppInput },
+  context: ({ input }) => ({
+    currentFilter: input?.currentStack != null ? ("all" as const) : ("to-listen" as const),
+    currentStack: input?.currentStack ?? null,
     searchQuery: "",
-    currentSort: "date-added",
-    currentSortDirection: "desc",
-    stacks: [],
+    currentSort: "date-added" as const,
+    currentSortDirection: "desc" as const,
+    stacks: input?.stacks ?? [],
     isReady: false,
     stackManageOpen: false,
     searchPanelOpen: false,
     sortPanelOpen: false,
     listVersion: 0,
     stackBarVersion: 0,
-  },
+  }),
   on: {
     APP_READY: {
       actions: assign({ isReady: true }),

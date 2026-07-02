@@ -1,6 +1,6 @@
 # On The Beach
 
-A full-stack music tracker for collecting links and keeping tabs on listening status. The app runs a Bun + Hono backend with a persistent server-side SQLite database and a Vite-powered TypeScript frontend.
+A full-stack music tracker for collecting links and keeping tabs on listening status. The app is a SvelteKit application running under Bun, with a persistent server-side SQLite database; the REST API layer is built with Hono and mounted into SvelteKit.
 
 ## Features
 
@@ -23,9 +23,10 @@ A full-stack music tracker for collecting links and keeping tabs on listening st
 ## Tech Stack
 
 - **Runtime**: Bun
-- **Backend**: Hono (REST API)
-- **Database**: SQLite via `better-sqlite3` + Drizzle ORM
-- **Frontend**: Vite + TypeScript (SPA)
+- **Framework**: SvelteKit (Svelte 5) with `@sveltejs/adapter-node`
+- **API**: Hono (REST), mounted into SvelteKit under `/api/*` and `/feed/*`
+- **Database**: SQLite via `bun:sqlite` + Drizzle ORM
+- **State**: XState machines bridged into Svelte runes
 - **AI**: Mistral (cover scanning)
 
 ## Getting Started
@@ -39,23 +40,24 @@ Open http://localhost:3000.
 
 ## Environment Variables
 
-| Variable             | Required | Default              | Description                                                                 |
-| -------------------- | -------- | -------------------- | --------------------------------------------------------------------------- |
-| `DATABASE_PATH`      | No       | `on_the_beach.db`    | Path to the SQLite database file                                            |
-| `PORT`               | No       | `3000`               | HTTP server port                                                            |
-| `UPLOADS_DIR`        | No       | `uploads`            | Directory for uploaded cover images                                         |
-| `MISTRAL_API_KEY`    | No       | —                    | Enables AI cover scanning and unsupported music-link extraction             |
-| `MISTRAL_LINK_MODEL` | No       | `mistral-small-latest` | Model for unsupported music-link extraction via chat completions.         |
-| `MISTRAL_SCAN_MODEL` | No       | `mistral-ocr-latest` | Model for cover scanning. Non-OCR models use chat-completions mode.         |
-| `INGEST_API_KEY`     | No       | —                    | Secret token for the HTTP email ingest webhook. Required to enable it.      |
-| `INGEST_ENABLED`     | No       | `true`               | Set to `false` to disable the HTTP ingest endpoint without removing the key |
+| Variable             | Required | Default                | Description                                                                 |
+| -------------------- | -------- | ---------------------- | --------------------------------------------------------------------------- |
+| `DATABASE_PATH`      | No       | `on_the_beach.db`      | Path to the SQLite database file                                            |
+| `PORT`               | No       | `3000`                 | HTTP server port                                                            |
+| `UPLOADS_DIR`        | No       | `uploads`              | Directory for uploaded cover images                                         |
+| `MISTRAL_API_KEY`    | No       | —                      | Enables AI cover scanning and unsupported music-link extraction             |
+| `MISTRAL_LINK_MODEL` | No       | `mistral-small-latest` | Model for unsupported music-link extraction via chat completions.           |
+| `MISTRAL_SCAN_MODEL` | No       | `mistral-ocr-latest`   | Model for cover scanning. Non-OCR models use chat-completions mode.         |
+| `INGEST_API_KEY`     | No       | —                      | Secret token for the HTTP email ingest webhook. Required to enable it.      |
+| `INGEST_ENABLED`     | No       | `true`                 | Set to `false` to disable the HTTP ingest endpoint without removing the key |
 
 ## Scripts
 
 ```bash
-bun run dev             # Start dev server (Hono + Vite HMR) on port 3000
-bun run build           # Build frontend for production
-bun run typecheck       # Type-check without building
+bun run dev             # Start SvelteKit dev server (Vite HMR) on port 3000
+bun run build           # Build the app (client + server) into build/
+bun run start           # Run the production build (bun build/index.js)
+bun run typecheck       # svelte-check (type-checks .ts and .svelte)
 bun run test:unit       # Unit tests (Bun test)
 bun run test:e2e        # Smoke E2E tests (Playwright)
 bun run test:visual     # Visual regression tests (Playwright screenshot comparison)
@@ -121,7 +123,7 @@ For container deployments, prefer an absolute uploads path (for example `UPLOADS
 
 Coolify deployment runbook: `docs/deployment/coolify-alpha.md`
 
-The app ships as a single Docker container (Dockerfile builds the frontend and starts the Bun server). Use `Dockerfile` build pack, port `3000`, and mount persistent volumes for the database and uploads directories.
+The app ships as a single Docker container (Dockerfile builds the SvelteKit app and starts it with `bun build/index.js`). Use `Dockerfile` build pack, port `3000`, and mount persistent volumes for the database and uploads directories.
 
 ## Querying Production From Local
 

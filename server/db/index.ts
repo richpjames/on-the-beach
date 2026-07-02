@@ -1,4 +1,5 @@
 import { Database } from "bun:sqlite";
+import path from "node:path";
 import { drizzle } from "drizzle-orm/bun-sqlite";
 import { migrate } from "drizzle-orm/bun-sqlite/migrator";
 import * as schema from "./schema";
@@ -9,8 +10,10 @@ sqlite.exec("PRAGMA journal_mode = WAL");
 sqlite.exec("PRAGMA foreign_keys = ON");
 export const db = drizzle(sqlite, { schema });
 
-// Apply any pending migrations on startup (idempotent)
-migrate(db, { migrationsFolder: `${import.meta.dir}/../../drizzle` });
+// Apply any pending migrations on startup (idempotent). Resolved from the
+// working directory (repo root / container WORKDIR) rather than import.meta
+// so the path survives the SvelteKit server bundle.
+migrate(db, { migrationsFolder: path.resolve(process.cwd(), "drizzle") });
 
 // Seed reference data (idempotent — onConflictDoNothing)
 const SEED_SOURCES = [

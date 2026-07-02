@@ -40,3 +40,7 @@ eval/fixtures/pending-review.json
 *.png
 
 uploads
+
+# SvelteKit
+.svelte-kit/
+build/
