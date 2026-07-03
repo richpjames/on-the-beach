@@ -3,7 +3,7 @@
   import { onMount } from "svelte";
   import type { PageData } from "../../routes/r/[id]/$types";
   import type { ListenEmbed } from "../../routes/r/[id]/+page.server";
-  import { api } from "../api";
+  import { api, apiFetch } from "../api";
   import { player } from "../player.svelte";
   import StarRating from "./StarRating.svelte";
 
@@ -112,7 +112,7 @@
       notes: editNotes.trim() || null,
       artworkUrl: editArtworkUrl.trim() || null,
     };
-    const res = await fetch(`/api/music-items/${item.id}`, {
+    const res = await apiFetch(`/api/music-items/${item.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
@@ -219,7 +219,7 @@
   );
 
   async function removeLink(linkId: number): Promise<void> {
-    const res = await fetch(`/api/music-items/${item.id}/links/${linkId}`, { method: "DELETE" });
+    const res = await apiFetch(`/api/music-items/${item.id}/links/${linkId}`, { method: "DELETE" });
     if (res.ok) {
       itemLinks = itemLinks.filter((l) => l.id !== linkId);
     }
@@ -229,7 +229,7 @@
     const sourceName = sourceQuery.trim();
     const url = linkUrl.trim();
     if (!sourceName || !url) return;
-    const res = await fetch(`/api/music-items/${item.id}/links`, {
+    const res = await apiFetch(`/api/music-items/${item.id}/links`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ sourceName, url }),
@@ -281,7 +281,7 @@
       !hasAppleMusicSecondary &&
       (!item.primary_source || !PLAYABLE_SOURCES.has(item.primary_source))
     ) {
-      fetch(`/api/release/apple-music-lookup/${item.id}`, { method: "POST" })
+      apiFetch(`/api/release/apple-music-lookup/${item.id}`, { method: "POST" })
         .then((r) => (r.ok ? r.json() : null))
         .then((lookup) => {
           if (lookup?.url) appleMusicLookupUrl = lookup.url;

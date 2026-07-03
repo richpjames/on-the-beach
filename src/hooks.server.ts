@@ -1,5 +1,11 @@
-import type { Handle } from "@sveltejs/kit";
+import { json, type Handle } from "@sveltejs/kit";
 import { processReminders } from "../server/reminders";
+import {
+  CSRF_COOKIE_NAME,
+  CSRF_HEADER_NAME,
+  createCsrfToken,
+  isCsrfRequestAllowed,
+} from "../server/csrf";
 
 // ---------- Reminder cron ----------
 // Run reminder processing on startup and then every hour. Guarded so dev-mode
@@ -21,6 +27,32 @@ function bodyClassForRoute(routeId: string | null): string {
 }
 
 export const handle: Handle = async ({ event, resolve }) => {
+  // ---------- CSRF (double-submit cookie) ----------
+  // See server/csrf.ts. Not httpOnly: the client reads the cookie to echo it
+  // in the x-csrf-token header — the token carries no authority by itself.
+  let csrfToken = event.cookies.get(CSRF_COOKIE_NAME) ?? null;
+  if (!csrfToken) {
+    csrfToken = createCsrfToken();
+    event.cookies.set(CSRF_COOKIE_NAME, csrfToken, {
+      path: "/",
+      httpOnly: false,
+      sameSite: "lax",
+      secure: event.url.protocol === "https:",
+    });
+  }
+
+  const allowed = isCsrfRequestAllowed({
+    method: event.request.method,
+    pathname: event.url.pathname,
+    requestOrigin: event.request.headers.get("origin"),
+    siteOrigin: event.url.origin,
+    cookieToken: csrfToken,
+    headerToken: event.request.headers.get(CSRF_HEADER_NAME),
+  });
+  if (!allowed) {
+    return json({ error: "CSRF token missing or invalid" }, { status: 403 });
+  }
+
   const bodyClass = bodyClassForRoute(event.route.id);
   return resolve(event, {
     transformPageChunk: ({ html }) => html.replaceAll("%otb.body_class%", bodyClass),

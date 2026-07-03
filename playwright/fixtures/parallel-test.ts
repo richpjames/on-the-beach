@@ -61,6 +61,11 @@ export const test = base.extend<{}, WorkerFixtures>({
   request: async ({ playwright, workerBaseURL }, use) => {
     const request = await playwright.request.newContext({
       baseURL: workerBaseURL,
+      // Direct API calls from tests have no browser Origin header; sending a
+      // same-origin one satisfies the CSRF check (see server/csrf.ts).
+      extraHTTPHeaders: {
+        origin: workerBaseURL,
+      },
     });
     await use(request);
     await request.dispose();
@@ -110,6 +115,9 @@ async function startWorkerServer(
     const env = {
       ...baseEnv,
       PORT: String(port),
+      // adapter-node assumes https when ORIGIN is unset; the CSRF origin
+      // check and cookie security flags need the real (http) origin.
+      ORIGIN: `http://127.0.0.1:${port}`,
     };
 
     const server = spawn("bun", ["build/index.js"], {

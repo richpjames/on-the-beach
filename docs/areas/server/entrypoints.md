@@ -15,7 +15,7 @@
 
 - Errors inside Hono handlers are normalized to a JSON `500` response in `server/app.ts` (`apiApp.onError`).
 - Test-only helpers are mounted at `/api/__test__` when `NODE_ENV === "test"` (the Playwright worker servers run this way).
-- SvelteKit's CSRF origin check is disabled (`svelte.config.js`): the app has no cookie auth, and the email ingest webhook receives cross-origin multipart POSTs authenticated by bearer token.
+- CSRF protection is a double-submit cookie (`server/csrf.ts`, enforced in `src/hooks.server.ts`): the hook issues an `otb_csrf` cookie, and unsafe-method requests must present a matching `Origin` header or echo the token in `x-csrf-token` (the API client and `apiFetch` do this automatically). The email ingest webhook is exempt — it authenticates with a bearer token and posts cross-origin multipart bodies, which is also why SvelteKit's built-in origin check is disabled in `svelte.config.js`.
 
 ## Why this matters
 

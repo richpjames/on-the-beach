@@ -15,6 +15,8 @@ import type {
   ItemSuggestion,
 } from "../types";
 
+import { CSRF_COOKIE_NAME, CSRF_HEADER_NAME } from "../../server/csrf";
+
 export class AmbiguousLinkApiError extends Error {
   payload: AmbiguousLinkPayload;
 
@@ -23,6 +25,36 @@ export class AmbiguousLinkApiError extends Error {
     this.name = "AmbiguousLinkApiError";
     this.payload = payload;
   }
+}
+
+function readCsrfToken(): string | null {
+  if (typeof document === "undefined") return null;
+  const match = document.cookie.match(new RegExp(`(?:^|;\\s*)${CSRF_COOKIE_NAME}=([^;]+)`));
+  return match ? decodeURIComponent(match[1]) : null;
+}
+
+/**
+ * Attach the double-submit CSRF token header to unsafe-method requests.
+ * The server issues the token cookie in `src/hooks.server.ts`.
+ */
+export function withCsrf(init?: RequestInit): RequestInit | undefined {
+  const method = (init?.method ?? "GET").toUpperCase();
+  if (method === "GET" || method === "HEAD" || !init) {
+    return init;
+  }
+
+  const token = readCsrfToken();
+  if (!token) {
+    return init;
+  }
+
+  return {
+    ...init,
+    headers: {
+      ...(init.headers as Record<string, string> | undefined),
+      [CSRF_HEADER_NAME]: token,
+    },
+  };
 }
 
 export class ApiClient {
@@ -41,7 +73,7 @@ export class ApiClient {
   }
 
   private async request(path: string, action: string, init?: RequestInit): Promise<Response> {
-    const response = await fetch(this.buildUrl(path), init);
+    const response = await fetch(this.buildUrl(path), withCsrf(init));
     if (!response.ok) {
       throw new Error(`${action} failed: ${response.status}`);
     }
@@ -59,7 +91,7 @@ export class ApiClient {
     action: string,
     init?: RequestInit,
   ): Promise<T | null> {
-    const response = await fetch(this.buildUrl(path), init);
+    const response = await fetch(this.buildUrl(path), withCsrf(init));
     if (response.status === 404) {
       return null;
     }
@@ -81,7 +113,7 @@ export class ApiClient {
   async createMusicItem(input: CreateMusicItemInput): Promise<MusicItemFull> {
     const response = await fetch(
       this.buildUrl("/api/music-items"),
-      this.jsonRequest("POST", input),
+      withCsrf(this.jsonRequest("POST", input)),
     );
     if (response.status === 409) {
       const body = (await response.json()) as Partial<AmbiguousLinkPayload>;
