@@ -5,8 +5,10 @@ const config = {
   kit: {
     adapter: adapter({ out: "build" }),
     csrf: {
-      // The app has no cookie-based auth, and the email ingest webhook
-      // receives cross-origin multipart POSTs (authenticated by bearer token).
+      // SvelteKit's built-in origin check can't exempt the email ingest
+      // webhook (cross-origin multipart POSTs authenticated by bearer token).
+      // CSRF protection is handled by the double-submit cookie check in
+      // src/hooks.server.ts (see server/csrf.ts).
       checkOrigin: false,
     },
     files: {

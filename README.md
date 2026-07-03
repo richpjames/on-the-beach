@@ -50,6 +50,7 @@ Open http://localhost:3000.
 | `MISTRAL_SCAN_MODEL` | No       | `mistral-ocr-latest`   | Model for cover scanning. Non-OCR models use chat-completions mode.         |
 | `INGEST_API_KEY`     | No       | —                      | Secret token for the HTTP email ingest webhook. Required to enable it.      |
 | `INGEST_ENABLED`     | No       | `true`                 | Set to `false` to disable the HTTP ingest endpoint without removing the key |
+| `ORIGIN`             | Prod     | —                      | Public origin of the deployment (e.g. `https://otb.example.com`). Used to derive request URLs, the CSRF origin check, and cookie security flags. |
 
 ## Scripts
 
