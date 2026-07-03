@@ -1,4 +1,5 @@
 import { json, type Handle } from "@sveltejs/kit";
+import { building } from "$app/environment";
 import { processReminders } from "../server/reminders";
 import {
   CSRF_COOKIE_NAME,
@@ -9,9 +10,10 @@ import {
 
 // ---------- Reminder cron ----------
 // Run reminder processing on startup and then every hour. Guarded so dev-mode
-// module reloads don't stack intervals.
+// module reloads don't stack intervals, and skipped entirely while SvelteKit
+// builds/analyses the app — the build environment has no database.
 const globalState = globalThis as typeof globalThis & { __otbRemindersStarted?: boolean };
-if (!globalState.__otbRemindersStarted) {
+if (!building && !globalState.__otbRemindersStarted) {
   globalState.__otbRemindersStarted = true;
   processReminders().catch((err) => console.error("[reminders] startup run failed:", err));
   setInterval(
