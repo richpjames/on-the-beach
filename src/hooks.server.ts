@@ -22,6 +22,16 @@ if (!building && !globalState.__otbRemindersStarted) {
   );
 }
 
+// ---------- Preview deployments ----------
+// Preview environments start with an empty database; PREVIEW_SEED=1 fills it
+// with demo content so the preview is explorable. No-op once data exists.
+// Dynamically imported so the build never touches the database.
+if (!building && process.env["PREVIEW_SEED"] === "1") {
+  import("../server/preview-seed")
+    .then(({ seedPreviewData }) => seedPreviewData())
+    .catch((err) => console.error("[preview-seed] failed:", err));
+}
+
 // Pages that restyle the retro window chrome need their class on <body> at SSR
 // time (the stylesheet targets `body.release-page-body` and its direct children).
 function bodyClassForRoute(routeId: string | null): string {
