@@ -1151,6 +1151,16 @@ select.input {
     max-height: none;
     overflow-y: auto;
     overflow-x: hidden;
+    /* Clearance for the fixed browse dock (taskbar clearance comes from the
+       body margin above). Matches the dock's rendered height. */
+    padding-bottom: 100px;
+  }
+
+  /* scrollIntoView targets (reorder, future flows) must land clear of the
+     fixed dock and taskbar overlay. */
+  .music-card {
+    scroll-margin-top: var(--space-4);
+    scroll-margin-bottom: 150px;
   }
 
   body:not(.release-page-body) .main {
@@ -1265,8 +1275,8 @@ select.input {
   }
 
   .filter-bar::before {
-    padding: 0 var(--space-4) 0 var(--space-1);
-    flex-shrink: 0;
+    /* No room for a label in the dock; the buttons speak for themselves. */
+    content: none;
   }
 
   .browse-controls {
@@ -1275,12 +1285,19 @@ select.input {
     position: relative;
   }
 
+  /* Thumb-zone dock: filters + search/sort live in a fixed bar just above
+     the taskbar, where they're reachable one-handed, instead of at the top
+     of the page. Content clearance comes from body padding below. */
   .filter-section {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: var(--taskbar-height);
+    z-index: 9998; /* over content, under the taskbar (9999) and modals (10000) */
     background: var(--chrome-panel);
-  }
-
-  .filter-section:has(#browse-sort-panel.is-open) {
-    padding-bottom: 46px; /* make room for the floating sort panel */
+    border-top: 2px solid var(--chrome-white);
+    box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.3);
+    padding: var(--space-2);
   }
 
   .browse-tools {
@@ -1298,7 +1315,8 @@ select.input {
   .browse-tools__panel {
     display: none;
     position: absolute;
-    top: calc(100% + 4px);
+    /* The dock sits at the bottom of the screen, so panels open upward. */
+    bottom: calc(100% + 8px);
     right: -2px;
     z-index: 3;
     min-width: min(72vw, 260px);
