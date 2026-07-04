@@ -543,6 +543,34 @@
           </div>
         </div>
 
+        <div class="release-page__status">
+          <label for="status-select">Status</label>
+          <select id="status-select" class="status-select" value={displayedStatus} onchange={onStatusChange}>
+            <option value="to-listen">To Listen</option>
+            <option value="listened">Listened</option>
+            {#if currentRemindAt}
+              <option value="scheduled" disabled>Scheduled</option>
+            {/if}
+          </select>
+        </div>
+
+        <div class="release-page__reminder">
+          <label for="remind-at">Remind me on</label>
+          <input class="input" type="date" id="remind-at" bind:value={remindAtValue} />
+          <button
+            type="button"
+            class="btn btn--primary"
+            class:btn--saved={reminderSaved}
+            id="set-reminder-btn"
+            onclick={setReminder}>{reminderSaved ? "Saved!" : "Set reminder"}</button
+          >
+          {#if currentRemindAt}
+            <button type="button" class="btn" id="clear-reminder-btn" onclick={clearReminder}
+              >Clear</button
+            >
+          {/if}
+        </div>
+
         <div class="release-page__edit-stacks">
           <div class="release-page__edit-stacks-header">Stacks</div>
           <div id="stack-chips" class="release-page__stacks release-page__stacks--inline">
@@ -582,34 +610,6 @@
               onkeydown={onNewStackKeydown}
             />
           </div>
-        </div>
-
-        <div class="release-page__status">
-          <label for="status-select">Status</label>
-          <select id="status-select" class="status-select" value={displayedStatus} onchange={onStatusChange}>
-            <option value="to-listen">To Listen</option>
-            <option value="listened">Listened</option>
-            {#if currentRemindAt}
-              <option value="scheduled" disabled>Scheduled</option>
-            {/if}
-          </select>
-        </div>
-
-        <div class="release-page__reminder">
-          <label for="remind-at">Remind me on</label>
-          <input class="input" type="date" id="remind-at" bind:value={remindAtValue} />
-          <button
-            type="button"
-            class="btn btn--primary"
-            class:btn--saved={reminderSaved}
-            id="set-reminder-btn"
-            onclick={setReminder}>{reminderSaved ? "Saved!" : "Set reminder"}</button
-          >
-          {#if currentRemindAt}
-            <button type="button" class="btn" id="clear-reminder-btn" onclick={clearReminder}
-              >Clear</button
-            >
-          {/if}
         </div>
 
         <div class="release-page__footer">
