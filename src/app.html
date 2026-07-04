@@ -15,6 +15,18 @@
     <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <link rel="manifest" href="/site.webmanifest" />
+    <script>
+      // Apply theme before paint to avoid flash. Reads ?theme=encarta or
+      // localStorage('theme'). Stays as classic Win98 by default.
+      (function () {
+        try {
+          var p = new URLSearchParams(location.search).get("theme");
+          var t = p || localStorage.getItem("theme") || "classic";
+          if (p) localStorage.setItem("theme", p);
+          if (t && t !== "classic") document.documentElement.dataset.theme = t;
+        } catch (_) {}
+      })();
+    </script>
     %sveltekit.head%
   </head>
   <!-- The body class placeholder is swapped by the handle hook so pages that
