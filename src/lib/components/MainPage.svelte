@@ -216,6 +216,43 @@
     app.send({ type: "STACK_DELETED", stackId });
   }
 
+  /**
+   * Slot-machine sweep across the visible cards before Pick One settles on the
+   * winner. Skipped for reduced motion, tiny lists, or when the picked item
+   * isn't rendered in the current view.
+   */
+  async function rouletteToCard(targetId: number): Promise<void> {
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      return;
+    }
+
+    const cards = [...document.querySelectorAll<HTMLElement>(".music-card")];
+    const target = document.querySelector<HTMLElement>(`.music-card[data-item-id="${targetId}"]`);
+    if (cards.length < 2 || !target) {
+      return;
+    }
+
+    const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+    const clear = () => {
+      for (const card of cards) card.classList.remove("music-card--roulette");
+    };
+
+    const steps = Math.min(8, cards.length + 3);
+    for (let i = 0; i < steps; i++) {
+      clear();
+      const card = cards[Math.floor(Math.random() * cards.length)];
+      card.classList.add("music-card--roulette");
+      card.scrollIntoView({ block: "nearest" });
+      await wait(55 + i * 16);
+    }
+
+    clear();
+    target.classList.add("music-card--roulette");
+    target.scrollIntoView({ block: "nearest" });
+    await wait(320);
+    target.classList.remove("music-card--roulette");
+  }
+
   async function pickRandom(): Promise<{ id: number } | null> {
     const filters = buildMusicItemFilters("to-listen", ctx.currentStack);
     const result = await api.listMusicItems(filters);
@@ -223,6 +260,7 @@
       return null;
     }
     const picked = result.items[Math.floor(Math.random() * result.items.length)];
+    await rouletteToCard(picked.id);
     await goto(`/r/${picked.id}`);
     return picked;
   }

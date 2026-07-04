@@ -90,6 +90,7 @@
   async function pickRandom(): Promise<void> {
     if (randomBtnDisabled) return;
     randomBtnDisabled = true;
+    randomBtnText = "🎲 Rolling…";
     try {
       const picked = await onPickRandom();
       if (!picked) {
@@ -98,6 +99,8 @@
           randomBtnText = "🎲 Pick One";
           randomBtnDisabled = false;
         }, 1500);
+      } else {
+        randomBtnText = "🎲 Pick One";
       }
     } finally {
       if (randomBtnText === "🎲 Pick One") {
