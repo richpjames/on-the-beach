@@ -3,7 +3,7 @@
   import { onMount } from "svelte";
   import type { ListenStatus, MusicItemFull, StackWithCount } from "../../types";
   import type { FilterSelection } from "../../ui/domain/music-list";
-  import { getEmptyStateMessage } from "../../ui/domain/music-list";
+  import { getEmptyStateHint, getEmptyStateMessage } from "../../ui/domain/music-list";
   import { api } from "../api";
   import FolderRow from "./FolderRow.svelte";
   import MusicCard from "./MusicCard.svelte";
@@ -239,7 +239,16 @@
       {/each}
       {#if items.length === 0}
         <div class="empty-state">
-          <p>{getEmptyStateMessage(currentFilter, searchQuery)}</p>
+          <img class="empty-state__mascot" src="/favicon-32x32.png" alt="" width="64" height="64" />
+          <p class="empty-state__headline">
+            {getEmptyStateMessage(currentFilter, searchQuery)}<span
+              class="empty-state__cursor"
+              aria-hidden="true"
+            ></span>
+          </p>
+          {#if getEmptyStateHint(currentFilter, searchQuery)}
+            <p class="empty-state__hint">{getEmptyStateHint(currentFilter, searchQuery)}</p>
+          {/if}
         </div>
       {:else}
         {#each items as item (item.id)}

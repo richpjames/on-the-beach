@@ -7,6 +7,7 @@ import {
 } from "../../src/ui/domain/add-form";
 import {
   buildMusicItemFilters,
+  getEmptyStateHint,
   getEmptyStateMessage,
   buildContextKey,
   applyOrder,
@@ -126,6 +127,15 @@ describe("app domain helpers", () => {
   it("builds the same empty-state messages used by the UI", () => {
     expect(getEmptyStateMessage("all")).toContain("No music tracked yet");
     expect(getEmptyStateMessage("all", " ambient ")).toContain('No matches for "ambient"');
+    expect(getEmptyStateMessage("to-listen")).toContain("all caught up");
+    expect(getEmptyStateMessage("scheduled")).toContain("No reminders scheduled");
+  });
+
+  it("pairs empty states with actionable hints", () => {
+    expect(getEmptyStateHint("all")).toContain("Add a release");
+    expect(getEmptyStateHint("all", "ambient")).toContain("switch filters");
+    expect(getEmptyStateHint("scheduled")).toContain("release page");
+    expect(getEmptyStateHint("looking-for-price-drop" as never)).toBeNull();
   });
 
   it("returns scan alert messages for known error types", () => {
