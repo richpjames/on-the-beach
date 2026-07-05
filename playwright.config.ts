@@ -70,6 +70,14 @@ export default defineConfig<TestOptions>({
   snapshotPathTemplate: "{testDir}/{testFileDir}/{testFileName}-snapshots/{arg}-{projectName}{ext}",
   use: {
     headless: true,
+    // Pin every project to the classic chrome. The behavioural smoke tests are
+    // coordinate/layout-sensitive, and the visual baselines must render with
+    // deterministic web fonts (the encarta default falls back to host-specific
+    // system fonts that differ between local and the CI container). Testing
+    // against the stable reference layout keeps both suites reliable while the
+    // encarta default ships to real users. Override per-project if a test needs
+    // a specific theme.
+    themeOverride: "classic",
   },
   projects: [
     // -----------------------------------------------------------------
@@ -79,11 +87,6 @@ export default defineConfig<TestOptions>({
       name: "chromium",
       use: {
         ...devices["Desktop Chrome"],
-        // Behavioural smoke tests validate app logic against the stable classic
-        // chrome; the encarta default's appearance is covered by the visual
-        // projects below. Pinning these coordinate/layout-sensitive tests to a
-        // fixed reference layout stops cosmetic theme changes breaking them.
-        themeOverride: "classic",
         launchOptions: {
           args: ["--no-sandbox"],
           executablePath: resolveChromeExecutable(),
