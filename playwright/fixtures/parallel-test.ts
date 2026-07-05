@@ -15,11 +15,10 @@ type WorkerFixtures = {
 };
 
 export type TestOptions = {
-  // Forces a theme via localStorage before the first paint. The behavioural
-  // e2e suite pins "classic" so its layout-sensitive assertions (reorder drop
-  // coordinates, stack-bar row count) run against the stable reference chrome
-  // regardless of the app's default theme. Visual projects leave this unset so
-  // they capture whatever the real default is.
+  // Forces a theme via localStorage before the first paint. The suites pin
+  // "classic" (see playwright.config.ts) so layout-sensitive assertions and the
+  // visual baselines run against the stable reference chrome, independent of the
+  // app's default theme. Set to null to exercise whatever the real default is.
   themeOverride: string | null;
 };
 
