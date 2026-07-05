@@ -14,7 +14,31 @@ type WorkerFixtures = {
   workerBaseURL: string;
 };
 
-export const test = base.extend<{}, WorkerFixtures>({
+export type TestOptions = {
+  // Forces a theme via localStorage before the first paint. The behavioural
+  // e2e suite pins "classic" so its layout-sensitive assertions (reorder drop
+  // coordinates, stack-bar row count) run against the stable reference chrome
+  // regardless of the app's default theme. Visual projects leave this unset so
+  // they capture whatever the real default is.
+  themeOverride: string | null;
+};
+
+export const test = base.extend<TestOptions, WorkerFixtures>({
+  themeOverride: [null, { option: true }],
+
+  page: async ({ page, themeOverride }, use) => {
+    if (themeOverride) {
+      await page.addInitScript((theme) => {
+        try {
+          localStorage.setItem("theme", theme);
+        } catch {
+          // localStorage may be unavailable; the app keeps its default theme.
+        }
+      }, themeOverride);
+    }
+    await use(page);
+  },
+
   workerBaseURL: [
     async ({ playwright }, use, workerInfo) => {
       void playwright;

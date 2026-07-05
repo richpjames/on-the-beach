@@ -1,4 +1,5 @@
 import { defineConfig, devices } from "@playwright/test";
+import type { TestOptions } from "./playwright/fixtures/parallel-test";
 import os from "node:os";
 import path from "node:path";
 import { existsSync, readdirSync } from "node:fs";
@@ -47,7 +48,7 @@ function resolveWorkers(): number {
   return Math.min(6, Math.max(2, os.availableParallelism() - 1));
 }
 
-export default defineConfig({
+export default defineConfig<TestOptions>({
   testDir: "./playwright",
   timeout: 30_000,
   // Build the SvelteKit app once; workers boot servers from build/index.js.
@@ -78,6 +79,11 @@ export default defineConfig({
       name: "chromium",
       use: {
         ...devices["Desktop Chrome"],
+        // Behavioural smoke tests validate app logic against the stable classic
+        // chrome; the encarta default's appearance is covered by the visual
+        // projects below. Pinning these coordinate/layout-sensitive tests to a
+        // fixed reference layout stops cosmetic theme changes breaking them.
+        themeOverride: "classic",
         launchOptions: {
           args: ["--no-sandbox"],
           executablePath: resolveChromeExecutable(),
