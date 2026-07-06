@@ -67,6 +67,7 @@ describe("processReminders", () => {
         reminderPending: musicItems.reminderPending,
         addedToListenAt: musicItems.addedToListenAt,
         createdAt: musicItems.createdAt,
+        remindAt: musicItems.remindAt,
       })
       .from(musicItems)
       .where(eq(musicItems.id, inserted.id))
@@ -82,6 +83,45 @@ describe("processReminders", () => {
     // created_at must be untouched so RSS pubDate and original creation time stay correct.
     const created = row?.createdAt instanceof Date ? row.createdAt.getTime() : 0;
     expect(created).toBe(past.getTime());
+  });
+
+  // Once the scheduled date has passed the release is no longer "scheduled":
+  // `remind_at` is cleared so it leaves the Scheduled filter (which selects
+  // remind_at IS NOT NULL) and surfaces under "To Listen" (which excludes
+  // remind_at IS NOT NULL).
+  test("clears remind_at so a fired reminder no longer counts as scheduled", async () => {
+    const { db } = await import("../../server/db/index");
+    const { musicItems } = await import("../../server/db/schema");
+    const { processReminders } = await import("../../server/reminders");
+    const { eq } = await import("drizzle-orm");
+
+    const past = new Date("2020-02-01T00:00:00Z");
+    const dueAt = new Date(Date.now() - 60_000);
+
+    const [inserted] = await db
+      .insert(musicItems)
+      .values({
+        title: "Overdue schedule",
+        normalizedTitle: "overdue schedule",
+        listenStatus: "to-listen",
+        createdAt: past,
+        updatedAt: past,
+        addedToListenAt: past,
+        remindAt: dueAt,
+        reminderPending: false,
+      })
+      .returning({ id: musicItems.id });
+    insertedItemIds.push(inserted.id);
+
+    await processReminders();
+
+    const row = await db
+      .select({ remindAt: musicItems.remindAt })
+      .from(musicItems)
+      .where(eq(musicItems.id, inserted.id))
+      .get();
+
+    expect(row?.remindAt).toBeNull();
   });
 
   test("does not touch items whose reminder is not yet due", async () => {

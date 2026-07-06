@@ -1,4 +1,4 @@
-import { lte, eq, and, inArray } from "drizzle-orm";
+import { lte, eq, and } from "drizzle-orm";
 import { db } from "./db/index";
 import { musicItems } from "./db/schema";
 
@@ -17,6 +17,10 @@ export async function processReminders(): Promise<void> {
     .update(musicItems)
     .set({
       listenStatus: "to-listen",
+      // Clear the reminder now that its date has passed: a release whose
+      // scheduled date is in the past is no longer "scheduled", so drop it out
+      // of the Scheduled filter and let it surface under "To Listen".
+      remindAt: null,
       reminderPending: true,
       updatedAt: now,
       addedToListenAt: now,
