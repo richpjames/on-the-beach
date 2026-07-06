@@ -3,9 +3,11 @@
   import { onMount } from "svelte";
   import type { PageData } from "../../routes/r/[id]/$types";
   import type { ListenEmbed } from "../../routes/r/[id]/+page.server";
+  import type { ItemSuggestion, ListenStatus } from "../../types";
   import { api, apiFetch } from "../api";
   import { player } from "../player.svelte";
   import StarRating from "./StarRating.svelte";
+  import SuggestionPickerModal from "./SuggestionPickerModal.svelte";
 
   // The page wraps this component in {#key item.id}, so all state below is
   // (re)initialised per release — the same lifecycle as the old full-page SSR.
@@ -63,12 +65,17 @@
     remindAtValue = "";
   }
 
+  // ── Suggestion picker ──────────────────────────────────────────────────────
+  let suggestion = $state<ItemSuggestion | null>(null);
+  let suggestionSourceId = $state<number | null>(null);
+
   async function onStatusChange(event: Event): Promise<void> {
     const newStatus = (event.currentTarget as HTMLSelectElement).value;
     if (newStatus === "scheduled") return;
     const wasScheduled = currentRemindAt !== null;
+    let result: Awaited<ReturnType<typeof api.updateListenStatus>>;
     try {
-      await api.updateMusicItem(item.id, { listenStatus: newStatus as "to-listen" | "listened" });
+      result = await api.updateListenStatus(item.id, newStatus as ListenStatus);
     } catch {
       alert("Failed to update status.");
       return;
@@ -76,6 +83,10 @@
     currentListenStatus = newStatus;
     if (wasScheduled) {
       await clearReminder();
+    }
+    if (newStatus === "listened" && result?.suggestion) {
+      suggestion = result.suggestion;
+      suggestionSourceId = item.id;
     }
   }
 
@@ -624,3 +635,13 @@
     </div>
   </div>
 </main>
+
+<SuggestionPickerModal
+  {suggestion}
+  sourceItemId={suggestionSourceId}
+  onAccepted={() => {}}
+  onClosed={() => {
+    suggestion = null;
+    suggestionSourceId = null;
+  }}
+/>
