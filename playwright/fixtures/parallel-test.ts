@@ -14,30 +14,7 @@ type WorkerFixtures = {
   workerBaseURL: string;
 };
 
-export type TestOptions = {
-  // Forces a theme via localStorage before the first paint. The suites pin
-  // "classic" (see playwright.config.ts) so layout-sensitive assertions and the
-  // visual baselines run against the stable reference chrome, independent of the
-  // app's default theme. Set to null to exercise whatever the real default is.
-  themeOverride: string | null;
-};
-
-export const test = base.extend<TestOptions, WorkerFixtures>({
-  themeOverride: [null, { option: true }],
-
-  page: async ({ page, themeOverride }, use) => {
-    if (themeOverride) {
-      await page.addInitScript((theme) => {
-        try {
-          localStorage.setItem("theme", theme);
-        } catch {
-          // localStorage may be unavailable; the app keeps its default theme.
-        }
-      }, themeOverride);
-    }
-    await use(page);
-  },
-
+export const test = base.extend<{}, WorkerFixtures>({
   workerBaseURL: [
     async ({ playwright }, use, workerInfo) => {
       void playwright;

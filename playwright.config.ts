@@ -1,5 +1,4 @@
 import { defineConfig, devices } from "@playwright/test";
-import type { TestOptions } from "./playwright/fixtures/parallel-test";
 import os from "node:os";
 import path from "node:path";
 import { existsSync, readdirSync } from "node:fs";
@@ -48,7 +47,7 @@ function resolveWorkers(): number {
   return Math.min(6, Math.max(2, os.availableParallelism() - 1));
 }
 
-export default defineConfig<TestOptions>({
+export default defineConfig({
   testDir: "./playwright",
   timeout: 30_000,
   // Build the SvelteKit app once; workers boot servers from build/index.js.
@@ -70,14 +69,6 @@ export default defineConfig<TestOptions>({
   snapshotPathTemplate: "{testDir}/{testFileDir}/{testFileName}-snapshots/{arg}-{projectName}{ext}",
   use: {
     headless: true,
-    // Pin every project to the classic chrome. The behavioural smoke tests are
-    // coordinate/layout-sensitive, and the visual baselines must render with
-    // deterministic web fonts (the encarta default falls back to host-specific
-    // system fonts that differ between local and the CI container). Testing
-    // against the stable reference layout keeps both suites reliable while the
-    // encarta default ships to real users. Override per-project if a test needs
-    // a specific theme.
-    themeOverride: "classic",
   },
   projects: [
     // -----------------------------------------------------------------
