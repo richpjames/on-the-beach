@@ -2,8 +2,9 @@
   import { goto } from "$app/navigation";
   import { onMount } from "svelte";
   import type { PageData } from "../../routes/r/[id]/$types";
-  import type { ListenEmbed } from "../../routes/r/[id]/+page.server";
+  import type { AppleMusicListen, ListenEmbed } from "../../routes/r/[id]/+page.server";
   import type { ItemSuggestion, ListenStatus } from "../../types";
+  import { parseAppleMusicCatalogUrl } from "../../../shared/apple-music";
   import { api, apiFetch } from "../api";
   import { player } from "../player.svelte";
   import StarRating from "./StarRating.svelte";
@@ -96,6 +97,43 @@
       window.open(embed.href, "_blank", "noopener,noreferrer");
     } else {
       player.load(embed.src, item.title, item.artist_name ?? "", embed.playerType);
+    }
+  }
+
+  // Full-track Apple Music playback (MusicKit) when configured, else the preview
+  // iframe. On touch devices, hand off to the native Apple Music app/site — the
+  // same behaviour the other listen buttons use for coarse pointers.
+  function listenAppleMusic(listenTarget: AppleMusicListen): void {
+    const coarse = window.matchMedia("(pointer: coarse)").matches;
+    if (listenTarget.mode === "musickit" && listenTarget.resource && !coarse) {
+      player.loadAppleMusic(
+        listenTarget.resource.kind,
+        listenTarget.resource.id,
+        item.title,
+        item.artist_name ?? "",
+      );
+      return;
+    }
+    if (coarse) {
+      window.open(listenTarget.href, "_blank", "noopener,noreferrer");
+      return;
+    }
+    // Unconfigured (preview) fallback.
+    if (listenTarget.src) {
+      player.load(listenTarget.src, item.title, item.artist_name ?? "", "audio");
+    } else {
+      window.open(listenTarget.href, "_blank", "noopener,noreferrer");
+    }
+  }
+
+  // Play a client-discovered Apple Music secondary link (the on-view lookup)
+  // through MusicKit when it resolves to a playable catalogue resource.
+  function listenLookupAppleMusic(url: string): void {
+    const resource = parseAppleMusicCatalogUrl(url);
+    if (resource && !window.matchMedia("(pointer: coarse)").matches) {
+      player.loadAppleMusic(resource.kind, resource.id, item.title, item.artist_name ?? "");
+    } else {
+      window.open(url, "_blank", "noopener,noreferrer");
     }
   }
 
@@ -266,6 +304,10 @@
   // request when the active service's link is already shown.
   let lookupLink = $state<{ url: string; label: string } | null>(null);
 
+  const lookupIsPlayableAppleMusic = $derived(
+    !!lookupLink && data.appleMusicConfigured && parseAppleMusicCatalogUrl(lookupLink.url) !== null,
+  );
+
   onMount(() => {
     api
       .listStacks()
@@ -383,14 +425,15 @@
               onclick={() => listen(data.youtubeEmbed!)}>▶ Watch</button
             >
           {/if}
-          {#if data.appleMusicEmbed}
+          {#if data.appleMusicListen}
             <button
-              class="release-page__listen-btn"
-              data-src={data.appleMusicEmbed.src}
+              class="release-page__listen-btn release-page__listen-btn--apple"
+              data-am-mode={data.appleMusicListen.mode}
               data-title={item.title}
               data-artist={item.artist_name ?? ""}
-              data-href={data.appleMusicEmbed.href}
-              onclick={() => listen(data.appleMusicEmbed!)}>▶ Listen</button
+              data-href={data.appleMusicListen.href}
+              onclick={() => listenAppleMusic(data.appleMusicListen!)}
+              >▶ Listen on Apple Music</button
             >
           {/if}
           {#if data.mixcloudWidgetSrc}
@@ -403,7 +446,14 @@
             ></iframe>
           {/if}
           <div id="secondary-links">
-            {#if lookupLink}
+            {#if lookupLink && lookupIsPlayableAppleMusic}
+              <button
+                class="release-page__listen-btn release-page__listen-btn--apple"
+                data-am-mode="musickit"
+                onclick={() => listenLookupAppleMusic(lookupLink!.url)}
+                >▶ Listen on Apple Music</button
+              >
+            {:else if lookupLink}
               <a
                 class="release-page__source-link"
                 href={lookupLink.url}

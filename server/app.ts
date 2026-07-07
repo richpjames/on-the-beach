@@ -3,6 +3,7 @@ import { musicItemRoutes } from "./routes/music-items";
 import { stackRoutes } from "./routes/stacks";
 import { ingestRoutes } from "./routes/ingest";
 import { releaseRoutes } from "./routes/release";
+import { appleMusicRoutes } from "./routes/apple-music";
 import { settingsRoutes } from "./routes/settings";
 import { rssRoutes } from "./routes/rss";
 
@@ -22,6 +23,7 @@ apiApp.route("/api/music-items", musicItemRoutes);
 apiApp.route("/api/stacks", stackRoutes);
 apiApp.route("/api/ingest", ingestRoutes);
 apiApp.route("/api/release", releaseRoutes);
+apiApp.route("/api/apple-music", appleMusicRoutes);
 apiApp.route("/api/settings", settingsRoutes);
 apiApp.route("/feed", rssRoutes);
 

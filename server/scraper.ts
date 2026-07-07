@@ -4,6 +4,7 @@ import {
   type ExtractedReleaseCandidate,
 } from "./link-extractor";
 import { fetchDiscogsRelease } from "./discogs";
+import { searchAppleMusicCatalog } from "./apple-music-catalog";
 
 export interface OgData {
   ogTitle?: string;
@@ -1138,8 +1139,27 @@ function normalizeForMatch(s: string): string {
 }
 
 /**
- * Search Apple Music (iTunes Search API) for a release by title and artist.
- * Returns the Apple Music URL for the best matching result, or null if not found.
+ * Search Apple Music for a release by title and artist, returning the best
+ * matching catalogue URL, or null if not found.
+ *
+ * Prefers the official Apple Music Catalog API (api.music.apple.com) when
+ * MusicKit is configured — those URLs carry the catalogue ids the browser SDK
+ * needs to stream full tracks — and falls back to the open iTunes Search API
+ * when unconfigured or when the catalogue search comes up empty.
+ */
+export async function searchAppleMusic(
+  title: string,
+  artist: string | null,
+  timeoutMs = 8000,
+): Promise<string | null> {
+  const catalogUrl = await searchAppleMusicCatalog(title, artist, timeoutMs);
+  if (catalogUrl) return catalogUrl;
+  return searchAppleMusicViaItunes(title, artist, timeoutMs);
+}
+
+/**
+ * Search Apple Music via the open iTunes Search API. Returns the Apple Music
+ * URL for the best matching result, or null if not found.
  *
  * Matching strategy (in order):
  *  1. Exact title + artist match
@@ -1147,7 +1167,7 @@ function normalizeForMatch(s: string): string {
  *     Wikipedia-style disambiguators like "Foo (1981 album)" vs "Foo")
  *  3. First result whose artist matches (search query is already specific)
  */
-export async function searchAppleMusic(
+export async function searchAppleMusicViaItunes(
   title: string,
   artist: string | null,
   timeoutMs = 8000,

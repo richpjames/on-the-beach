@@ -2,11 +2,13 @@ import { error } from "@sveltejs/kit";
 import type { PageServerLoad } from "./$types";
 import { fetchFullItem } from "../../../../server/music-item-creator";
 import { getLookupService } from "../../../../server/settings";
+import { isAppleMusicConfigured } from "../../../../server/apple-music-token";
 import {
   parseUrl,
   extractYouTubeVideoId,
   extractYouTubePlaylistId,
 } from "../../../../server/utils";
+import { parseAppleMusicCatalogUrl, type AppleMusicResource } from "../../../../shared/apple-music";
 import type { MusicItemFull } from "../../../types";
 
 const SOURCE_DISPLAY_NAMES: Record<string, string> = {
@@ -82,19 +84,61 @@ function bandcampEmbed(item: MusicItemFull): ListenEmbed | null {
   };
 }
 
-function appleMusicEmbed(item: MusicItemFull): ListenEmbed | null {
-  if (!item.primary_url?.includes("music.apple.com")) return null;
-  try {
-    const parsed = new URL(item.primary_url);
-    if (!parsed.hostname.endsWith("music.apple.com")) return null;
-    return {
-      src: `https://embed.music.apple.com${parsed.pathname}`,
-      href: item.primary_url,
-      playerType: "audio",
-    };
-  } catch {
-    return null;
+/**
+ * How to listen to a release on Apple Music.
+ *  - "musickit": full-track playback via the browser MusicKit SDK, using the
+ *    catalogue id parsed from the stored URL. Requires MusicKit configured.
+ *  - "preview": the legacy `embed.music.apple.com` iframe (30-second previews),
+ *    kept as a fallback when MusicKit isn't configured.
+ */
+export interface AppleMusicListen {
+  mode: "musickit" | "preview";
+  resource: AppleMusicResource | null;
+  src: string | null;
+  href: string;
+}
+
+/** The first Apple Music URL on the item (primary link preferred). */
+function appleMusicUrlForItem(item: MusicItemFull): { url: string; isPrimary: boolean } | null {
+  if (item.primary_url?.includes("music.apple.com")) {
+    return { url: item.primary_url, isPrimary: true };
   }
+  const link = item.links.find(
+    (l) => !l.is_primary && (l.source_name === "apple_music" || l.url.includes("music.apple.com")),
+  );
+  return link ? { url: link.url, isPrimary: false } : null;
+}
+
+function appleMusicListen(item: MusicItemFull, configured: boolean): AppleMusicListen | null {
+  const found = appleMusicUrlForItem(item);
+  if (!found) return null;
+
+  if (configured) {
+    const resource = parseAppleMusicCatalogUrl(found.url);
+    if (resource) {
+      return { mode: "musickit", resource, src: null, href: found.url };
+    }
+  }
+
+  // Preview fallback, only for a primary Apple Music link (unchanged behaviour
+  // for unconfigured deployments — secondary AM links stay plain links).
+  if (found.isPrimary) {
+    try {
+      const parsed = new URL(found.url);
+      if (parsed.hostname.endsWith("music.apple.com")) {
+        return {
+          mode: "preview",
+          resource: null,
+          src: `https://embed.music.apple.com${parsed.pathname}`,
+          href: found.url,
+        };
+      }
+    } catch {
+      return null;
+    }
+  }
+
+  return null;
 }
 
 function mixcloudWidgetSrc(item: MusicItemFull): string | null {
@@ -133,6 +177,8 @@ export const load: PageServerLoad = async ({ params }) => {
         }
       : null;
 
+  const appleMusicConfigured = isAppleMusicConfigured();
+
   return {
     item,
     backdropUrl: safeArtworkUrl(item.artwork_url ?? ""),
@@ -140,7 +186,8 @@ export const load: PageServerLoad = async ({ params }) => {
     sourceLink,
     youtubeEmbed: youTubeEmbed(item),
     bandcampEmbed: bandcampEmbed(item),
-    appleMusicEmbed: appleMusicEmbed(item),
+    appleMusicListen: appleMusicListen(item, appleMusicConfigured),
+    appleMusicConfigured,
     mixcloudWidgetSrc: mixcloudWidgetSrc(item),
     lookupService: await getLookupService(),
   };
