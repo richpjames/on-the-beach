@@ -40,17 +40,21 @@ Open http://localhost:3000.
 
 ## Environment Variables
 
-| Variable             | Required | Default                | Description                                                                 |
-| -------------------- | -------- | ---------------------- | --------------------------------------------------------------------------- |
-| `DATABASE_PATH`      | No       | `on_the_beach.db`      | Path to the SQLite database file                                            |
-| `PORT`               | No       | `3000`                 | HTTP server port                                                            |
-| `UPLOADS_DIR`        | No       | `uploads`              | Directory for uploaded cover images                                         |
-| `MISTRAL_API_KEY`    | No       | —                      | Enables AI cover scanning and unsupported music-link extraction             |
-| `MISTRAL_LINK_MODEL` | No       | `mistral-small-latest` | Model for unsupported music-link extraction via chat completions.           |
-| `MISTRAL_SCAN_MODEL` | No       | `mistral-ocr-latest`   | Model for cover scanning. Non-OCR models use chat-completions mode.         |
-| `INGEST_API_KEY`     | No       | —                      | Secret token for the HTTP email ingest webhook. Required to enable it.      |
-| `INGEST_ENABLED`     | No       | `true`                 | Set to `false` to disable the HTTP ingest endpoint without removing the key |
-| `ORIGIN`             | Prod     | —                      | Public origin of the deployment (e.g. `https://otb.example.com`). Used to derive request URLs, the CSRF origin check, and cookie security flags. |
+| Variable                  | Required | Default                | Description                                                                                                                                      |
+| ------------------------- | -------- | ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `DATABASE_PATH`           | No       | `on_the_beach.db`      | Path to the SQLite database file                                                                                                                 |
+| `PORT`                    | No       | `3000`                 | HTTP server port                                                                                                                                 |
+| `UPLOADS_DIR`             | No       | `uploads`              | Directory for uploaded cover images                                                                                                              |
+| `MISTRAL_API_KEY`         | No       | —                      | Enables AI cover scanning and unsupported music-link extraction                                                                                  |
+| `MISTRAL_LINK_MODEL`      | No       | `mistral-small-latest` | Model for unsupported music-link extraction via chat completions.                                                                                |
+| `MISTRAL_SCAN_MODEL`      | No       | `mistral-ocr-latest`   | Model for cover scanning. Non-OCR models use chat-completions mode.                                                                              |
+| `INGEST_API_KEY`          | No       | —                      | Secret token for the HTTP email ingest webhook. Required to enable it.                                                                           |
+| `INGEST_ENABLED`          | No       | `true`                 | Set to `false` to disable the HTTP ingest endpoint without removing the key                                                                      |
+| `ORIGIN`                  | Prod     | —                      | Public origin of the deployment (e.g. `https://otb.example.com`). Used to derive request URLs, the CSRF origin check, and cookie security flags. |
+| `APPLE_MUSIC_TEAM_ID`     | No       | —                      | Apple Developer Team ID. Enables MusicKit full-track playback and catalogue search (all three `APPLE_MUSIC_*` vars required).                    |
+| `APPLE_MUSIC_KEY_ID`      | No       | —                      | MusicKit key identifier for the `.p8` auth key.                                                                                                  |
+| `APPLE_MUSIC_PRIVATE_KEY` | No       | —                      | Contents of the MusicKit `AuthKey_XXXX.p8` (PKCS#8 PEM; `\n`-escaped newlines accepted).                                                         |
+| `APPLE_MUSIC_STOREFRONT`  | No       | `gb`                   | Two-letter storefront code used for Apple Music catalogue search.                                                                                |
 
 ## Scripts
 
