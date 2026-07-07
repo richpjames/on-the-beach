@@ -63,6 +63,11 @@ jobs:
     name: Publish report
     needs: visual-tests
     if: always()
+    # Publishing the report to the single shared github-pages environment can
+    # race with other PRs' deployments and fail with a transient Pages error
+    # ("Deployment failed, try again later"). That must not gate the PR — the
+    # actual visual tests run in the job above.
+    continue-on-error: true
     runs-on: ubuntu-latest
     timeout-minutes: 10
 
