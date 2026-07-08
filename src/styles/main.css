@@ -2583,6 +2583,29 @@ a:hover {
   opacity: 0.7;
 }
 
+.am-player__skip {
+  width: 32px;
+  height: 28px;
+  font-size: var(--text-sm);
+  background: var(--chrome);
+  border: 2px solid;
+  border-color: var(--bevel-raised);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+
+.am-player__skip:active:not(:disabled) {
+  border-color: var(--bevel-sunken);
+}
+
+.am-player__skip:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+
 .am-player__signin {
   flex: 1;
   height: 28px;
@@ -2604,6 +2627,57 @@ a:hover {
 
 .am-player__error {
   color: #d60017;
+}
+
+.am-player__tracklist {
+  list-style: none;
+  margin: 0;
+  padding: 2px;
+  max-height: 168px;
+  overflow-y: auto;
+  border: 2px solid;
+  border-color: var(--bevel-sunken);
+  background: var(--field, #ffffff);
+}
+
+.am-player__track {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  padding: 3px 5px;
+  border: 0;
+  background: transparent;
+  font-size: var(--text-sm);
+  text-align: left;
+  cursor: pointer;
+  color: inherit;
+}
+
+.am-player__track:hover {
+  background: var(--title-bar);
+  color: #ffffff;
+}
+
+.am-player__track--current {
+  background: var(--title-bar);
+  color: #ffffff;
+  font-weight: bold;
+}
+
+.am-player__track-num {
+  flex-shrink: 0;
+  width: 1.5em;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  opacity: 0.8;
+}
+
+.am-player__track-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .player-window--video {

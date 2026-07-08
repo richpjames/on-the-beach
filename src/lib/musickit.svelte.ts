@@ -26,6 +26,11 @@ interface MusicKitMediaItem {
   artwork?: MusicKitArtwork;
 }
 
+interface MusicKitQueue {
+  items: MusicKitMediaItem[];
+  position: number;
+}
+
 type SetQueueOptions = Partial<Record<AppleMusicKind, string>>;
 
 interface MusicKitInstance {
@@ -34,6 +39,8 @@ interface MusicKitInstance {
   currentPlaybackTime: number;
   currentPlaybackDuration: number;
   nowPlayingItem: MusicKitMediaItem | null;
+  nowPlayingItemIndex: number;
+  queue: MusicKitQueue;
   addEventListener(name: string, handler: (event: unknown) => void): void;
   authorize(): Promise<string>;
   unauthorize(): Promise<void>;
@@ -42,6 +49,9 @@ interface MusicKitInstance {
   pause(): Promise<void>;
   stop(): Promise<void>;
   seekToTime(seconds: number): Promise<void>;
+  skipToNextItem(): Promise<void>;
+  skipToPreviousItem(): Promise<void>;
+  changeToMediaAtIndex(index: number): Promise<void>;
 }
 
 interface MusicKitStatic {
@@ -63,6 +73,12 @@ declare global {
 // ── Reactive state ──────────────────────────────────────────────────────────
 type Availability = "unknown" | "loading" | "ready" | "unavailable";
 
+/** One entry of the current playback queue (an album/playlist's track list). */
+export interface QueueTrack {
+  title: string;
+  artist: string;
+}
+
 interface MusicKitUiState {
   availability: Availability;
   authorized: boolean;
@@ -74,6 +90,8 @@ interface MusicKitUiState {
   artist: string;
   artworkUrl: string | null;
   error: string | null;
+  tracks: QueueTrack[];
+  trackIndex: number;
 }
 
 const ui = $state<MusicKitUiState>({
@@ -87,6 +105,8 @@ const ui = $state<MusicKitUiState>({
   artist: "",
   artworkUrl: null,
   error: null,
+  tracks: [],
+  trackIndex: -1,
 });
 
 let instance: MusicKitInstance | null = null;
@@ -142,6 +162,19 @@ function syncFromInstance(MK: MusicKitStatic): void {
   ui.title = item?.title ?? "";
   ui.artist = item?.artistName ?? "";
   ui.artworkUrl = artworkUrlFor(item);
+  syncQueueFromInstance();
+}
+
+/** Mirror MusicKit's playback queue (the release's track list) into the UI. */
+function syncQueueFromInstance(): void {
+  if (!instance) return;
+  const items = instance.queue?.items ?? [];
+  ui.tracks = items.map((it) => ({ title: it.title ?? "", artist: it.artistName ?? "" }));
+  const idx =
+    typeof instance.nowPlayingItemIndex === "number" && instance.nowPlayingItemIndex >= 0
+      ? instance.nowPlayingItemIndex
+      : (instance.queue?.position ?? -1);
+  ui.trackIndex = idx;
 }
 
 function attachListeners(MK: MusicKitStatic): void {
@@ -150,6 +183,8 @@ function attachListeners(MK: MusicKitStatic): void {
   instance.addEventListener("playbackStateDidChange", sync);
   instance.addEventListener("nowPlayingItemDidChange", sync);
   instance.addEventListener("authorizationStatusDidChange", sync);
+  instance.addEventListener("queueItemsDidChange", () => syncQueueFromInstance());
+  instance.addEventListener("queuePositionDidChange", () => syncQueueFromInstance());
   instance.addEventListener("playbackTimeDidChange", (event) => {
     // The event carries the fresh time; read the instance to stay authoritative.
     void event;
@@ -276,6 +311,36 @@ export async function togglePlay(): Promise<void> {
   }
 }
 
+/** Advance to the next track in the queue (e.g. the next album track). */
+export async function skipNext(): Promise<void> {
+  if (!instance) return;
+  try {
+    await instance.skipToNextItem();
+  } catch (err) {
+    console.error("[musickit] skip next failed:", err);
+  }
+}
+
+/** Go back to the previous track in the queue. */
+export async function skipPrevious(): Promise<void> {
+  if (!instance) return;
+  try {
+    await instance.skipToPreviousItem();
+  } catch (err) {
+    console.error("[musickit] skip previous failed:", err);
+  }
+}
+
+/** Jump straight to a track by its position in the queue (track-list click). */
+export async function playTrackAt(index: number): Promise<void> {
+  if (!instance) return;
+  try {
+    await instance.changeToMediaAtIndex(index);
+  } catch (err) {
+    console.error("[musickit] change track failed:", err);
+  }
+}
+
 export async function seek(seconds: number): Promise<void> {
   if (!instance) return;
   try {
@@ -295,6 +360,8 @@ export async function stop(): Promise<void> {
   }
   ui.playing = false;
   ui.position = 0;
+  ui.tracks = [];
+  ui.trackIndex = -1;
 }
 
 /** Reactive facade the player UI binds to. */
@@ -328,5 +395,21 @@ export const musickit = {
   },
   get error(): string | null {
     return ui.error;
+  },
+  get tracks(): QueueTrack[] {
+    return ui.tracks;
+  },
+  get trackIndex(): number {
+    return ui.trackIndex;
+  },
+  /** More than one track queued, so skip/track-list controls are meaningful. */
+  get hasQueue(): boolean {
+    return ui.tracks.length > 1;
+  },
+  get canSkipNext(): boolean {
+    return ui.tracks.length > 1 && ui.trackIndex < ui.tracks.length - 1;
+  },
+  get canSkipPrevious(): boolean {
+    return ui.tracks.length > 1 && ui.trackIndex > 0;
   },
 };

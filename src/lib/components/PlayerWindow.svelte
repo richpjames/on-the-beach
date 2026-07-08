@@ -1,6 +1,14 @@
 <script lang="ts">
   import { player } from "../player.svelte";
-  import { musickit, togglePlay, seek, authorize } from "../musickit.svelte";
+  import {
+    musickit,
+    togglePlay,
+    seek,
+    authorize,
+    skipNext,
+    skipPrevious,
+    playTrackAt,
+  } from "../musickit.svelte";
 
   let windowEl: HTMLElement | undefined = $state();
 
@@ -134,6 +142,18 @@
         </div>
 
         <div class="am-player__controls">
+          {#if musickit.hasQueue}
+            <button
+              class="am-player__skip"
+              id="apple-music-prev"
+              type="button"
+              aria-label="Previous track"
+              title="Previous track"
+              disabled={!musickit.canSkipPrevious}
+              onclick={() => skipPrevious()}>⏮</button
+            >
+          {/if}
+
           <button
             class="am-player__play"
             id="apple-music-play"
@@ -144,6 +164,18 @@
           >
             {#if musickit.loadingTrack}…{:else if musickit.playing}❚❚{:else}▶{/if}
           </button>
+
+          {#if musickit.hasQueue}
+            <button
+              class="am-player__skip"
+              id="apple-music-next"
+              type="button"
+              aria-label="Next track"
+              title="Next track"
+              disabled={!musickit.canSkipNext}
+              onclick={() => skipNext()}>⏭</button
+            >
+          {/if}
 
           {#if !musickit.authorized}
             <button
@@ -159,6 +191,27 @@
           <div class="am-player__error" role="status">{musickit.error}</div>
         {:else if !musickit.authorized}
           <div class="am-player__hint">Sign in to play the full track.</div>
+        {/if}
+
+        {#if musickit.hasQueue}
+          <ol class="am-player__tracklist" id="apple-music-tracklist">
+            {#each musickit.tracks as track, i (i)}
+              <li>
+                <button
+                  type="button"
+                  class="am-player__track"
+                  class:am-player__track--current={i === musickit.trackIndex}
+                  aria-current={i === musickit.trackIndex ? "true" : undefined}
+                  onclick={() => playTrackAt(i)}
+                >
+                  <span class="am-player__track-num" aria-hidden="true">
+                    {#if i === musickit.trackIndex && musickit.playing}▶{:else}{i + 1}{/if}
+                  </span>
+                  <span class="am-player__track-title">{track.title}</span>
+                </button>
+              </li>
+            {/each}
+          </ol>
         {/if}
       </div>
     {:else if player.src !== null}
