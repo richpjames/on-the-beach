@@ -55,10 +55,15 @@ the Capacitor version. Regenerate it any time with `npx cap add ios`.
 
 ```bash
 bun install
-npx cap add ios      # creates ios/App/ (gitignored)
+bun run cap:add      # cap add ios — creates ios/App/ (gitignored)
 bun run cap:sync     # cap sync ios — installs pods, applies config
-bun run cap:open     # opens ios/App/App.xcworkspace in Xcode
+bun run cap:open     # cap open ios — opens ios/App/App.xcworkspace in Xcode
 ```
+
+> Use `bun run cap:add` / `bunx cap add ios`, **not** `npx cap add ios`. This
+> project installs the Capacitor CLI with Bun, so `npx` can't find the `cap`
+> binary — it tries to fetch an unrelated npm package named `cap` and fails with
+> "could not determine executable to run".
 
 ### 2. Add the Share Extension target in Xcode
 
