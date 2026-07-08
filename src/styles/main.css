@@ -2460,7 +2460,27 @@ a:hover {
 .player-window--apple-music {
   height: auto;
   min-height: 0;
-  resize: none;
+  resize: both;
+}
+
+/* With a track list present, default to a roomier box and let the list flex
+   to fill whatever height the window is dragged to — so resizing taller shows
+   more tracks rather than just adding empty chrome. */
+.player-window--am-queue {
+  height: 300px;
+  min-height: 180px;
+}
+
+.player-window--am-queue .am-player {
+  height: 100%;
+  box-sizing: border-box;
+  min-height: 0;
+}
+
+.player-window--am-queue .am-player__tracklist {
+  flex: 1 1 auto;
+  max-height: none;
+  min-height: 48px;
 }
 
 /* ─── Apple Music (MusicKit) native transport ───────────────────────────── */

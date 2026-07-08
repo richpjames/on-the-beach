@@ -74,6 +74,7 @@
   class="player-window"
   class:player-window--video={player.playerType === "video"}
   class:player-window--apple-music={player.isAppleMusic}
+  class:player-window--am-queue={player.isAppleMusic && musickit.hasQueue}
   bind:this={windowEl}
   hidden={!player.windowVisible}
   aria-hidden={player.windowVisible ? undefined : "true"}
