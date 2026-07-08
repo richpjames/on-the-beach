@@ -2,7 +2,7 @@ import type { CapacitorConfig } from "@capacitor/cli";
 
 // Capacitor wraps the hosted On The Beach web app in a thin native iOS shell.
 // The shell exists primarily to host a native Share Extension (see
-// `ios/ShareExtension/`) so the app appears in the iOS share sheet — something a
+// `native/ShareExtension/`) so the app appears in the iOS share sheet — something a
 // pure web app / PWA cannot do, because iOS Safari does not implement the Web
 // Share Target API.
 //
