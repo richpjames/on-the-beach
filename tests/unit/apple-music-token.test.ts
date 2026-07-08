@@ -85,6 +85,19 @@ describe("mintDeveloperToken", () => {
     expect(verify(mintDeveloperToken({ ...credentials, privateKey: bareBody }))).toBe(true);
     expect(verify(mintDeveloperToken({ ...credentials, privateKey: escaped }))).toBe(true);
   });
+
+  test("accepts a key whose newlines were collapsed (armour glued to body)", () => {
+    // What a host does when a multi-line PEM is pasted into a single-line field:
+    // all newlines vanish, gluing the header/footer onto the base64 body.
+    const glued = privatePem.replace(/\n/g, "");
+    expect(glued).toMatch(/-----BEGIN PRIVATE KEY-----[A-Za-z0-9+/=]+-----END PRIVATE KEY-----/);
+    expect(verify(mintDeveloperToken({ ...credentials, privateKey: glued }))).toBe(true);
+  });
+
+  test("accepts a key with real newlines and surrounding whitespace", () => {
+    const padded = `\n  ${privatePem}\n\n`;
+    expect(verify(mintDeveloperToken({ ...credentials, privateKey: padded }))).toBe(true);
+  });
 });
 
 describe("credentials and configuration", () => {

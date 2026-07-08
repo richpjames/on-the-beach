@@ -68,20 +68,33 @@ function base64Url(input: Buffer | string): string {
 }
 
 /**
- * Reconstruct a usable PKCS#8 PEM from the configured private key, tolerating
- * `\n`-escaped newlines and a bare (armour-stripped) base64 body.
+ * Reconstruct a canonical PEM from the configured private key.
+ *
+ * Env vars mangle multi-line PEMs in every direction, so rather than trust the
+ * incoming layout we always strip the armour + all whitespace down to the raw
+ * base64 body and re-wrap it at 64-char lines. This tolerates:
+ *   - `\n`- (and `\r\n`-) escaped newlines,
+ *   - real newlines,
+ *   - a bare (armour-stripped) base64 body, and
+ *   - the header/footer glued to the body when a host collapses newlines
+ *     (e.g. `-----BEGIN PRIVATE KEY-----MIGT…==-----END PRIVATE KEY-----`).
+ *
+ * The BEGIN/END label is preserved when present (Apple `.p8` keys are PKCS#8,
+ * i.e. `PRIVATE KEY`), defaulting to `PRIVATE KEY` for a bare body.
  */
 function normalizePrivateKeyPem(raw: string): string {
-  const withNewlines = raw.replace(/\\n/g, "\n").trim();
+  const unescaped = raw.replace(/\\r/g, "").replace(/\\n/g, "\n").trim();
 
-  if (withNewlines.includes("-----BEGIN")) {
-    return withNewlines;
-  }
+  const labelMatch = unescaped.match(/-----BEGIN ([A-Z0-9 ]+?)-----/);
+  const label = labelMatch ? labelMatch[1].trim() : "PRIVATE KEY";
 
-  // Bare base64 body — wrap it in PKCS#8 PEM armour at 64-char lines.
-  const body = withNewlines.replace(/\s+/g, "");
+  const body = unescaped
+    .replace(/-----BEGIN [^-]+-----/g, "")
+    .replace(/-----END [^-]+-----/g, "")
+    .replace(/\s+/g, "");
+
   const lines = body.match(/.{1,64}/g) ?? [body];
-  return `-----BEGIN PRIVATE KEY-----\n${lines.join("\n")}\n-----END PRIVATE KEY-----\n`;
+  return `-----BEGIN ${label}-----\n${lines.join("\n")}\n-----END ${label}-----\n`;
 }
 
 /**
