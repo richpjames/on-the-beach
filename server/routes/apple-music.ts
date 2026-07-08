@@ -22,10 +22,34 @@ export function createAppleMusicRoutes(): Hono {
   });
 
   routes.get("/token", (c) => {
+    // Distinguish "no credentials set" from "credentials present but the token
+    // couldn't be minted" (usually a malformed private key) so the failure is
+    // diagnosable from the response alone.
+    if (!isAppleMusicConfigured()) {
+      return c.json(
+        {
+          error: "Apple Music is not configured",
+          reason: "missing_credentials",
+          detail:
+            "Set APPLE_MUSIC_TEAM_ID, APPLE_MUSIC_KEY_ID and APPLE_MUSIC_PRIVATE_KEY, then restart the server.",
+        },
+        503,
+      );
+    }
+
     const token = getDeveloperToken();
     if (!token) {
-      return c.json({ error: "Apple Music is not configured" }, 503);
+      return c.json(
+        {
+          error: "Apple Music developer token could not be generated",
+          reason: "token_error",
+          detail:
+            "Credentials are set but signing failed — check that APPLE_MUSIC_PRIVATE_KEY is the full .p8 contents (PKCS#8 PEM).",
+        },
+        503,
+      );
     }
+
     // Small caches are fine — the token lives for months and is not secret.
     c.header("Cache-Control", "private, max-age=3600");
     return c.json({ token, storefront: getStorefront() });
