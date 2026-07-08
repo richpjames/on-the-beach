@@ -2,6 +2,10 @@
 
 An iOS Shortcut that lets you add music links to On the Beach directly from the share sheet in Safari or any other app.
 
+> Prefer a native app entry in the share sheet (no per-device Shortcut setup)?
+> See `docs/ios-native-app.md` for the Capacitor shell + native Share Extension.
+> Both approaches post to the same `POST /api/ingest/link` endpoint.
+
 ## Actions
 
 1. **Receive from Share Sheet** — accepts URLs shared from any app. If no input is provided, it stops and responds with "No input!".
