@@ -649,13 +649,23 @@
           </div>
           <div id="stack-picker-list" class="release-page__edit-stacks-list">
             {#each visibleStacks as stack (stack.id)}
-              <label class="stack-dropdown__item">
+              <!-- svelte-ignore a11y_click_events_have_key_events -->
+              <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+              <label
+                class="stack-dropdown__item"
+                onclick={(event) => {
+                  // Toggle explicitly so clicking the name text works as
+                  // reliably as clicking the box — native <label>→checkbox
+                  // click forwarding dropped text clicks in some browsers.
+                  event.preventDefault();
+                  toggleStack(stack.id, !assignedIds.has(stack.id));
+                }}
+              >
                 <input
                   type="checkbox"
                   class="stack-dropdown__checkbox"
                   data-sid={stack.id}
                   checked={assignedIds.has(stack.id)}
-                  onchange={(e) => toggleStack(stack.id, e.currentTarget.checked)}
                 />
                 {stack.name}
               </label>

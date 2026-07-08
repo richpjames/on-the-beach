@@ -104,13 +104,28 @@
   </div>
   <div class="stack-dropdown__list">
     {#each visibleStacks as stack (stack.id)}
-      <label class="stack-dropdown__item">
+      <!-- Keyboard access is preserved: the nested checkbox is focusable and
+           Space fires a click that bubbles to this handler. -->
+      <!-- svelte-ignore a11y_click_events_have_key_events -->
+      <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+      <label
+        class="stack-dropdown__item"
+        onclick={(event) => {
+          // Toggle explicitly so clicking anywhere on the row — the name text,
+          // the padding, or the box — reliably flips the assignment exactly
+          // once. Relying on the browser's native <label>→checkbox forwarding
+          // dropped text clicks in some browsers (e.g. Safari), so the box
+          // was the only thing that worked. preventDefault stops the native
+          // toggle; the checkbox stays a controlled reflection of state.
+          event.preventDefault();
+          onToggle(stack.id, !selectedStackIds.has(stack.id));
+        }}
+      >
         <input
           type="checkbox"
           class="stack-dropdown__checkbox"
           data-stack-id={stack.id}
           checked={selectedStackIds.has(stack.id)}
-          onchange={(e) => onToggle(stack.id, e.currentTarget.checked)}
         />
         {stack.name}
       </label>
