@@ -15,7 +15,7 @@ import MobileCoreServices
 final class ShareViewController: UIViewController {
     // Read from the extension's Info.plist. `OTBBaseURL` is committed; the API
     // key is injected from a gitignored xcconfig at build time (see
-    // ios/ShareExtension/Secrets.example.xcconfig).
+    // native/ShareExtension/Secrets.example.xcconfig).
     private var baseURL: String {
         infoValue("OTBBaseURL") ?? "https://onthebeach.ricojam.es"
     }

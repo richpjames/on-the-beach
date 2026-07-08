@@ -17,7 +17,7 @@ a first-class destination — no Shortcut required.
   at the production URL via `capacitor.config.ts` (`server.url`). It's just a
   wrapper so there's a real app to host the extension; there is no separate
   mobile web bundle to maintain.
-- The Share Extension (`ios/ShareExtension/`) is the part that matters. When the
+- The Share Extension (`native/ShareExtension/`) is the part that matters. When the
   user shares a link, `ShareViewController.swift` extracts the URL and `POST`s it
   to `POST /api/ingest/link` with a `Bearer` token — the exact endpoint the
   documented Shortcut uses. The extension talks to the server directly, so a
@@ -32,13 +32,14 @@ iOS share sheet ──► ShareExtension (Swift) ──► POST /api/ingest/link
 | Path                              | Source of truth | Committed? |
 | --------------------------------- | --------------- | ---------- |
 | `capacitor.config.ts`             | hand-authored   | yes        |
-| `ios/ShareExtension/*.swift`      | hand-authored   | yes        |
-| `ios/ShareExtension/Info.plist`   | hand-authored   | yes        |
-| `ios/ShareExtension/Secrets.xcconfig` | you create locally | no (gitignored) |
-| `ios/App/` (Xcode project, Pods)  | `npx cap add ios` | no (gitignored) |
+| `native/ShareExtension/*.swift`      | hand-authored   | yes        |
+| `native/ShareExtension/Info.plist`   | hand-authored   | yes        |
+| `native/ShareExtension/Secrets.xcconfig` | you create locally | no (gitignored) |
+| `ios/App/` (Xcode project, Pods)  | `bun run cap:add` | no (gitignored) |
 
-The Xcode project is generated, not committed, so it's never stale relative to
-the Capacitor version. Regenerate it any time with `npx cap add ios`.
+The whole `ios/` directory is generated, not committed, so it's never stale
+relative to the Capacitor version. Regenerate it any time by removing `ios/` and
+running `bun run cap:add`.
 
 ## Prerequisites (mac only)
 
@@ -77,11 +78,11 @@ Xcode owns the `.xcodeproj`, so the extension target is added through the IDE
 2. **Delete** the auto-generated `ShareViewController.swift`,
    `Info.plist`, and `MainInterface.storyboard` that Xcode just made.
 3. **Add** the repo's versions instead: drag
-   `ios/ShareExtension/ShareViewController.swift` and
-   `ios/ShareExtension/Info.plist` into the `ShareExtension` target (check
+   `native/ShareExtension/ShareViewController.swift` and
+   `native/ShareExtension/Info.plist` into the `ShareExtension` target (check
    "Copy items if needed" **off** — reference them in place so git stays the
    source of truth). Set the target's **Info.plist File** build setting to
-   `ios/ShareExtension/Info.plist`.
+   `native/ShareExtension/Info.plist`.
    - The provided `Info.plist` has no `NSExtensionMainStoryboard` key (it uses
      `NSExtensionPrincipalClass` instead), so the storyboard isn't needed.
 4. Set the extension target's **iOS Deployment Target** to 13.0 or higher.
@@ -89,7 +90,7 @@ Xcode owns the `.xcodeproj`, so the extension target is added through the IDE
 ### 3. Wire up the ingest API key
 
 ```bash
-cp ios/ShareExtension/Secrets.example.xcconfig ios/ShareExtension/Secrets.xcconfig
+cp native/ShareExtension/Secrets.example.xcconfig native/ShareExtension/Secrets.xcconfig
 # edit Secrets.xcconfig, set OTB_INGEST_API_KEY to match the server's INGEST_API_KEY
 ```
 
@@ -119,7 +120,7 @@ scheme, and run. To use the extension: open Safari, tap **Share**, and pick
 
 There's nothing to rebuild for web-app changes — the shell loads the live site.
 Rebuild/redeploy the app only when you change native code
-(`ios/ShareExtension/`), the Capacitor version, or `capacitor.config.ts` (run
+(`native/ShareExtension/`), the Capacitor version, or `capacitor.config.ts` (run
 `bun run cap:sync` after config changes).
 
 ## Security note
@@ -142,3 +143,7 @@ consider rotating `INGEST_API_KEY`.
   server's `INGEST_API_KEY`, or ingest is disabled (`INGEST_ENABLED=false`).
 - **Add failed (4xx/5xx)** — the alert includes the server's response body;
   check the server logs for `POST /api/ingest/link`.
+- **"ios platform already exists"** on `cap add` — a leftover `ios/` directory
+  is present. It's fully generated and gitignored, so just `rm -rf ios` and run
+  `bun run cap:add` again. (The hand-authored sources live in `native/`, not
+  `ios/`, so removing `ios/` is always safe.)
