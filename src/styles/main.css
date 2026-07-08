@@ -3416,6 +3416,41 @@ a:hover {
   margin: 0;
   font-family: var(--font-display);
   font-size: var(--text-lg);
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.settings__badge {
+  font-family: var(--font-body);
+  font-size: var(--text-2xs);
+  font-weight: bold;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 1px 6px;
+  border: 1px solid;
+  border-color: var(--bevel-sunken);
+  background: var(--chrome);
+  color: var(--chrome-darker);
+  white-space: nowrap;
+}
+
+.settings__badge--ok {
+  background: #0a7d2c;
+  border-color: #0a7d2c;
+  color: #ffffff;
+}
+
+.settings__badge--warn {
+  background: #b25a00;
+  border-color: #b25a00;
+  color: #ffffff;
+}
+
+.settings__badge--off {
+  background: var(--chrome-dark);
+  border-color: var(--chrome-dark);
+  color: #ffffff;
 }
 
 .settings__hint {

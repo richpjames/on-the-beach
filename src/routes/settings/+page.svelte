@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { onMount } from "svelte";
   import { apiFetch } from "$lib/api";
   import { musickit, authorize, unauthorize, ensureConfigured } from "$lib/musickit.svelte";
   import type { LookupService } from "../../../server/settings";
@@ -9,12 +10,46 @@
   let activeService = $state(data.activeService);
   let statusMessage = $state("");
 
+  // ── Apple Music configuration status ────────────────────────────────────────
+  // Probe the token endpoint so the page reflects the *live* server state,
+  // including the case where the credentials are set but the developer token
+  // can't be minted (usually a malformed private key) — which the SSR
+  // `configured` flag alone can't distinguish.
+  type AmState = "checking" | "ready" | "missing_credentials" | "token_error";
+  let amState = $state<AmState>("checking");
+  let amDetail = $state("");
+
+  const amReady = $derived(amState === "ready");
+
+  onMount(() => {
+    void refreshAppleMusicStatus();
+  });
+
+  async function refreshAppleMusicStatus(): Promise<void> {
+    amState = "checking";
+    try {
+      const res = await fetch("/api/apple-music/token");
+      if (res.ok) {
+        amState = "ready";
+        amDetail = "";
+        void ensureConfigured();
+        return;
+      }
+      const body = (await res.json().catch(() => ({}))) as { reason?: string; detail?: string };
+      amState = body.reason === "token_error" ? "token_error" : "missing_credentials";
+      amDetail = body.detail ?? "";
+    } catch {
+      amState = "missing_credentials";
+      amDetail = "Couldn't reach the server to check Apple Music status.";
+    }
+  }
+
   // ── Apple Music account authorisation ──────────────────────────────────────
   // The developer token enables catalogue access; playing full tracks needs the
   // listener to authorise their own Apple Music subscription once, here or from
   // the player.
   function connectAppleMusic(): void {
-    if (data.appleMusicConfigured) void ensureConfigured();
+    if (amReady) void ensureConfigured();
   }
 
   async function signInAppleMusic(): Promise<void> {
@@ -86,8 +121,28 @@
     </section>
 
     <section class="settings__section" id="apple-music-settings">
-      <h2 class="settings__heading">Apple Music</h2>
-      {#if data.appleMusicConfigured}
+      <h2 class="settings__heading">
+        Apple Music
+        <span
+          class="settings__badge"
+          class:settings__badge--ok={amReady}
+          class:settings__badge--warn={amState === "token_error"}
+          class:settings__badge--off={amState === "missing_credentials"}
+          id="apple-music-status-badge"
+        >
+          {#if amState === "checking"}
+            Checking…
+          {:else if amReady}
+            Configured ✓
+          {:else if amState === "token_error"}
+            Key error
+          {:else}
+            Not configured
+          {/if}
+        </span>
+      </h2>
+
+      {#if amReady}
         <p class="settings__hint">
           MusicKit is configured (storefront: {data.appleMusicStorefront.toUpperCase()}). Sign in to
           your Apple Music subscription to play full tracks in the player instead of 30-second
@@ -107,13 +162,24 @@
               onclick={signInAppleMusic}
               onmouseenter={connectAppleMusic}>Sign in to Apple Music</button
             >
+            {#if musickit.error}
+              <p class="settings__status" role="status">{musickit.error}</p>
+            {/if}
           {/if}
         </div>
+      {:else if amState === "checking"}
+        <p class="settings__hint">Checking Apple Music configuration…</p>
+      {:else if amState === "token_error"}
+        <p class="settings__hint">
+          Apple Music credentials are set, but the developer token couldn't be generated.
+          {amDetail || "Check that APPLE_MUSIC_PRIVATE_KEY is the full .p8 contents (PKCS#8 PEM)."}
+        </p>
       {:else}
         <p class="settings__hint">
           MusicKit is not configured. Set <code>APPLE_MUSIC_TEAM_ID</code>,
-          <code>APPLE_MUSIC_KEY_ID</code>, and <code>APPLE_MUSIC_PRIVATE_KEY</code> to enable
-          full-track Apple Music playback. Until then, Apple Music links play 30-second previews.
+          <code>APPLE_MUSIC_KEY_ID</code>, and <code>APPLE_MUSIC_PRIVATE_KEY</code> on the server
+          (then restart it) to enable full-track Apple Music playback. Until then, Apple Music links
+          play 30-second previews.
         </p>
       {/if}
     </section>
