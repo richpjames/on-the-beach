@@ -7,6 +7,9 @@ const mockCreateMany = mock();
 const mockCreateDirect = mock();
 const mockSaveImage = mock();
 const mockScan = mock();
+const mockListStacks = mock();
+const mockResolveOrCreateStack = mock();
+const mockAttachItemToStack = mock();
 
 // Mock the music-item-creator module before importing any route, overriding
 // only the functions the ingest routes call. bun's mock.module() persists
@@ -27,7 +30,16 @@ const { createIngestRoutes } = await import("../../server/routes/ingest");
 
 function makeApp() {
   const app = new Hono();
-  app.route("/api/ingest", createIngestRoutes({ scanPhoto: mockScan, savePhoto: mockSaveImage }));
+  app.route(
+    "/api/ingest",
+    createIngestRoutes({
+      scanPhoto: mockScan,
+      savePhoto: mockSaveImage,
+      listStacks: mockListStacks,
+      resolveOrCreateStack: mockResolveOrCreateStack,
+      attachItemToStack: mockAttachItemToStack,
+    }),
+  );
   return app;
 }
 
@@ -200,6 +212,159 @@ describe("POST /api/ingest/link", () => {
     expect(res.status).toBe(422);
     const body = await res.json();
     expect(body.error).toBeDefined();
+  });
+});
+
+describe("POST /api/ingest/link with list and notes", () => {
+  const originalEnv = { ...process.env };
+  const url = "https://artist.bandcamp.com/album/cool-album";
+
+  beforeEach(() => {
+    process.env.INGEST_API_KEY = "test-secret";
+    delete process.env.INGEST_ENABLED;
+    mockCreateMany.mockReset();
+    mockResolveOrCreateStack.mockReset();
+    mockAttachItemToStack.mockReset();
+  });
+
+  afterEach(() => {
+    process.env = { ...originalEnv };
+  });
+
+  it("passes notes through to the item creator", async () => {
+    mockCreateMany.mockResolvedValue([
+      { item: { id: 1, title: "Cool Album", primary_url: url } as any, created: true },
+    ]);
+
+    const app = makeApp();
+    const res = await makeLinkRequest(
+      app,
+      { url, notes: "saw this live" },
+      { apiKey: "test-secret" },
+    );
+
+    expect(res.status).toBe(200);
+    expect(mockCreateMany).toHaveBeenCalledWith(url, { notes: "saw this live" });
+  });
+
+  it("resolves the list by name and attaches the created item to it", async () => {
+    mockCreateMany.mockResolvedValue([
+      { item: { id: 7, title: "Cool Album", primary_url: url } as any, created: true },
+    ]);
+    mockResolveOrCreateStack.mockResolvedValue({ id: 3, name: "Jazz finds" });
+
+    const app = makeApp();
+    const res = await makeLinkRequest(
+      app,
+      { url, listName: "Jazz finds" },
+      { apiKey: "test-secret" },
+    );
+
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(mockResolveOrCreateStack).toHaveBeenCalledWith("Jazz finds");
+    expect(mockAttachItemToStack).toHaveBeenCalledWith(7, 3);
+    expect(body.list).toEqual({ id: 3, name: "Jazz finds" });
+  });
+
+  it("does not touch lists when no listName is given", async () => {
+    mockCreateMany.mockResolvedValue([
+      { item: { id: 1, title: "Cool Album", primary_url: url } as any, created: true },
+    ]);
+
+    const app = makeApp();
+    const res = await makeLinkRequest(app, { url }, { apiKey: "test-secret" });
+
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(mockResolveOrCreateStack).not.toHaveBeenCalled();
+    expect(mockAttachItemToStack).not.toHaveBeenCalled();
+    expect(body.list).toBeNull();
+  });
+
+  it("still files a duplicate item into the chosen list", async () => {
+    // The creator returns the pre-existing item (created: false) and leaves its
+    // note untouched, so re-sharing to file it into a list is safe.
+    mockCreateMany.mockResolvedValue([
+      { item: { id: 9, title: "Cool Album" } as any, created: false },
+    ]);
+    mockResolveOrCreateStack.mockResolvedValue({ id: 3, name: "Jazz finds" });
+
+    const app = makeApp();
+    const res = await makeLinkRequest(
+      app,
+      { url, listName: "Jazz finds" },
+      { apiKey: "test-secret" },
+    );
+
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(mockAttachItemToStack).toHaveBeenCalledWith(9, 3);
+    expect(body.items_skipped).toBe(1);
+    expect(body.list).toEqual({ id: 3, name: "Jazz finds" });
+  });
+
+  it("ignores a blank listName", async () => {
+    mockCreateMany.mockResolvedValue([
+      { item: { id: 1, title: "Cool Album", primary_url: url } as any, created: true },
+    ]);
+
+    const app = makeApp();
+    const res = await makeLinkRequest(app, { url, listName: "   " }, { apiKey: "test-secret" });
+
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(mockResolveOrCreateStack).not.toHaveBeenCalled();
+    expect(body.list).toBeNull();
+  });
+});
+
+describe("GET /api/ingest/stacks", () => {
+  const originalEnv = { ...process.env };
+
+  beforeEach(() => {
+    process.env.INGEST_API_KEY = "test-secret";
+    delete process.env.INGEST_ENABLED;
+    mockListStacks.mockReset();
+  });
+
+  afterEach(() => {
+    process.env = { ...originalEnv };
+  });
+
+  function getStacks(app: Hono, opts?: { apiKey?: string }) {
+    const headers: Record<string, string> = {};
+    if (opts?.apiKey) headers.Authorization = `Bearer ${opts.apiKey}`;
+    return app.request("http://localhost/api/ingest/stacks", { headers });
+  }
+
+  it("returns 401 when no Authorization header is provided", async () => {
+    const app = makeApp();
+    const res = await getStacks(app);
+    expect(res.status).toBe(401);
+  });
+
+  it("returns 401 when wrong API key is provided", async () => {
+    const app = makeApp();
+    const res = await getStacks(app, { apiKey: "wrong-key" });
+    expect(res.status).toBe(401);
+  });
+
+  it("returns the lists for the picker", async () => {
+    mockListStacks.mockResolvedValue([
+      { id: 1, name: "Jazz finds" },
+      { id: 2, name: "To buy" },
+    ]);
+
+    const app = makeApp();
+    const res = await getStacks(app, { apiKey: "test-secret" });
+
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.stacks).toEqual([
+      { id: 1, name: "Jazz finds" },
+      { id: 2, name: "To buy" },
+    ]);
   });
 });
 
