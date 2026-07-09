@@ -1,18 +1,36 @@
 import UIKit
+import Social
 import UniformTypeIdentifiers
 import MobileCoreServices
 
 /// Native share-sheet entry point for On The Beach.
 ///
 /// When the user taps "On The Beach" in the iOS share sheet, iOS instantiates
-/// this view controller inside the Share Extension process and hands us the
-/// shared content via `extensionContext`. We pull a URL out of that content and
-/// POST it to the app's ingest endpoint (`/api/ingest/link`) — the same endpoint
-/// the documented iOS Shortcut uses — then dismiss with a brief confirmation.
+/// this controller inside the Share Extension process and hands us the shared
+/// content via `extensionContext`. We present Apple's standard compose sheet
+/// (`SLComposeServiceViewController`) so the user can add an optional note and
+/// pick a list (existing or new) before we POST the link to the app's ingest
+/// endpoint (`/api/ingest/link`) with a `Bearer` token.
 ///
 /// The extension talks to the server directly rather than opening the app, so a
 /// share succeeds even when the app isn't running.
-final class ShareViewController: UIViewController {
+///
+/// Posting is optimistic: `didSelectPost()` fires the request and dismisses.
+/// iOS keeps the process alive until `completeRequest`, so the POST finishes in
+/// the background, but the compose UI is already gone and can't surface a
+/// per-request error — the standard tradeoff for the native compose sheet.
+final class ShareViewController: SLComposeServiceViewController {
+    /// A list as the ingest picker endpoint returns it.
+    private struct Stack: Decodable {
+        let id: Int
+        let name: String
+    }
+
+    private var sharedURL: URL?
+    private var stacks: [Stack] = []
+    private var selectedListName: String?
+    private weak var listConfigurationItem: SLComposeSheetConfigurationItem?
+
     // Read from the extension's Info.plist. `OTBBaseURL` is committed; the API
     // key is injected from a gitignored xcconfig at build time (see
     // native/ShareExtension/Secrets.example.xcconfig).
@@ -24,31 +42,68 @@ final class ShareViewController: UIViewController {
         infoValue("OTBIngestAPIKey") ?? ""
     }
 
-    private let activity = UIActivityIndicatorView(style: .large)
-
     override func viewDidLoad() {
         super.viewDidLoad()
-        view.backgroundColor = UIColor.black.withAlphaComponent(0.35)
-        activity.color = .white
-        activity.translatesAutoresizingMaskIntoConstraints = false
-        view.addSubview(activity)
-        NSLayoutConstraint.activate([
-            activity.centerXAnchor.constraint(equalTo: view.centerXAnchor),
-            activity.centerYAnchor.constraint(equalTo: view.centerYAnchor),
-        ])
-        activity.startAnimating()
+        title = "On The Beach"
+        placeholder = "Add a note (optional)"
     }
 
-    override func viewDidAppear(_ animated: Bool) {
-        super.viewDidAppear(animated)
+    override func presentationAnimationDidFinish() {
+        super.presentationAnimationDidFinish()
+        // Extract the URL and load lists once the sheet is on screen.
         extractSharedURL { [weak self] url in
             guard let self else { return }
-            guard let url else {
-                self.finish(message: "No link found to share.", success: false)
-                return
-            }
-            self.postLink(url)
+            self.sharedURL = url
+            // Re-run isContentValid() now that we know whether we have a URL.
+            self.validateContent()
         }
+        fetchStacks()
+    }
+
+    // MARK: - Compose sheet configuration
+
+    /// Post is only enabled once we've found a URL to share; the note is optional.
+    override func isContentValid() -> Bool {
+        sharedURL != nil
+    }
+
+    /// A single "List" row under the note field. Tapping it pushes the picker.
+    override func configurationItems() -> [Any]! {
+        guard let item = SLComposeSheetConfigurationItem() else { return [] }
+        item.title = "List"
+        item.value = selectedListName ?? "None"
+        item.tapHandler = { [weak self] in
+            self?.presentListPicker()
+        }
+        listConfigurationItem = item
+        return [item]
+    }
+
+    override func didSelectPost() {
+        guard let url = sharedURL else {
+            extensionContext?.completeRequest(returningItems: [], completionHandler: nil)
+            return
+        }
+        let note = (contentText ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        postLink(url: url, note: note, listName: selectedListName) { [weak self] in
+            self?.extensionContext?.completeRequest(returningItems: [], completionHandler: nil)
+        }
+    }
+
+    // MARK: - List picker
+
+    private func presentListPicker() {
+        let picker = ListPickerViewController(
+            stacks: stacks.map(\.name),
+            selected: selectedListName
+        )
+        picker.onPick = { [weak self] name in
+            guard let self else { return }
+            self.selectedListName = name
+            self.listConfigurationItem?.value = name ?? "None"
+            self.popConfigurationViewController()
+        }
+        pushConfigurationViewController(picker)
     }
 
     // MARK: - Extracting the shared URL
@@ -84,7 +139,7 @@ final class ShareViewController: UIViewController {
         completion(nil)
     }
 
-    private static func firstURL(in text: String) -> URL? {
+    private nonisolated static func firstURL(in text: String) -> URL? {
         guard let detector = try? NSDataDetector(types: NSTextCheckingResult.CheckingType.link.rawValue) else {
             return nil
         }
@@ -93,63 +148,133 @@ final class ShareViewController: UIViewController {
         return match?.url
     }
 
+    // MARK: - Loading lists for the picker
+
+    private func fetchStacks() {
+        guard let endpoint = URL(string: baseURL + "/api/ingest/stacks"), !apiKey.isEmpty else {
+            return
+        }
+        var request = URLRequest(url: endpoint)
+        request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+        request.timeoutInterval = 15
+
+        URLSession.shared.dataTask(with: request) { [weak self] data, _, _ in
+            guard let self, let data,
+                  let payload = try? JSONDecoder().decode(StacksResponse.self, from: data) else {
+                return
+            }
+            DispatchQueue.main.async { self.stacks = payload.stacks }
+        }.resume()
+    }
+
+    private struct StacksResponse: Decodable {
+        let stacks: [Stack]
+    }
+
     // MARK: - Posting to the ingest endpoint
 
-    private func postLink(_ url: URL) {
-        guard let endpoint = URL(string: baseURL + "/api/ingest/link") else {
-            finish(message: "Misconfigured server URL.", success: false)
+    private func postLink(url: URL, note: String, listName: String?, completion: @escaping () -> Void) {
+        guard let endpoint = URL(string: baseURL + "/api/ingest/link"), !apiKey.isEmpty else {
+            completion()
             return
         }
-        guard !apiKey.isEmpty else {
-            finish(message: "Missing ingest API key in build config.", success: false)
-            return
-        }
+
+        var payload: [String: String] = ["url": url.absoluteString]
+        if !note.isEmpty { payload["notes"] = note }
+        if let listName, !listName.isEmpty { payload["listName"] = listName }
 
         var request = URLRequest(url: endpoint)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
-        request.httpBody = try? JSONSerialization.data(withJSONObject: ["url": url.absoluteString])
+        request.httpBody = try? JSONSerialization.data(withJSONObject: payload)
         request.timeoutInterval = 20
 
-        URLSession.shared.dataTask(with: request) { [weak self] data, response, error in
-            guard let self else { return }
-            DispatchQueue.main.async {
-                if let error {
-                    self.finish(message: "Couldn't reach On The Beach: \(error.localizedDescription)", success: false)
-                    return
-                }
-                let status = (response as? HTTPURLResponse)?.statusCode ?? 0
-                if (200...299).contains(status) {
-                    self.finish(message: "Added to On The Beach.", success: true)
-                } else if status == 401 {
-                    self.finish(message: "Unauthorized — check the ingest API key.", success: false)
-                } else {
-                    let body = data.flatMap { String(data: $0, encoding: .utf8) } ?? ""
-                    self.finish(message: "Add failed (\(status)). \(body)", success: false)
-                }
-            }
+        URLSession.shared.dataTask(with: request) { _, _, _ in
+            DispatchQueue.main.async { completion() }
         }.resume()
-    }
-
-    // MARK: - Finishing
-
-    private func finish(message: String, success: Bool) {
-        activity.stopAnimating()
-        let alert = UIAlertController(
-            title: success ? "On The Beach" : "Couldn't add",
-            message: message,
-            preferredStyle: .alert
-        )
-        alert.addAction(UIAlertAction(title: "OK", style: .default) { [weak self] _ in
-            self?.extensionContext?.completeRequest(returningItems: [], completionHandler: nil)
-        })
-        present(alert, animated: true)
     }
 
     private func infoValue(_ key: String) -> String? {
         guard let value = Bundle.main.object(forInfoDictionaryKey: key) as? String,
               !value.isEmpty else { return nil }
         return value
+    }
+}
+
+/// A minimal list picker pushed onto the compose sheet's navigation stack.
+///
+/// Shows "None", every existing list, and a "New list…" row that prompts for a
+/// name. Whatever the user chooses is handed back via `onPick` — the server
+/// resolves it by name (creating it if new), so no id round-trip is needed.
+private final class ListPickerViewController: UITableViewController {
+    var onPick: ((String?) -> Void)?
+
+    private let names: [String]
+    private let selected: String?
+
+    init(stacks: [String], selected: String?) {
+        self.names = stacks
+        self.selected = selected
+        super.init(style: .plain)
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+
+    override func viewDidLoad() {
+        super.viewDidLoad()
+        title = "List"
+    }
+
+    // Section 0: "None" + existing lists. Section 1: "New list…".
+    override func numberOfSections(in tableView: UITableView) -> Int { 2 }
+
+    override func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
+        section == 0 ? names.count + 1 : 1
+    }
+
+    override func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
+        let cell = tableView.dequeueReusableCell(withIdentifier: "cell")
+            ?? UITableViewCell(style: .default, reuseIdentifier: "cell")
+
+        if indexPath.section == 1 {
+            cell.textLabel?.text = "New list…"
+            cell.textLabel?.textColor = cell.tintColor
+            cell.accessoryType = .none
+            return cell
+        }
+
+        let name = indexPath.row == 0 ? nil : names[indexPath.row - 1]
+        cell.textLabel?.text = name ?? "None"
+        cell.textLabel?.textColor = .label
+        cell.accessoryType = (name == selected) ? .checkmark : .none
+        return cell
+    }
+
+    override func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
+        tableView.deselectRow(at: indexPath, animated: true)
+
+        if indexPath.section == 1 {
+            promptForNewList()
+            return
+        }
+
+        let name = indexPath.row == 0 ? nil : names[indexPath.row - 1]
+        onPick?(name)
+    }
+
+    private func promptForNewList() {
+        let alert = UIAlertController(title: "New list", message: nil, preferredStyle: .alert)
+        alert.addTextField { $0.placeholder = "List name"; $0.autocapitalizationType = .sentences }
+        alert.addAction(UIAlertAction(title: "Cancel", style: .cancel))
+        alert.addAction(UIAlertAction(title: "Add", style: .default) { [weak self, weak alert] _ in
+            let name = alert?.textFields?.first?.text?.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard let name, !name.isEmpty else { return }
+            self?.onPick?(name)
+        })
+        present(alert, animated: true)
     }
 }
