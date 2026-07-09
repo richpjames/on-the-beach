@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import { asc, eq } from "drizzle-orm";
 import { extractMusicUrls } from "../email-parser";
 import { createMusicItemDirect, createMusicItemsFromUrl } from "../music-item-creator";
 import { scheduleAppleMusicBackfill } from "../apple-music-backfill";
@@ -8,7 +9,9 @@ import { createScanEnricher } from "../scan-enricher";
 import { extractReleaseInfo, extractReleaseInfoFromWebContext } from "../vision";
 import { getWebContext } from "../google-vision";
 import { lookupRelease } from "../musicbrainz";
-import type { ScanResult } from "../../src/types";
+import { db } from "../db";
+import { stacks, musicItemStacks } from "../db/schema";
+import type { CreateMusicItemInput, ScanResult } from "../../src/types";
 
 interface EmailEnvelope {
   from: string;
@@ -34,9 +37,64 @@ const providers: Record<string, ProviderAdapter> = {
 export type ScanPhotoFn = (base64Image: string) => Promise<ScanResult | null>;
 export type SavePhotoFn = (base64Image: string) => Promise<string>;
 
+/** A list (stack) as the share-sheet picker needs it: just id + name. */
+export interface IngestStack {
+  id: number;
+  name: string;
+}
+
+export type ListStacksFn = () => Promise<IngestStack[]>;
+export type ResolveOrCreateStackFn = (name: string) => Promise<IngestStack>;
+export type AttachItemToStackFn = (itemId: number, stackId: number) => Promise<void>;
+
 export interface IngestRoutesDeps {
   scanPhoto?: ScanPhotoFn;
   savePhoto?: SavePhotoFn;
+  listStacks?: ListStacksFn;
+  resolveOrCreateStack?: ResolveOrCreateStackFn;
+  attachItemToStack?: AttachItemToStackFn;
+}
+
+/** Every list, id + name, alphabetised — the payload the extension's picker shows. */
+async function defaultListStacks(): Promise<IngestStack[]> {
+  return db.select({ id: stacks.id, name: stacks.name }).from(stacks).orderBy(asc(stacks.name));
+}
+
+/**
+ * Find a list by name or create it. Stack names are UNIQUE, so this collapses
+ * the picker's "pick existing" and "create new" cases into one call. The
+ * onConflictDoNothing + re-select guards against a race where a concurrent
+ * request inserts the same name between our lookup and insert.
+ */
+async function defaultResolveOrCreateStack(name: string): Promise<IngestStack> {
+  const trimmed = name.trim();
+
+  const existing = await db
+    .select({ id: stacks.id, name: stacks.name })
+    .from(stacks)
+    .where(eq(stacks.name, trimmed))
+    .get();
+  if (existing) return existing;
+
+  const inserted = await db
+    .insert(stacks)
+    .values({ name: trimmed })
+    .onConflictDoNothing()
+    .returning({ id: stacks.id, name: stacks.name });
+  if (inserted[0]) return inserted[0];
+
+  // Lost the race — the row now exists, so read it back.
+  const row = await db
+    .select({ id: stacks.id, name: stacks.name })
+    .from(stacks)
+    .where(eq(stacks.name, trimmed))
+    .get();
+  if (!row) throw new Error(`Failed to resolve list "${trimmed}"`);
+  return row;
+}
+
+async function defaultAttachItemToStack(itemId: number, stackId: number): Promise<void> {
+  await db.insert(musicItemStacks).values({ musicItemId: itemId, stackId }).onConflictDoNothing();
 }
 
 export function createIngestRoutes(deps: IngestRoutesDeps = {}): Hono {
@@ -49,8 +107,31 @@ export function createIngestRoutes(deps: IngestRoutesDeps = {}): Hono {
       extractReleaseInfoFromWebContext,
     );
   const savePhoto = deps.savePhoto ?? saveImageFromBase64;
+  const listStacks = deps.listStacks ?? defaultListStacks;
+  const resolveOrCreateStack = deps.resolveOrCreateStack ?? defaultResolveOrCreateStack;
+  const attachItemToStack = deps.attachItemToStack ?? defaultAttachItemToStack;
 
   const routes = new Hono();
+
+  // GET /stacks — lists for the share-sheet picker. Bearer-authed with the
+  // ingest key because the extension can't use the session-authed /api/stacks.
+  routes.get("/stacks", async (c) => {
+    const apiKey = process.env.INGEST_API_KEY;
+    if (!apiKey) {
+      return c.json({ error: "Ingest not configured" }, 503);
+    }
+
+    if (process.env.INGEST_ENABLED === "false") {
+      return c.json({ error: "Ingest disabled" }, 503);
+    }
+
+    const auth = c.req.header("Authorization");
+    if (auth !== `Bearer ${apiKey}`) {
+      return c.json({ error: "Unauthorized" }, 401);
+    }
+
+    return c.json({ stacks: await listStacks() });
+  });
 
   routes.post("/email", async (c) => {
     const apiKey = process.env.INGEST_API_KEY;
@@ -139,13 +220,31 @@ export function createIngestRoutes(deps: IngestRoutesDeps = {}): Hono {
       return c.json({ error: "Missing or invalid url" }, 400);
     }
 
+    const notes = typeof body?.notes === "string" ? body.notes.trim() : "";
+    const listName = typeof body?.listName === "string" ? body.listName.trim() : "";
+
+    // Notes are only meaningful for a freshly-created item; createMusicItemsFromUrl
+    // returns a duplicate's existing item unchanged, so passing them there can never
+    // clobber an existing note.
+    const overrides: Partial<CreateMusicItemInput> = {};
+    if (notes) overrides.notes = notes;
+
     try {
-      const results = await createMusicItemsFromUrl(url);
+      const results = Object.keys(overrides).length
+        ? await createMusicItemsFromUrl(url, overrides)
+        : await createMusicItemsFromUrl(url);
+
+      // Resolve the list once (creating it if new), then file every returned item
+      // into it — including duplicates, so re-sharing to organise works.
+      const list = listName ? await resolveOrCreateStack(listName) : null;
 
       const items: Array<{ id: number; title: string; url: string }> = [];
       const skipped: Array<{ url: string; reason: string }> = [];
 
       for (const result of results) {
+        if (list) {
+          await attachItemToStack(result.item.id, list.id);
+        }
         if (result.created) {
           scheduleAppleMusicBackfill(result.item.id);
           items.push({
@@ -164,6 +263,7 @@ export function createIngestRoutes(deps: IngestRoutesDeps = {}): Hono {
         items_skipped: skipped.length,
         items,
         skipped,
+        list,
       });
     } catch (err) {
       console.error(`[api] POST /api/ingest/link failed for ${url}:`, err);
