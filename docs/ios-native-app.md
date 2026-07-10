@@ -54,11 +54,15 @@ iOS share sheet ──► ShareExtension compose form ──► POST /api/ingest
 | `native/ShareExtension/*.swift`      | hand-authored   | yes        |
 | `native/ShareExtension/Info.plist`   | hand-authored   | yes        |
 | `native/ShareExtension/Secrets.xcconfig` | you create locally | no (gitignored) |
-| `ios/App/` (Xcode project, Pods)  | `bun run cap:add` | no (gitignored) |
+| `scripts/add-share-extension.rb`  | hand-authored   | yes        |
+| `ios/App/` (Xcode project, Pods)  | `bun run cap:add` + the script | no (gitignored) |
 
 The whole `ios/` directory is generated, not committed, so it's never stale
 relative to the Capacitor version. Regenerate it any time by removing `ios/` and
-running `bun run cap:add`.
+running `bun run cap:add` followed by `ruby scripts/add-share-extension.rb` to
+re-inject the extension target. Because the extension target is scripted (not
+hand-clicked in Xcode), CI can reproduce the whole build on every PR — see
+`.github/workflows/ios-build.yml`.
 
 ## Prerequisites (mac only)
 
@@ -77,9 +81,15 @@ running `bun run cap:add`.
 bun install
 bun run build        # produces build/client — cap sync needs webDir to exist
 bun run cap:add      # cap add ios — creates ios/App/ (gitignored)
-bun run cap:sync     # cap sync ios — installs pods, applies config
+ruby scripts/add-share-extension.rb   # inject the Share Extension target (§2)
 bun run cap:open     # cap open ios — opens ios/App/App.xcworkspace in Xcode
 ```
+
+> `scripts/add-share-extension.rb` needs the `xcodeproj` gem
+> (`gem install xcodeproj`). CocoaPods depends on it, so it's already present on
+> a machine set up to build this project — but usually under CocoaPods' own Ruby;
+> installing it into the Ruby you'll run the script with is the reliable path.
+> The same script runs in CI (`.github/workflows/ios-build.yml`).
 
 > Use `bun run cap:add` / `bunx cap add ios`, **not** `npx cap add ios`. This
 > project installs the Capacitor CLI with Bun, so `npx` can't find the `cap`
@@ -100,26 +110,38 @@ bun run cap:open     # cap open ios — opens ios/App/App.xcworkspace in Xcode
 > skip the failing clean step. Point `xcode-select` at real Xcode once installed:
 > `sudo xcode-select -s /Applications/Xcode.app/Contents/Developer`.
 
-### 2. Add the Share Extension target in Xcode
+### 2. Add the Share Extension target
 
-Xcode owns the `.xcodeproj`, so the extension target is added through the IDE
-(this can't be scripted from Linux):
+`scripts/add-share-extension.rb` injects the `ShareExtension` app-extension
+target into the generated `ios/App/App.xcodeproj` — the scripted equivalent of
+adding it by hand in Xcode. Run it after `cap:add` (step 1 already does):
 
-1. **File ▸ New ▸ Target… ▸ Share Extension.** Name it `ShareExtension`.
-   Uncheck "Activate scheme" if prompted. Xcode creates a
-   `ShareExtension/` group with its own `ShareViewController.swift`,
-   `Info.plist`, and a `MainInterface.storyboard`.
-2. **Delete** the auto-generated `ShareViewController.swift`,
-   `Info.plist`, and `MainInterface.storyboard` that Xcode just made.
-3. **Add** the repo's versions instead: drag
-   `native/ShareExtension/ShareViewController.swift` and
-   `native/ShareExtension/Info.plist` into the `ShareExtension` target (check
-   "Copy items if needed" **off** — reference them in place so git stays the
-   source of truth). Set the target's **Info.plist File** build setting to
-   `native/ShareExtension/Info.plist`.
-   - The provided `Info.plist` has no `NSExtensionMainStoryboard` key (it uses
-     `NSExtensionPrincipalClass` instead), so the storyboard isn't needed.
-4. Set the extension target's **iOS Deployment Target** to 13.0 or higher.
+```bash
+ruby scripts/add-share-extension.rb
+```
+
+It references `native/ShareExtension/ShareViewController.swift` and `Info.plist`
+**in place** (git stays the source of truth — nothing is copied into `ios/`),
+sets the target's Info.plist path and bundle id
+(`es.ricojam.onthebeach.ShareExtension`), wires the `Secrets.xcconfig` base
+configuration, and adds the "Embed App Extensions" phase so building the `App`
+scheme also builds the extension. It's idempotent, so re-running it (e.g. after
+regenerating `ios/`) is safe.
+
+Notes on what the script encodes, in case you ever do it manually instead:
+
+- The provided `Info.plist` has no `NSExtensionMainStoryboard` key (it uses
+  `NSExtensionPrincipalClass`), so no storyboard is needed.
+- The **iOS Deployment Target is 26.0** for the whole app. Capacitor generates
+  the App target at 13.0; the script raises the App target, the project, and the
+  extension to 26.0 so there's one floor across the app (this is a single-user
+  app that runs the current iOS). It also comfortably clears the iOS 14 `UTType`
+  API that `ShareViewController.swift` uses.
+- **Mac Catalyst** is enabled on both the App and extension targets (the
+  extension only reaches the macOS share menu if both build for Catalyst).
+
+> This is what the CI check builds — a broken `ShareViewController.swift` or
+> Capacitor/Info.plist change fails the PR instead of only surfacing here.
 
 ### 3. Wire up the ingest API key
 
@@ -128,11 +150,12 @@ cp native/ShareExtension/Secrets.example.xcconfig native/ShareExtension/Secrets.
 # edit Secrets.xcconfig, set OTB_INGEST_API_KEY to match the server's INGEST_API_KEY
 ```
 
-In Xcode, select the project ▸ **Info ▸ Configurations**, expand **Debug** and
-**Release**, and set the **ShareExtension** target's configuration file to
-`Secrets.xcconfig` for both. The key flows into the extension's `Info.plist`
-through the `$(OTB_INGEST_API_KEY)` substitution and is read at runtime by
-`ShareViewController`.
+The script in step 2 already wires this file as the **ShareExtension** target's
+configuration file for both Debug and Release, so you don't need to touch Xcode's
+Configurations pane. Just create `Secrets.xcconfig` **before** running the script
+(if you add it afterwards, re-run the script). The key flows into the extension's
+`Info.plist` through the `$(OTB_INGEST_API_KEY)` substitution and is read at
+runtime by `ShareViewController`.
 
 `OTBBaseURL` is already set to the production origin in `Info.plist`; change it
 there if you deploy elsewhere.
