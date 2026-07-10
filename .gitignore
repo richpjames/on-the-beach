@@ -38,6 +38,9 @@ eval/fixtures/pending-review.json
 # Playwright MCP snapshots and screenshots
 .playwright-mcp/
 *.png
+# ...but the single brand master IS tracked — it's the one source image that
+# scripts/generate-brand-assets.sh turns into every favicon and app icon.
+!assets/logo.png
 
 uploads
 
