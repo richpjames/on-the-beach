@@ -55,7 +55,10 @@ iOS share sheet ──► ShareExtension compose form ──► POST /api/ingest
 | `native/ShareExtension/Info.plist`   | hand-authored   | yes        |
 | `native/ShareExtension/Secrets.xcconfig` | you create locally | no (gitignored) |
 | `scripts/add-share-extension.rb`  | hand-authored   | yes        |
-| `ios/App/` (Xcode project, Pods)  | `bun run cap:add` + the script | no (gitignored) |
+| `assets/logo.png`                 | hand-authored (the one brand master) | yes |
+| `scripts/generate-brand-assets.sh` | hand-authored  | yes        |
+| `public/favicon*`, `public/*-chrome-*`, `apple-touch-icon.png` | generated from `assets/logo.png` | yes |
+| `ios/App/` (Xcode project, Pods)  | `bun run cap:add` + the scripts | no (gitignored) |
 
 The whole `ios/` directory is generated, not committed, so it's never stale
 relative to the Capacitor version. Regenerate it any time by removing `ios/` and
@@ -63,6 +66,37 @@ running `bun run cap:add` followed by `ruby scripts/add-share-extension.rb` to
 re-inject the extension target. Because the extension target is scripted (not
 hand-clicked in Xcode), CI can reproduce the whole build on every PR — see
 `.github/workflows/ios-build.yml`.
+
+`add-share-extension.rb` also patches two host-app details that Capacitor gets
+wrong for our case, so they survive every regenerate:
+
+- **`CFBundleName = "On The Beach"`.** Capacitor sets it to `"App"`. The macOS
+  "Login Items & Extensions ▸ Sharing" list titles each provider by its
+  `CFBundleName` (not `CFBundleDisplayName`), so without this the app — and its
+  Share Extension row — shows as a generic "App". It's also the Catalyst menu-bar
+  title.
+- **Extension version = the app's.** The extension's `CFBundleVersion` /
+  `CFBundleShortVersionString` are mirrored from the App target, or an archive is
+  rejected ("The CFBundleVersion of an app extension … must match…").
+
+## Brand assets (icons + favicons from one source)
+
+Every app icon and web favicon derives from a single master, **`assets/logo.png`**
+(a transparent square — ideally ≥1024px). `scripts/generate-brand-assets.sh`
+(`bun run brand:assets`) regenerates all of them:
+
+- **Web favicons** in `public/` (`favicon.ico`, `-16`/`-32`, `apple-touch-icon`,
+  `android-chrome-*`) — kept transparent.
+- **iOS + Mac Catalyst app icon and splash** in the generated `ios/` tree, via
+  `@capacitor/assets` (logo composited on white, since iOS icons must be opaque).
+
+Two gotchas the script handles: `@capacitor/assets` rewrites the AppIcon
+`Contents.json` and drops the Mac Catalyst `mac` idiom on every run (without it,
+Catalyst shows a placeholder icon), so the script regenerates the `mac`
+renditions and rewrites `Contents.json`. Requires ImageMagick (`magick`).
+
+To rebrand: replace `assets/logo.png` and run `bun run brand:assets` (then
+`bun run cap:sync` to copy the web assets into the app).
 
 ## Prerequisites (mac only)
 
@@ -82,6 +116,7 @@ bun install
 bun run build        # produces build/client — cap sync needs webDir to exist
 bun run cap:add      # cap add ios — creates ios/App/ (gitignored)
 ruby scripts/add-share-extension.rb   # inject the Share Extension target (§2)
+bun run brand:assets # capybara app icon + splash into ios/ (needs ImageMagick)
 bun run cap:open     # cap open ios — opens ios/App/App.xcworkspace in Xcode
 ```
 

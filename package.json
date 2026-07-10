@@ -32,7 +32,8 @@
     "start": "bun build/index.js",
     "cap:add": "cap add ios",
     "cap:sync": "cap sync ios",
-    "cap:open": "cap open ios"
+    "cap:open": "cap open ios",
+    "brand:assets": "bash scripts/generate-brand-assets.sh"
   },
   "dependencies": {
     "@mistralai/mistralai": "^1.14.1",
@@ -43,6 +44,7 @@
     "xstate": "^5.28.0"
   },
   "devDependencies": {
+    "@capacitor/assets": "^3.0.5",
     "@capacitor/cli": "^6",
     "@capacitor/core": "^6",
     "@capacitor/ios": "^6",
