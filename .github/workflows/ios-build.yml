@@ -31,7 +31,7 @@ concurrency:
 
 jobs:
   build:
-    runs-on: macos-15
+    runs-on: macos-26
     timeout-minutes: 30
 
     steps:
@@ -39,7 +39,7 @@ jobs:
         uses: actions/checkout@v6
 
       - name: Select Xcode
-        # latest-stable on the macos-15 image. Pin to an explicit version here if
+        # latest-stable on the macos-26 image. Pin to an explicit version here if
         # you need byte-for-byte reproducibility across image updates.
         uses: maxim-lobanov/setup-xcode@v1
         with:
@@ -108,11 +108,14 @@ jobs:
         # a documented failure mode), so it's worth its own build. Reuses the
         # already-generated project + Pods, so it's mostly incremental compile.
         #
-        # Use a *generic* Catalyst destination, not "My Mac": the runner's macOS
-        # (15.x) is older than the iOS-26-era Xcode's minimum for a runnable "My
-        # Mac", so a concrete destination fails with "Xcode doesn't support My
-        # Mac's macOS …". A generic destination is build-only — it never resolves
-        # to My Mac — so it compiles for Catalyst regardless of the host OS.
+        # Use a *generic* Catalyst destination, not "My Mac". This is a
+        # compile-only check: a generic destination never resolves to a concrete
+        # bootable Mac, so it needs no signing and no runnable My Mac — it just
+        # proves the App + extension compile and link for Catalyst (the point of
+        # this job). The macos-26 runner now matches the iOS-26-era Xcode, so a
+        # concrete "My Mac" destination would also resolve here — switch to it
+        # (dropping CODE_SIGNING_ALLOWED=NO won't be enough; you'd need signing)
+        # only if you later want CI to *run*, not just build, the Catalyst app.
         run: |
           xcodebuild \
             -workspace ios/App/App.xcworkspace \

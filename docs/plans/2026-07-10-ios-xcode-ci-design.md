@@ -80,7 +80,7 @@ with "'UTType' is only available in iOS 14.0 or newer".)
   `capacitor.config.ts`, the script, the workflow, `package.json`, `bun.lock`;
   plus `workflow_dispatch`. macOS runners bill at 10x Linux minutes, and the
   shell loads the live site, so web-only PRs don't need it.
-- **Runner:** `macos-15`, Xcode `latest-stable`.
+- **Runner:** `macos-26`, Xcode `latest-stable`.
 - **Steps:** checkout → select Xcode → setup Bun → **setup Ruby 3.3** →
   `gem install cocoapods xcodeproj` → `bun install` → placeholder
   `build/client/index.html` → dummy `Secrets.xcconfig` → `bun run cap:add` →
