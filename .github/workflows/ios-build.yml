@@ -1,0 +1,102 @@
+name: iOS Build
+
+# Compiles the native iOS app *and its Share Extension* on PRs that touch native
+# code, so a broken ShareViewController.swift (or Capacitor/Info.plist change)
+# fails the check instead of only surfacing when someone next opens Xcode.
+#
+# The whole `ios/` project is generated (see docs/ios-native-app.md), so this job
+# reproduces it from scratch: cap add -> inject the extension target with
+# scripts/add-share-extension.rb -> xcodebuild. It builds for the iOS Simulator
+# with signing disabled, so it needs no certificates, provisioning profiles, or
+# the real ingest key.
+#
+# Path-filtered because macOS runners bill at 10x Linux minutes — no point paying
+# that when a PR only touches web code (the shell loads the live site anyway).
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    paths:
+      - "native/**"
+      - "capacitor.config.ts"
+      - "scripts/add-share-extension.rb"
+      - ".github/workflows/ios-build.yml"
+      - "package.json"
+      - "bun.lock"
+  workflow_dispatch:
+
+concurrency:
+  group: ios-build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: macos-15
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Select Xcode
+        # latest-stable on the macos-15 image. Pin to an explicit version here if
+        # you need byte-for-byte reproducibility across image updates.
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Setup Ruby
+        # A modern Ruby with a writable gem dir. Without it, Capacitor's pod
+        # pre-flight (`checkBundler`) runs against the read-only system Ruby and
+        # aborts with Gem::FilePermissionError (see docs troubleshooting).
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.3"
+
+      - name: Install CocoaPods + xcodeproj
+        # cocoapods for `cap add`'s `pod install`; xcodeproj for the target
+        # injection script. Installing into the setup-ruby gem home keeps `pod`
+        # and the script on the same Ruby.
+        run: gem install cocoapods xcodeproj --no-document
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Create placeholder web dir
+        # `cap sync` copies webDir (build/client) into the app and fails if it's
+        # missing. server.url points the shell at the live site, so the copied
+        # bundle is never served — a placeholder satisfies the check without a
+        # full `bun run build`.
+        run: |
+          mkdir -p build/client
+          printf '<!doctype html><title>On The Beach</title>' > build/client/index.html
+
+      - name: Write dummy ingest secrets
+        # Secrets.xcconfig is gitignored and only needed so OTB_INGEST_API_KEY
+        # substitutes into Info.plist. Any value compiles; the real key never
+        # touches CI (this only compiles, it doesn't run the extension).
+        run: |
+          printf 'OTB_INGEST_API_KEY = ci-dummy-key\n' > native/ShareExtension/Secrets.xcconfig
+
+      - name: Generate iOS project (Capacitor)
+        run: bun run cap:add
+
+      - name: Inject Share Extension target
+        run: ruby scripts/add-share-extension.rb
+
+      - name: Build App + Share Extension
+        # Building the App scheme also builds the embedded ShareExtension target,
+        # so ShareViewController.swift is genuinely compiled. No signing needed
+        # for a simulator build.
+        run: |
+          xcodebuild \
+            -workspace ios/App/App.xcworkspace \
+            -scheme App \
+            -sdk iphonesimulator \
+            -destination 'generic/platform=iOS Simulator' \
+            -configuration Debug \
+            CODE_SIGNING_ALLOWED=NO \
+            build
