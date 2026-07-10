@@ -9,6 +9,10 @@ import type { CapacitorConfig } from "@capacitor/cli";
 // `server.url` points the shell's WKWebView at the live deployment, so the app
 // itself is always the current production build with no separate mobile bundle
 // to maintain. Override `OTB_APP_URL` at build time to target a staging origin.
+//
+// The same targets also build as a native Mac app via Mac Catalyst (enabled in
+// Xcode, not here — see docs/ios-native-app.md), which is what puts On The Beach
+// in the macOS share menu. There is no Catalyst-specific Capacitor config.
 const config: CapacitorConfig = {
   appId: "es.ricojam.onthebeach",
   appName: "On The Beach",

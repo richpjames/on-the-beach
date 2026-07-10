@@ -6,6 +6,10 @@
 	<string>On The Beach</string>
 	<key>CFBundleName</key>
 	<string>ShareExtension</string>
+	<key>CFBundleExecutable</key>
+	<string>$(EXECUTABLE_NAME)</string>
+	<key>CFBundleInfoDictionaryVersion</key>
+	<string>6.0</string>
 	<key>CFBundleIdentifier</key>
 	<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
 	<key>CFBundlePackageType</key>
@@ -31,12 +35,14 @@
 		<key>NSExtensionAttributes</key>
 		<dict>
 			<!-- Offer the extension whenever the share payload contains a web
-			     URL, a web page, or text that may embed a URL. -->
+			     URL or text that may embed a URL. NSExtensionActivationSupportsWebPage
+			     is intentionally NOT used: it requires an NSExtensionJavaScriptPreprocessingFile,
+			     and without one the whole activation rule is malformed and iOS silently
+			     drops the extension from the share sheet. We only need the URL, which
+			     WebURL/Text already cover. -->
 			<key>NSExtensionActivationRule</key>
 			<dict>
 				<key>NSExtensionActivationSupportsWebURLWithMaxCount</key>
-				<integer>1</integer>
-				<key>NSExtensionActivationSupportsWebPageWithMaxCount</key>
 				<integer>1</integer>
 				<key>NSExtensionActivationSupportsText</key>
 				<true/>
