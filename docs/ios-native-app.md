@@ -1,38 +1,48 @@
-# Native iOS App & Share Extension
+# Native App & Share Extension (iOS + macOS)
 
-This is the "real" share-sheet integration: a native iOS app (a thin
+This is the "real" share-sheet integration: a native app (a thin
 [Capacitor](https://capacitorjs.com) shell around the hosted web app) plus a
-native **Share Extension** so **On The Beach** appears in the iOS share sheet as
-a first-class destination — no Shortcut required.
+native **Share Extension** so **On The Beach** appears in the share sheet as a
+first-class destination — no Shortcut required. The same app and extension serve
+both **iOS** and **macOS**: iOS is the primary target, and macOS support comes
+for free by building the same targets with **Mac Catalyst** (see [Enable macOS
+(Mac Catalyst)](#6-enable-macos-mac-catalyst) below).
 
 > **Why native?** iOS Safari does not implement the Web Share _Target_ API, so a
 > PWA can never register as a share destination on iOS. The only ways a web app
 > can appear in the share sheet are (a) a user-installed Shortcut
 > (`docs/ios-shortcut.md`) or (b) a native app that ships a Share Extension —
-> this document.
+> this document. On macOS the share **menu** likewise only lists Share
+> extensions vended by installed native apps, so the same native app — built for
+> the Mac via Mac Catalyst — is what puts On The Beach in the Mac share menu.
 
 ## How it works
 
 - The Capacitor shell (`ios/App/`, generated on a mac) is a `WKWebView` pointed
   at the production URL via `capacitor.config.ts` (`server.url`). It's just a
   wrapper so there's a real app to host the extension; there is no separate
-  mobile web bundle to maintain.
+  mobile web bundle to maintain. The same shell target also builds as a native
+  Mac app under **Mac Catalyst**, which is what hosts the extension on macOS.
+- The `ShareViewController.swift` and `Info.plist` are shared **byte-for-byte**
+  across iOS and macOS — it's a custom `UIViewController` compose form (plus
+  `UIAlertController`), all of which work under Mac Catalyst, so no Mac-specific
+  Swift is needed.
 - The Share Extension (`native/ShareExtension/`) is the part that matters. When the
-  user shares a link, `ShareViewController.swift` presents Apple's standard compose
-  sheet (`SLComposeServiceViewController`) with an optional **note** field and a
-  **List** row. The List row fetches your lists from `GET /api/ingest/stacks` and
-  lets you pick an existing one or create a new one by name. On **Post** it `POST`s
-  the URL — plus `notes` and `listName` when set — to `POST /api/ingest/link` with a
-  `Bearer` token. The extension talks to the server directly, so a share works even
-  when the app isn't running.
-- Posting is **optimistic**: iOS dismisses the compose sheet as soon as you tap Post
-  and keeps the extension alive just long enough to finish the request in the
-  background, so a per-request server error isn't surfaced in the sheet (the
-  tradeoff for using the native compose UI). The item either appears in the app or
-  it doesn't; check the server logs for `POST /api/ingest/link` if one goes missing.
+  user shares a link, `ShareViewController.swift` shows a small compose form with an
+  optional **note** field and a **List** row. The List row fetches your lists from
+  `GET /api/ingest/stacks` and lets you pick an existing one or create a new one by
+  name. On **Add** it `POST`s the URL — plus `notes` and `listName` when set — to
+  `POST /api/ingest/link` with a `Bearer` token. The extension talks to the server
+  directly, so a share works even when the app isn't running.
+- Posting is **synchronous**: the form stays on screen showing an "Adding…" spinner
+  until the request finishes. It dismisses on success and presents a blocking error
+  alert on failure (a deliberate departure from Apple's
+  `SLComposeServiceViewController`, which swooshes away on Post and leaves nowhere to
+  report a failure). The networking lives in the container view controller, which
+  outlives the form, so there's always a live controller to present the alert on.
 
 ```
-iOS share sheet ──► ShareExtension compose sheet ──► POST /api/ingest/link ──► item created
+iOS share sheet ──► ShareExtension compose form ──► POST /api/ingest/link ──► item created
         (note + list picker)          GET /api/ingest/stacks ──┘  (filed into list)
 ```
 
@@ -138,8 +148,35 @@ suggests this automatically.
 
 Plug in an iPhone (share-sheet testing is best on a device), select the **App**
 scheme, and run. To use the extension: open Safari, tap **Share**, and pick
-**On The Beach**. You should see the compose sheet — type a note if you like, tap
-**List** to file it into a list (existing or new), then tap **Post**.
+**On The Beach**. You should see the compose form — type a note if you like, tap
+**List** to file it into a list (existing or new), then tap **Add**.
+
+### 6. Enable macOS (Mac Catalyst)
+
+Mac Catalyst runs the **same** `App` and `ShareExtension` targets as a native Mac
+app, so the compose form and ingest logic are shared with iOS — there is no
+separate macOS code to write or keep in sync.
+
+1. Select the project ▸ **App** target ▸ **General ▸ Supported Destinations** ▸
+   **＋** ▸ add **Mac (Mac Catalyst)**. (On older Xcode this is a **Mac**
+   checkbox under *Deployment Info*.)
+2. Do the same for the **ShareExtension** target — the extension must itself
+   support the Mac destination to appear in the macOS share menu. Both targets'
+   iOS Deployment Target of 13.0 maps to macOS 10.15+; Xcode sets the macOS
+   deployment automatically.
+3. **Signing & Capabilities** for each target: pick the same team you used for
+   iOS. The extension's bundle id stays a child of the app's
+   (`es.ricojam.onthebeach.ShareExtension`); a free personal team is fine for
+   running locally on your own Mac.
+4. Choose the **My Mac (Mac Catalyst)** run destination and **Run**. The shell
+   opens as a Mac window showing the live site.
+
+**Using it on macOS:** in Safari (or Finder, Notes, most apps) use the **Share**
+button/menu and pick **On The Beach**. If it isn't listed, enable it under
+**System Settings ▸ General ▸ Login Items & Extensions ▸ Sharing** (older macOS:
+**System Settings ▸ Privacy & Security ▸ Extensions ▸ Sharing**) and tick **On
+The Beach**. The compose form, note field, and List picker all work the same as
+on iOS.
 
 ## Updating after web changes
 
@@ -172,6 +209,24 @@ consider rotating `INGEST_API_KEY`.
   is present. It's fully generated and gitignored, so just `rm -rf ios` and run
   `bun run cap:add` again. (The hand-authored sources live in `native/`, not
   `ios/`, so removing `ios/` is always safe.)
+- **(macOS) Extension not in the Mac share menu** — run the app once so macOS
+  registers the extension, then enable it under **System Settings ▸ General ▸
+  Login Items & Extensions ▸ Sharing**. If it still doesn't show, log out and
+  back in (or `killall Finder`); macOS caches extension registrations like iOS
+  does.
+- **(macOS) Compose form looks or behaves oddly under Mac Catalyst** — the
+  extension is a plain `UIViewController` (a `UINavigationController` hosting a note
+  field and a List table), all standard UIKit that Mac Catalyst renders reliably.
+  Still, treat macOS as "test on a real Mac" rather than guaranteed-identical to
+  iOS. Because posting is synchronous, the form stays up until the request finishes
+  and reports failures inline, so a wedged share hasn't silently posted — retry it.
+  A fully native AppKit share extension would be marginally more Mac-idiomatic at
+  the cost of a second, duplicated codebase; that trade-off wasn't worth it for a
+  single-user deployment.
+- **(macOS) Pods fail to build for Mac Catalyst** — set the **Pods** project's
+  *Supported Destinations* (or its macOS deployment target) to include Mac
+  Catalyst, then rebuild. Capacitor's WKWebView pod supports Catalyst; this only
+  bites if a pod's own deployment settings exclude the Mac destination.
 - **`Gem::FilePermissionError … /Library/Ruby/Gems/2.6.0` on `cap add`/`cap sync`**
   — before installing pods, Capacitor's `checkBundler` runs `bundle` and, if it
   returns a non-zero status (which the stock system Ruby's bundler does), tries

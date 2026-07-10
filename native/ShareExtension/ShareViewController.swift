@@ -1,35 +1,47 @@
 import UIKit
-import Social
 import UniformTypeIdentifiers
 import MobileCoreServices
 
 /// Native share-sheet entry point for On The Beach.
 ///
-/// When the user taps "On The Beach" in the iOS share sheet, iOS instantiates
+/// When the user taps "On The Beach" in the share sheet, iOS/macOS instantiates
 /// this controller inside the Share Extension process and hands us the shared
-/// content via `extensionContext`. We present Apple's standard compose sheet
-/// (`SLComposeServiceViewController`) so the user can add an optional note and
-/// pick a list (existing or new) before we POST the link to the app's ingest
-/// endpoint (`/api/ingest/link`) with a `Bearer` token.
+/// content via `extensionContext`. We show a small compose form so the user can
+/// add an optional note and pick a list (existing or new), then POST the link to
+/// the app's ingest endpoint (`/api/ingest/link`) with a `Bearer` token.
 ///
 /// The extension talks to the server directly rather than opening the app, so a
 /// share succeeds even when the app isn't running.
 ///
-/// Posting is optimistic: `didSelectPost()` fires the request and dismisses.
-/// iOS keeps the process alive until `completeRequest`, so the POST finishes in
-/// the background, but the compose UI is already gone and can't surface a
-/// per-request error — the standard tradeoff for the native compose sheet.
-final class ShareViewController: SLComposeServiceViewController {
-    /// A list as the ingest picker endpoint returns it.
+/// Unlike Apple's `SLComposeServiceViewController` (which swooshes away the
+/// instant you tap Post, leaving nowhere to report a failure), this is a custom
+/// form: the post is synchronous. We stay on screen with an "Adding…" spinner
+/// until the request finishes, dismiss on success, and present a blocking error
+/// alert on failure. Networking and alerts live here in the container — which
+/// outlives the child form/picker — so there's always a live view controller to
+/// present the alert on.
+final class ShareViewController: UIViewController {
     private struct Stack: Decodable {
         let id: Int
         let name: String
     }
 
+    private struct StacksResponse: Decodable {
+        let stacks: [Stack]
+    }
+
+    /// Outcome of a post attempt: success, or a message to show the user.
+    private enum PostResult {
+        case success
+        case failure(String)
+    }
+
     private var sharedURL: URL?
-    private var stacks: [Stack] = []
+    private var stackNames: [String] = []
     private var selectedListName: String?
-    private weak var listConfigurationItem: SLComposeSheetConfigurationItem?
+
+    private let compose = ComposeFormController()
+    private lazy var navController = UINavigationController(rootViewController: compose)
 
     // Read from the extension's Info.plist. `OTBBaseURL` is committed; the API
     // key is injected from a gitignored xcconfig at build time (see
@@ -44,66 +56,67 @@ final class ShareViewController: SLComposeServiceViewController {
 
     override func viewDidLoad() {
         super.viewDidLoad()
-        title = "On The Beach"
-        placeholder = "Add a note (optional)"
-    }
 
-    override func presentationAnimationDidFinish() {
-        super.presentationAnimationDidFinish()
-        // Extract the URL and load lists once the sheet is on screen.
+        addChild(navController)
+        navController.view.frame = view.bounds
+        navController.view.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+        view.addSubview(navController.view)
+        navController.didMove(toParent: self)
+
+        compose.onCancel = { [weak self] in self?.cancel() }
+        compose.onPickList = { [weak self] in self?.pushListPicker() }
+        compose.onSubmit = { [weak self] note in self?.submit(note: note) }
+
         extractSharedURL { [weak self] url in
             guard let self else { return }
             self.sharedURL = url
-            // Re-run isContentValid() now that we know whether we have a URL.
-            self.validateContent()
+            self.compose.setURL(url)
         }
         fetchStacks()
     }
 
-    // MARK: - Compose sheet configuration
-
-    /// Post is only enabled once we've found a URL to share; the note is optional.
-    override func isContentValid() -> Bool {
-        sharedURL != nil
-    }
-
-    /// A single "List" row under the note field. Tapping it pushes the picker.
-    override func configurationItems() -> [Any]! {
-        guard let item = SLComposeSheetConfigurationItem() else { return [] }
-        item.title = "List"
-        item.value = selectedListName ?? "None"
-        item.tapHandler = { [weak self] in
-            self?.presentListPicker()
-        }
-        listConfigurationItem = item
-        return [item]
-    }
-
-    override func didSelectPost() {
-        guard let url = sharedURL else {
-            extensionContext?.completeRequest(returningItems: [], completionHandler: nil)
-            return
-        }
-        let note = (contentText ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
-        postLink(url: url, note: note, listName: selectedListName) { [weak self] in
-            self?.extensionContext?.completeRequest(returningItems: [], completionHandler: nil)
-        }
-    }
-
     // MARK: - List picker
 
-    private func presentListPicker() {
-        let picker = ListPickerViewController(
-            stacks: stacks.map(\.name),
-            selected: selectedListName
-        )
+    private func pushListPicker() {
+        let picker = ListPickerViewController(stacks: stackNames, selected: selectedListName)
         picker.onPick = { [weak self] name in
             guard let self else { return }
             self.selectedListName = name
-            self.listConfigurationItem?.value = name ?? "None"
-            self.popConfigurationViewController()
+            self.compose.setListValue(name)
+            self.navController.popViewController(animated: true)
         }
-        pushConfigurationViewController(picker)
+        navController.pushViewController(picker, animated: true)
+    }
+
+    // MARK: - Submit / cancel
+
+    private func submit(note: String) {
+        guard let url = sharedURL else {
+            cancel()
+            return
+        }
+        compose.setPosting(true)
+        postLink(url: url, note: note, listName: selectedListName) { [weak self] result in
+            guard let self else { return }
+            switch result {
+            case .success:
+                self.extensionContext?.completeRequest(returningItems: [], completionHandler: nil)
+            case .failure(let message):
+                self.compose.setPosting(false)
+                self.presentError(message)
+            }
+        }
+    }
+
+    private func presentError(_ message: String) {
+        let alert = UIAlertController(title: "Couldn't add", message: message, preferredStyle: .alert)
+        alert.addAction(UIAlertAction(title: "OK", style: .default))
+        navController.present(alert, animated: true)
+    }
+
+    private func cancel() {
+        let error = NSError(domain: "es.ricojam.onthebeach.ShareExtension", code: 0)
+        extensionContext?.cancelRequest(withError: error)
     }
 
     // MARK: - Extracting the shared URL
@@ -163,19 +176,24 @@ final class ShareViewController: SLComposeServiceViewController {
                   let payload = try? JSONDecoder().decode(StacksResponse.self, from: data) else {
                 return
             }
-            DispatchQueue.main.async { self.stacks = payload.stacks }
+            DispatchQueue.main.async { self.stackNames = payload.stacks.map(\.name) }
         }.resume()
-    }
-
-    private struct StacksResponse: Decodable {
-        let stacks: [Stack]
     }
 
     // MARK: - Posting to the ingest endpoint
 
-    private func postLink(url: URL, note: String, listName: String?, completion: @escaping () -> Void) {
-        guard let endpoint = URL(string: baseURL + "/api/ingest/link"), !apiKey.isEmpty else {
-            completion()
+    private func postLink(
+        url: URL,
+        note: String,
+        listName: String?,
+        completion: @escaping (PostResult) -> Void
+    ) {
+        guard let endpoint = URL(string: baseURL + "/api/ingest/link") else {
+            completion(.failure("Misconfigured server URL."))
+            return
+        }
+        guard !apiKey.isEmpty else {
+            completion(.failure("Missing ingest API key in build config."))
             return
         }
 
@@ -190,8 +208,22 @@ final class ShareViewController: SLComposeServiceViewController {
         request.httpBody = try? JSONSerialization.data(withJSONObject: payload)
         request.timeoutInterval = 20
 
-        URLSession.shared.dataTask(with: request) { _, _, _ in
-            DispatchQueue.main.async { completion() }
+        URLSession.shared.dataTask(with: request) { data, response, error in
+            let result: PostResult
+            if let error {
+                result = .failure("Couldn't reach On The Beach: \(error.localizedDescription)")
+            } else {
+                let status = (response as? HTTPURLResponse)?.statusCode ?? 0
+                if (200...299).contains(status) {
+                    result = .success
+                } else if status == 401 {
+                    result = .failure("Unauthorized — check the ingest API key.")
+                } else {
+                    let body = data.flatMap { String(data: $0, encoding: .utf8) } ?? ""
+                    result = .failure("Add failed (\(status)). \(body)")
+                }
+            }
+            DispatchQueue.main.async { completion(result) }
         }.resume()
     }
 
@@ -202,7 +234,164 @@ final class ShareViewController: SLComposeServiceViewController {
     }
 }
 
-/// A minimal list picker pushed onto the compose sheet's navigation stack.
+/// The compose form: an optional note field and a tappable "List" row, with
+/// Cancel/Add in the navigation bar. It owns no state and does no networking —
+/// it reports Cancel, Add (with the note text), and List taps back to its
+/// container via closures.
+private final class ComposeFormController: UIViewController, UITextViewDelegate {
+    var onCancel: (() -> Void)?
+    var onSubmit: ((String) -> Void)?
+    var onPickList: (() -> Void)?
+
+    private let urlLabel = UILabel()
+    private let noteView = UITextView()
+    private let notePlaceholder = UILabel()
+    private let listValueLabel = UILabel()
+    private let spinner = UIActivityIndicatorView(style: .medium)
+    private lazy var addButton = UIBarButtonItem(
+        title: "Add", style: .done, target: self, action: #selector(didTapAdd)
+    )
+
+    override func viewDidLoad() {
+        super.viewDidLoad()
+        title = "On The Beach"
+        view.backgroundColor = .systemGroupedBackground
+
+        navigationItem.leftBarButtonItem = UIBarButtonItem(
+            barButtonSystemItem: .cancel, target: self, action: #selector(didTapCancel)
+        )
+        navigationItem.rightBarButtonItem = addButton
+        // Nothing to post until a URL is extracted.
+        addButton.isEnabled = false
+
+        urlLabel.font = .preferredFont(forTextStyle: .footnote)
+        urlLabel.textColor = .secondaryLabel
+        urlLabel.numberOfLines = 2
+        urlLabel.lineBreakMode = .byTruncatingMiddle
+
+        noteView.font = .preferredFont(forTextStyle: .body)
+        noteView.layer.cornerRadius = 10
+        noteView.backgroundColor = .secondarySystemGroupedBackground
+        noteView.textContainerInset = UIEdgeInsets(top: 10, left: 8, bottom: 10, right: 8)
+        noteView.delegate = self
+
+        notePlaceholder.text = "Add a note (optional)"
+        notePlaceholder.font = .preferredFont(forTextStyle: .body)
+        notePlaceholder.textColor = .placeholderText
+
+        let listRow = makeListRow()
+
+        let stack = UIStackView(arrangedSubviews: [urlLabel, noteView, listRow])
+        stack.axis = .vertical
+        stack.spacing = 12
+        stack.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(stack)
+
+        noteView.addSubview(notePlaceholder)
+        notePlaceholder.translatesAutoresizingMaskIntoConstraints = false
+
+        let guide = view.safeAreaLayoutGuide
+        NSLayoutConstraint.activate([
+            stack.topAnchor.constraint(equalTo: guide.topAnchor, constant: 16),
+            stack.leadingAnchor.constraint(equalTo: guide.leadingAnchor, constant: 16),
+            stack.trailingAnchor.constraint(equalTo: guide.trailingAnchor, constant: -16),
+            noteView.heightAnchor.constraint(equalToConstant: 96),
+            notePlaceholder.topAnchor.constraint(equalTo: noteView.topAnchor, constant: 10),
+            notePlaceholder.leadingAnchor.constraint(equalTo: noteView.leadingAnchor, constant: 12),
+        ])
+    }
+
+    override func viewDidAppear(_ animated: Bool) {
+        super.viewDidAppear(animated)
+        noteView.becomeFirstResponder()
+    }
+
+    /// Builds the "List — None ›" row as a tappable stack (no iOS 15 button APIs).
+    private func makeListRow() -> UIView {
+        let container = UIView()
+        container.backgroundColor = .secondarySystemGroupedBackground
+        container.layer.cornerRadius = 10
+
+        let title = UILabel()
+        title.text = "List"
+        title.font = .preferredFont(forTextStyle: .body)
+
+        listValueLabel.text = "None"
+        listValueLabel.font = .preferredFont(forTextStyle: .body)
+        listValueLabel.textColor = .secondaryLabel
+        listValueLabel.textAlignment = .right
+        listValueLabel.setContentHuggingPriority(.defaultLow, for: .horizontal)
+
+        let chevron = UIImageView(image: UIImage(systemName: "chevron.right"))
+        chevron.tintColor = .tertiaryLabel
+        chevron.setContentHuggingPriority(.required, for: .horizontal)
+
+        let row = UIStackView(arrangedSubviews: [title, listValueLabel, chevron])
+        row.axis = .horizontal
+        row.spacing = 8
+        row.alignment = .center
+        row.isLayoutMarginsRelativeArrangement = true
+        row.layoutMargins = UIEdgeInsets(top: 12, left: 12, bottom: 12, right: 12)
+        row.translatesAutoresizingMaskIntoConstraints = false
+        container.addSubview(row)
+        NSLayoutConstraint.activate([
+            row.topAnchor.constraint(equalTo: container.topAnchor),
+            row.bottomAnchor.constraint(equalTo: container.bottomAnchor),
+            row.leadingAnchor.constraint(equalTo: container.leadingAnchor),
+            row.trailingAnchor.constraint(equalTo: container.trailingAnchor),
+        ])
+
+        container.addGestureRecognizer(
+            UITapGestureRecognizer(target: self, action: #selector(didTapList))
+        )
+        return container
+    }
+
+    // MARK: - Updates from the container
+
+    func setURL(_ url: URL?) {
+        urlLabel.text = url?.absoluteString
+        addButton.isEnabled = (url != nil) && !isPosting
+    }
+
+    func setListValue(_ name: String?) {
+        listValueLabel.text = name ?? "None"
+    }
+
+    private var isPosting = false
+
+    /// While posting, swap the Add button for a spinner and block re-entry.
+    func setPosting(_ posting: Bool) {
+        isPosting = posting
+        view.isUserInteractionEnabled = !posting
+        if posting {
+            spinner.startAnimating()
+            navigationItem.rightBarButtonItem = UIBarButtonItem(customView: spinner)
+        } else {
+            spinner.stopAnimating()
+            navigationItem.rightBarButtonItem = addButton
+            addButton.isEnabled = urlLabel.text != nil
+        }
+    }
+
+    // MARK: - Actions
+
+    @objc private func didTapCancel() { onCancel?() }
+    @objc private func didTapList() { onPickList?() }
+
+    @objc private func didTapAdd() {
+        let note = noteView.text.trimmingCharacters(in: .whitespacesAndNewlines)
+        onSubmit?(note)
+    }
+
+    // MARK: - UITextViewDelegate
+
+    func textViewDidChange(_ textView: UITextView) {
+        notePlaceholder.isHidden = !textView.text.isEmpty
+    }
+}
+
+/// A minimal list picker pushed onto the compose form's navigation stack.
 ///
 /// Shows "None", every existing list, and a "New list…" row that prompts for a
 /// name. Whatever the user chooses is handed back via `onPick` — the server
