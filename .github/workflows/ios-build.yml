@@ -107,11 +107,17 @@ jobs:
         # exercises a distinct code path (notably the Pods' own Catalyst support,
         # a documented failure mode), so it's worth its own build. Reuses the
         # already-generated project + Pods, so it's mostly incremental compile.
+        #
+        # Use a *generic* Catalyst destination, not "My Mac": the runner's macOS
+        # (15.x) is older than the iOS-26-era Xcode's minimum for a runnable "My
+        # Mac", so a concrete destination fails with "Xcode doesn't support My
+        # Mac's macOS …". A generic destination is build-only — it never resolves
+        # to My Mac — so it compiles for Catalyst regardless of the host OS.
         run: |
           xcodebuild \
             -workspace ios/App/App.xcworkspace \
             -scheme App \
-            -destination 'platform=macOS,variant=Mac Catalyst' \
+            -destination 'generic/platform=macOS,variant=Mac Catalyst' \
             -configuration Debug \
             CODE_SIGNING_ALLOWED=NO \
             build
