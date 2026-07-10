@@ -84,8 +84,10 @@ with "'UTType' is only available in iOS 14.0 or newer".)
 - **Steps:** checkout → select Xcode → setup Bun → **setup Ruby 3.3** →
   `gem install cocoapods xcodeproj` → `bun install` → placeholder
   `build/client/index.html` → dummy `Secrets.xcconfig` → `bun run cap:add` →
-  `ruby scripts/add-share-extension.rb` → `xcodebuild … -sdk iphonesimulator
-  CODE_SIGNING_ALLOWED=NO build`.
+  `ruby scripts/add-share-extension.rb` → `xcodebuild … build` for **both** the
+  iOS Simulator and **Mac Catalyst** destinations (`CODE_SIGNING_ALLOWED=NO`).
+  The Catalyst build reuses the same generated project + Pods, so it's mostly
+  incremental compile.
 
 Two environment gotchas encoded in the workflow:
 
@@ -99,10 +101,6 @@ Two environment gotchas encoded in the workflow:
 
 ## Non-goals (YAGNI)
 
-- **Mac Catalyst build.** `ShareViewController.swift` is byte-for-byte identical
-  across iOS and Catalyst, so the iOS-simulator compile already covers the code
-  that changes. A second Catalyst destination adds runner time and Pod
-  destination fiddling for near-zero extra signal.
 - **Pods/DerivedData caching.** Kept the first version simple; a caching pass is
   a straightforward later optimization if macOS minutes become a concern.
 - **Code signing / device or TestFlight builds.** This is a compile check, not a
@@ -111,6 +109,7 @@ Two environment gotchas encoded in the workflow:
 ## Verification
 
 Reproduced the full flow locally on macOS (Xcode 26.6): `cap add` → script →
-`xcodebuild` for the iOS Simulator with signing disabled. Confirmed the script
-is idempotent, that `ShareViewController.swift` is genuinely compiled, and that
-`ShareExtension.appex` is produced and embedded in `App.app`.
+`xcodebuild` with signing disabled, for **both** the iOS Simulator and Mac
+Catalyst destinations. Confirmed the script is idempotent, that
+`ShareViewController.swift` is genuinely compiled, and that `ShareExtension.appex`
+is produced and embedded in `App.app` for both destinations.
