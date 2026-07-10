@@ -180,18 +180,17 @@ Mac Catalyst runs the **same** `App` and `ShareExtension` targets as a native Ma
 app, so the compose form and ingest logic are shared with iOS — there is no
 separate macOS code to write or keep in sync.
 
-1. Select the project ▸ **App** target ▸ **General ▸ Supported Destinations** ▸
-   **＋** ▸ add **Mac (Mac Catalyst)**. (On older Xcode this is a **Mac**
-   checkbox under *Deployment Info*.)
-2. Do the same for the **ShareExtension** target — the extension must itself
-   support the Mac destination to appear in the macOS share menu. Both targets'
-   iOS Deployment Target of 13.0 maps to macOS 10.15+; Xcode sets the macOS
-   deployment automatically.
-3. **Signing & Capabilities** for each target: pick the same team you used for
+`scripts/add-share-extension.rb` already enables Mac Catalyst
+(`SUPPORTS_MACCATALYST`) on **both** the App and ShareExtension targets — the
+extension only reaches the macOS share menu if both build for Catalyst. Xcode
+derives the macOS deployment target from the iOS floor (26.0) automatically, so
+there's nothing to toggle in the IDE. That leaves only:
+
+1. **Signing & Capabilities** for each target: pick the same team you used for
    iOS. The extension's bundle id stays a child of the app's
    (`es.ricojam.onthebeach.ShareExtension`); a free personal team is fine for
    running locally on your own Mac.
-4. Choose the **My Mac (Mac Catalyst)** run destination and **Run**. The shell
+2. Choose the **My Mac (Mac Catalyst)** run destination and **Run**. The shell
    opens as a Mac window showing the live site.
 
 **Using it on macOS:** in Safari (or Finder, Notes, most apps) use the **Share**

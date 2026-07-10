@@ -87,7 +87,7 @@ jobs:
       - name: Inject Share Extension target
         run: ruby scripts/add-share-extension.rb
 
-      - name: Build App + Share Extension
+      - name: Build App + Share Extension (iOS Simulator)
         # Building the App scheme also builds the embedded ShareExtension target,
         # so ShareViewController.swift is genuinely compiled. No signing needed
         # for a simulator build.
@@ -97,6 +97,21 @@ jobs:
             -scheme App \
             -sdk iphonesimulator \
             -destination 'generic/platform=iOS Simulator' \
+            -configuration Debug \
+            CODE_SIGNING_ALLOWED=NO \
+            build
+
+      - name: Build App + Share Extension (Mac Catalyst)
+        # The extension reaches the macOS share menu only if both it and the app
+        # build for Mac Catalyst; the script enables it on both targets. Catalyst
+        # exercises a distinct code path (notably the Pods' own Catalyst support,
+        # a documented failure mode), so it's worth its own build. Reuses the
+        # already-generated project + Pods, so it's mostly incremental compile.
+        run: |
+          xcodebuild \
+            -workspace ios/App/App.xcworkspace \
+            -scheme App \
+            -destination 'platform=macOS,variant=Mac Catalyst' \
             -configuration Debug \
             CODE_SIGNING_ALLOWED=NO \
             build
