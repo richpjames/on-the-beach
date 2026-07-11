@@ -1279,36 +1279,56 @@ select.input {
   }
 
   .music-card {
-    padding: var(--space-4) var(--space-3);
-    min-height: 82px;
-    gap: var(--space-4);
-    align-items: flex-start;
+    padding: var(--space-3);
+    min-height: 0;
+    gap: var(--space-3);
+    align-items: center;
   }
 
   .music-card--no-artwork {
-    min-height: 92px;
+    min-height: 0;
   }
 
   .music-card__artwork {
-    width: 64px;
-    height: 64px;
+    width: 56px;
+    height: 56px;
   }
 
   .music-card .music-card__content {
     min-height: 0;
+    gap: var(--space-1);
+    justify-content: center;
   }
 
+  /* Status + stars share one compact row instead of stacking into two
+     sparse lines with a void of black beside them. Nowrap keeps them on a
+     single line at phone widths; wrap is only a safety net for very narrow
+     (<~340px) screens. */
   .music-card .music-card__meta {
-    margin-top: var(--space-3);
+    margin-top: var(--space-2);
     gap: var(--space-3);
+    flex-wrap: wrap;
+    align-items: center;
   }
 
+  /* Trim the rating stars so the select + five stars fit on a single line
+     within the content column (down to 360px) while staying tappable. */
+  .music-card .rating-stars__star {
+    width: 26px;
+    height: 26px;
+    font-size: 16px;
+  }
+
+  /* Stack the reorder/menu icons as a tidy cluster in the top-right corner
+     so the meta row gets the full content width. */
   .music-card .music-card__actions {
     position: relative;
-    gap: var(--space-2);
+    flex-direction: column;
+    justify-content: flex-start;
+    gap: var(--space-1);
     align-self: flex-start;
     padding-top: 0;
-    margin-top: 1px;
+    margin-top: 0;
   }
 
   .music-card .music-card__reorder-handle {
