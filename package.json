@@ -34,6 +34,7 @@
     "cap:sync": "cap sync ios",
     "cap:open": "cap open ios",
     "mac": "bash scripts/build-mac.sh",
+    "ios": "bash scripts/build-ios.sh",
     "brand:assets": "bash scripts/generate-brand-assets.sh"
   },
   "dependencies": {
