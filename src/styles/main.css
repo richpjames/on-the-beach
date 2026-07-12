@@ -750,6 +750,9 @@ select.input {
   grid-template-columns: 24px minmax(0, 1fr) 24px;
   align-items: stretch;
   border-top: 1px solid var(--chrome-dark);
+  /* Let the scrollbar handle its own touch gestures (thumb drag / track tap)
+     instead of the browser treating them as page scrolls. */
+  touch-action: none;
 }
 
 .stack-scrollbar__button,

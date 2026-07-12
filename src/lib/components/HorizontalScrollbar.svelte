@@ -81,16 +81,16 @@
   }
 
   $effect(() => {
-    document.addEventListener("mouseup", stopRepeatScroll);
+    document.addEventListener("pointerup", stopRepeatScroll);
     window.addEventListener("blur", stopRepeatScroll);
     return () => {
-      document.removeEventListener("mouseup", stopRepeatScroll);
+      document.removeEventListener("pointerup", stopRepeatScroll);
       window.removeEventListener("blur", stopRepeatScroll);
       stopRepeatScroll();
     };
   });
 
-  function onTrackMouseDown(event: MouseEvent): void {
+  function onTrackPointerDown(event: PointerEvent): void {
     if (!target || !trackEl) return;
     if ((event.target as HTMLElement).id === thumbId) return;
 
@@ -103,7 +103,7 @@
     });
   }
 
-  function onDragMove(event: MouseEvent): void {
+  function onDragMove(event: PointerEvent): void {
     if (!drag || !target || !trackEl) return;
 
     const scrollRange = target.scrollWidth - target.clientWidth;
@@ -121,14 +121,19 @@
 
   function onDragEnd(): void {
     drag = null;
-    document.removeEventListener("mousemove", onDragMove);
+    document.removeEventListener("pointermove", onDragMove);
   }
 
-  function onThumbMouseDown(event: MouseEvent): void {
+  function onThumbPointerDown(event: PointerEvent): void {
     event.preventDefault();
+    const thumb = event.currentTarget as HTMLElement;
+    if (event.pointerId !== undefined && typeof thumb.setPointerCapture === "function") {
+      thumb.setPointerCapture(event.pointerId);
+    }
     drag = { startX: event.clientX, startLeft: thumbLeft };
-    document.addEventListener("mousemove", onDragMove);
-    document.addEventListener("mouseup", onDragEnd, { once: true });
+    document.addEventListener("pointermove", onDragMove);
+    document.addEventListener("pointerup", onDragEnd, { once: true });
+    document.addEventListener("pointercancel", onDragEnd, { once: true });
   }
 </script>
 
@@ -139,9 +144,10 @@
     data-stack-scroll-btn="left"
     tabindex="-1"
     onclick={() => scrollByStep(-80)}
-    onmousedown={() => startRepeatScroll(-80)}
-    onmouseup={stopRepeatScroll}
-    onmouseleave={stopRepeatScroll}
+    onpointerdown={() => startRepeatScroll(-80)}
+    onpointerup={stopRepeatScroll}
+    onpointercancel={stopRepeatScroll}
+    onpointerleave={stopRepeatScroll}
   >
     ◀
   </button>
@@ -150,14 +156,14 @@
     class="stack-scrollbar__track"
     role="presentation"
     bind:this={trackEl}
-    onmousedown={onTrackMouseDown}
+    onpointerdown={onTrackPointerDown}
   >
     <div
       id={thumbId}
       class="stack-scrollbar__thumb"
       role="presentation"
       style="width: {thumbWidth}px; left: {thumbLeft}px"
-      onmousedown={onThumbMouseDown}
+      onpointerdown={onThumbPointerDown}
     ></div>
   </div>
   <button
@@ -166,9 +172,10 @@
     data-stack-scroll-btn="right"
     tabindex="-1"
     onclick={() => scrollByStep(80)}
-    onmousedown={() => startRepeatScroll(80)}
-    onmouseup={stopRepeatScroll}
-    onmouseleave={stopRepeatScroll}
+    onpointerdown={() => startRepeatScroll(80)}
+    onpointerup={stopRepeatScroll}
+    onpointercancel={stopRepeatScroll}
+    onpointerleave={stopRepeatScroll}
   >
     ▶
   </button>
