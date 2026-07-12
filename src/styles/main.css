@@ -1360,8 +1360,18 @@ select.input {
   }
 
   .filter-btn {
-    padding: 0 var(--space-5);
-    flex-shrink: 0;
+    padding: 0 var(--space-3);
+    /* Grow to share the row equally so the dock fills its width instead of
+       leaving dead space; never shrink below the label so nothing clips. */
+    flex: 1 1 auto;
+    white-space: nowrap;
+  }
+
+  .filter-btn--action {
+    /* Pick One spans the full width of its own row below the filters rather
+       than floating in an empty right corner. */
+    flex: 1 0 100%;
+    margin-left: 0;
   }
 
   /* Wrap instead of horizontal scroll: every filter (and Pick One) stays
