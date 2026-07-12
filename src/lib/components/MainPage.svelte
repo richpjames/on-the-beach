@@ -296,6 +296,7 @@
     appReady={ctx.isReady}
     onStackCreated={refreshStacks}
     onItemCreated={() => app.send({ type: "ITEM_CREATED" })}
+    onSearch={(query) => app.send({ type: "SEARCH_UPDATED", query })}
   />
 
   <section class="stack-section">
