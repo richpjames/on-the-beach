@@ -1,6 +1,7 @@
 import { json, type Handle } from "@sveltejs/kit";
 import { building } from "$app/environment";
 import { processReminders } from "../server/reminders";
+import { ensureSuggestionsForToListenArtists } from "../server/suggestions";
 import {
   CSRF_COOKIE_NAME,
   CSRF_HEADER_NAME,
@@ -12,12 +13,36 @@ import {
 // Run reminder processing on startup and then every hour. Guarded so dev-mode
 // module reloads don't stack intervals, and skipped entirely while SvelteKit
 // builds/analyses the app — the build environment has no database.
-const globalState = globalThis as typeof globalThis & { __otbRemindersStarted?: boolean };
+const globalState = globalThis as typeof globalThis & {
+  __otbRemindersStarted?: boolean;
+  __otbSuggestionSweepStarted?: boolean;
+};
 if (!building && !globalState.__otbRemindersStarted) {
   globalState.__otbRemindersStarted = true;
   processReminders().catch((err) => console.error("[reminders] startup run failed:", err));
   setInterval(
     () => processReminders().catch((err) => console.error("[reminders] interval run failed:", err)),
+    60 * 60 * 1000,
+  );
+}
+
+// ---------- Suggestion prefetch sweep ----------
+// Make sure every artist with a 'to-listen' item has one "you might also
+// like" release prefetched from MusicBrainz, so the suggestion prompt has
+// something ready the moment an item is marked listened. Runs on startup
+// (backfilling items that predate the prefetch) and then hourly (refilling
+// after suggestions are accepted or dismissed). No-ops under
+// OTB_DISABLE_EXTERNAL_LOOKUPS.
+if (!building && !globalState.__otbSuggestionSweepStarted) {
+  globalState.__otbSuggestionSweepStarted = true;
+  ensureSuggestionsForToListenArtists().catch((err) =>
+    console.error("[suggestions] startup sweep failed:", err),
+  );
+  setInterval(
+    () =>
+      ensureSuggestionsForToListenArtists().catch((err) =>
+        console.error("[suggestions] interval sweep failed:", err),
+      ),
     60 * 60 * 1000,
   );
 }
