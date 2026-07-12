@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { eq, and, inArray, isNotNull, isNull, sql, desc, asc, lte } from "drizzle-orm";
+import { eq, and, inArray, isNotNull, isNull, sql, desc, asc } from "drizzle-orm";
 import { db } from "../db/index";
 import {
   musicItems,
@@ -24,7 +24,7 @@ import {
 } from "../music-item-creator";
 import { hydrateItemStacks } from "../hydrate-item-stacks";
 import { UnsupportedMusicLinkError } from "../scraper";
-import { fetchAndStoreSuggestion } from "../suggestions";
+import { findPendingSuggestionForItem } from "../suggestions";
 import { scheduleAppleMusicBackfill } from "../apple-music-backfill";
 import type {
   CreateMusicItemInput,
@@ -360,14 +360,6 @@ musicItemRoutes.post("/", async (c) => {
     } else {
       result = await createMusicItemDirect(input);
     }
-    if (result.item.listen_status === "to-listen" && result.item.artist_name) {
-      void fetchAndStoreSuggestion({
-        id: result.item.id,
-        artist_name: result.item.artist_name,
-        year: result.item.year,
-        musicbrainz_artist_id: result.item.musicbrainz_artist_id,
-      });
-    }
     // Newly added non-Apple-Music releases get an Apple Music link backfilled in
     // the background, so a playable secondary link is ready by the time the
     // release page is opened. No-ops if the primary link is already Apple Music.
@@ -502,12 +494,7 @@ musicItemRoutes.patch("/:id", async (c) => {
   let suggestion = null;
   if (input.listenStatus === "listened") {
     try {
-      suggestion =
-        (await db
-          .select()
-          .from(itemSuggestions)
-          .where(and(eq(itemSuggestions.sourceItemId, id), eq(itemSuggestions.status, "pending")))
-          .get()) ?? null;
+      suggestion = await findPendingSuggestionForItem(id);
     } catch {
       // Non-critical — suggestion lookup must not block the status update
     }
@@ -542,29 +529,37 @@ musicItemRoutes.post("/:id/suggestion/accept", async (c) => {
   const id = Number(c.req.param("id"));
   if (Number.isNaN(id)) return c.json({ error: "Invalid ID" }, 400);
 
-  const suggestion = await db
-    .select()
-    .from(itemSuggestions)
-    .where(and(eq(itemSuggestions.sourceItemId, id), eq(itemSuggestions.status, "pending")))
-    .get();
+  const suggestion = await findPendingSuggestionForItem(id);
 
   if (!suggestion) return c.json({ error: "No pending suggestion" }, 404);
 
-  const result = await createMusicItemDirect({
-    title: suggestion.title,
-    artistName: suggestion.artistName,
-    itemType: suggestion.itemType as ItemType,
-    listenStatus: "to-listen",
-    year: suggestion.year ?? undefined,
-    musicbrainzReleaseId: suggestion.musicbrainzReleaseId ?? undefined,
-  });
-
+  // Consume the suggestion before creating the item: creation triggers the
+  // background prefetch of the artist's next suggestion, which skips artists
+  // that still have a pending one.
   await db
     .update(itemSuggestions)
     .set({ status: "accepted" })
     .where(eq(itemSuggestions.id, suggestion.id));
 
-  return c.json(result.item, 201);
+  try {
+    const result = await createMusicItemDirect({
+      title: suggestion.title,
+      artistName: suggestion.artistName,
+      itemType: suggestion.itemType as ItemType,
+      listenStatus: "to-listen",
+      year: suggestion.year ?? undefined,
+      musicbrainzReleaseId: suggestion.musicbrainzReleaseId ?? undefined,
+    });
+
+    return c.json(result.item, 201);
+  } catch (err) {
+    await db
+      .update(itemSuggestions)
+      .set({ status: "pending" })
+      .where(eq(itemSuggestions.id, suggestion.id));
+    console.error("[api] POST /suggestion/accept failed to create item:", err);
+    return c.json({ error: "Failed to add suggested release" }, 500);
+  }
 });
 
 // ---------------------------------------------------------------------------
@@ -575,10 +570,13 @@ musicItemRoutes.post("/:id/suggestion/dismiss", async (c) => {
   const id = Number(c.req.param("id"));
   if (Number.isNaN(id)) return c.json({ error: "Invalid ID" }, 400);
 
-  await db
-    .update(itemSuggestions)
-    .set({ status: "dismissed" })
-    .where(and(eq(itemSuggestions.sourceItemId, id), eq(itemSuggestions.status, "pending")));
+  const suggestion = await findPendingSuggestionForItem(id);
+  if (suggestion) {
+    await db
+      .update(itemSuggestions)
+      .set({ status: "dismissed" })
+      .where(eq(itemSuggestions.id, suggestion.id));
+  }
 
   return c.json({ success: true });
 });

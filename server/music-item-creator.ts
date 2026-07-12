@@ -5,6 +5,7 @@ import { musicItems, artists, musicLinks, sources, musicItemStacks, stacks } fro
 import { parseUrl, isValidUrl, normalize, capitalize } from "./utils";
 import { scrapeUrl, UnsupportedMusicLinkError } from "./scraper";
 import { enrichSecondaryLinkInBackground } from "./secondary-link-enrichment";
+import { fetchSuggestionInBackground } from "./suggestions";
 import { pickPrimaryReleaseCandidate } from "./link-extractor";
 import { fullItemSelect } from "./queries/full-item-select";
 import type {
@@ -240,8 +241,26 @@ async function insertMusicItemWithLink(
   // background so it's ready by the time the item is viewed. Non-blocking —
   // never delays creation.
   enrichSecondaryLinkInBackground(inserted.id);
+  queueSuggestionPrefetch(item);
 
   return item;
+}
+
+/**
+ * Prefetch another release by the same artist so the "you might also like"
+ * prompt has one ready when this item is later marked listened. Lives here —
+ * not in the routes — so every creation path (web form, share extension,
+ * email/photo ingest, accepted suggestions) triggers it. Non-blocking.
+ */
+function queueSuggestionPrefetch(item: MusicItemFull): void {
+  if (item.listen_status !== "to-listen" || !item.artist_name) return;
+
+  fetchSuggestionInBackground({
+    id: item.id,
+    artist_name: item.artist_name,
+    year: item.year,
+    musicbrainz_artist_id: item.musicbrainz_artist_id,
+  });
 }
 
 function resolveSelectedCandidate(
@@ -624,6 +643,7 @@ export async function createMusicItemDirect(
   // Direct items (physical / from-memory) have no primary link, so they're
   // always eligible for a secondary-link lookup. Non-blocking.
   enrichSecondaryLinkInBackground(inserted.id);
+  queueSuggestionPrefetch(item);
 
   return { item, created: true };
 }
