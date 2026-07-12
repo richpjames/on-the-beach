@@ -1,0 +1,42 @@
+name: Ingest E2E (prod)
+
+# Verifies that a shared link still lands in production end-to-end: it POSTs to
+# /api/ingest/link exactly as the Share Extension does, confirms the item is in
+# the DB, then deletes it (see tests/e2e/ingest-prod.test.ts).
+#
+# This writes to REAL production, so it is deliberately NOT run on pull requests
+# (no prod write-key exposed to fork PRs, no per-PR writes to live data). It runs
+# on a nightly schedule and on demand. The test is self-cleaning, but because it
+# touches prod it lives here rather than in the hermetic unit suite.
+#
+# Requires repo secret OTB_INGEST_API_KEY = the production ingest key (must match
+# INGEST_API_KEY in the server's environment). Without it the test skips.
+
+on:
+  workflow_dispatch:
+  schedule:
+    # Nightly at 06:17 UTC (odd minute to dodge the top-of-hour scheduler rush).
+    - cron: "17 6 * * *"
+
+concurrency:
+  group: ingest-e2e
+  cancel-in-progress: true
+
+jobs:
+  ingest-e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Run ingest prod e2e
+        env:
+          OTB_INGEST_API_KEY: ${{ secrets.OTB_INGEST_API_KEY }}
+        run: bun run test:ingest:prod
