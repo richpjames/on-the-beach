@@ -36,6 +36,19 @@ export function buildCreateMusicItemInputFromValues(values: AddFormValues): Crea
   };
 }
 
+/**
+ * The add bar doubles as a live filter for the current list. Link-looking
+ * input is exempt — a pasted URL would match nothing and empty the list
+ * mid-add.
+ */
+export function toListSearchQuery(value: string): string {
+  const text = value.trim();
+  if (/^https?:\/\//i.test(text) || /^www\./i.test(text) || text.includes("://")) {
+    return "";
+  }
+  return text;
+}
+
 export function getCoverScanErrorMessage(error: unknown): string {
   if (error instanceof Error && error.message.includes("uploadReleaseImage")) {
     return "Couldn't save the image. Enter details manually.";

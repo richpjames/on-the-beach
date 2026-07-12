@@ -4,6 +4,7 @@ import {
   buildCreateMusicItemInputFromValues,
   getCoverScanErrorMessage,
   hasAnyNonEmptyField,
+  toListSearchQuery,
 } from "../../src/ui/domain/add-form";
 import {
   buildMusicItemFilters,
@@ -136,6 +137,17 @@ describe("app domain helpers", () => {
     expect(getEmptyStateHint("all", "ambient")).toContain("switch filters");
     expect(getEmptyStateHint("scheduled")).toContain("release page");
     expect(getEmptyStateHint("looking-for-price-drop" as never)).toBeNull();
+  });
+
+  it("turns add bar text into a list search query, exempting links", () => {
+    expect(toListSearchQuery("  aphex twin  ")).toBe("aphex twin");
+    expect(toListSearchQuery("R.E.M.")).toBe("R.E.M.");
+    expect(toListSearchQuery("")).toBe("");
+    expect(toListSearchQuery("   ")).toBe("");
+    expect(toListSearchQuery("https://example.bandcamp.com/album/x")).toBe("");
+    expect(toListSearchQuery("HTTP://EXAMPLE.COM")).toBe("");
+    expect(toListSearchQuery("www.example.com/release")).toBe("");
+    expect(toListSearchQuery("spotify://track/123")).toBe("");
   });
 
   it("returns scan alert messages for known error types", () => {

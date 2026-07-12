@@ -2,7 +2,7 @@
   import { tick } from "svelte";
   import type { StackWithCount } from "../../types";
   import type { AddFormValues } from "../../ui/domain/add-form";
-  import { getCoverScanErrorMessage } from "../../ui/domain/add-form";
+  import { getCoverScanErrorMessage, toListSearchQuery } from "../../ui/domain/add-form";
   import { constrainDimensions } from "../../ui/domain/scan";
   import { addFormMachine, RECORD_DURATION_MS } from "../../ui/state/add-form-machine";
   import { api } from "../api";
@@ -15,6 +15,7 @@
     appReady,
     onStackCreated,
     onItemCreated,
+    onSearch,
   }: {
     form: MachineHandle<typeof addFormMachine>;
     stacks: StackWithCount[];
@@ -23,6 +24,8 @@
     onStackCreated: () => Promise<void>;
     /** An item was created — refresh the list and stack bar. */
     onItemCreated: () => void;
+    /** The add bar doubles as a search box — live-filter the list as the user types. */
+    onSearch: (query: string) => void;
   } = $props();
 
   const ctx = $derived(form.snapshot.context);
@@ -75,8 +78,20 @@
     };
   }
 
+  // Track what we last pushed so clearing the form only resets the list
+  // filter when the add bar itself set it (not a query typed in the browse
+  // search panel).
+  let lastSearchQuery = "";
+  function syncSearch(): void {
+    const query = toListSearchQuery(url);
+    if (query === lastSearchQuery) return;
+    lastSearchQuery = query;
+    onSearch(query);
+  }
+
   function resetFields(): void {
     url = "";
+    syncSearch();
     artist = "";
     title = "";
     itemType = "album";
@@ -250,6 +265,7 @@
         placeholder="search or paste a link"
         class="input"
         bind:value={url}
+        oninput={syncSearch}
       />
       <input
         type="file"
