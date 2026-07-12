@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- macOS/Mac Catalyst only (wired via CODE_SIGN_ENTITLEMENTS[sdk=macosx*] in
+	     scripts/add-share-extension.rb, so iOS device signing is untouched).
+
+	     macOS ALWAYS runs an app extension inside the "plugin" App Sandbox,
+	     regardless of whether the binary opts in. The host app can dodge the
+	     sandbox by simply not enabling it, but an extension cannot — so without
+	     network.client the extension's URLSession POST to /api/ingest/link is
+	     silently denied and the shared link never leaves the machine. These two
+	     keys grant the extension outbound network inside its sandbox. -->
+	<key>com.apple.security.app-sandbox</key>
+	<true/>
+	<key>com.apple.security.network.client</key>
+	<true/>
+</dict>
+</plist>

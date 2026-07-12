@@ -35,6 +35,7 @@ NATIVE_DIR = File.join(REPO_ROOT, "native", "ShareExtension")
 SWIFT_SOURCE = File.join(NATIVE_DIR, "ShareViewController.swift")
 INFO_PLIST = File.join(NATIVE_DIR, "Info.plist")
 SECRETS_XCCONFIG = File.join(NATIVE_DIR, "Secrets.xcconfig")
+ENTITLEMENTS = File.join(NATIVE_DIR, "ShareExtension.entitlements")
 
 EXT_NAME = "ShareExtension"
 APP_TARGET_NAME = "App"
@@ -138,6 +139,13 @@ ext_target.build_configurations.each do |config|
     # menu. Xcode derives MACOSX_DEPLOYMENT_TARGET from the iOS floor, so no
     # separate Mac version is needed.
     "SUPPORTS_MACCATALYST" => "YES",
+    # macOS ALWAYS sandboxes an app extension ("plugin" profile), and without
+    # network.client the extension's URLSession POST to the ingest endpoint is
+    # silently denied — the share never leaves the machine. Grant the sandbox +
+    # outbound network via an entitlements file. Scope it to the macOS SDK (which
+    # is what Mac Catalyst builds against) so iOS device signing — which has no
+    # such entitlements in its provisioning profile — is untouched.
+    "CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" => "../../native/ShareExtension/ShareExtension.entitlements",
   )
 end
 
@@ -147,8 +155,10 @@ end
 group = project.main_group.new_group(EXT_NAME, NATIVE_DIR)
 swift_ref = group.new_file(SWIFT_SOURCE)
 ext_target.add_file_references([swift_ref])
-# Keep the Info.plist visible in the navigator (it isn't a build input).
+# Keep the Info.plist + entitlements visible in the navigator (not build inputs;
+# the entitlements is referenced via CODE_SIGN_ENTITLEMENTS above).
 group.new_file(INFO_PLIST)
+group.new_file(ENTITLEMENTS) if File.exist?(ENTITLEMENTS)
 
 # --- Wire the ingest-key xcconfig --------------------------------------------
 # Secrets.xcconfig provides OTB_INGEST_API_KEY, substituted into Info.plist at

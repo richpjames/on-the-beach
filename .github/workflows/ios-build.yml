@@ -87,6 +87,18 @@ jobs:
       - name: Inject Share Extension target
         run: ruby scripts/add-share-extension.rb
 
+      - name: Verify Share Extension macOS entitlements
+        # Regression guard for a bug that only bit the real Mac app: macOS always
+        # sandboxes an app extension, so without com.apple.security.network.client
+        # the extension's ingest POST is silently denied and shared links never
+        # land. Neither iOS nor a signing-disabled CI *build* surfaces this, so
+        # assert the config directly: the entitlements file grants network, and
+        # the injector wired it onto the extension target (macOS-scoped).
+        run: |
+          grep -q 'com.apple.security.network.client' native/ShareExtension/ShareExtension.entitlements
+          grep -q 'com.apple.security.app-sandbox' native/ShareExtension/ShareExtension.entitlements
+          grep -q 'CODE_SIGN_ENTITLEMENTS\[sdk=macosx\*\]' ios/App/App.xcodeproj/project.pbxproj
+
       - name: Build App + Share Extension (iOS Simulator)
         # Building the App scheme also builds the embedded ShareExtension target,
         # so ShareViewController.swift is genuinely compiled. No signing needed
