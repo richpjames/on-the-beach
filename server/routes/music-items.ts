@@ -24,7 +24,7 @@ import {
 } from "../music-item-creator";
 import { hydrateItemStacks } from "../hydrate-item-stacks";
 import { UnsupportedMusicLinkError } from "../scraper";
-import { findPendingSuggestionForItem } from "../suggestions";
+import { ensureSuggestionForItemNow, findPendingSuggestionForItem } from "../suggestions";
 import { scheduleAppleMusicBackfill } from "../apple-music-backfill";
 import type {
   CreateMusicItemInput,
@@ -494,9 +494,13 @@ musicItemRoutes.patch("/:id", async (c) => {
   let suggestion = null;
   if (input.listenStatus === "listened") {
     try {
-      suggestion = await findPendingSuggestionForItem(id);
-    } catch {
+      // Prefetched suggestion if one is ready, else a bounded on-demand
+      // lookup — covers items marked listened before the background prefetch
+      // finished (or whose prefetch failed).
+      suggestion = await ensureSuggestionForItemNow(id);
+    } catch (err) {
       // Non-critical — suggestion lookup must not block the status update
+      console.error("[api] suggestion lookup failed during PATCH", id, err);
     }
   }
 

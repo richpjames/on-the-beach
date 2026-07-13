@@ -107,17 +107,48 @@ describe("findSuggestedRelease", () => {
     expect(result?.title).toBe("Chiastic Slide");
   });
 
-  test("returns null on fetch error", async () => {
-    spyOn(globalThis, "fetch").mockRejectedValueOnce(new Error("network error"));
+  test("ranks undated releases last instead of treating them as a perfect year match", async () => {
+    spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      makeMbArtistReleasesResponse([
+        { id: "r1", title: "Undated Compilation" },
+        { id: "r2", title: "Dead Men Don't Smoke Marijuana", date: "1994" },
+      ]),
+    );
 
     const result = await findSuggestedRelease({
       mbArtistId: "artist-uuid",
-      artistName: "Autechre",
+      artistName: "S. E. Rogie",
       trackedTitles: new Set(),
-      sourceYear: 1995,
+      sourceYear: 2022,
     });
 
-    expect(result).toBeNull();
+    expect(result?.title).toBe("Dead Men Don't Smoke Marijuana");
+  });
+
+  test("throws on fetch error so callers can distinguish failure from no-candidates", async () => {
+    spyOn(globalThis, "fetch").mockRejectedValueOnce(new Error("network error"));
+
+    expect(
+      findSuggestedRelease({
+        mbArtistId: "artist-uuid",
+        artistName: "Autechre",
+        trackedTitles: new Set(),
+        sourceYear: 1995,
+      }),
+    ).rejects.toThrow("network error");
+  });
+
+  test("throws on a non-2xx MusicBrainz response (e.g. rate limiting)", async () => {
+    spyOn(globalThis, "fetch").mockResolvedValueOnce(new Response("rate limited", { status: 503 }));
+
+    expect(
+      findSuggestedRelease({
+        mbArtistId: "artist-uuid",
+        artistName: "Autechre",
+        trackedTitles: new Set(),
+        sourceYear: 1995,
+      }),
+    ).rejects.toThrow("503");
   });
 });
 
