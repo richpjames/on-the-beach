@@ -7,6 +7,7 @@ import { normalize } from "../../server/utils";
 import {
   fetchAndStoreSuggestion,
   findPendingSuggestionForItem,
+  ensureSuggestionForItemNow,
   ensureSuggestionsForToListenArtists,
   __clearSuggestionSweepBackoff,
 } from "../../server/suggestions";
@@ -45,50 +46,88 @@ const testSuggestion: musicbrainz.SuggestedRelease = {
 };
 
 describe("fetchAndStoreSuggestion", () => {
+  beforeEach(() => {
+    __clearSuggestionSweepBackoff();
+  });
+
   afterEach(() => {
     mock.restore();
   });
 
-  test("does nothing when item has no artist_name", async () => {
+  test("skips when item has no artist_name", async () => {
     const mbSpy = spyOn(musicbrainz, "findSuggestedRelease");
 
-    const stored = await fetchAndStoreSuggestion({
+    const outcome = await fetchAndStoreSuggestion({
       id: 1,
       artist_name: null,
       year: null,
       musicbrainz_artist_id: null,
     });
 
-    expect(stored).toBe(false);
+    expect(outcome).toBe("skipped");
     expect(mbSpy).not.toHaveBeenCalled();
   });
 
-  test("does nothing when findSuggestedRelease returns null", async () => {
-    spyOn(musicbrainz, "findSuggestedRelease").mockResolvedValueOnce(null);
+  test("reports no-candidates when findSuggestedRelease returns null, then backs off", async () => {
+    const mbSpy = spyOn(musicbrainz, "findSuggestedRelease").mockResolvedValue(null);
     const { itemId } = await createArtistWithItem("Nothing Found FM", "Static");
 
-    const stored = await fetchAndStoreSuggestion({
+    const first = await fetchAndStoreSuggestion({
+      id: itemId,
+      artist_name: "Nothing Found FM",
+      year: 1994,
+      musicbrainz_artist_id: null,
+    });
+    const second = await fetchAndStoreSuggestion({
       id: itemId,
       artist_name: "Nothing Found FM",
       year: 1994,
       musicbrainz_artist_id: null,
     });
 
-    expect(stored).toBe(false);
+    expect(first).toBe("no-candidates");
+    expect(second).toBe("skipped");
+    expect(mbSpy).toHaveBeenCalledTimes(1);
+  });
+
+  test("reports error without backing off when the lookup throws", async () => {
+    const mbSpy = spyOn(musicbrainz, "findSuggestedRelease").mockRejectedValue(
+      new Error("MusicBrainz artist search returned 503"),
+    );
+    const { itemId } = await createArtistWithItem("Rate Limited Band", "Throttled");
+
+    const first = await fetchAndStoreSuggestion({
+      id: itemId,
+      artist_name: "Rate Limited Band",
+      year: null,
+      musicbrainz_artist_id: null,
+    });
+    // A transient failure must not suppress the artist for 24h — the next
+    // attempt retries the lookup.
+    const second = await fetchAndStoreSuggestion({
+      id: itemId,
+      artist_name: "Rate Limited Band",
+      year: null,
+      musicbrainz_artist_id: null,
+    });
+
+    expect(first).toBe("error");
+    expect(second).toBe("error");
+    expect(mbSpy).toHaveBeenCalledTimes(2);
   });
 
   test("stores a pending suggestion for the item's artist", async () => {
     spyOn(musicbrainz, "findSuggestedRelease").mockResolvedValueOnce(testSuggestion);
     const { itemId } = await createArtistWithItem("Autechre Store Test", "Amber");
 
-    const stored = await fetchAndStoreSuggestion({
+    const outcome = await fetchAndStoreSuggestion({
       id: itemId,
       artist_name: "Autechre Store Test",
       year: 1994,
       musicbrainz_artist_id: null,
     });
 
-    expect(stored).toBe(true);
+    expect(outcome).toBe("stored");
     const row = await db
       .select()
       .from(itemSuggestions)
@@ -116,9 +155,38 @@ describe("fetchAndStoreSuggestion", () => {
       musicbrainz_artist_id: null,
     });
 
-    expect(first).toBe(true);
-    expect(second).toBe(false);
+    expect(first).toBe("stored");
+    expect(second).toBe("already-pending");
     expect(mbSpy).toHaveBeenCalledTimes(1);
+  });
+
+  test("concurrent calls for the same artist share one lookup and store one row", async () => {
+    // The background prefetch fired at creation and the on-demand lookup at
+    // state-change time can overlap — they must not both insert.
+    const mbSpy = spyOn(musicbrainz, "findSuggestedRelease").mockImplementation(
+      () => new Promise((resolve) => setTimeout(() => resolve(testSuggestion), 30)),
+    );
+    const { itemId } = await createArtistWithItem("Concurrent Band", "Race Album");
+    const summary = {
+      id: itemId,
+      artist_name: "Concurrent Band",
+      year: null,
+      musicbrainz_artist_id: null,
+    };
+
+    const [first, second] = await Promise.all([
+      fetchAndStoreSuggestion(summary),
+      fetchAndStoreSuggestion(summary),
+    ]);
+
+    expect(first).toBe("stored");
+    expect(second).toBe("stored");
+    expect(mbSpy).toHaveBeenCalledTimes(1);
+    const rows = await db
+      .select()
+      .from(itemSuggestions)
+      .where(eq(itemSuggestions.sourceItemId, itemId));
+    expect(rows.length).toBe(1);
   });
 
   test("excludes previously suggested (dismissed) titles from the next lookup", async () => {
@@ -150,6 +218,10 @@ describe("fetchAndStoreSuggestion", () => {
 });
 
 describe("findPendingSuggestionForItem", () => {
+  beforeEach(() => {
+    __clearSuggestionSweepBackoff();
+  });
+
   afterEach(() => {
     mock.restore();
   });
@@ -197,6 +269,79 @@ describe("findPendingSuggestionForItem", () => {
   });
 });
 
+describe("ensureSuggestionForItemNow", () => {
+  beforeEach(() => {
+    __clearSuggestionSweepBackoff();
+    delete process.env.OTB_DISABLE_EXTERNAL_LOOKUPS;
+  });
+
+  afterEach(() => {
+    mock.restore();
+    delete process.env.OTB_DISABLE_EXTERNAL_LOOKUPS;
+  });
+
+  test("returns the prefetched suggestion without a live lookup", async () => {
+    const mbSpy = spyOn(musicbrainz, "findSuggestedRelease").mockResolvedValueOnce(testSuggestion);
+    const { itemId } = await createArtistWithItem("Prefetched Now Band", "Ready Album");
+    await fetchAndStoreSuggestion({
+      id: itemId,
+      artist_name: "Prefetched Now Band",
+      year: null,
+      musicbrainz_artist_id: null,
+    });
+    mbSpy.mockClear();
+
+    const found = await ensureSuggestionForItemNow(itemId);
+
+    expect(found?.title).toBe("Tri Repetae");
+    expect(mbSpy).not.toHaveBeenCalled();
+  });
+
+  test("looks up a suggestion on demand when nothing was prefetched", async () => {
+    // The exact race the prompt used to lose: item marked listened before the
+    // background prefetch stored anything.
+    const mbSpy = spyOn(musicbrainz, "findSuggestedRelease").mockResolvedValueOnce(testSuggestion);
+    const { itemId } = await createArtistWithItem("On Demand Band", "Fresh Album");
+
+    const found = await ensureSuggestionForItemNow(itemId);
+
+    expect(mbSpy).toHaveBeenCalledTimes(1);
+    expect(found?.title).toBe("Tri Repetae");
+    expect(found?.status).toBe("pending");
+  });
+
+  test("returns null when the lookup exceeds the timeout, but stores in background", async () => {
+    let resolveLookup: (value: musicbrainz.SuggestedRelease) => void;
+    spyOn(musicbrainz, "findSuggestedRelease").mockReturnValueOnce(
+      new Promise((resolve) => {
+        resolveLookup = resolve;
+      }),
+    );
+    const { itemId } = await createArtistWithItem("Slow Lookup Band", "Slow Album");
+
+    const found = await ensureSuggestionForItemNow(itemId, 50);
+    expect(found).toBeNull();
+
+    // The in-flight lookup completes later and stores the suggestion for
+    // the next state change.
+    resolveLookup!(testSuggestion);
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    const later = await findPendingSuggestionForItem(itemId);
+    expect(later?.title).toBe("Tri Repetae");
+  });
+
+  test("does not perform a live lookup under OTB_DISABLE_EXTERNAL_LOOKUPS", async () => {
+    process.env.OTB_DISABLE_EXTERNAL_LOOKUPS = "1";
+    const mbSpy = spyOn(musicbrainz, "findSuggestedRelease");
+    const { itemId } = await createArtistWithItem("Disabled Now Band", "Quiet Album");
+
+    const found = await ensureSuggestionForItemNow(itemId);
+
+    expect(found).toBeNull();
+    expect(mbSpy).not.toHaveBeenCalled();
+  });
+});
+
 describe("ensureSuggestionsForToListenArtists", () => {
   beforeEach(() => {
     __clearSuggestionSweepBackoff();
@@ -211,8 +356,6 @@ describe("ensureSuggestionsForToListenArtists", () => {
   });
 
   test("prefetches a suggestion for a to-listen artist with none pending", async () => {
-    // Give artists from earlier tests pending suggestions so the sweep only
-    // looks at the artist created here.
     const uncoveredName = `Sweep Band ${Date.now()}`;
     const mbSpy = spyOn(musicbrainz, "findSuggestedRelease").mockResolvedValue(testSuggestion);
     const { itemId } = await createArtistWithItem(uncoveredName, "Sweep Album");
@@ -252,6 +395,20 @@ describe("ensureSuggestionsForToListenArtists", () => {
 
     expect(callsAfterFirst).toBe(1);
     expect(callsAfterSecond).toBe(1);
+  });
+
+  test("retries artists whose lookup errored", async () => {
+    const flakyName = `Flaky Band ${Date.now()}`;
+    const mbSpy = spyOn(musicbrainz, "findSuggestedRelease").mockRejectedValue(
+      new Error("MusicBrainz artist lookup returned 503"),
+    );
+    await createArtistWithItem(flakyName, "Retry Album");
+
+    await ensureSuggestionsForToListenArtists();
+    await ensureSuggestionsForToListenArtists();
+
+    const calls = mbSpy.mock.calls.filter((c) => c[0].artistName === flakyName).length;
+    expect(calls).toBe(2);
   });
 
   test("no-ops under OTB_DISABLE_EXTERNAL_LOOKUPS", async () => {

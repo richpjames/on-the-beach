@@ -83,21 +83,67 @@ export async function findPendingSuggestionForItem(
   return findPendingSuggestionForArtist(itemRow.artistName);
 }
 
+export type SuggestionFetchOutcome =
+  // A new pending suggestion was stored.
+  | "stored"
+  // The artist already has a pending suggestion — nothing to do.
+  | "already-pending"
+  // MusicBrainz has no untracked release to suggest; retried after a day.
+  | "no-candidates"
+  // The lookup failed (network, rate limit, blocked UA); retried on the
+  // next sweep or creation — transient failures must not back off for 24h.
+  | "error"
+  // No artist name, or the artist is inside its no-candidates backoff window.
+  | "skipped";
+
+// Artists whose last lookup found nothing suggestible — don't hammer
+// MusicBrainz for them on every attempt. Cleared on server restart.
+// Lookup *errors* deliberately do not enter this map.
+const emptyLookupBackoff = new Map<string, number>();
+const EMPTY_LOOKUP_BACKOFF_MS = 24 * 60 * 60 * 1000;
+
+// One lookup per artist at a time. Without this, the on-demand lookup at
+// state-change time can race the background prefetch fired at creation: both
+// pass the "no pending suggestion" check and both insert a row. A concurrent
+// caller joins the in-flight lookup instead.
+const inFlightByArtist = new Map<string, Promise<SuggestionFetchOutcome>>();
+
 /**
  * Look up one extra release by the item's artist on MusicBrainz and store it
  * as a pending suggestion. Skips artists that already have a pending
  * suggestion (one "extra" per artist) and never re-suggests a release that is
  * already tracked or was previously suggested (accepted or dismissed).
- *
- * Returns true when a new suggestion was stored.
  */
-export async function fetchAndStoreSuggestion(item: ItemSummary): Promise<boolean> {
-  if (!item.artist_name) return false;
+export async function fetchAndStoreSuggestion(item: ItemSummary): Promise<SuggestionFetchOutcome> {
+  const artistName = item.artist_name;
+  if (!artistName) return "skipped";
+
+  const artistKey = normalize(artistName);
+  const inFlight = inFlightByArtist.get(artistKey);
+  if (inFlight) return inFlight;
+
+  const run = fetchAndStoreSuggestionLocked({ ...item, artist_name: artistName }, artistKey);
+  inFlightByArtist.set(artistKey, run);
+  try {
+    return await run;
+  } finally {
+    inFlightByArtist.delete(artistKey);
+  }
+}
+
+async function fetchAndStoreSuggestionLocked(
+  item: ItemSummary & { artist_name: string },
+  backoffKey: string,
+): Promise<SuggestionFetchOutcome> {
+  const backoffUntil = emptyLookupBackoff.get(backoffKey);
+  if (backoffUntil !== undefined && backoffUntil > Date.now()) {
+    return "skipped";
+  }
 
   try {
     const previousSuggestions = await suggestionsForArtist(item.artist_name);
     if (previousSuggestions.some((row) => row.status === "pending")) {
-      return false;
+      return "already-pending";
     }
 
     // Exclude releases already in the library…
@@ -122,7 +168,10 @@ export async function fetchAndStoreSuggestion(item: ItemSummary): Promise<boolea
       sourceYear: item.year,
     });
 
-    if (!suggestion) return false;
+    if (!suggestion) {
+      emptyLookupBackoff.set(backoffKey, Date.now() + EMPTY_LOOKUP_BACKOFF_MS);
+      return "no-candidates";
+    }
 
     await db.insert(itemSuggestions).values({
       sourceItemId: item.id,
@@ -133,10 +182,19 @@ export async function fetchAndStoreSuggestion(item: ItemSummary): Promise<boolea
       musicbrainzReleaseId: suggestion.musicbrainzReleaseId,
       status: "pending",
     });
-    return true;
+    emptyLookupBackoff.delete(backoffKey);
+    console.info("[suggestions] stored suggestion", {
+      artist: item.artist_name,
+      title: suggestion.title,
+      sourceItemId: item.id,
+    });
+    return "stored";
   } catch (err) {
-    console.error("[suggestions] Failed to fetch/store suggestion for item", item.id, err);
-    return false;
+    console.error(
+      `[suggestions] lookup failed for artist "${item.artist_name}" (item ${item.id}):`,
+      err,
+    );
+    return "error";
   }
 }
 
@@ -152,18 +210,65 @@ export function fetchSuggestionInBackground(item: ItemSummary): void {
   });
 }
 
-// Artists whose last lookup found nothing suggestible — don't hammer
-// MusicBrainz for them on every sweep. Cleared on server restart.
-const emptyLookupBackoff = new Map<string, number>();
-const EMPTY_LOOKUP_BACKOFF_MS = 24 * 60 * 60 * 1000;
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+/**
+ * Resolve a suggestion for an item at state-change time, looking one up on
+ * the spot when nothing was prefetched — e.g. the item was marked listened
+ * seconds after being added (before the background prefetch finished), or the
+ * earlier prefetch failed. Bounded so the status update stays responsive: on
+ * timeout the lookup keeps running in the background and its result is
+ * stored for next time.
+ */
+export async function ensureSuggestionForItemNow(
+  itemId: number,
+  timeoutMs = 4_500,
+): Promise<StoredSuggestion | null> {
+  const prefetched = await findPendingSuggestionForItem(itemId);
+  if (prefetched) return prefetched;
+
+  if (process.env.OTB_DISABLE_EXTERNAL_LOOKUPS) return null;
+
+  const itemRow = await db
+    .select({
+      artistName: artists.name,
+      year: musicItems.year,
+      mbArtistId: musicItems.musicbrainzArtistId,
+    })
+    .from(musicItems)
+    .innerJoin(artists, eq(musicItems.artistId, artists.id))
+    .where(eq(musicItems.id, itemId))
+    .get();
+  if (!itemRow?.artistName) return null;
+
+  console.info("[suggestions] no prefetched suggestion — looking up on demand", {
+    itemId,
+    artist: itemRow.artistName,
+  });
+
+  const lookup = fetchAndStoreSuggestion({
+    id: itemId,
+    artist_name: itemRow.artistName,
+    year: itemRow.year,
+    musicbrainz_artist_id: itemRow.mbArtistId,
+  });
+  const outcome = await Promise.race([lookup, sleep(timeoutMs).then(() => "timeout" as const)]);
+
+  if (outcome === "timeout") {
+    console.warn("[suggestions] on-demand lookup timed out; result will store in background", {
+      itemId,
+    });
+    return null;
+  }
+
+  return findPendingSuggestionForItem(itemId);
+}
 
 /** MusicBrainz allows ~1 request/second; each artist lookup makes up to two. */
 function sweepThrottleMs(): number {
   const fromEnv = Number(process.env.OTB_SUGGESTION_SWEEP_THROTTLE_MS);
   return Number.isFinite(fromEnv) && fromEnv >= 0 ? fromEnv : 2_500;
 }
-
-const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 /**
  * Ensure every artist with at least one 'to-listen' item has a pending
@@ -204,6 +309,7 @@ export async function ensureSuggestionsForToListenArtists(): Promise<void> {
 
   const now = Date.now();
   let fetched = 0;
+  const outcomes: Record<string, number> = {};
   for (const [key, candidate] of perArtist) {
     if (covered.has(key)) continue;
     const backoffUntil = emptyLookupBackoff.get(key);
@@ -212,22 +318,17 @@ export async function ensureSuggestionsForToListenArtists(): Promise<void> {
     if (fetched > 0) await sleep(sweepThrottleMs());
     fetched += 1;
 
-    const stored = await fetchAndStoreSuggestion({
+    const outcome = await fetchAndStoreSuggestion({
       id: candidate.itemId,
       artist_name: candidate.artistName,
       year: candidate.year,
       musicbrainz_artist_id: candidate.mbArtistId,
     });
-
-    if (stored) {
-      emptyLookupBackoff.delete(key);
-    } else {
-      emptyLookupBackoff.set(key, now + EMPTY_LOOKUP_BACKOFF_MS);
-    }
+    outcomes[outcome] = (outcomes[outcome] ?? 0) + 1;
   }
 
   if (fetched > 0) {
-    console.log(`[suggestions] sweep looked up ${fetched} artist(s)`);
+    console.log(`[suggestions] sweep looked up ${fetched} artist(s):`, outcomes);
   }
 }
 
