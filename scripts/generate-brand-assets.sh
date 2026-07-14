@@ -9,9 +9,16 @@
 #       kept transparent, so the mascot sits on any page background.
 #   - Native iOS + Mac Catalyst app icon and splash, composited on white
 #       (iOS app icons must be fully opaque).
+#   - A committed copy of the app icon at native/AppIcon.appiconset — the source
+#       of truth the native build restores after `cap add` (which regenerates and
+#       thus WIPES ios/). scripts/lib/native-build-common.sh copies it back into
+#       every generated project so builds are branded reproducibly.
 #
-# To rebrand, replace assets/logo.png with a higher-res transparent square and
-# re-run this script. Ideally the source is >= 1024x1024.
+# To rebrand, replace assets/logo.png with a higher-res transparent square,
+# re-run this script, and COMMIT native/AppIcon.appiconset. Ideally the source is
+# >= 1024x1024. Note: this writes into ios/App/App/..., so an ios/ project must
+# already exist — run a native build once (e.g. `bun run mac`) before the first
+# `bun run brand:assets`.
 #
 # Requires: ImageMagick (`magick`) and @capacitor/assets (a devDependency).
 #
@@ -62,6 +69,14 @@ cat > "$ICONSET/Contents.json" <<'JSON'
   "info": { "author": "xcode", "version": 1 }
 }
 JSON
+
+echo "==> Persist app icon as committed source of truth (native/AppIcon.appiconset)"
+# ios/ is regenerated (rm -rf ios; cap add) on every native build, wiping the
+# appiconset above. Commit this copy under native/ so native-build-common.sh can
+# restore it into each freshly generated project — same pattern as the Share
+# Extension. Remember to `git add native/AppIcon.appiconset` after running this.
+rm -rf native/AppIcon.appiconset
+cp -R "$ICONSET" native/AppIcon.appiconset
 
 echo "==> Web favicons (transparent), matching the filenames the app references"
 magick "$SRC" -resize 16x16   "$PUBLIC/favicon-16x16.png"

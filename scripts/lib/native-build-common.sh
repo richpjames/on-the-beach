@@ -76,5 +76,28 @@ native_regenerate() {
   log "Regenerating ios/ project"
   rm -rf ios
   bun run cap:add
+  native_restore_app_icon
   ruby scripts/add-share-extension.rb
+}
+
+# --- Restore the committed app icon ------------------------------------------
+# `cap add` regenerates AppIcon.appiconset with Capacitor's placeholder icon
+# (and only the iOS `universal` idiom — no Mac Catalyst `mac` idiom, so Catalyst
+# falls back to a generic placeholder). Copy our committed set — the capybara,
+# same source as the web favicon, incl. every `mac` rendition — over it so every
+# build is branded without a separate `bun run brand:assets` step. This is the
+# icon analogue of how the Share Extension is injected after cap add.
+#
+# Source of truth is native/AppIcon.appiconset; regenerate it via
+# `bun run brand:assets` whenever assets/logo.png changes, then commit.
+native_restore_app_icon() {
+  local committed="native/AppIcon.appiconset"
+  local project="ios/App/App/Assets.xcassets/AppIcon.appiconset"
+  if [[ -d "$committed" ]]; then
+    rm -rf "$project"
+    cp -R "$committed" "$project"
+    log "Restored app icon from $committed"
+  else
+    log "No committed app icon at $committed — run 'bun run brand:assets'; using Capacitor default"
+  fi
 }

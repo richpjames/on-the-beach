@@ -41,6 +41,10 @@ eval/fixtures/pending-review.json
 # ...but the single brand master IS tracked — it's the one source image that
 # scripts/generate-brand-assets.sh turns into every favicon and app icon.
 !assets/logo.png
+# ...and the generated app iconset IS tracked too: ios/ is wiped and regenerated
+# on every native build, so this committed copy is the source of truth that
+# scripts/lib/native-build-common.sh restores into the project after `cap add`.
+!native/AppIcon.appiconset/*.png
 
 uploads
 
