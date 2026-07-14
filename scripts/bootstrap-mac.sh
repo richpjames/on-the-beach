@@ -101,16 +101,56 @@ else
 fi
 
 # --- Signing identity ---------------------------------------------------------
-# `mac:install` signs automatically, but only if Xcode holds an Apple ID whose
-# team can vend an "Apple Development" certificate. Presence of such an identity
-# in the keychain is the cheapest proxy for "you're signed in and provisioned".
-if security find-identity -v -p codesigning 2>/dev/null | grep -q "Apple Development"; then
-  ok "Apple Development signing identity present"
+# `mac:install` signs automatically, but only with a *valid* "Apple Development"
+# identity — one whose whole chain validates: leaf cert → Apple WWDR intermediate
+# → Apple root. `find-identity -v` lists only valid ones; the same call without
+# -v also lists identities whose chain is broken. Splitting those two apart lets
+# us name which of three very different states we're in and give advice that fits
+# it, instead of always saying "add your Apple ID" — useless once it already is:
+#   valid              → nothing to do.
+#   present but broken → the leaf and its private key exist, but an intermediate
+#                        is missing or expired. The classic trap on a second Mac:
+#                        only the WWDR G1 that expired in 2023 is installed, while
+#                        any cert minted since is issued by G3+. No Xcode needed —
+#                        importing the current intermediate repairs it.
+#   absent             → no cert at all; only Xcode can mint one.
+codesign_valid()   { security find-identity -v -p codesigning 2>/dev/null | grep -q "Apple Development"; }
+codesign_present() { security find-identity    -p codesigning 2>/dev/null | grep -q "Apple Development"; }
+
+if codesign_valid; then
+  ok "Apple Development signing identity present and valid"
+elif codesign_present; then
+  warn "An 'Apple Development' cert exists but its chain won't validate — a missing or expired Apple WWDR intermediate."
+  # The leaf names the intermediate generation it needs in its issuer OU (e.g.
+  # G3), so fetch exactly that one from Apple's certificate authority and import
+  # it into the login keychain — the same official cert Xcode would install, and
+  # no sudo. Fall back to G3 (today's default) if the OU can't be read.
+  leaf_ou="$(security find-certificate -c "Apple Development" -p 2>/dev/null \
+             | openssl x509 -noout -issuer 2>/dev/null \
+             | grep -oE 'OU=G[0-9]+' | head -1 | cut -d= -f2 || true)"
+  wwdr="AppleWWDRCA${leaf_ou:-G3}"
+  log "Installing Apple WWDR intermediate ($wwdr)"
+  tmp_dir="$(mktemp -d)"
+  if curl -fsSL -o "$tmp_dir/$wwdr.cer" "https://www.apple.com/certificateauthority/$wwdr.cer"; then
+    security import "$tmp_dir/$wwdr.cer" -k "$HOME/Library/Keychains/login.keychain-db" >/dev/null 2>&1 || true
+    if codesign_valid; then
+      ok "WWDR intermediate installed — signing identity now valid"
+    else
+      fail "Imported $wwdr but the identity still won't validate."
+      echo "    Check https://www.apple.com/certificateauthority/ for the intermediate your cert needs." >&2
+      BLOCKERS+=("Repair the Apple Development certificate chain (see Apple's certificate authority page)")
+    fi
+  else
+    fail "Couldn't download the WWDR intermediate ($wwdr)."
+    echo "    Download it from https://www.apple.com/certificateauthority/ and double-click to install." >&2
+    BLOCKERS+=("Install the current Apple WWDR intermediate certificate")
+  fi
+  rm -rf "$tmp_dir"
 else
-  fail "No 'Apple Development' signing identity found."
-  echo "    Open Xcode ▸ Settings ▸ Accounts, add the Apple ID for team $DEV_TEAM," >&2
-  echo "    then let Xcode create a development certificate for it." >&2
-  BLOCKERS+=("Add your Apple ID (team $DEV_TEAM) in Xcode ▸ Settings ▸ Accounts")
+  fail "No 'Apple Development' signing certificate found."
+  echo "    In Xcode ▸ Settings ▸ Accounts, add the Apple ID for team $DEV_TEAM if it isn't already," >&2
+  echo "    then select the team ▸ Manage Certificates… ▸ + ▸ Apple Development to create one." >&2
+  BLOCKERS+=("Create an Apple Development certificate in Xcode ▸ Settings ▸ Accounts ▸ Manage Certificates")
 fi
 
 # --- Ingest key (soft) --------------------------------------------------------
