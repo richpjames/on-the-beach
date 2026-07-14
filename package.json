@@ -34,6 +34,7 @@
     "cap:add": "cap add ios",
     "cap:sync": "cap sync ios",
     "cap:open": "cap open ios",
+    "mac:bootstrap": "bash scripts/bootstrap-mac.sh",
     "mac": "bash scripts/build-mac.sh",
     "mac:install": "bash scripts/build-mac.sh --install",
     "mac:local": "OTB_APP_URL=http://localhost:3000 bash scripts/build-mac.sh --install",
