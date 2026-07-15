@@ -264,10 +264,55 @@ describe("POST /api/ingest/link with list and notes", () => {
     const body = await res.json();
     expect(mockResolveOrCreateStack).toHaveBeenCalledWith("Jazz finds");
     expect(mockAttachItemToStack).toHaveBeenCalledWith(7, 3);
-    expect(body.list).toEqual({ id: 3, name: "Jazz finds" });
+    expect(body.lists).toEqual([{ id: 3, name: "Jazz finds" }]);
   });
 
-  it("does not touch lists when no listName is given", async () => {
+  it("resolves several lists and files the item into each of them", async () => {
+    mockCreateMany.mockResolvedValue([
+      { item: { id: 7, title: "Cool Album", primary_url: url } as any, created: true },
+    ]);
+    mockResolveOrCreateStack.mockImplementation(
+      async (name: string) => ({ "Jazz finds": { id: 3, name }, Wishlist: { id: 5, name } })[name],
+    );
+
+    const app = makeApp();
+    const res = await makeLinkRequest(
+      app,
+      { url, listNames: ["Jazz finds", "Wishlist"] },
+      { apiKey: "test-secret" },
+    );
+
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(mockResolveOrCreateStack).toHaveBeenCalledWith("Jazz finds");
+    expect(mockResolveOrCreateStack).toHaveBeenCalledWith("Wishlist");
+    expect(mockAttachItemToStack).toHaveBeenCalledWith(7, 3);
+    expect(mockAttachItemToStack).toHaveBeenCalledWith(7, 5);
+    expect(body.lists).toEqual([
+      { id: 3, name: "Jazz finds" },
+      { id: 5, name: "Wishlist" },
+    ]);
+  });
+
+  it("de-dupes list names across listNames and the legacy listName", async () => {
+    mockCreateMany.mockResolvedValue([
+      { item: { id: 7, title: "Cool Album", primary_url: url } as any, created: true },
+    ]);
+    mockResolveOrCreateStack.mockResolvedValue({ id: 3, name: "Jazz finds" });
+
+    const app = makeApp();
+    const res = await makeLinkRequest(
+      app,
+      { url, listNames: ["Jazz finds", "  Jazz finds  "], listName: "Jazz finds" },
+      { apiKey: "test-secret" },
+    );
+
+    expect(res.status).toBe(200);
+    expect(mockResolveOrCreateStack).toHaveBeenCalledTimes(1);
+    expect(mockAttachItemToStack).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not touch lists when no list is given", async () => {
     mockCreateMany.mockResolvedValue([
       { item: { id: 1, title: "Cool Album", primary_url: url } as any, created: true },
     ]);
@@ -279,7 +324,7 @@ describe("POST /api/ingest/link with list and notes", () => {
     const body = await res.json();
     expect(mockResolveOrCreateStack).not.toHaveBeenCalled();
     expect(mockAttachItemToStack).not.toHaveBeenCalled();
-    expect(body.list).toBeNull();
+    expect(body.lists).toEqual([]);
   });
 
   it("still files a duplicate item into the chosen list", async () => {
@@ -301,21 +346,25 @@ describe("POST /api/ingest/link with list and notes", () => {
     const body = await res.json();
     expect(mockAttachItemToStack).toHaveBeenCalledWith(9, 3);
     expect(body.items_skipped).toBe(1);
-    expect(body.list).toEqual({ id: 3, name: "Jazz finds" });
+    expect(body.lists).toEqual([{ id: 3, name: "Jazz finds" }]);
   });
 
-  it("ignores a blank listName", async () => {
+  it("ignores blank list names", async () => {
     mockCreateMany.mockResolvedValue([
       { item: { id: 1, title: "Cool Album", primary_url: url } as any, created: true },
     ]);
 
     const app = makeApp();
-    const res = await makeLinkRequest(app, { url, listName: "   " }, { apiKey: "test-secret" });
+    const res = await makeLinkRequest(
+      app,
+      { url, listName: "   ", listNames: ["", "  "] },
+      { apiKey: "test-secret" },
+    );
 
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(mockResolveOrCreateStack).not.toHaveBeenCalled();
-    expect(body.list).toBeNull();
+    expect(body.lists).toEqual([]);
   });
 });
 
