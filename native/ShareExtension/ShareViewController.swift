@@ -121,35 +121,75 @@ final class ShareViewController: UIViewController {
 
     // MARK: - Extracting the shared URL
 
-    /// Walks the extension's input items looking for a URL. Handles the two
-    /// shapes iOS delivers: a real `public.url` attachment (most apps) and a
+    /// Walks the extension's input items looking for a URL. Handles the shapes
+    /// the system delivers: a real `public.url` attachment (most apps) and a
     /// `public.plain-text` blob that contains a URL somewhere in it (Safari
-    /// often shares "Page Title\nhttps://…"). Falls back to scanning text with
-    /// NSDataDetector so a wrapped URL is still recovered.
+    /// often shares "Page Title\nhttps://…"). If neither attachment yields a
+    /// URL, falls back to the item's attributed text — some apps (e.g. Apple
+    /// Music) carry the link there rather than as an attachment.
+    ///
+    /// Whatever the branch, `url(from:)` does the decoding, because the loaded
+    /// item is not always a `URL`: on macOS a `public.url` item arrives as
+    /// `Data` holding the URL string (see below), and text branches arrive as
+    /// `String`. Getting that coercion wrong is what left the Add button
+    /// permanently disabled when sharing from Apple Music on macOS.
     private func extractSharedURL(completion: @escaping (URL?) -> Void) {
-        let providers = (extensionContext?.inputItems as? [NSExtensionItem] ?? [])
-            .flatMap { $0.attachments ?? [] }
+        let items = (extensionContext?.inputItems as? [NSExtensionItem]) ?? []
+        let providers = items.flatMap { $0.attachments ?? [] }
 
         let urlType = UTType.url.identifier
         let textType = UTType.plainText.identifier
 
+        // Last resort: recover a link from the item's attributed text.
+        let fallback: () -> Void = {
+            let text = items.compactMap { $0.attributedContentText?.string }.joined(separator: "\n")
+            completion(Self.firstURL(in: text))
+        }
+
         if let provider = providers.first(where: { $0.hasItemConformingToTypeIdentifier(urlType) }) {
             provider.loadItem(forTypeIdentifier: urlType, options: nil) { item, _ in
-                let url = (item as? URL) ?? (item as? String).flatMap(Self.firstURL(in:))
-                DispatchQueue.main.async { completion(url) }
+                DispatchQueue.main.async {
+                    if let url = Self.url(from: item) { completion(url) } else { fallback() }
+                }
             }
             return
         }
 
         if let provider = providers.first(where: { $0.hasItemConformingToTypeIdentifier(textType) }) {
             provider.loadItem(forTypeIdentifier: textType, options: nil) { item, _ in
-                let text = (item as? String) ?? (item as? URL)?.absoluteString ?? ""
-                DispatchQueue.main.async { completion(Self.firstURL(in: text)) }
+                DispatchQueue.main.async {
+                    if let url = Self.url(from: item) { completion(url) } else { fallback() }
+                }
             }
             return
         }
 
-        completion(nil)
+        fallback()
+    }
+
+    /// Coerces whatever `NSItemProvider.loadItem` hands back into a URL.
+    ///
+    /// iOS delivers a `public.url` item as a `URL`, but macOS / Mac Catalyst
+    /// delivers the same item as `Data` containing the URL's UTF-8 string — so
+    /// `item as? URL` alone silently returns nil there. Text items arrive as a
+    /// `String`. We try URL, then String, then Data, and only trust a parsed
+    /// string if it has a scheme (so a bare title isn't turned into a
+    /// schemeless URL); otherwise we scan the text for an embedded link.
+    private nonisolated static func url(from item: NSSecureCoding?) -> URL? {
+        if let url = item as? URL { return url }
+
+        let text: String?
+        if let string = item as? String {
+            text = string
+        } else if let data = item as? Data {
+            text = String(data: data, encoding: .utf8)
+        } else {
+            text = nil
+        }
+        guard let text else { return nil }
+
+        if let url = URL(string: text), url.scheme != nil { return url }
+        return firstURL(in: text)
     }
 
     private nonisolated static func firstURL(in text: String) -> URL? {
