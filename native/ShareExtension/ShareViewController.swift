@@ -7,8 +7,8 @@ import MobileCoreServices
 /// When the user taps "On The Beach" in the share sheet, iOS/macOS instantiates
 /// this controller inside the Share Extension process and hands us the shared
 /// content via `extensionContext`. We show a small compose form so the user can
-/// add an optional note and pick a list (existing or new), then POST the link to
-/// the app's ingest endpoint (`/api/ingest/link`) with a `Bearer` token.
+/// add an optional note and pick any number of lists (existing or new), then POST
+/// the link to the app's ingest endpoint (`/api/ingest/link`) with a `Bearer` token.
 ///
 /// The extension talks to the server directly rather than opening the app, so a
 /// share succeeds even when the app isn't running.
@@ -38,7 +38,7 @@ final class ShareViewController: UIViewController {
 
     private var sharedURL: URL?
     private var stackNames: [String] = []
-    private var selectedListName: String?
+    private var selectedListNames: [String] = []
 
     private let compose = ComposeFormController()
     private lazy var navController = UINavigationController(rootViewController: compose)
@@ -78,12 +78,17 @@ final class ShareViewController: UIViewController {
     // MARK: - List picker
 
     private func pushListPicker() {
-        let picker = ListPickerViewController(stacks: stackNames, selected: selectedListName)
-        picker.onPick = { [weak self] name in
+        let picker = ListPickerViewController(stacks: stackNames, selected: selectedListNames)
+        // The picker is multi-select and pushed (no Done button), so it reports
+        // the full selection on every toggle — the user commits by tapping back.
+        picker.onSelectionChanged = { [weak self] names in
             guard let self else { return }
-            self.selectedListName = name
-            self.compose.setListValue(name)
-            self.navController.popViewController(animated: true)
+            self.selectedListNames = names
+            // A newly-created list should show up as an option next time too.
+            for name in names where !self.stackNames.contains(name) {
+                self.stackNames.append(name)
+            }
+            self.compose.setListNames(names)
         }
         navController.pushViewController(picker, animated: true)
     }
@@ -96,7 +101,7 @@ final class ShareViewController: UIViewController {
             return
         }
         compose.setPosting(true)
-        postLink(url: url, note: note, listName: selectedListName) { [weak self] result in
+        postLink(url: url, note: note, listNames: selectedListNames) { [weak self] result in
             guard let self else { return }
             switch result {
             case .success:
@@ -225,7 +230,7 @@ final class ShareViewController: UIViewController {
     private func postLink(
         url: URL,
         note: String,
-        listName: String?,
+        listNames: [String],
         completion: @escaping (PostResult) -> Void
     ) {
         guard let endpoint = URL(string: baseURL + "/api/ingest/link") else {
@@ -237,9 +242,9 @@ final class ShareViewController: UIViewController {
             return
         }
 
-        var payload: [String: String] = ["url": url.absoluteString]
+        var payload: [String: Any] = ["url": url.absoluteString]
         if !note.isEmpty { payload["notes"] = note }
-        if let listName, !listName.isEmpty { payload["listName"] = listName }
+        if !listNames.isEmpty { payload["listNames"] = listNames }
 
         var request = URLRequest(url: endpoint)
         request.httpMethod = "POST"
@@ -346,14 +351,14 @@ private final class ComposeFormController: UIViewController, UITextViewDelegate 
         noteView.becomeFirstResponder()
     }
 
-    /// Builds the "List — None ›" row as a tappable stack (no iOS 15 button APIs).
+    /// Builds the "Lists — None ›" row as a tappable stack (no iOS 15 button APIs).
     private func makeListRow() -> UIView {
         let container = UIView()
         container.backgroundColor = .secondarySystemGroupedBackground
         container.layer.cornerRadius = 10
 
         let title = UILabel()
-        title.text = "List"
+        title.text = "Lists"
         title.font = .preferredFont(forTextStyle: .body)
 
         listValueLabel.text = "None"
@@ -394,8 +399,10 @@ private final class ComposeFormController: UIViewController, UITextViewDelegate 
         addButton.isEnabled = (url != nil) && !isPosting
     }
 
-    func setListValue(_ name: String?) {
-        listValueLabel.text = name ?? "None"
+    /// Reflects the chosen lists in the "List" row: "None", the single name, or
+    /// all names joined so the user can see everything the item will be filed into.
+    func setListNames(_ names: [String]) {
+        listValueLabel.text = names.isEmpty ? "None" : names.joined(separator: ", ")
     }
 
     private var isPosting = false
@@ -431,18 +438,22 @@ private final class ComposeFormController: UIViewController, UITextViewDelegate 
     }
 }
 
-/// A minimal list picker pushed onto the compose form's navigation stack.
+/// A multi-select list picker pushed onto the compose form's navigation stack.
 ///
-/// Shows "None", every existing list, and a "New list…" row that prompts for a
-/// name. Whatever the user chooses is handed back via `onPick` — the server
-/// resolves it by name (creating it if new), so no id round-trip is needed.
+/// Shows every existing list with a checkmark for the ones the item will go into,
+/// plus a "New list…" row that prompts for a name. Tapping a list toggles it; an
+/// item can belong to any number of lists (or none). The full selection is
+/// reported via `onSelectionChanged` after every change — the server resolves the
+/// names (creating any new), so no id round-trip is needed. The user commits by
+/// tapping back out of the picker.
 private final class ListPickerViewController: UITableViewController {
-    var onPick: ((String?) -> Void)?
+    var onSelectionChanged: (([String]) -> Void)?
 
-    private let names: [String]
-    private let selected: String?
+    private var names: [String]
+    // Selection order is preserved so the compose row and payload stay stable.
+    private var selected: [String]
 
-    init(stacks: [String], selected: String?) {
+    init(stacks: [String], selected: [String]) {
         self.names = stacks
         self.selected = selected
         super.init(style: .plain)
@@ -455,14 +466,14 @@ private final class ListPickerViewController: UITableViewController {
 
     override func viewDidLoad() {
         super.viewDidLoad()
-        title = "List"
+        title = "Lists"
     }
 
-    // Section 0: "None" + existing lists. Section 1: "New list…".
+    // Section 0: existing lists (checkmark = selected). Section 1: "New list…".
     override func numberOfSections(in tableView: UITableView) -> Int { 2 }
 
     override func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
-        section == 0 ? names.count + 1 : 1
+        section == 0 ? names.count : 1
     }
 
     override func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
@@ -476,10 +487,10 @@ private final class ListPickerViewController: UITableViewController {
             return cell
         }
 
-        let name = indexPath.row == 0 ? nil : names[indexPath.row - 1]
-        cell.textLabel?.text = name ?? "None"
+        let name = names[indexPath.row]
+        cell.textLabel?.text = name
         cell.textLabel?.textColor = .label
-        cell.accessoryType = (name == selected) ? .checkmark : .none
+        cell.accessoryType = selected.contains(name) ? .checkmark : .none
         return cell
     }
 
@@ -491,8 +502,18 @@ private final class ListPickerViewController: UITableViewController {
             return
         }
 
-        let name = indexPath.row == 0 ? nil : names[indexPath.row - 1]
-        onPick?(name)
+        toggle(names[indexPath.row])
+        tableView.reloadRows(at: [indexPath], with: .none)
+    }
+
+    /// Add or remove a name from the selection, then report the new full set.
+    private func toggle(_ name: String) {
+        if let index = selected.firstIndex(of: name) {
+            selected.remove(at: index)
+        } else {
+            selected.append(name)
+        }
+        onSelectionChanged?(selected)
     }
 
     private func promptForNewList() {
@@ -500,9 +521,16 @@ private final class ListPickerViewController: UITableViewController {
         alert.addTextField { $0.placeholder = "List name"; $0.autocapitalizationType = .sentences }
         alert.addAction(UIAlertAction(title: "Cancel", style: .cancel))
         alert.addAction(UIAlertAction(title: "Add", style: .default) { [weak self, weak alert] _ in
+            guard let self else { return }
             let name = alert?.textFields?.first?.text?.trimmingCharacters(in: .whitespacesAndNewlines)
             guard let name, !name.isEmpty else { return }
-            self?.onPick?(name)
+            // Surface the new list as a checked row, and select it if it's brand new.
+            if !self.names.contains(name) { self.names.append(name) }
+            if !self.selected.contains(name) {
+                self.selected.append(name)
+                self.onSelectionChanged?(self.selected)
+            }
+            self.tableView.reloadData()
         })
         present(alert, animated: true)
     }

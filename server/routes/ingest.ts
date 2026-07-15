@@ -97,6 +97,31 @@ async function defaultAttachItemToStack(itemId: number, stackId: number): Promis
   await db.insert(musicItemStacks).values({ musicItemId: itemId, stackId }).onConflictDoNothing();
 }
 
+/**
+ * Gather the list names a /link request wants the item filed into, from either
+ * `listNames` (multi-select share sheet) or the legacy single `listName`.
+ * Trims each, drops blanks, and de-dupes case-sensitively by name.
+ */
+function collectListNames(body: unknown): string[] {
+  const raw: unknown[] = [];
+  if (body && typeof body === "object") {
+    const { listName, listNames } = body as Record<string, unknown>;
+    if (Array.isArray(listNames)) raw.push(...listNames);
+    if (listName !== undefined) raw.push(listName);
+  }
+
+  const seen = new Set<string>();
+  const names: string[] = [];
+  for (const value of raw) {
+    if (typeof value !== "string") continue;
+    const trimmed = value.trim();
+    if (!trimmed || seen.has(trimmed)) continue;
+    seen.add(trimmed);
+    names.push(trimmed);
+  }
+  return names;
+}
+
 export function createIngestRoutes(deps: IngestRoutesDeps = {}): Hono {
   const scanPhoto =
     deps.scanPhoto ??
@@ -221,7 +246,11 @@ export function createIngestRoutes(deps: IngestRoutesDeps = {}): Hono {
     }
 
     const notes = typeof body?.notes === "string" ? body.notes.trim() : "";
-    const listName = typeof body?.listName === "string" ? body.listName.trim() : "";
+
+    // Accept both the single `listName` (older extension builds) and `listNames`
+    // (multi-select share sheet). Trim, drop blanks, and de-dupe by name so the
+    // same list picked twice only files the item once.
+    const listNames = collectListNames(body);
 
     // Notes are only meaningful for a freshly-created item; createMusicItemsFromUrl
     // returns a duplicate's existing item unchanged, so passing them there can never
@@ -234,15 +263,16 @@ export function createIngestRoutes(deps: IngestRoutesDeps = {}): Hono {
         ? await createMusicItemsFromUrl(url, overrides)
         : await createMusicItemsFromUrl(url);
 
-      // Resolve the list once (creating it if new), then file every returned item
-      // into it — including duplicates, so re-sharing to organise works.
-      const list = listName ? await resolveOrCreateStack(listName) : null;
+      // Resolve each list once (creating any that are new), then file every
+      // returned item into all of them — including duplicates, so re-sharing to
+      // organise works.
+      const lists = await Promise.all(listNames.map((name) => resolveOrCreateStack(name)));
 
       const items: Array<{ id: number; title: string; url: string }> = [];
       const skipped: Array<{ url: string; reason: string }> = [];
 
       for (const result of results) {
-        if (list) {
+        for (const list of lists) {
           await attachItemToStack(result.item.id, list.id);
         }
         if (result.created) {
@@ -263,7 +293,7 @@ export function createIngestRoutes(deps: IngestRoutesDeps = {}): Hono {
         items_skipped: skipped.length,
         items,
         skipped,
-        list,
+        lists,
       });
     } catch (err) {
       console.error(`[api] POST /api/ingest/link failed for ${url}:`, err);
