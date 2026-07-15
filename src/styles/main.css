@@ -2767,7 +2767,10 @@ a:hover {
   }
 }
 
-.release-page-body > :not(.release-page__backdrop):not(.player-window),
+/* .link-picker overlays (link picker, suggestion picker) must keep their
+   fixed positioning — this rule would otherwise drop them into document
+   flow below the release. */
+.release-page-body > :not(.release-page__backdrop):not(.player-window):not(.link-picker),
 .release-page-body .main {
   position: relative;
   z-index: 1;
