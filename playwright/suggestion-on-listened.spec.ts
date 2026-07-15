@@ -53,4 +53,50 @@ test("suggestion modal appears when a release is marked listened on the release 
   await expect(modal).toBeVisible({ timeout: 5_000 });
   await expect(modal).toContainText("Tri Repetae");
   await expect(modal).toContainText("Autechre");
+
+  // It must overlay the viewport, not sit in document flow below the release
+  // (the release-page body class used to override its fixed positioning).
+  const position = await modal.evaluate((el) => getComputedStyle(el).position);
+  expect(position).toBe("fixed");
+});
+
+test("accepting a suggestion adds the release to the to-listen list", async ({ page, request }) => {
+  const res = await request.post("/api/music-items", {
+    data: { title: "Amber", artistName: "Autechre", listenStatus: "to-listen", year: 1994 },
+  });
+  const item = await res.json();
+
+  // Stand in for the MusicBrainz prefetch, which is disabled under test.
+  await request.post("/api/__test__/suggestions", {
+    data: {
+      sourceItemId: item.id,
+      title: "Tri Repetae",
+      artistName: "Autechre",
+      itemType: "album",
+      year: 1995,
+    },
+  });
+
+  await page.goto(`/r/${item.id}`);
+  await page.locator("#status-select").selectOption("listened");
+
+  const modal = page.locator("#suggestion-picker-modal");
+  await expect(modal).toBeVisible({ timeout: 5_000 });
+
+  // Accept must POST to the real item id (a live prop read after the modal
+  // closed used to send /api/music-items/null/... and create nothing).
+  const acceptResponse = page.waitForResponse(
+    (response) =>
+      response.url().includes(`/api/music-items/${item.id}/suggestion/accept`) &&
+      response.request().method() === "POST",
+    { timeout: 5_000 },
+  );
+  await page.locator("#suggestion-picker-accept").click();
+  expect((await acceptResponse).status()).toBe(201);
+
+  const list = await (await request.get("/api/music-items?listenStatus=to-listen")).json();
+  const items = Array.isArray(list) ? list : list.items;
+  const added = items.find((entry: { title: string }) => entry.title === "Tri Repetae");
+  expect(added).toBeTruthy();
+  expect(added.listen_status).toBe("to-listen");
 });

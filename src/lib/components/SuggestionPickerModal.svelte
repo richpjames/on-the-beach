@@ -28,15 +28,28 @@
 
   async function accept(): Promise<void> {
     if (sourceItemId === null) return;
+    // Snapshot the id: destructured $props() reads are live, and onClosed()
+    // nulls the parent state this prop is bound to.
+    const itemId = sourceItemId;
     onClosed();
-    await api.acceptSuggestion(sourceItemId);
+    try {
+      await api.acceptSuggestion(itemId);
+    } catch {
+      alert("Failed to add release.");
+      return;
+    }
     onAccepted();
   }
 
   async function dismiss(): Promise<void> {
     if (sourceItemId === null) return;
+    const itemId = sourceItemId;
     onClosed();
-    await api.dismissSuggestion(sourceItemId);
+    try {
+      await api.dismissSuggestion(itemId);
+    } catch {
+      alert("Failed to dismiss suggestion.");
+    }
   }
 
   $effect(() => {
