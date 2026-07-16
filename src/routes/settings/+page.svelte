@@ -2,13 +2,22 @@
   import { onMount } from "svelte";
   import { apiFetch } from "$lib/api";
   import { musickit, authorize, unauthorize, ensureConfigured } from "$lib/musickit.svelte";
-  import type { LookupService } from "../../../server/settings";
+  import type { LookupService, ReleaseLengthPreference } from "../../../server/settings";
 
   let { data } = $props();
 
   // svelte-ignore state_referenced_locally
   let activeService = $state(data.activeService);
   let statusMessage = $state("");
+
+  // svelte-ignore state_referenced_locally
+  let lengthPreference = $state(data.releaseLengthPreference);
+  let lengthStatusMessage = $state("");
+
+  const LENGTH_PREFERENCE_LABELS: Record<ReleaseLengthPreference, string> = {
+    longer: "Longer releases — albums before EPs and singles (default)",
+    shorter: "Shorter releases — EPs and singles before albums",
+  };
 
   // ── Apple Music configuration status ────────────────────────────────────────
   // Probe the token endpoint so the page reflects the *live* server state,
@@ -82,6 +91,29 @@
       statusMessage = "Failed to save.";
     }
   }
+
+  async function onLengthPreferenceChange(preference: ReleaseLengthPreference): Promise<void> {
+    lengthPreference = preference;
+    lengthStatusMessage = "Saving…";
+    try {
+      const res = await apiFetch("/api/settings", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ releaseLengthPreference: preference }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        lengthStatusMessage = err.error || "Failed to save.";
+        return;
+      }
+      const result = await res.json();
+      lengthStatusMessage = result.changed
+        ? "Saved. Queued suggestions will be re-picked with this preference."
+        : "Saved.";
+    } catch {
+      lengthStatusMessage = "Failed to save.";
+    }
+  }
 </script>
 
 <svelte:head>
@@ -117,6 +149,36 @@
       </form>
       <p id="settings-status" class="settings__status" role="status" aria-live="polite">
         {statusMessage}
+      </p>
+    </section>
+
+    <section class="settings__section" id="release-length-settings">
+      <h2 class="settings__heading">Suggested release length</h2>
+      <p class="settings__hint">
+        When suggesting another release by an artist you've listened to, which length to favour.
+        Changing this re-picks any queued suggestions.
+      </p>
+      <form id="release-length-form" class="settings__options">
+        {#each data.releaseLengthPreferences as preference (preference)}
+          <label class="settings__option">
+            <input
+              type="radio"
+              name="release-length-preference"
+              value={preference}
+              checked={preference === lengthPreference}
+              onchange={() => onLengthPreferenceChange(preference)}
+            />
+            <span>{LENGTH_PREFERENCE_LABELS[preference]}</span>
+          </label>
+        {/each}
+      </form>
+      <p
+        id="release-length-status"
+        class="settings__status"
+        role="status"
+        aria-live="polite"
+      >
+        {lengthStatusMessage}
       </p>
     </section>
 

@@ -1,6 +1,6 @@
 import { eq } from "drizzle-orm";
 import { db } from "./db/index";
-import { appSettings, musicItems } from "./db/schema";
+import { appSettings, itemSuggestions, musicItems } from "./db/schema";
 
 // ---------------------------------------------------------------------------
 // App settings (key/value, global — this is a single-user app)
@@ -58,5 +58,48 @@ export async function setLookupService(service: LookupService): Promise<{ change
   await putSetting(LOOKUP_SERVICE_KEY, service);
   // Re-lookup on switch: clear every item's attempt marker.
   await db.update(musicItems).set({ lookupAttemptedAt: null });
+  return { changed: true };
+}
+
+// ---------------------------------------------------------------------------
+// Release length preference
+// ---------------------------------------------------------------------------
+
+/** Whether "you might also like" suggestions favour longer or shorter releases. */
+export type ReleaseLengthPreference = "longer" | "shorter";
+
+export const RELEASE_LENGTH_PREFERENCES: readonly ReleaseLengthPreference[] = ["longer", "shorter"];
+
+export function isReleaseLengthPreference(value: unknown): value is ReleaseLengthPreference {
+  return (
+    typeof value === "string" && (RELEASE_LENGTH_PREFERENCES as readonly string[]).includes(value)
+  );
+}
+
+const RELEASE_LENGTH_PREFERENCE_KEY = "release_length_preference";
+const DEFAULT_RELEASE_LENGTH_PREFERENCE: ReleaseLengthPreference = "longer";
+
+/** The release length currently favoured when picking suggestions. */
+export async function getReleaseLengthPreference(): Promise<ReleaseLengthPreference> {
+  const value = await getSetting(RELEASE_LENGTH_PREFERENCE_KEY);
+  return isReleaseLengthPreference(value) ? value : DEFAULT_RELEASE_LENGTH_PREFERENCE;
+}
+
+/**
+ * Set the release length preference. When it actually changes, discards
+ * pending (not yet accepted/dismissed) suggestions — they were picked under
+ * the old preference — so the next prefetch/sweep re-picks under the new one.
+ * Returns whether the value changed.
+ */
+export async function setReleaseLengthPreference(
+  preference: ReleaseLengthPreference,
+): Promise<{ changed: boolean }> {
+  const current = await getReleaseLengthPreference();
+  if (current === preference) {
+    return { changed: false };
+  }
+
+  await putSetting(RELEASE_LENGTH_PREFERENCE_KEY, preference);
+  await db.delete(itemSuggestions).where(eq(itemSuggestions.status, "pending"));
   return { changed: true };
 }
