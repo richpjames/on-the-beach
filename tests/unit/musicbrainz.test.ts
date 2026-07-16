@@ -125,6 +125,139 @@ describe("findSuggestedRelease", () => {
     expect(result?.title).toBe("Dead Men Don't Smoke Marijuana");
   });
 
+  test("excludes titles close to tracked ones (edition variants, punctuation)", async () => {
+    spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      makeMbArtistReleasesResponse([
+        { id: "r1", title: "Amber (Deluxe Edition)", date: "2014" },
+        { id: "r2", title: "Tri Repetae++", date: "1996" },
+        { id: "r3", title: "Confield", date: "2001" },
+      ]),
+    );
+
+    const result = await findSuggestedRelease({
+      mbArtistId: "artist-uuid",
+      artistName: "Autechre",
+      trackedTitles: new Set(["amber", "tri repetae"]),
+      sourceYear: 1995,
+    });
+
+    expect(result?.title).toBe("Confield");
+  });
+
+  test("returns null when every candidate is close to a tracked title", async () => {
+    spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      makeMbArtistReleasesResponse([
+        { id: "r1", title: "Amber [2009 Remaster]", date: "2009" },
+        { id: "r2", title: "Amber (Deluxe Edition)", date: "2014" },
+      ]),
+    );
+
+    const result = await findSuggestedRelease({
+      mbArtistId: "artist-uuid",
+      artistName: "Autechre",
+      trackedTitles: new Set(["amber"]),
+      sourceYear: 1994,
+    });
+
+    expect(result).toBeNull();
+  });
+
+  test("prefers longer releases by default, even when a shorter one is closer in year", async () => {
+    spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      makeMbArtistReleasesResponse([
+        { id: "r1", title: "Anvil Vapre", date: "1995", media: [{ "track-count": 4 }] },
+        { id: "r2", title: "Chiastic Slide", date: "1997", media: [{ "track-count": 9 }] },
+      ]),
+    );
+
+    const result = await findSuggestedRelease({
+      mbArtistId: "artist-uuid",
+      artistName: "Autechre",
+      trackedTitles: new Set(),
+      sourceYear: 1995,
+    });
+
+    expect(result?.title).toBe("Chiastic Slide");
+  });
+
+  test("prefers shorter releases when lengthPreference is 'shorter'", async () => {
+    spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      makeMbArtistReleasesResponse([
+        { id: "r1", title: "Anvil Vapre", date: "1995", media: [{ "track-count": 4 }] },
+        { id: "r2", title: "Chiastic Slide", date: "1997", media: [{ "track-count": 9 }] },
+      ]),
+    );
+
+    const result = await findSuggestedRelease({
+      mbArtistId: "artist-uuid",
+      artistName: "Autechre",
+      trackedTitles: new Set(),
+      sourceYear: 1997,
+      lengthPreference: "shorter",
+    });
+
+    expect(result?.title).toBe("Anvil Vapre");
+  });
+
+  test("breaks length-bucket ties by year proximity", async () => {
+    spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      makeMbArtistReleasesResponse([
+        { id: "r1", title: "Incunabula", date: "1993", media: [{ "track-count": 9 }] },
+        { id: "r2", title: "LP5", date: "1998", media: [{ "track-count": 11 }] },
+      ]),
+    );
+
+    const result = await findSuggestedRelease({
+      mbArtistId: "artist-uuid",
+      artistName: "Autechre",
+      trackedTitles: new Set(),
+      sourceYear: 1999,
+    });
+
+    expect(result?.title).toBe("LP5");
+  });
+
+  test("ranks releases without track data below sized ones", async () => {
+    spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      makeMbArtistReleasesResponse([
+        { id: "r1", title: "Mystery Comp", date: "1995" },
+        {
+          id: "r2",
+          title: "Tri Repetae",
+          date: "1995",
+          media: [{ "track-count": 5 }, { "track-count": 5 }],
+        },
+      ]),
+    );
+
+    const result = await findSuggestedRelease({
+      mbArtistId: "artist-uuid",
+      artistName: "Autechre",
+      trackedTitles: new Set(),
+      sourceYear: 1995,
+    });
+
+    // Track counts sum across media (5 + 5 = 10) and a sized release always
+    // beats one MusicBrainz has no media data for.
+    expect(result?.title).toBe("Tri Repetae");
+  });
+
+  test("requests media with the artist's releases", async () => {
+    const fetchSpy = spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      makeMbArtistReleasesResponse([]),
+    );
+
+    await findSuggestedRelease({
+      mbArtistId: "artist-uuid",
+      artistName: "Autechre",
+      trackedTitles: new Set(),
+      sourceYear: 1995,
+    });
+
+    const [url] = fetchSpy.mock.calls[0] as [string, RequestInit];
+    expect(url).toContain("inc=releases%2Bmedia");
+  });
+
   test("throws on fetch error so callers can distinguish failure from no-candidates", async () => {
     spyOn(globalThis, "fetch").mockRejectedValueOnce(new Error("network error"));
 

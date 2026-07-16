@@ -215,6 +215,41 @@ describe("fetchAndStoreSuggestion", () => {
     const secondCall = mbSpy.mock.calls[1][0];
     expect(secondCall.trackedTitles.has("tri repetae")).toBe(true);
   });
+
+  test("excludes titles from the whole library, not just the item's artist", async () => {
+    const mbSpy = spyOn(musicbrainz, "findSuggestedRelease").mockResolvedValue(testSuggestion);
+    await createArtistWithItem("Other Library Artist", "Crosslib Album", "listened");
+    const { itemId } = await createArtistWithItem("Library Wide Band", "Own Album");
+
+    await fetchAndStoreSuggestion({
+      id: itemId,
+      artist_name: "Library Wide Band",
+      year: null,
+      musicbrainz_artist_id: null,
+    });
+
+    const call = mbSpy.mock.calls[0][0];
+    expect(call.trackedTitles.has("own album")).toBe(true);
+    // A listened item by a different artist still counts as "in the library".
+    expect(call.trackedTitles.has("crosslib album")).toBe(true);
+  });
+
+  test("passes the stored release length preference to the lookup", async () => {
+    const { setReleaseLengthPreference } = await import("../../server/settings");
+    await setReleaseLengthPreference("shorter");
+    const mbSpy = spyOn(musicbrainz, "findSuggestedRelease").mockResolvedValue(testSuggestion);
+    const { itemId } = await createArtistWithItem("Length Pref Band", "Length Album");
+
+    await fetchAndStoreSuggestion({
+      id: itemId,
+      artist_name: "Length Pref Band",
+      year: null,
+      musicbrainz_artist_id: null,
+    });
+
+    expect(mbSpy.mock.calls[0][0].lengthPreference).toBe("shorter");
+    await setReleaseLengthPreference("longer");
+  });
 });
 
 describe("findPendingSuggestionForItem", () => {

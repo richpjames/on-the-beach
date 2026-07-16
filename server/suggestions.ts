@@ -2,6 +2,7 @@ import { and, desc, eq } from "drizzle-orm";
 import { db } from "./db/index";
 import { musicItems, artists, itemSuggestions } from "./db/schema";
 import { findSuggestedRelease } from "./musicbrainz";
+import { getReleaseLengthPreference } from "./settings";
 import { normalize } from "./utils";
 
 // ---------------------------------------------------------------------------
@@ -146,14 +147,15 @@ async function fetchAndStoreSuggestionLocked(
       return "already-pending";
     }
 
-    // Exclude releases already in the library…
-    const artistRows = await db
+    // Exclude anything already in the library — every artist, every listen
+    // status. Title-only matching across artists can rarely block a legit
+    // suggestion (self-titled albums, "Greatest Hits"), but a duplicate
+    // suggestion is worse than a missed one.
+    const libraryRows = await db
       .select({ normalizedTitle: musicItems.normalizedTitle })
-      .from(musicItems)
-      .innerJoin(artists, eq(musicItems.artistId, artists.id))
-      .where(eq(artists.normalizedName, normalize(item.artist_name)));
+      .from(musicItems);
 
-    const trackedTitles = new Set(artistRows.map((r) => r.normalizedTitle));
+    const trackedTitles = new Set(libraryRows.map((r) => r.normalizedTitle));
 
     // …and releases the user already saw suggested (dismissed or accepted).
     for (const row of previousSuggestions) {
@@ -166,6 +168,7 @@ async function fetchAndStoreSuggestionLocked(
       artistName: item.artist_name,
       trackedTitles,
       sourceYear: item.year,
+      lengthPreference: await getReleaseLengthPreference(),
     });
 
     if (!suggestion) {
