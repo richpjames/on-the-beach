@@ -4,6 +4,7 @@
   import { onMount, untrack } from "svelte";
   import type { ItemSuggestion, ListenStatus, MusicItemFull, StackWithCount } from "../../types";
   import { buildContextKey, buildMusicItemFilters } from "../../ui/domain/music-list";
+  import { normalizeStarRating } from "../../ui/components/star-rating";
   import { addFormMachine } from "../../ui/state/add-form-machine";
   import { appMachine } from "../../ui/state/app-machine";
   import {
@@ -253,13 +254,17 @@
     target.classList.remove("music-card--roulette");
   }
 
-  async function pickRandom(): Promise<{ id: number } | null> {
+  async function pickRandom(rating: number | null = null): Promise<{ id: number } | null> {
     const filters = buildMusicItemFilters("to-listen", ctx.currentStack);
     const result = await api.listMusicItems(filters);
-    if (result.items.length === 0) {
+    const pool =
+      rating === null
+        ? result.items
+        : result.items.filter((item) => normalizeStarRating(item.rating) === rating);
+    if (pool.length === 0) {
       return null;
     }
-    const picked = result.items[Math.floor(Math.random() * result.items.length)];
+    const picked = pool[Math.floor(Math.random() * pool.length)];
     await rouletteToCard(picked.id);
     await goto(`/r/${picked.id}`);
     return picked;

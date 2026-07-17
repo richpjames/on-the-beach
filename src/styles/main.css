@@ -902,6 +902,75 @@ select.input {
   color: var(--chrome-dark);
 }
 
+.pick-random {
+  position: relative;
+  margin-left: auto;
+  display: inline-flex;
+  /* Suppress the touch callout so press-and-hold opens our menu instead. */
+  -webkit-touch-callout: none;
+}
+
+.pick-random .filter-btn--action {
+  margin-left: 0;
+}
+
+.pick-random__menu {
+  position: absolute;
+  top: calc(100% + 2px);
+  right: 0;
+  z-index: 40;
+  min-width: 160px;
+  max-height: 60vh;
+  overflow-y: auto;
+  background: var(--chrome);
+  border-width: 2px;
+  border-style: solid;
+  border-color: var(--bevel-raised);
+  box-shadow: 2px 2px 0 rgba(0, 0, 0, 0.35);
+  padding: 2px;
+}
+
+.pick-random__menu-heading {
+  padding: 3px 8px 4px;
+  font-size: var(--text-sm, 0.75rem);
+  font-weight: bold;
+  color: #000000;
+  border-bottom: 1px solid var(--bevel-sunken);
+  margin-bottom: 2px;
+}
+
+.pick-random__menu-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 4px 8px;
+  background: transparent;
+  border: none;
+  color: #000000;
+  font-size: var(--text-base);
+  text-align: left;
+  cursor: pointer;
+}
+
+.pick-random__menu-item:hover,
+.pick-random__menu-item:focus-visible {
+  background: var(--chrome-mid);
+  outline: none;
+}
+
+.pick-random__menu-stars {
+  color: #b8860b;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
+.pick-random__menu-label {
+  margin-left: auto;
+  color: var(--chrome-dark, #555);
+  font-size: var(--text-sm, 0.75rem);
+}
+
 .browse-tools {
   display: flex;
   align-items: center;
