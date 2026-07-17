@@ -10,6 +10,7 @@ const mockScan = mock();
 const mockListStacks = mock();
 const mockResolveOrCreateStack = mock();
 const mockAttachItemToStack = mock();
+const mockSetItemReminder = mock();
 
 // Mock the music-item-creator module before importing any route, overriding
 // only the functions the ingest routes call. bun's mock.module() persists
@@ -38,6 +39,7 @@ function makeApp() {
       listStacks: mockListStacks,
       resolveOrCreateStack: mockResolveOrCreateStack,
       attachItemToStack: mockAttachItemToStack,
+      setItemReminder: mockSetItemReminder,
     }),
   );
   return app;
@@ -365,6 +367,97 @@ describe("POST /api/ingest/link with list and notes", () => {
     const body = await res.json();
     expect(mockResolveOrCreateStack).not.toHaveBeenCalled();
     expect(body.lists).toEqual([]);
+  });
+});
+
+describe("POST /api/ingest/link with a scheduled date", () => {
+  const originalEnv = { ...process.env };
+  const url = "https://artist.bandcamp.com/album/cool-album";
+
+  beforeEach(() => {
+    process.env.INGEST_API_KEY = "test-secret";
+    delete process.env.INGEST_ENABLED;
+    mockCreateMany.mockReset();
+    mockSetItemReminder.mockReset();
+  });
+
+  afterEach(() => {
+    process.env = { ...originalEnv };
+  });
+
+  it("sets the reminder on the created item", async () => {
+    mockCreateMany.mockResolvedValue([
+      { item: { id: 7, title: "Cool Album", primary_url: url } as any, created: true },
+    ]);
+
+    const app = makeApp();
+    const res = await makeLinkRequest(
+      app,
+      { url, remindAt: "2026-08-01" },
+      { apiKey: "test-secret" },
+    );
+
+    expect(res.status).toBe(200);
+    expect(mockSetItemReminder).toHaveBeenCalledTimes(1);
+    const [itemId, date] = mockSetItemReminder.mock.calls[0];
+    expect(itemId).toBe(7);
+    expect(date).toBeInstanceOf(Date);
+    expect((date as Date).toISOString()).toBe(new Date("2026-08-01").toISOString());
+  });
+
+  it("also schedules a duplicate item, so re-sharing to set a date works", async () => {
+    mockCreateMany.mockResolvedValue([
+      { item: { id: 9, title: "Cool Album" } as any, created: false },
+    ]);
+
+    const app = makeApp();
+    const res = await makeLinkRequest(
+      app,
+      { url, remindAt: "2026-08-01" },
+      { apiKey: "test-secret" },
+    );
+
+    expect(res.status).toBe(200);
+    expect(mockSetItemReminder).toHaveBeenCalledWith(9, expect.any(Date));
+  });
+
+  it("leaves the item unscheduled when no date is given", async () => {
+    mockCreateMany.mockResolvedValue([
+      { item: { id: 1, title: "Cool Album", primary_url: url } as any, created: true },
+    ]);
+
+    const app = makeApp();
+    const res = await makeLinkRequest(app, { url }, { apiKey: "test-secret" });
+
+    expect(res.status).toBe(200);
+    expect(mockSetItemReminder).not.toHaveBeenCalled();
+  });
+
+  it("ignores a blank date", async () => {
+    mockCreateMany.mockResolvedValue([
+      { item: { id: 1, title: "Cool Album", primary_url: url } as any, created: true },
+    ]);
+
+    const app = makeApp();
+    const res = await makeLinkRequest(app, { url, remindAt: "" }, { apiKey: "test-secret" });
+
+    expect(res.status).toBe(200);
+    expect(mockSetItemReminder).not.toHaveBeenCalled();
+  });
+
+  it("returns 400 for an invalid date and creates nothing", async () => {
+    const app = makeApp();
+    const res = await makeLinkRequest(
+      app,
+      { url, remindAt: "not-a-date" },
+      { apiKey: "test-secret" },
+    );
+
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.error).toContain("remindAt");
+    expect(mockCreateMany).not.toHaveBeenCalled();
+    expect(mockSetItemReminder).not.toHaveBeenCalled();
   });
 });
 
