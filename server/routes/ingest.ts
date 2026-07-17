@@ -10,7 +10,7 @@ import { extractReleaseInfo, extractReleaseInfoFromWebContext } from "../vision"
 import { getWebContext } from "../google-vision";
 import { lookupRelease } from "../musicbrainz";
 import { db } from "../db";
-import { stacks, musicItemStacks } from "../db/schema";
+import { stacks, musicItemStacks, musicItems } from "../db/schema";
 import type { CreateMusicItemInput, ScanResult } from "../../src/types";
 
 interface EmailEnvelope {
@@ -46,6 +46,7 @@ export interface IngestStack {
 export type ListStacksFn = () => Promise<IngestStack[]>;
 export type ResolveOrCreateStackFn = (name: string) => Promise<IngestStack>;
 export type AttachItemToStackFn = (itemId: number, stackId: number) => Promise<void>;
+export type SetItemReminderFn = (itemId: number, remindAt: Date) => Promise<void>;
 
 export interface IngestRoutesDeps {
   scanPhoto?: ScanPhotoFn;
@@ -53,6 +54,7 @@ export interface IngestRoutesDeps {
   listStacks?: ListStacksFn;
   resolveOrCreateStack?: ResolveOrCreateStackFn;
   attachItemToStack?: AttachItemToStackFn;
+  setItemReminder?: SetItemReminderFn;
 }
 
 /** Every list, id + name, alphabetised — the payload the extension's picker shows. */
@@ -97,6 +99,30 @@ async function defaultAttachItemToStack(itemId: number, stackId: number): Promis
   await db.insert(musicItemStacks).values({ musicItemId: itemId, stackId }).onConflictDoNothing();
 }
 
+/** Set an item's scheduled reminder date — the share sheet's "Remind me". */
+async function defaultSetItemReminder(itemId: number, remindAt: Date): Promise<void> {
+  await db
+    .update(musicItems)
+    .set({ remindAt, updatedAt: new Date() })
+    .where(eq(musicItems.id, itemId));
+}
+
+/**
+ * Parse an optional `remindAt` scheduled date from a /link request body. Returns
+ * the parsed Date, `null` when absent/blank, or an `error` when present but not a
+ * valid date string — mirroring the strictness of the /:id/reminder endpoint so a
+ * mis-formatted client is surfaced rather than silently dropping the schedule.
+ */
+function parseRemindAt(body: unknown): { date: Date | null } | { error: string } {
+  if (!body || typeof body !== "object") return { date: null };
+  const { remindAt } = body as Record<string, unknown>;
+  if (remindAt === undefined || remindAt === null || remindAt === "") return { date: null };
+  if (typeof remindAt !== "string") return { error: "remindAt must be a date string" };
+  const date = new Date(remindAt);
+  if (isNaN(date.getTime())) return { error: "remindAt must be a valid date" };
+  return { date };
+}
+
 /**
  * Gather the list names a /link request wants the item filed into, from either
  * `listNames` (multi-select share sheet) or the legacy single `listName`.
@@ -135,6 +161,7 @@ export function createIngestRoutes(deps: IngestRoutesDeps = {}): Hono {
   const listStacks = deps.listStacks ?? defaultListStacks;
   const resolveOrCreateStack = deps.resolveOrCreateStack ?? defaultResolveOrCreateStack;
   const attachItemToStack = deps.attachItemToStack ?? defaultAttachItemToStack;
+  const setItemReminder = deps.setItemReminder ?? defaultSetItemReminder;
 
   const routes = new Hono();
 
@@ -252,6 +279,14 @@ export function createIngestRoutes(deps: IngestRoutesDeps = {}): Hono {
     // same list picked twice only files the item once.
     const listNames = collectListNames(body);
 
+    // Optional scheduled date ("Remind me" in the share sheet). Absent/blank
+    // leaves the item unscheduled; a present-but-invalid value is a client bug.
+    const remindAtResult = parseRemindAt(body);
+    if ("error" in remindAtResult) {
+      return c.json({ error: remindAtResult.error }, 400);
+    }
+    const remindAt = remindAtResult.date;
+
     // Notes are only meaningful for a freshly-created item; createMusicItemsFromUrl
     // returns a duplicate's existing item unchanged, so passing them there can never
     // clobber an existing note.
@@ -274,6 +309,12 @@ export function createIngestRoutes(deps: IngestRoutesDeps = {}): Hono {
       for (const result of results) {
         for (const list of lists) {
           await attachItemToStack(result.item.id, list.id);
+        }
+        // Apply the schedule to every returned item — including duplicates, so
+        // re-sharing an already-saved item to set (or update) its date works,
+        // just like re-sharing to file it into a list does.
+        if (remindAt) {
+          await setItemReminder(result.item.id, remindAt);
         }
         if (result.created) {
           scheduleAppleMusicBackfill(result.item.id);

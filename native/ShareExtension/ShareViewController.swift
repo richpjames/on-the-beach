@@ -7,8 +7,9 @@ import MobileCoreServices
 /// When the user taps "On The Beach" in the share sheet, iOS/macOS instantiates
 /// this controller inside the Share Extension process and hands us the shared
 /// content via `extensionContext`. We show a small compose form so the user can
-/// add an optional note and pick any number of lists (existing or new), then POST
-/// the link to the app's ingest endpoint (`/api/ingest/link`) with a `Bearer` token.
+/// add an optional note, pick any number of lists (existing or new), and set an
+/// optional scheduled reminder date, then POST the link to the app's ingest
+/// endpoint (`/api/ingest/link`) with a `Bearer` token.
 ///
 /// The extension talks to the server directly rather than opening the app, so a
 /// share succeeds even when the app isn't running.
@@ -40,6 +41,15 @@ final class ShareViewController: UIViewController {
     private var stackNames: [String] = []
     private var selectedListNames: [String] = []
 
+    /// Formats a chosen schedule as a locale-independent `yyyy-MM-dd` string —
+    /// the same shape the web date picker sends to `/api/music-items/:id/reminder`.
+    private static let scheduleFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateFormat = "yyyy-MM-dd"
+        return formatter
+    }()
+
     private let compose = ComposeFormController()
     private lazy var navController = UINavigationController(rootViewController: compose)
 
@@ -65,7 +75,7 @@ final class ShareViewController: UIViewController {
 
         compose.onCancel = { [weak self] in self?.cancel() }
         compose.onPickList = { [weak self] in self?.pushListPicker() }
-        compose.onSubmit = { [weak self] note in self?.submit(note: note) }
+        compose.onSubmit = { [weak self] note, remindAt in self?.submit(note: note, remindAt: remindAt) }
 
         extractSharedURL { [weak self] url in
             guard let self else { return }
@@ -95,13 +105,13 @@ final class ShareViewController: UIViewController {
 
     // MARK: - Submit / cancel
 
-    private func submit(note: String) {
+    private func submit(note: String, remindAt: Date?) {
         guard let url = sharedURL else {
             cancel()
             return
         }
         compose.setPosting(true)
-        postLink(url: url, note: note, listNames: selectedListNames) { [weak self] result in
+        postLink(url: url, note: note, listNames: selectedListNames, remindAt: remindAt) { [weak self] result in
             guard let self else { return }
             switch result {
             case .success:
@@ -231,6 +241,7 @@ final class ShareViewController: UIViewController {
         url: URL,
         note: String,
         listNames: [String],
+        remindAt: Date?,
         completion: @escaping (PostResult) -> Void
     ) {
         guard let endpoint = URL(string: baseURL + "/api/ingest/link") else {
@@ -245,6 +256,9 @@ final class ShareViewController: UIViewController {
         var payload: [String: Any] = ["url": url.absoluteString]
         if !note.isEmpty { payload["notes"] = note }
         if !listNames.isEmpty { payload["listNames"] = listNames }
+        // Send the schedule as a plain yyyy-MM-dd date, matching the web reminder
+        // control; the server parses it with `new Date(...)`.
+        if let remindAt { payload["remindAt"] = Self.scheduleFormatter.string(from: remindAt) }
 
         var request = URLRequest(url: endpoint)
         request.httpMethod = "POST"
@@ -279,19 +293,22 @@ final class ShareViewController: UIViewController {
     }
 }
 
-/// The compose form: an optional note field and a tappable "List" row, with
-/// Cancel/Add in the navigation bar. It owns no state and does no networking —
-/// it reports Cancel, Add (with the note text), and List taps back to its
+/// The compose form: an optional note field, a tappable "List" row, and a
+/// "Remind me" switch that reveals a date picker, with Cancel/Add in the
+/// navigation bar. It owns no state and does no networking — it reports Cancel,
+/// Add (with the note text and any chosen date), and List taps back to its
 /// container via closures.
 private final class ComposeFormController: UIViewController, UITextViewDelegate {
     var onCancel: (() -> Void)?
-    var onSubmit: ((String) -> Void)?
+    var onSubmit: ((String, Date?) -> Void)?
     var onPickList: (() -> Void)?
 
     private let urlLabel = UILabel()
     private let noteView = UITextView()
     private let notePlaceholder = UILabel()
     private let listValueLabel = UILabel()
+    private let scheduleSwitch = UISwitch()
+    private let datePicker = UIDatePicker()
     private let spinner = UIActivityIndicatorView(style: .medium)
     private lazy var addButton = UIBarButtonItem(
         title: "Add", style: .done, target: self, action: #selector(didTapAdd)
@@ -324,9 +341,19 @@ private final class ComposeFormController: UIViewController, UITextViewDelegate 
         notePlaceholder.font = .preferredFont(forTextStyle: .body)
         notePlaceholder.textColor = .placeholderText
 
-        let listRow = makeListRow()
+        // Schedule: a compact date picker revealed only when "Remind me" is on, so
+        // an unscheduled share sends no date. Default to tomorrow, and never let
+        // the user pick a past day.
+        datePicker.datePickerMode = .date
+        datePicker.preferredDatePickerStyle = .compact
+        datePicker.minimumDate = Calendar.current.startOfDay(for: Date())
+        datePicker.date = Calendar.current.date(byAdding: .day, value: 1, to: Date()) ?? Date()
+        datePicker.isHidden = true
 
-        let stack = UIStackView(arrangedSubviews: [urlLabel, noteView, listRow])
+        let listRow = makeListRow()
+        let scheduleRow = makeScheduleRow()
+
+        let stack = UIStackView(arrangedSubviews: [urlLabel, noteView, listRow, scheduleRow, datePicker])
         stack.axis = .vertical
         stack.spacing = 12
         stack.translatesAutoresizingMaskIntoConstraints = false
@@ -392,6 +419,37 @@ private final class ComposeFormController: UIViewController, UITextViewDelegate 
         return container
     }
 
+    /// Builds the "Remind me" row: a title and a switch that reveals the date picker.
+    private func makeScheduleRow() -> UIView {
+        let container = UIView()
+        container.backgroundColor = .secondarySystemGroupedBackground
+        container.layer.cornerRadius = 10
+
+        let title = UILabel()
+        title.text = "Remind me"
+        title.font = .preferredFont(forTextStyle: .body)
+        title.setContentHuggingPriority(.defaultLow, for: .horizontal)
+
+        scheduleSwitch.addTarget(self, action: #selector(didToggleSchedule), for: .valueChanged)
+        scheduleSwitch.setContentHuggingPriority(.required, for: .horizontal)
+
+        let row = UIStackView(arrangedSubviews: [title, scheduleSwitch])
+        row.axis = .horizontal
+        row.spacing = 8
+        row.alignment = .center
+        row.isLayoutMarginsRelativeArrangement = true
+        row.layoutMargins = UIEdgeInsets(top: 8, left: 12, bottom: 8, right: 12)
+        row.translatesAutoresizingMaskIntoConstraints = false
+        container.addSubview(row)
+        NSLayoutConstraint.activate([
+            row.topAnchor.constraint(equalTo: container.topAnchor),
+            row.bottomAnchor.constraint(equalTo: container.bottomAnchor),
+            row.leadingAnchor.constraint(equalTo: container.leadingAnchor),
+            row.trailingAnchor.constraint(equalTo: container.trailingAnchor),
+        ])
+        return container
+    }
+
     // MARK: - Updates from the container
 
     func setURL(_ url: URL?) {
@@ -426,9 +484,17 @@ private final class ComposeFormController: UIViewController, UITextViewDelegate 
     @objc private func didTapCancel() { onCancel?() }
     @objc private func didTapList() { onPickList?() }
 
+    /// Reveal or hide the date picker alongside the "Remind me" switch.
+    @objc private func didToggleSchedule() {
+        UIView.animate(withDuration: 0.2) {
+            self.datePicker.isHidden = !self.scheduleSwitch.isOn
+        }
+    }
+
     @objc private func didTapAdd() {
         let note = noteView.text.trimmingCharacters(in: .whitespacesAndNewlines)
-        onSubmit?(note)
+        let remindAt = scheduleSwitch.isOn ? datePicker.date : nil
+        onSubmit?(note, remindAt)
     }
 
     // MARK: - UITextViewDelegate
