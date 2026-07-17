@@ -10,7 +10,7 @@
     onPickRandom,
   }: {
     app: MachineHandle<typeof appMachine>;
-    onPickRandom: () => Promise<{ id: number } | null>;
+    onPickRandom: (rating?: number | null) => Promise<{ id: number } | null>;
   } = $props();
 
   const ctx = $derived(app.snapshot.context);
@@ -87,14 +87,74 @@
   let randomBtnText = $state("🎲 Pick One");
   let randomBtnDisabled = $state(false);
 
-  async function pickRandom(): Promise<void> {
+  // Press-and-hold on Pick One opens a menu to constrain the roll to a rating.
+  const RATING_OPTIONS: number[] = [5, 4.5, 4, 3.5, 3, 2.5, 2, 1.5, 1, 0.5];
+  const LONG_PRESS_MS = 450;
+  let ratingMenuOpen = $state(false);
+  let pickRandomEl: HTMLElement | undefined = $state();
+  let longPressTimer: ReturnType<typeof setTimeout> | undefined;
+  let longPressFired = false;
+
+  function ratingStars(value: number): string {
+    const full = Math.floor(value);
+    return "★".repeat(full) + (value - full >= 0.5 ? "½" : "");
+  }
+
+  function openRatingMenu(): void {
+    if (randomBtnDisabled) return;
+    ratingMenuOpen = true;
+  }
+
+  function closeRatingMenu(): void {
+    ratingMenuOpen = false;
+  }
+
+  function startLongPress(): void {
+    longPressFired = false;
+    clearLongPress();
+    longPressTimer = setTimeout(() => {
+      longPressFired = true;
+      openRatingMenu();
+    }, LONG_PRESS_MS);
+  }
+
+  function clearLongPress(): void {
+    if (longPressTimer !== undefined) {
+      clearTimeout(longPressTimer);
+      longPressTimer = undefined;
+    }
+  }
+
+  function onPickRandomClick(): void {
+    // Suppress the click that follows a long-press (it already opened the menu).
+    if (longPressFired) {
+      longPressFired = false;
+      return;
+    }
+    void pickRandom(null);
+  }
+
+  function onPickRandomContextMenu(event: Event): void {
+    // Prevent the native context / callout menu so hold-to-open works everywhere.
+    event.preventDefault();
+    clearLongPress();
+    longPressFired = true;
+    openRatingMenu();
+  }
+
+  function selectRating(rating: number | null): void {
+    closeRatingMenu();
+    void pickRandom(rating);
+  }
+
+  async function pickRandom(rating: number | null): Promise<void> {
     if (randomBtnDisabled) return;
     randomBtnDisabled = true;
     randomBtnText = "🎲 Rolling…";
     try {
-      const picked = await onPickRandom();
+      const picked = await onPickRandom(rating);
       if (!picked) {
-        randomBtnText = "🎲 Nothing yet";
+        randomBtnText = rating === null ? "🎲 Nothing yet" : "🎲 No matches";
         setTimeout(() => {
           randomBtnText = "🎲 Pick One";
           randomBtnDisabled = false;
@@ -116,10 +176,14 @@
       if (!browseToolsEl.contains(target)) {
         app.send({ type: "BROWSE_PANELS_CLOSED" });
       }
+      if (pickRandomEl instanceof HTMLElement && !pickRandomEl.contains(target)) {
+        closeRatingMenu();
+      }
     };
     const onEscape = (event: KeyboardEvent): void => {
       if (event.key === "Escape") {
         app.send({ type: "BROWSE_PANELS_CLOSED" });
+        closeRatingMenu();
       }
     };
     document.addEventListener("click", onDocumentClick);
@@ -141,15 +205,46 @@
           onclick={() => selectFilter(value)}>{label}</button
         >
       {/each}
-      <button
-        type="button"
-        id="pick-random-btn"
-        class="filter-btn filter-btn--action"
-        title="Pick a random item from To Listen"
-        aria-label="Pick a random item from To Listen"
-        disabled={randomBtnDisabled}
-        onclick={pickRandom}>{randomBtnText}</button
-      >
+      <div class="pick-random" bind:this={pickRandomEl}>
+        <button
+          type="button"
+          id="pick-random-btn"
+          class="filter-btn filter-btn--action"
+          title="Pick a random item from To Listen — hold to pick by rating"
+          aria-label="Pick a random item from To Listen. Press and hold to pick by star rating."
+          aria-haspopup="menu"
+          aria-expanded={ratingMenuOpen ? "true" : "false"}
+          disabled={randomBtnDisabled}
+          onclick={onPickRandomClick}
+          onpointerdown={startLongPress}
+          onpointerup={clearLongPress}
+          onpointerleave={clearLongPress}
+          onpointercancel={clearLongPress}
+          oncontextmenu={onPickRandomContextMenu}>{randomBtnText}</button
+        >
+        {#if ratingMenuOpen}
+          <div class="pick-random__menu" role="menu" aria-label="Pick a release rated">
+            <div class="pick-random__menu-heading">Pick one rated…</div>
+            <button
+              type="button"
+              class="pick-random__menu-item"
+              role="menuitem"
+              onclick={() => selectRating(null)}>Any rating</button
+            >
+            {#each RATING_OPTIONS as value (value)}
+              <button
+                type="button"
+                class="pick-random__menu-item"
+                role="menuitem"
+                onclick={() => selectRating(value)}
+              >
+                <span class="pick-random__menu-stars" aria-hidden="true">{ratingStars(value)}</span>
+                <span class="pick-random__menu-label">{value} star{value === 1 ? "" : "s"}</span>
+              </button>
+            {/each}
+          </div>
+        {/if}
+      </div>
     </div>
     <div class="browse-tools" bind:this={browseToolsEl}>
       <div class="browse-tools__mobile-actions">
