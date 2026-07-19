@@ -35,11 +35,13 @@ for free by building the same targets with **Mac Catalyst** (see [Enable macOS
   `POST /api/ingest/link` with a `Bearer` token. The extension talks to the server
   directly, so a share works even when the app isn't running.
 - Posting is **synchronous**: the form stays on screen showing an "Adding…" spinner
-  until the request finishes. It dismisses on success and presents a blocking error
-  alert on failure (a deliberate departure from Apple's
-  `SLComposeServiceViewController`, which swooshes away on Post and leaves nowhere to
-  report a failure). The networking lives in the container view controller, which
-  outlives the form, so there's always a live controller to present the alert on.
+  until the request finishes. On success it flashes a brief checkmark toast built
+  from the server's response — "Added", "Added to Jazz, Chill", or "Already saved"
+  for a duplicate — then dismisses; on failure it presents a blocking error alert
+  (a deliberate departure from Apple's `SLComposeServiceViewController`, which
+  swooshes away on Post and leaves nowhere to report a failure). The networking
+  lives in the container view controller, which outlives the form, so there's
+  always a live controller to present the toast and alert on.
 
 ```
 iOS share sheet ──► ShareExtension compose form ──► POST /api/ingest/link ──► item created

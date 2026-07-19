@@ -17,10 +17,11 @@ import MobileCoreServices
 /// Unlike Apple's `SLComposeServiceViewController` (which swooshes away the
 /// instant you tap Post, leaving nowhere to report a failure), this is a custom
 /// form: the post is synchronous. We stay on screen with an "Adding…" spinner
-/// until the request finishes, dismiss on success, and present a blocking error
-/// alert on failure. Networking and alerts live here in the container — which
+/// until the request finishes, flash a brief "Added" confirmation toast before
+/// dismissing on success, and present a blocking error alert on failure.
+/// Networking, the toast, and alerts live here in the container — which
 /// outlives the child form/picker — so there's always a live view controller to
-/// present the alert on.
+/// present them on.
 final class ShareViewController: UIViewController {
     private struct Stack: Decodable {
         let id: Int
@@ -31,9 +32,28 @@ final class ShareViewController: UIViewController {
         let stacks: [Stack]
     }
 
-    /// Outcome of a post attempt: success, or a message to show the user.
+    /// The slice of the `POST /api/ingest/link` response the confirmation toast
+    /// needs: whether anything was created or skipped as a duplicate, and which
+    /// lists the item was filed into.
+    private struct LinkResponse: Decodable {
+        struct List: Decodable {
+            let name: String
+        }
+
+        let itemsCreated: Int?
+        let itemsSkipped: Int?
+        let lists: [List]?
+
+        enum CodingKeys: String, CodingKey {
+            case itemsCreated = "items_created"
+            case itemsSkipped = "items_skipped"
+            case lists
+        }
+    }
+
+    /// Outcome of a post attempt: a confirmation or error message to show the user.
     private enum PostResult {
-        case success
+        case success(String)
         case failure(String)
     }
 
@@ -114,12 +134,71 @@ final class ShareViewController: UIViewController {
         postLink(url: url, note: note, listNames: selectedListNames, remindAt: remindAt) { [weak self] result in
             guard let self else { return }
             switch result {
-            case .success:
-                self.extensionContext?.completeRequest(returningItems: [], completionHandler: nil)
+            case .success(let message):
+                self.presentSuccess(message)
             case .failure(let message):
                 self.compose.setPosting(false)
                 self.presentError(message)
             }
+        }
+    }
+
+    /// Flashes a checkmark toast over the form, then closes the sheet. Completing
+    /// the request immediately gave no visible feedback, so the user couldn't tell
+    /// a successful add from the sheet just vanishing.
+    private func presentSuccess(_ message: String) {
+        view.endEditing(true)
+
+        let checkmark = UIImageView(image: UIImage(systemName: "checkmark.circle.fill"))
+        checkmark.tintColor = .systemGreen
+        checkmark.contentMode = .scaleAspectFit
+
+        let label = UILabel()
+        label.text = message
+        label.font = .preferredFont(forTextStyle: .headline)
+        label.textAlignment = .center
+        label.numberOfLines = 0
+
+        let stack = UIStackView(arrangedSubviews: [checkmark, label])
+        stack.axis = .vertical
+        stack.spacing = 8
+        stack.alignment = .center
+        stack.translatesAutoresizingMaskIntoConstraints = false
+
+        let toast = UIView()
+        toast.backgroundColor = .secondarySystemBackground
+        toast.layer.cornerRadius = 14
+        toast.layer.shadowColor = UIColor.black.cgColor
+        toast.layer.shadowOpacity = 0.15
+        toast.layer.shadowRadius = 12
+        toast.layer.shadowOffset = CGSize(width: 0, height: 4)
+        toast.translatesAutoresizingMaskIntoConstraints = false
+
+        toast.addSubview(stack)
+        view.addSubview(toast)
+        NSLayoutConstraint.activate([
+            stack.topAnchor.constraint(equalTo: toast.topAnchor, constant: 20),
+            stack.bottomAnchor.constraint(equalTo: toast.bottomAnchor, constant: -20),
+            stack.leadingAnchor.constraint(equalTo: toast.leadingAnchor, constant: 24),
+            stack.trailingAnchor.constraint(equalTo: toast.trailingAnchor, constant: -24),
+            checkmark.widthAnchor.constraint(equalToConstant: 44),
+            checkmark.heightAnchor.constraint(equalToConstant: 44),
+            toast.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+            toast.centerYAnchor.constraint(equalTo: view.centerYAnchor),
+            toast.leadingAnchor.constraint(greaterThanOrEqualTo: view.leadingAnchor, constant: 32),
+            toast.trailingAnchor.constraint(lessThanOrEqualTo: view.trailingAnchor, constant: -32),
+        ])
+
+        toast.alpha = 0
+        toast.transform = CGAffineTransform(scaleX: 0.9, y: 0.9)
+        UIView.animate(withDuration: 0.2) {
+            toast.alpha = 1
+            toast.transform = .identity
+        }
+        UINotificationFeedbackGenerator().notificationOccurred(.success)
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.1) { [weak self] in
+            self?.extensionContext?.completeRequest(returningItems: [], completionHandler: nil)
         }
     }
 
@@ -274,7 +353,7 @@ final class ShareViewController: UIViewController {
             } else {
                 let status = (response as? HTTPURLResponse)?.statusCode ?? 0
                 if (200...299).contains(status) {
-                    result = .success
+                    result = .success(Self.successMessage(from: data))
                 } else if status == 401 {
                     result = .failure("Unauthorized — check the ingest API key.")
                 } else {
@@ -284,6 +363,20 @@ final class ShareViewController: UIViewController {
             }
             DispatchQueue.main.async { completion(result) }
         }.resume()
+    }
+
+    /// Builds the confirmation toast text from the ingest response: "Added",
+    /// "Added to Jazz, Chill", or "Already saved" when the link was a duplicate
+    /// (still worth confirming — a re-share still files it into lists and sets
+    /// the reminder). An unparseable body is still a 2xx, so fall back to "Added".
+    private nonisolated static func successMessage(from data: Data?) -> String {
+        guard let data, let payload = try? JSONDecoder().decode(LinkResponse.self, from: data) else {
+            return "Added"
+        }
+        let duplicate = (payload.itemsCreated ?? 0) == 0 && (payload.itemsSkipped ?? 0) > 0
+        let base = duplicate ? "Already saved" : "Added"
+        let names = (payload.lists ?? []).map(\.name)
+        return names.isEmpty ? base : "\(base) to \(names.joined(separator: ", "))"
     }
 
     private func infoValue(_ key: String) -> String? {
