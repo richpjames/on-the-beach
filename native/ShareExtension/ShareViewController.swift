@@ -87,6 +87,9 @@ final class ShareViewController: UIViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
 
+        view.backgroundColor = OTBTheme.desktop
+        OTBTheme.styleTitleBar(navController.navigationBar)
+
         addChild(navController)
         navController.view.frame = view.bounds
         navController.view.autoresizingMask = [.flexibleWidth, .flexibleHeight]
@@ -150,12 +153,13 @@ final class ShareViewController: UIViewController {
         view.endEditing(true)
 
         let checkmark = UIImageView(image: UIImage(systemName: "checkmark.circle.fill"))
-        checkmark.tintColor = .systemGreen
+        checkmark.tintColor = OTBTheme.ledGreen
         checkmark.contentMode = .scaleAspectFit
 
         let label = UILabel()
         label.text = message
-        label.font = .preferredFont(forTextStyle: .headline)
+        label.font = OTBTheme.ui(14, bold: true)
+        label.textColor = .black
         label.textAlignment = .center
         label.numberOfLines = 0
 
@@ -165,13 +169,13 @@ final class ShareViewController: UIViewController {
         stack.alignment = .center
         stack.translatesAutoresizingMaskIntoConstraints = false
 
-        let toast = UIView()
-        toast.backgroundColor = .secondarySystemBackground
-        toast.layer.cornerRadius = 14
+        // A raised chrome "window" with a hard offset shadow (no blur, zero
+        // radius) — the app's --shadow-window signature.
+        let toast = BeveledView(style: .raised, fill: OTBTheme.chrome)
         toast.layer.shadowColor = UIColor.black.cgColor
-        toast.layer.shadowOpacity = 0.15
-        toast.layer.shadowRadius = 12
-        toast.layer.shadowOffset = CGSize(width: 0, height: 4)
+        toast.layer.shadowOpacity = 1
+        toast.layer.shadowRadius = 0
+        toast.layer.shadowOffset = CGSize(width: 4, height: 4)
         toast.translatesAutoresizingMaskIntoConstraints = false
 
         toast.addSubview(stack)
@@ -410,7 +414,7 @@ private final class ComposeFormController: UIViewController, UITextViewDelegate 
     override func viewDidLoad() {
         super.viewDidLoad()
         title = "On The Beach"
-        view.backgroundColor = .systemGroupedBackground
+        view.backgroundColor = OTBTheme.chrome
 
         navigationItem.leftBarButtonItem = UIBarButtonItem(
             barButtonSystemItem: .cancel, target: self, action: #selector(didTapCancel)
@@ -419,50 +423,62 @@ private final class ComposeFormController: UIViewController, UITextViewDelegate 
         // Nothing to post until a URL is extracted.
         addButton.isEnabled = false
 
-        urlLabel.font = .preferredFont(forTextStyle: .footnote)
-        urlLabel.textColor = .secondaryLabel
+        // The shared URL reads like a terminal line: mono type, navy on chrome.
+        urlLabel.font = OTBTheme.mono(11)
+        urlLabel.textColor = OTBTheme.navy
         urlLabel.numberOfLines = 2
         urlLabel.lineBreakMode = .byTruncatingMiddle
 
-        noteView.font = .preferredFont(forTextStyle: .body)
-        noteView.layer.cornerRadius = 10
-        noteView.backgroundColor = .secondarySystemGroupedBackground
-        noteView.textContainerInset = UIEdgeInsets(top: 10, left: 8, bottom: 10, right: 8)
+        // A sunken white well for the note, matching the app's --bevel-field inputs.
+        noteView.font = OTBTheme.ui(14)
+        noteView.textColor = .black
+        noteView.backgroundColor = .clear
+        noteView.textContainerInset = UIEdgeInsets(top: 8, left: 6, bottom: 8, right: 6)
         noteView.delegate = self
 
         notePlaceholder.text = "Add a note (optional)"
-        notePlaceholder.font = .preferredFont(forTextStyle: .body)
-        notePlaceholder.textColor = .placeholderText
+        notePlaceholder.font = OTBTheme.ui(14)
+        notePlaceholder.textColor = OTBTheme.chromeDark
 
         // Schedule: a compact date picker revealed only when "Remind me" is on, so
         // an unscheduled share sends no date. Default to tomorrow, and never let
         // the user pick a past day.
         datePicker.datePickerMode = .date
         datePicker.preferredDatePickerStyle = .compact
+        datePicker.tintColor = OTBTheme.winBlue
         datePicker.minimumDate = Calendar.current.startOfDay(for: Date())
         datePicker.date = Calendar.current.date(byAdding: .day, value: 1, to: Date()) ?? Date()
         datePicker.isHidden = true
 
+        // Seat the note text view inside a sunken field well, inset by the 2px bevel.
+        let noteField = BeveledView(style: .field, fill: OTBTheme.chromeWhite)
+        noteField.translatesAutoresizingMaskIntoConstraints = false
+        noteView.translatesAutoresizingMaskIntoConstraints = false
+        noteField.addSubview(noteView)
+        noteView.addSubview(notePlaceholder)
+        notePlaceholder.translatesAutoresizingMaskIntoConstraints = false
+
         let listRow = makeListRow()
         let scheduleRow = makeScheduleRow()
 
-        let stack = UIStackView(arrangedSubviews: [urlLabel, noteView, listRow, scheduleRow, datePicker])
+        let stack = UIStackView(arrangedSubviews: [urlLabel, noteField, listRow, scheduleRow, datePicker])
         stack.axis = .vertical
         stack.spacing = 12
         stack.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(stack)
-
-        noteView.addSubview(notePlaceholder)
-        notePlaceholder.translatesAutoresizingMaskIntoConstraints = false
 
         let guide = view.safeAreaLayoutGuide
         NSLayoutConstraint.activate([
             stack.topAnchor.constraint(equalTo: guide.topAnchor, constant: 16),
             stack.leadingAnchor.constraint(equalTo: guide.leadingAnchor, constant: 16),
             stack.trailingAnchor.constraint(equalTo: guide.trailingAnchor, constant: -16),
-            noteView.heightAnchor.constraint(equalToConstant: 96),
-            notePlaceholder.topAnchor.constraint(equalTo: noteView.topAnchor, constant: 10),
-            notePlaceholder.leadingAnchor.constraint(equalTo: noteView.leadingAnchor, constant: 12),
+            noteField.heightAnchor.constraint(equalToConstant: 96),
+            noteView.topAnchor.constraint(equalTo: noteField.topAnchor, constant: 2),
+            noteView.bottomAnchor.constraint(equalTo: noteField.bottomAnchor, constant: -2),
+            noteView.leadingAnchor.constraint(equalTo: noteField.leadingAnchor, constant: 2),
+            noteView.trailingAnchor.constraint(equalTo: noteField.trailingAnchor, constant: -2),
+            notePlaceholder.topAnchor.constraint(equalTo: noteView.topAnchor, constant: 8),
+            notePlaceholder.leadingAnchor.constraint(equalTo: noteView.leadingAnchor, constant: 10),
         ])
     }
 
@@ -473,22 +489,22 @@ private final class ComposeFormController: UIViewController, UITextViewDelegate 
 
     /// Builds the "Lists — None ›" row as a tappable stack (no iOS 15 button APIs).
     private func makeListRow() -> UIView {
-        let container = UIView()
-        container.backgroundColor = .secondarySystemGroupedBackground
-        container.layer.cornerRadius = 10
+        let container = PressableBeveledView(style: .raised, fill: OTBTheme.chromePanel)
+        container.onTap = { [weak self] in self?.onPickList?() }
 
         let title = UILabel()
         title.text = "Lists"
-        title.font = .preferredFont(forTextStyle: .body)
+        title.font = OTBTheme.ui(14)
+        title.textColor = .black
 
         listValueLabel.text = "None"
-        listValueLabel.font = .preferredFont(forTextStyle: .body)
-        listValueLabel.textColor = .secondaryLabel
+        listValueLabel.font = OTBTheme.ui(14)
+        listValueLabel.textColor = OTBTheme.chromeDarker
         listValueLabel.textAlignment = .right
         listValueLabel.setContentHuggingPriority(.defaultLow, for: .horizontal)
 
         let chevron = UIImageView(image: UIImage(systemName: "chevron.right"))
-        chevron.tintColor = .tertiaryLabel
+        chevron.tintColor = OTBTheme.chromeDark
         chevron.setContentHuggingPriority(.required, for: .horizontal)
 
         let row = UIStackView(arrangedSubviews: [title, listValueLabel, chevron])
@@ -505,24 +521,20 @@ private final class ComposeFormController: UIViewController, UITextViewDelegate 
             row.leadingAnchor.constraint(equalTo: container.leadingAnchor),
             row.trailingAnchor.constraint(equalTo: container.trailingAnchor),
         ])
-
-        container.addGestureRecognizer(
-            UITapGestureRecognizer(target: self, action: #selector(didTapList))
-        )
         return container
     }
 
     /// Builds the "Remind me" row: a title and a switch that reveals the date picker.
     private func makeScheduleRow() -> UIView {
-        let container = UIView()
-        container.backgroundColor = .secondarySystemGroupedBackground
-        container.layer.cornerRadius = 10
+        let container = BeveledView(style: .raised, fill: OTBTheme.chromePanel)
 
         let title = UILabel()
         title.text = "Remind me"
-        title.font = .preferredFont(forTextStyle: .body)
+        title.font = OTBTheme.ui(14)
+        title.textColor = .black
         title.setContentHuggingPriority(.defaultLow, for: .horizontal)
 
+        scheduleSwitch.onTintColor = OTBTheme.winBlue
         scheduleSwitch.addTarget(self, action: #selector(didToggleSchedule), for: .valueChanged)
         scheduleSwitch.setContentHuggingPriority(.required, for: .horizontal)
 
@@ -575,7 +587,6 @@ private final class ComposeFormController: UIViewController, UITextViewDelegate 
     // MARK: - Actions
 
     @objc private func didTapCancel() { onCancel?() }
-    @objc private func didTapList() { onPickList?() }
 
     /// Reveal or hide the date picker alongside the "Remind me" switch.
     @objc private func didToggleSchedule() {
@@ -626,6 +637,10 @@ private final class ListPickerViewController: UITableViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
         title = "Lists"
+        // The Winamp black playlist: black well, light-blue text, navy separators.
+        tableView.backgroundColor = OTBTheme.playlistBg
+        tableView.separatorColor = OTBTheme.navyBorder
+        tableView.tintColor = OTBTheme.accent // checkmark colour
     }
 
     // Section 0: existing lists (checkmark = selected). Section 1: "New list…".
@@ -639,18 +654,35 @@ private final class ListPickerViewController: UITableViewController {
         let cell = tableView.dequeueReusableCell(withIdentifier: "cell")
             ?? UITableViewCell(style: .default, reuseIdentifier: "cell")
 
+        cell.backgroundColor = .clear
+        cell.textLabel?.font = OTBTheme.ui(14)
+        // Keep the selected-row highlight in the Winamp blue rather than iOS grey.
+        let highlight = UIView()
+        highlight.backgroundColor = OTBTheme.playlistSelectedBg
+        cell.selectedBackgroundView = highlight
+
         if indexPath.section == 1 {
             cell.textLabel?.text = "New list…"
-            cell.textLabel?.textColor = cell.tintColor
+            cell.textLabel?.textColor = OTBTheme.accent
             cell.accessoryType = .none
             return cell
         }
 
         let name = names[indexPath.row]
         cell.textLabel?.text = name
-        cell.textLabel?.textColor = .label
+        cell.textLabel?.textColor = OTBTheme.playlistText
         cell.accessoryType = selected.contains(name) ? .checkmark : .none
         return cell
+    }
+
+    /// Zebra-stripe the existing-list rows, matching the playlist's alternating
+    /// row backgrounds (--playlist-bg / --playlist-bg-alt).
+    override func tableView(_ tableView: UITableView, willDisplay cell: UITableViewCell, forRowAt indexPath: IndexPath) {
+        guard indexPath.section == 0 else {
+            cell.backgroundColor = OTBTheme.playlistBg
+            return
+        }
+        cell.backgroundColor = indexPath.row.isMultiple(of: 2) ? OTBTheme.playlistBg : OTBTheme.playlistBgAlt
     }
 
     override func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
@@ -692,5 +724,198 @@ private final class ListPickerViewController: UITableViewController {
             self.tableView.reloadData()
         })
         present(alert, animated: true)
+    }
+}
+
+// MARK: - Windows 98 / Winamp styling
+//
+// The web app (src/styles/main.css) is a deliberate Windows 98 + Winamp skin:
+// silver-chrome surfaces, a teal desktop, a blue title bar, a black Winamp
+// playlist, 2px two-tone 3D bevels, zero corner radius, and hard offset shadows.
+// This extension is native UIKit with no access to that stylesheet, so we mirror
+// the same design tokens here in code and apply them to the share sheet.
+
+/// The app's palette and fonts, mirrored from the `:root` tokens in main.css.
+enum OTBTheme {
+    static let chrome = UIColor(rgb: 0xC0C0C0)       // --chrome: primary surface
+    static let chromeLight = UIColor(rgb: 0xDFDFDF)  // --chrome-light: hover
+    static let chromeWhite = UIColor.white           // --chrome-white
+    static let chromeDark = UIColor(rgb: 0x808080)   // --chrome-dark
+    static let chromeDarker = UIColor(rgb: 0x404040) // --chrome-darker: shadow edge
+    static let chromePanel = UIColor(rgb: 0xD4D0C8)  // --chrome-panel: warm toolbar grey
+    static let desktop = UIColor(rgb: 0x008080)      // teal desktop background
+    static let titleBarStart = UIColor(rgb: 0x000080) // --title-bar gradient stops
+    static let titleBarMid = UIColor(rgb: 0x1084D0)
+    static let titleBarEnd = UIColor(rgb: 0x4DB0E8)
+    static let playlistBg = UIColor.black            // --playlist-bg
+    static let playlistBgAlt = UIColor(rgb: 0x06060E) // --playlist-bg-alt (zebra)
+    static let playlistText = UIColor(rgb: 0xADC8FF) // --playlist-text
+    static let playlistSelectedBg = UIColor(rgb: 0x225FA8) // --playlist-selected-bg
+    static let accent = UIColor(rgb: 0x6699FF)       // --accent: electric blue
+    static let winBlue = UIColor(rgb: 0x225FA8)      // --win-blue: menu/selection highlight
+    static let navy = UIColor(rgb: 0x001033)         // --navy
+    static let navyBorder = UIColor(rgb: 0x224499)   // --navy-border
+    static let ledGreen = UIColor(rgb: 0x00FF41)     // --led-green
+
+    /// UI chrome type. The web uses Tahoma; iOS doesn't ship it, so we use
+    /// Verdana — the same designer's near-identical face, bundled on every device.
+    static func ui(_ size: CGFloat, bold: Bool = false) -> UIFont {
+        UIFont(name: bold ? "Verdana-Bold" : "Verdana", size: size)
+            ?? .systemFont(ofSize: size, weight: bold ? .bold : .regular)
+    }
+
+    /// Mono/terminal type for URLs and the toast — the web's Share Tech Mono
+    /// stand-in, using Courier New (also always present on iOS).
+    static func mono(_ size: CGFloat) -> UIFont {
+        UIFont(name: "CourierNewPSMT", size: size)
+            ?? .monospacedSystemFont(ofSize: size, weight: .regular)
+    }
+
+    /// A horizontal title-bar gradient (navy → blue → light blue) rendered to an
+    /// image so it can back a `UINavigationBarAppearance`. Wide so it stretches
+    /// cleanly to any bar width while keeping the 0 / 0.7 / 1 colour stops.
+    static func titleBarImage() -> UIImage {
+        let size = CGSize(width: 1024, height: 44)
+        return UIGraphicsImageRenderer(size: size).image { ctx in
+            let colors = [titleBarStart.cgColor, titleBarMid.cgColor, titleBarEnd.cgColor] as CFArray
+            guard let gradient = CGGradient(
+                colorsSpace: CGColorSpaceCreateDeviceRGB(),
+                colors: colors,
+                locations: [0, 0.7, 1]
+            ) else { return }
+            ctx.cgContext.drawLinearGradient(
+                gradient,
+                start: .zero,
+                end: CGPoint(x: size.width, y: 0),
+                options: []
+            )
+        }
+    }
+
+    /// Applies the blue title-bar look to a navigation bar: gradient background,
+    /// white bold Verdana title, white bar-button items.
+    static func styleTitleBar(_ navigationBar: UINavigationBar) {
+        let appearance = UINavigationBarAppearance()
+        appearance.configureWithOpaqueBackground()
+        appearance.backgroundImage = titleBarImage()
+        appearance.shadowColor = .black
+        appearance.titleTextAttributes = [
+            .foregroundColor: UIColor.white,
+            .font: ui(15, bold: true),
+        ]
+        let buttonText: [NSAttributedString.Key: Any] = [.font: ui(14)]
+        appearance.buttonAppearance.normal.titleTextAttributes = buttonText
+        appearance.doneButtonAppearance.normal.titleTextAttributes = [.font: ui(14, bold: true)]
+
+        navigationBar.standardAppearance = appearance
+        navigationBar.scrollEdgeAppearance = appearance
+        navigationBar.compactAppearance = appearance
+        navigationBar.tintColor = .white
+    }
+}
+
+extension UIColor {
+    /// Builds an opaque colour from a 0xRRGGBB literal, matching how the CSS
+    /// tokens are written, so the palette reads the same in both places.
+    convenience init(rgb: UInt32) {
+        self.init(
+            red: CGFloat((rgb >> 16) & 0xFF) / 255,
+            green: CGFloat((rgb >> 8) & 0xFF) / 255,
+            blue: CGFloat(rgb & 0xFF) / 255,
+            alpha: 1
+        )
+    }
+}
+
+/// The three Windows 98 bevel states. Each is a 2px border whose top+left edges
+/// are one tone and bottom+right edges the opposite, faking a 3D light source.
+enum BevelStyle {
+    case raised // buttons, windows, panels: light top-left, dark bottom-right
+    case sunken // pressed controls: dark top-left, light bottom-right
+    case field  // sunken wells (inputs, list rows): grey top-left, white bottom-right
+}
+
+/// A flat-filled view that draws a Windows 98 two-tone bevel around its edge.
+///
+/// UIKit has no built-in for this: `CALayer.borderColor` is a single colour, but
+/// the whole retro look depends on adjacent edges being *different* colours. So we
+/// draw it ourselves in `draw(_:)`. Subclassed by `PressableBeveledView`.
+class BeveledView: UIView {
+    var style: BevelStyle { didSet { setNeedsDisplay() } }
+    var fill: UIColor { didSet { setNeedsDisplay() } }
+    /// Bevel thickness in points (the web uses 2px).
+    var bevelWidth: CGFloat = 2 { didSet { setNeedsDisplay() } }
+
+    init(style: BevelStyle = .raised, fill: UIColor = OTBTheme.chrome) {
+        self.style = style
+        self.fill = fill
+        super.init(frame: .zero)
+        backgroundColor = .clear
+        isOpaque = false
+        contentMode = .redraw // re-run draw(_:) whenever Auto Layout resizes us
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
+
+    /// The two edge tones for the current style: `light` paints the top + left
+    /// edges, `dark` paints the bottom + right edges.
+    var edgeColors: (light: UIColor, dark: UIColor) {
+        switch style {
+        case .raised: return (OTBTheme.chromeWhite, OTBTheme.chromeDarker)
+        case .sunken: return (OTBTheme.chromeDarker, OTBTheme.chromeWhite)
+        case .field:  return (OTBTheme.chromeDark, OTBTheme.chromeWhite)
+        }
+    }
+
+    override func draw(_ rect: CGRect) {
+        guard let ctx = UIGraphicsGetCurrentContext() else { return }
+        let (light, dark) = edgeColors
+        let w = bevelWidth
+
+        // 1. Fill the interior.
+        ctx.setFillColor(fill.cgColor)
+        ctx.fill(bounds)
+
+        // 2. Light top + left edges.
+        ctx.setFillColor(light.cgColor)
+        ctx.fill(CGRect(x: 0, y: 0, width: bounds.width, height: w))          // top
+        ctx.fill(CGRect(x: 0, y: 0, width: w, height: bounds.height))         // left
+
+        // 3. Dark bottom + right edges.
+        ctx.setFillColor(dark.cgColor)
+        ctx.fill(CGRect(x: 0, y: bounds.height - w, width: bounds.width, height: w))  // bottom
+        ctx.fill(CGRect(x: bounds.width - w, y: 0, width: w, height: bounds.height))  // right
+    }
+}
+
+/// A beveled panel that behaves like a Windows 98 button: it "pushes in" while
+/// held (bevel flips raised → sunken), springs back on release, and fires `onTap`
+/// only when the touch lifts inside its bounds — same feel as the web app's
+/// raised controls, which invert their bevel on `:active`.
+final class PressableBeveledView: BeveledView {
+    var onTap: (() -> Void)?
+    /// The look when not being pressed, restored on release/cancel.
+    private let restingStyle: BevelStyle
+
+    override init(style: BevelStyle = .raised, fill: UIColor = OTBTheme.chrome) {
+        self.restingStyle = style
+        super.init(style: style, fill: fill)
+        isUserInteractionEnabled = true
+    }
+
+    override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
+        style = .sunken
+    }
+
+    override func touchesEnded(_ touches: Set<UITouch>, with event: UIEvent?) {
+        style = restingStyle
+        if let point = touches.first?.location(in: self), bounds.contains(point) {
+            onTap?()
+        }
+    }
+
+    override func touchesCancelled(_ touches: Set<UITouch>, with event: UIEvent?) {
+        style = restingStyle
     }
 }
