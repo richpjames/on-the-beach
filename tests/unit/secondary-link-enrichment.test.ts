@@ -13,9 +13,18 @@ const fetchItem = mock();
 const getExisting = mock();
 const search = mock();
 const save = mock();
+const saveArtwork = mock();
 const stamp = mock();
 
-const deps: SecondaryLookupDeps = { getService, fetchItem, getExisting, search, save, stamp };
+const deps: SecondaryLookupDeps = {
+  getService,
+  fetchItem,
+  getExisting,
+  search,
+  save,
+  saveArtwork,
+  stamp,
+};
 
 function item(overrides: Partial<ItemInfoForLookup> = {}): ItemInfoForLookup {
   return {
@@ -23,9 +32,15 @@ function item(overrides: Partial<ItemInfoForLookup> = {}): ItemInfoForLookup {
     artistName: "Massive Attack",
     primarySource: null,
     primaryUrl: null,
+    artworkUrl: null,
     lookupAttemptedAt: null,
     ...overrides,
   };
+}
+
+/** A search hit for the given URL, with optional cover artwork. */
+function hit(url: string, artworkUrl: string | null = null) {
+  return { url, artworkUrl };
 }
 
 beforeEach(() => {
@@ -34,10 +49,12 @@ beforeEach(() => {
   getExisting.mockReset();
   search.mockReset();
   save.mockReset();
+  saveArtwork.mockReset();
   stamp.mockReset();
   getService.mockResolvedValue("apple_music" as LookupService);
   getExisting.mockResolvedValue(null);
   save.mockResolvedValue(undefined);
+  saveArtwork.mockResolvedValue(undefined);
   stamp.mockResolvedValue(undefined);
 });
 
@@ -69,7 +86,7 @@ describe("lookupSecondaryLinkForItem", () => {
     fetchItem.mockResolvedValue(
       item({ primarySource: "spotify", primaryUrl: "https://open.spotify.com/album/abc" }),
     );
-    search.mockResolvedValue("https://music.apple.com/gb/album/blue-lines/456");
+    search.mockResolvedValue(hit("https://music.apple.com/gb/album/blue-lines/456"));
     const outcome = await lookupSecondaryLinkForItem(1, deps);
     expect(outcome.kind).toBe("result");
     expect(search).toHaveBeenCalledWith("Blue Lines", "Massive Attack", "apple_music");
@@ -105,7 +122,7 @@ describe("lookupSecondaryLinkForItem", () => {
 
   test("on a hit: saves the link and stamps the marker", async () => {
     fetchItem.mockResolvedValue(item());
-    search.mockResolvedValue("https://music.apple.com/gb/album/blue-lines/456");
+    search.mockResolvedValue(hit("https://music.apple.com/gb/album/blue-lines/456"));
     const outcome = await lookupSecondaryLinkForItem(5, deps);
     expect(outcome).toEqual({
       kind: "result",
@@ -119,6 +136,31 @@ describe("lookupSecondaryLinkForItem", () => {
       "apple_music",
     );
     expect(stamp).toHaveBeenCalledWith(5);
+  });
+
+  test("on a hit with artwork: backfills the item's cover when it has none", async () => {
+    fetchItem.mockResolvedValue(item({ artworkUrl: null }));
+    search.mockResolvedValue(
+      hit("https://music.apple.com/gb/album/blue-lines/456", "https://cdn/cover/1200x1200bb.jpg"),
+    );
+    await lookupSecondaryLinkForItem(5, deps);
+    expect(saveArtwork).toHaveBeenCalledWith(5, "https://cdn/cover/1200x1200bb.jpg");
+  });
+
+  test("does not overwrite artwork the item already has", async () => {
+    fetchItem.mockResolvedValue(item({ artworkUrl: "https://existing/cover.jpg" }));
+    search.mockResolvedValue(
+      hit("https://music.apple.com/gb/album/blue-lines/456", "https://cdn/cover/1200x1200bb.jpg"),
+    );
+    await lookupSecondaryLinkForItem(5, deps);
+    expect(saveArtwork).not.toHaveBeenCalled();
+  });
+
+  test("saves no artwork when the hit carries none", async () => {
+    fetchItem.mockResolvedValue(item({ artworkUrl: null }));
+    search.mockResolvedValue(hit("https://music.apple.com/gb/album/blue-lines/456", null));
+    await lookupSecondaryLinkForItem(5, deps);
+    expect(saveArtwork).not.toHaveBeenCalled();
   });
 
   test("on a miss: stamps the marker but saves nothing", async () => {
@@ -138,7 +180,7 @@ describe("lookupSecondaryLinkForItem", () => {
   test("uses the active service from settings (Spotify)", async () => {
     getService.mockResolvedValue("spotify" as LookupService);
     fetchItem.mockResolvedValue(item({ primarySource: "apple_music" }));
-    search.mockResolvedValue("https://open.spotify.com/album/xyz");
+    search.mockResolvedValue(hit("https://open.spotify.com/album/xyz"));
     const outcome = await lookupSecondaryLinkForItem(9, deps);
     expect(outcome).toMatchObject({
       kind: "result",
@@ -155,7 +197,7 @@ describe("lookupSecondaryLinkForItem", () => {
 describe("enrichSecondaryLink", () => {
   test("unwraps a hit to the URL", async () => {
     fetchItem.mockResolvedValue(item());
-    search.mockResolvedValue("https://music.apple.com/gb/album/blue-lines/456");
+    search.mockResolvedValue(hit("https://music.apple.com/gb/album/blue-lines/456"));
     expect(await enrichSecondaryLink(5, deps)).toBe(
       "https://music.apple.com/gb/album/blue-lines/456",
     );

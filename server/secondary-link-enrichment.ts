@@ -1,8 +1,8 @@
-import { and, eq } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 import { db } from "./db/index";
 import { artists, musicItems, musicLinks, sources } from "./db/schema";
 import { parseUrl } from "./utils";
-import { searchAppleMusic, searchSpotify } from "./scraper";
+import { searchAppleMusic, searchSpotify, type ServiceSearchResult } from "./scraper";
 import { getLookupService, type LookupService } from "./settings";
 
 // ---------------------------------------------------------------------------
@@ -24,7 +24,7 @@ export interface ServiceConfig {
   displayName: string;
   /** Host fragment identifying a primary URL already on this service. */
   urlFragment: string;
-  search: (title: string, artist: string | null) => Promise<string | null>;
+  search: (title: string, artist: string | null) => Promise<ServiceSearchResult | null>;
 }
 
 export const LOOKUP_SERVICE_CONFIG: Record<LookupService, ServiceConfig> = {
@@ -47,6 +47,8 @@ export interface ItemInfoForLookup {
   artistName: string | null;
   primarySource: string | null;
   primaryUrl: string | null;
+  /** The item's current cover art, if any — a lookup only fills a gap, never overwrites. */
+  artworkUrl: string | null;
   /** Set once a lookup has been attempted (hit or miss); used to avoid re-querying. */
   lookupAttemptedAt: Date | null;
 }
@@ -58,8 +60,9 @@ export type SearchServiceFn = (
   title: string,
   artist: string | null,
   service: LookupService,
-) => Promise<string | null>;
+) => Promise<ServiceSearchResult | null>;
 export type SaveLinkFn = (itemId: number, url: string, sourceName: string) => Promise<void>;
+export type SaveArtworkFn = (itemId: number, artworkUrl: string) => Promise<void>;
 export type StampLookupFn = (itemId: number) => Promise<void>;
 
 export async function fetchItemForLookup(id: number): Promise<ItemInfoForLookup | null> {
@@ -69,6 +72,7 @@ export async function fetchItemForLookup(id: number): Promise<ItemInfoForLookup 
       artistName: artists.name,
       primarySource: sources.name,
       primaryUrl: musicLinks.url,
+      artworkUrl: musicItems.artworkUrl,
       lookupAttemptedAt: musicItems.lookupAttemptedAt,
     })
     .from(musicItems)
@@ -89,6 +93,7 @@ export async function fetchItemForLookup(id: number): Promise<ItemInfoForLookup 
     artistName: row.artistName ?? null,
     primarySource: row.primarySource ?? null,
     primaryUrl: row.primaryUrl ?? null,
+    artworkUrl: row.artworkUrl ?? null,
     lookupAttemptedAt: row.lookupAttemptedAt ?? null,
   };
 }
@@ -133,6 +138,18 @@ export async function stampLookup(itemId: number): Promise<void> {
     .where(eq(musicItems.id, itemId));
 }
 
+/**
+ * Persist cover art discovered during a lookup, but only when the item still has
+ * none — the `IS NULL` guard means an artwork the user set (or an earlier lookup
+ * found) is never clobbered, even under a concurrent enrichment.
+ */
+export async function saveArtwork(itemId: number, artworkUrl: string): Promise<void> {
+  await db
+    .update(musicItems)
+    .set({ artworkUrl })
+    .where(and(eq(musicItems.id, itemId), isNull(musicItems.artworkUrl)));
+}
+
 const defaultSearch: SearchServiceFn = (title, artist, service) =>
   LOOKUP_SERVICE_CONFIG[service].search(title, artist);
 
@@ -142,6 +159,7 @@ export interface SecondaryLookupDeps {
   getExisting: GetExistingLinkFn;
   search: SearchServiceFn;
   save: SaveLinkFn;
+  saveArtwork: SaveArtworkFn;
   stamp: StampLookupFn;
 }
 
@@ -151,6 +169,7 @@ export const defaultSecondaryLookupDeps: SecondaryLookupDeps = {
   getExisting: getExistingLink,
   search: defaultSearch,
   save: saveLink,
+  saveArtwork,
   stamp: stampLookup,
 };
 
@@ -198,15 +217,21 @@ export async function lookupSecondaryLinkForItem(
     return { kind: "skipped", reason: "already_attempted" };
   }
 
-  const url = await deps.search(item.title, item.artistName, service);
+  const result = await deps.search(item.title, item.artistName, service);
   await deps.stamp(itemId);
 
-  if (!url) {
+  if (!result) {
     return { kind: "result", service, serviceDisplayName: cfg.displayName, url: null };
   }
 
-  await deps.save(itemId, url, cfg.sourceName);
-  return { kind: "result", service, serviceDisplayName: cfg.displayName, url };
+  await deps.save(itemId, result.url, cfg.sourceName);
+
+  // Backfill cover art from the same lookup when the item has none of its own.
+  if (result.artworkUrl && !item.artworkUrl) {
+    await deps.saveArtwork(itemId, result.artworkUrl);
+  }
+
+  return { kind: "result", service, serviceDisplayName: cfg.displayName, url: result.url };
 }
 
 /** Convenience wrapper returning just the resolved URL (or null). */

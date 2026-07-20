@@ -4,7 +4,9 @@ import {
   type ExtractedReleaseCandidate,
 } from "./link-extractor";
 import { fetchDiscogsRelease } from "./discogs";
-import { searchAppleMusicCatalog } from "./apple-music-catalog";
+import { searchAppleMusicCatalog, type ServiceSearchResult } from "./apple-music-catalog";
+
+export type { ServiceSearchResult } from "./apple-music-catalog";
 
 export interface OgData {
   ogTitle?: string;
@@ -1140,7 +1142,7 @@ function normalizeForMatch(s: string): string {
 
 /**
  * Search Apple Music for a release by title and artist, returning the best
- * matching catalogue URL, or null if not found.
+ * matching catalogue URL together with its cover artwork, or null if not found.
  *
  * Prefers the official Apple Music Catalog API (api.music.apple.com) when
  * MusicKit is configured — those URLs carry the catalogue ids the browser SDK
@@ -1151,15 +1153,16 @@ export async function searchAppleMusic(
   title: string,
   artist: string | null,
   timeoutMs = 8000,
-): Promise<string | null> {
-  const catalogUrl = await searchAppleMusicCatalog(title, artist, timeoutMs);
-  if (catalogUrl) return catalogUrl;
+): Promise<ServiceSearchResult | null> {
+  const catalogResult = await searchAppleMusicCatalog(title, artist, timeoutMs);
+  if (catalogResult) return catalogResult;
   return searchAppleMusicViaItunes(title, artist, timeoutMs);
 }
 
 /**
  * Search Apple Music via the open iTunes Search API. Returns the Apple Music
- * URL for the best matching result, or null if not found.
+ * URL for the best matching result together with its cover artwork, or null if
+ * not found.
  *
  * Matching strategy (in order):
  *  1. Exact title + artist match
@@ -1171,7 +1174,7 @@ export async function searchAppleMusicViaItunes(
   title: string,
   artist: string | null,
   timeoutMs = 8000,
-): Promise<string | null> {
+): Promise<ServiceSearchResult | null> {
   // Test environments set this to keep the release page deterministic — the
   // visual snapshot can't depend on whether iTunes responds in time.
   if (process.env.OTB_DISABLE_EXTERNAL_LOOKUPS) return null;
@@ -1227,6 +1230,16 @@ export async function searchAppleMusicViaItunes(
       }
     }
 
+    function toResult(result: Record<string, unknown>): ServiceSearchResult | undefined {
+      const url = resultUrl(result);
+      if (!url) return undefined;
+      const artworkUrl =
+        normalizeAppleMusicImageUrl(
+          firstDefined(getString(result.artworkUrl100), getString(result.artworkUrl60)),
+        ) ?? null;
+      return { url, artworkUrl };
+    }
+
     // Pass 1: exact title + artist
     for (const result of data.results) {
       if (!isRecord(result)) continue;
@@ -1236,8 +1249,8 @@ export async function searchAppleMusicViaItunes(
       );
       if (!resultTitle || normalizeForMatch(resultTitle) !== normalizedTitle) continue;
       if (!artistMatches(getString(result.artistName))) continue;
-      const url = resultUrl(result);
-      if (url) return url;
+      const match = toResult(result);
+      if (match) return match;
     }
 
     // Pass 2: compatible title (one is a prefix of the other) + artist
@@ -1249,16 +1262,16 @@ export async function searchAppleMusicViaItunes(
       );
       if (!resultTitle || !titlesCompatible(resultTitle)) continue;
       if (!artistMatches(getString(result.artistName))) continue;
-      const url = resultUrl(result);
-      if (url) return url;
+      const match = toResult(result);
+      if (match) return match;
     }
 
     // Pass 3: first result whose artist matches (search query is already scoped)
     for (const result of data.results) {
       if (!isRecord(result)) continue;
       if (!artistMatches(getString(result.artistName))) continue;
-      const url = resultUrl(result);
-      if (url) return url;
+      const match = toResult(result);
+      if (match) return match;
     }
 
     return null;
@@ -1282,7 +1295,7 @@ export async function searchSpotify(
   _title: string,
   _artist: string | null,
   _timeoutMs = 8000,
-): Promise<string | null> {
+): Promise<ServiceSearchResult | null> {
   if (process.env.OTB_DISABLE_EXTERNAL_LOOKUPS) return null;
 
   const clientId = process.env.SPOTIFY_CLIENT_ID;
