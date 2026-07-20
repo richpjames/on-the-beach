@@ -153,36 +153,35 @@
   // A dedicated add/edit-notes control that lives with the notes in view mode,
   // so notes can be changed without opening the full edit form.
   let currentNotes = $state<string | null>(item.notes ?? null);
-  let notesEditing = $state(false);
+  let notesState = $state<"idle" | "editing" | "saving">("idle");
   let notesDraft = $state("");
-  let notesSaving = $state(false);
 
   function startEditNotes(): void {
     notesDraft = currentNotes ?? "";
-    notesEditing = true;
+    notesState = "editing";
   }
 
   function cancelEditNotes(): void {
-    notesEditing = false;
+    notesState = "idle";
   }
 
   async function saveNotes(): Promise<void> {
     const trimmed = notesDraft.trim();
-    notesSaving = true;
+    notesState = "saving";
     const res = await apiFetch(`/api/music-items/${item.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ notes: trimmed || null }),
     });
-    notesSaving = false;
     if (!res.ok) {
       alert("Failed to save notes.");
+      notesState = "editing";
       return;
     }
     currentNotes = trimmed || null;
     // Keep the full edit form in sync in case it's opened afterwards.
     editNotes = trimmed;
-    notesEditing = false;
+    notesState = "idle";
   }
 
   async function saveChanges(): Promise<void> {
@@ -422,7 +421,7 @@
             <p class="release-page__catalogue">{item.catalogue_number}</p>
           {/if}
           <div class="release-page__notes-section">
-            {#if notesEditing}
+            {#if notesState === "editing" || notesState === "saving"}
               <textarea
                 class="input release-page__notes-editor"
                 id="inline-notes"
@@ -434,8 +433,9 @@
                   type="button"
                   class="btn btn--primary"
                   id="save-notes-btn"
-                  disabled={notesSaving}
-                  onclick={saveNotes}>{notesSaving ? "Saving…" : "Save notes"}</button
+                  disabled={notesState === "saving"}
+                  onclick={saveNotes}
+                  >{notesState === "saving" ? "Saving…" : "Save notes"}</button
                 >
                 <button type="button" class="btn" id="cancel-notes-btn" onclick={cancelEditNotes}
                   >Cancel</button
