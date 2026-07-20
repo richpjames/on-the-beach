@@ -2945,6 +2945,33 @@ a:hover {
   margin-top: var(--space-2);
 }
 
+.release-page__notes-section {
+  margin-top: var(--space-2);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-2);
+}
+
+.release-page__notes-section .release-page__notes {
+  margin-top: 0;
+}
+
+.release-page__notes-btn {
+  font-size: var(--text-sm);
+}
+
+.release-page__notes-editor {
+  width: 100%;
+  min-height: 4rem;
+  resize: vertical;
+}
+
+.release-page__notes-actions {
+  display: flex;
+  gap: var(--space-2);
+}
+
 .release-page__rating {
   color: var(--chrome-black);
   font-size: var(--text-lg);
