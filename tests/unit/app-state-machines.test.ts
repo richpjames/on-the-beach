@@ -3,6 +3,7 @@ import { describe, expect, it } from "bun:test";
 
 import { addFormMachine } from "../../src/ui/state/add-form-machine";
 import { appMachine } from "../../src/ui/state/app-machine";
+import { playerMachine } from "../../src/ui/state/player-machine";
 import {
   initialRatingState,
   resolveRatingClick,
@@ -655,5 +656,109 @@ describe("rating state machine", () => {
     const clearResult = resolveRatingClick(state, 9, 4);
     expect(clearResult.shouldClear).toBe(false);
     expect(clearResult.state.clearCandidate).toBeNull();
+  });
+});
+
+describe("player state machine", () => {
+  function makePlayer() {
+    const calls: string[] = [];
+    const actor = createActor(playerMachine, {
+      input: {
+        playAppleMusic: (kind: string, id: string) => calls.push(`play:${kind}:${id}`),
+        stopAppleMusic: () => calls.push("stop"),
+      },
+    }).start();
+    return { actor, calls };
+  }
+
+  it("starts idle with nothing playing", () => {
+    const { actor } = makePlayer();
+    expect(actor.getSnapshot().matches("idle")).toBe(true);
+    expect(actor.getSnapshot().context.src).toBeNull();
+    expect(actor.getSnapshot().context.apple).toBeNull();
+  });
+
+  it("plays an iframe source", () => {
+    const { actor, calls } = makePlayer();
+    actor.send({
+      type: "LOAD_IFRAME",
+      src: "https://bandcamp/x",
+      label: "A — B",
+      playerType: "audio",
+    });
+    const snap = actor.getSnapshot();
+    expect(snap.matches("iframe")).toBe(true);
+    expect(snap.context.src).toBe("https://bandcamp/x");
+    expect(snap.context.apple).toBeNull();
+    expect(calls).toEqual([]);
+  });
+
+  it("starts Apple Music playback on entry", () => {
+    const { actor, calls } = makePlayer();
+    actor.send({ type: "LOAD_APPLE_MUSIC", kind: "albums", id: "123", label: "A — B" });
+    const snap = actor.getSnapshot();
+    expect(snap.matches("appleMusic")).toBe(true);
+    expect(snap.context.src).toBeNull();
+    expect(snap.context.apple).toEqual({ kind: "albums", id: "123" });
+    expect(calls).toEqual(["play:albums:123"]);
+  });
+
+  it("stops Apple Music when switching to a Bandcamp iframe", () => {
+    const { actor, calls } = makePlayer();
+    actor.send({ type: "LOAD_APPLE_MUSIC", kind: "albums", id: "123", label: "A" });
+    actor.send({ type: "LOAD_IFRAME", src: "https://bandcamp/x", label: "B", playerType: "audio" });
+    expect(actor.getSnapshot().matches("iframe")).toBe(true);
+    expect(actor.getSnapshot().context.apple).toBeNull();
+    // Apple Music was started, then stopped before the iframe took over.
+    expect(calls).toEqual(["play:albums:123", "stop"]);
+  });
+
+  it("does not touch Apple Music when switching between iframe sources", () => {
+    const { actor, calls } = makePlayer();
+    actor.send({ type: "LOAD_IFRAME", src: "https://bandcamp/x", label: "A", playerType: "audio" });
+    actor.send({ type: "LOAD_IFRAME", src: "https://youtube/y", label: "B", playerType: "video" });
+    expect(actor.getSnapshot().context.src).toBe("https://youtube/y");
+    expect(actor.getSnapshot().context.playerType).toBe("video");
+    expect(calls).toEqual([]);
+  });
+
+  it("stops the old track and plays the new one when switching Apple Music releases", () => {
+    const { actor, calls } = makePlayer();
+    actor.send({ type: "LOAD_APPLE_MUSIC", kind: "albums", id: "1", label: "A" });
+    actor.send({ type: "LOAD_APPLE_MUSIC", kind: "albums", id: "2", label: "B" });
+    expect(actor.getSnapshot().context.apple).toEqual({ kind: "albums", id: "2" });
+    expect(calls).toEqual(["play:albums:1", "stop", "play:albums:2"]);
+  });
+
+  it("stops Apple Music and returns to idle on STOP", () => {
+    const { actor, calls } = makePlayer();
+    actor.send({ type: "LOAD_APPLE_MUSIC", kind: "albums", id: "123", label: "A" });
+    actor.send({ type: "STOP" });
+    const snap = actor.getSnapshot();
+    expect(snap.matches("idle")).toBe(true);
+    expect(snap.context.src).toBeNull();
+    expect(snap.context.apple).toBeNull();
+    expect(snap.context.label).toBe("");
+    expect(calls).toEqual(["play:albums:123", "stop"]);
+  });
+
+  it("tracks minimize and window toggling without affecting playback", () => {
+    const { actor, calls } = makePlayer();
+    actor.send({ type: "LOAD_IFRAME", src: "https://bandcamp/x", label: "A", playerType: "audio" });
+    actor.send({ type: "MINIMIZE" });
+    expect(actor.getSnapshot().context.minimized).toBe(true);
+    actor.send({ type: "TOGGLE_WINDOW" });
+    expect(actor.getSnapshot().context.minimized).toBe(false);
+    expect(actor.getSnapshot().matches("iframe")).toBe(true);
+    expect(calls).toEqual([]);
+  });
+
+  it("clears a minimized flag when new playback starts", () => {
+    const { actor } = makePlayer();
+    actor.send({ type: "LOAD_IFRAME", src: "https://bandcamp/x", label: "A", playerType: "audio" });
+    actor.send({ type: "MINIMIZE" });
+    expect(actor.getSnapshot().context.minimized).toBe(true);
+    actor.send({ type: "LOAD_APPLE_MUSIC", kind: "albums", id: "1", label: "B" });
+    expect(actor.getSnapshot().context.minimized).toBe(false);
   });
 });
