@@ -149,6 +149,42 @@
   let editNotes = $state(item.notes ?? "");
   let editArtworkUrl = $state(item.artwork_url ?? "");
 
+  // ── Inline notes editing ─────────────────────────────────────────────────
+  // A dedicated add/edit-notes control that lives with the notes in view mode,
+  // so notes can be changed without opening the full edit form.
+  let currentNotes = $state<string | null>(item.notes ?? null);
+  let notesEditing = $state(false);
+  let notesDraft = $state("");
+  let notesSaving = $state(false);
+
+  function startEditNotes(): void {
+    notesDraft = currentNotes ?? "";
+    notesEditing = true;
+  }
+
+  function cancelEditNotes(): void {
+    notesEditing = false;
+  }
+
+  async function saveNotes(): Promise<void> {
+    const trimmed = notesDraft.trim();
+    notesSaving = true;
+    const res = await apiFetch(`/api/music-items/${item.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ notes: trimmed || null }),
+    });
+    notesSaving = false;
+    if (!res.ok) {
+      alert("Failed to save notes.");
+      return;
+    }
+    currentNotes = trimmed || null;
+    // Keep the full edit form in sync in case it's opened afterwards.
+    editNotes = trimmed;
+    notesEditing = false;
+  }
+
   async function saveChanges(): Promise<void> {
     const body = {
       title: editTitle.trim() || undefined,
@@ -385,9 +421,38 @@
           {#if item.catalogue_number}
             <p class="release-page__catalogue">{item.catalogue_number}</p>
           {/if}
-          {#if item.notes}
-            <p class="release-page__notes">{item.notes}</p>
-          {/if}
+          <div class="release-page__notes-section">
+            {#if notesEditing}
+              <textarea
+                class="input release-page__notes-editor"
+                id="inline-notes"
+                placeholder="Notes"
+                bind:value={notesDraft}
+              ></textarea>
+              <div class="release-page__notes-actions">
+                <button
+                  type="button"
+                  class="btn btn--primary"
+                  id="save-notes-btn"
+                  disabled={notesSaving}
+                  onclick={saveNotes}>{notesSaving ? "Saving…" : "Save notes"}</button
+                >
+                <button type="button" class="btn" id="cancel-notes-btn" onclick={cancelEditNotes}
+                  >Cancel</button
+                >
+              </div>
+            {:else}
+              {#if currentNotes}
+                <p class="release-page__notes">{currentNotes}</p>
+              {/if}
+              <button
+                type="button"
+                class="btn release-page__notes-btn"
+                id="edit-notes-btn"
+                onclick={startEditNotes}>{currentNotes ? "Edit notes" : "Add notes"}</button
+              >
+            {/if}
+          </div>
           <StarRating
             itemId={item.id}
             rating={item.rating}
