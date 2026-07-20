@@ -12,6 +12,18 @@ import { getDeveloperToken, getStorefront, isAppleMusicConfigured } from "./appl
 
 const API_BASE = "https://api.music.apple.com/v1/catalog";
 
+/** The square pixel size we bake into Apple Music artwork template URLs. */
+const ARTWORK_SIZE = 1200;
+
+/**
+ * The result of resolving a release on a streaming service: its catalogue URL
+ * plus, when the service exposes one, a ready-to-use cover artwork URL.
+ */
+export interface ServiceSearchResult {
+  url: string;
+  artworkUrl: string | null;
+}
+
 function normalizeForMatch(s: string): string {
   return s
     .toLowerCase()
@@ -25,6 +37,7 @@ interface CatalogResource {
     name?: unknown;
     artistName?: unknown;
     url?: unknown;
+    artwork?: unknown;
   };
 }
 
@@ -33,16 +46,43 @@ function getString(value: unknown): string | undefined {
 }
 
 /**
+ * Resolve an Apple Music artwork template into a concrete image URL.
+ *
+ * Catalogue resources carry artwork as a templated URL with `{w}`/`{h}` (and
+ * sometimes `{c}`/`{f}`) placeholders, e.g.
+ * `https://…/{w}x{h}bb.{f}`. We bake in a fixed square size so the stored URL
+ * points straight at a usable cover image.
+ */
+function resolveCatalogArtworkUrl(artwork: unknown): string | null {
+  if (!artwork || typeof artwork !== "object") return null;
+  const template = getString((artwork as { url?: unknown }).url);
+  if (!template) return null;
+  return template
+    .replace(/\{w\}/g, String(ARTWORK_SIZE))
+    .replace(/\{h\}/g, String(ARTWORK_SIZE))
+    .replace(/\{c\}/g, "bb")
+    .replace(/\{f\}/g, "jpg");
+}
+
+/** Build a search result from a matched catalogue resource, or null if it has no URL. */
+function toResult(resource: CatalogResource): ServiceSearchResult | null {
+  const url = getString(resource.attributes?.url);
+  if (!url) return null;
+  return { url, artworkUrl: resolveCatalogArtworkUrl(resource.attributes?.artwork) };
+}
+
+/**
  * Search the Apple Music catalogue for a release by title and artist, returning
- * the best-matching catalogue URL, or null when unconfigured, on error, or when
- * nothing matches confidently. Mirrors the three-pass matching used for the
- * iTunes search (exact title+artist, compatible title+artist, artist-only).
+ * the best-matching catalogue URL together with its cover artwork, or null when
+ * unconfigured, on error, or when nothing matches confidently. Mirrors the
+ * three-pass matching used for the iTunes search (exact title+artist, compatible
+ * title+artist, artist-only).
  */
 export async function searchAppleMusicCatalog(
   title: string,
   artist: string | null,
   timeoutMs = 8000,
-): Promise<string | null> {
+): Promise<ServiceSearchResult | null> {
   if (process.env.OTB_DISABLE_EXTERNAL_LOOKUPS) return null;
   if (!isAppleMusicConfigured()) return null;
 
@@ -104,8 +144,8 @@ export async function searchAppleMusicCatalog(
       const name = getString(c.attributes?.name);
       if (!name || normalizeForMatch(name) !== normalizedTitle) continue;
       if (!artistMatches(getString(c.attributes?.artistName))) continue;
-      const url = getString(c.attributes?.url);
-      if (url) return url;
+      const result = toResult(c);
+      if (result) return result;
     }
 
     // Pass 2: compatible title (prefix either way) + artist.
@@ -113,15 +153,15 @@ export async function searchAppleMusicCatalog(
       const name = getString(c.attributes?.name);
       if (!name || !titlesCompatible(name)) continue;
       if (!artistMatches(getString(c.attributes?.artistName))) continue;
-      const url = getString(c.attributes?.url);
-      if (url) return url;
+      const result = toResult(c);
+      if (result) return result;
     }
 
     // Pass 3: first artist-matching result (the query is already specific).
     for (const c of candidates) {
       if (!artistMatches(getString(c.attributes?.artistName))) continue;
-      const url = getString(c.attributes?.url);
-      if (url) return url;
+      const result = toResult(c);
+      if (result) return result;
     }
 
     return null;

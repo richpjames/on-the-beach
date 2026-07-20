@@ -28,6 +28,7 @@ interface CatalogItem {
   name: string;
   artistName: string;
   url: string;
+  artwork?: { url: string; width?: number; height?: number };
 }
 
 function catalogResponse(albums: CatalogItem[], songs: CatalogItem[] = []): Response {
@@ -76,7 +77,7 @@ describe("searchAppleMusicCatalog", () => {
     );
 
     const result = await searchAppleMusicCatalog("Blue Lines", "Massive Attack");
-    expect(result).toBe("https://music.apple.com/gb/album/blue-lines/123");
+    expect(result?.url).toBe("https://music.apple.com/gb/album/blue-lines/123");
 
     const [url, init] = fetchSpy.mock.calls[0] as [string, RequestInit];
     expect(url).toContain("https://api.music.apple.com/v1/catalog/gb/search");
@@ -96,7 +97,48 @@ describe("searchAppleMusicCatalog", () => {
       ]),
     );
     const result = await searchAppleMusicCatalog("Michael Nyman (1981 album)", "Michael Nyman");
-    expect(result).toBe("https://music.apple.com/gb/album/michael-nyman/456");
+    expect(result?.url).toBe("https://music.apple.com/gb/album/michael-nyman/456");
+  });
+
+  test("resolves the artwork template to a concrete cover URL", async () => {
+    configure();
+    spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      catalogResponse([
+        {
+          name: "Blue Lines",
+          artistName: "Massive Attack",
+          url: "https://music.apple.com/gb/album/blue-lines/123",
+          artwork: {
+            url: "https://is1-ssl.mzstatic.com/image/thumb/abc/{w}x{h}{c}.{f}",
+            width: 1200,
+            height: 1200,
+          },
+        },
+      ]),
+    );
+    const result = await searchAppleMusicCatalog("Blue Lines", "Massive Attack");
+    expect(result).toEqual({
+      url: "https://music.apple.com/gb/album/blue-lines/123",
+      artworkUrl: "https://is1-ssl.mzstatic.com/image/thumb/abc/1200x1200bb.jpg",
+    });
+  });
+
+  test("returns a null artworkUrl when the resource has no artwork", async () => {
+    configure();
+    spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      catalogResponse([
+        {
+          name: "Blue Lines",
+          artistName: "Massive Attack",
+          url: "https://music.apple.com/gb/album/blue-lines/123",
+        },
+      ]),
+    );
+    const result = await searchAppleMusicCatalog("Blue Lines", "Massive Attack");
+    expect(result).toEqual({
+      url: "https://music.apple.com/gb/album/blue-lines/123",
+      artworkUrl: null,
+    });
   });
 
   test("prefers albums over songs", async () => {
@@ -120,7 +162,7 @@ describe("searchAppleMusicCatalog", () => {
       ),
     );
     const result = await searchAppleMusicCatalog("Discovery", "Daft Punk");
-    expect(result).toBe("https://music.apple.com/gb/album/discovery/1");
+    expect(result?.url).toBe("https://music.apple.com/gb/album/discovery/1");
   });
 
   test("returns null when nothing matches the artist", async () => {
@@ -182,7 +224,7 @@ describe("searchAppleMusic orchestration", () => {
     );
 
     const result = await searchAppleMusic("Blue Lines", "Massive Attack");
-    expect(result).toBe("https://music.apple.com/gb/album/blue-lines/from-catalog");
+    expect(result?.url).toBe("https://music.apple.com/gb/album/blue-lines/from-catalog");
     // Only the catalogue endpoint was hit — no iTunes fallback fetch.
     expect(fetchSpy).toHaveBeenCalledTimes(1);
     expect(fetchSpy.mock.calls[0]?.[0]).toContain("api.music.apple.com");
@@ -208,7 +250,7 @@ describe("searchAppleMusic orchestration", () => {
       );
 
     const result = await searchAppleMusic("Blue Lines", "Massive Attack");
-    expect(result).toBe("https://music.apple.com/gb/album/blue-lines/from-itunes");
+    expect(result?.url).toBe("https://music.apple.com/gb/album/blue-lines/from-itunes");
     expect(fetchSpy).toHaveBeenCalledTimes(2);
     expect(fetchSpy.mock.calls[1]?.[0]).toContain("itunes.apple.com");
   });

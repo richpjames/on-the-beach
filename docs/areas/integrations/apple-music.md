@@ -43,12 +43,18 @@ team-scoped catalogue access and expires. It is served from:
 
 `searchAppleMusic` (in `server/scraper.ts`) first tries the Apple Music Catalog
 API (`server/apple-music-catalog.ts`) using the developer token, then falls back
-to the iTunes Search API. Both return a `music.apple.com` URL; the catalogue API
-path yields URLs that carry the catalogue ids MusicKit needs for playback.
+to the iTunes Search API. Both return a `ServiceSearchResult` — the
+`music.apple.com` URL plus the release's cover `artworkUrl` when the service
+exposes one. The catalogue API path yields URLs that carry the catalogue ids
+MusicKit needs for playback; its artwork template is resolved to a concrete
+1200×1200 image (the iTunes path upscales `artworkUrl100` the same way).
 
 The lookup is wired into the shared secondary-link enrichment
 (`server/secondary-link-enrichment.ts`), so nothing else changes about when or
-how Apple Music links are attached to items.
+how Apple Music links are attached to items. When the resolved release carries
+artwork and the item has none of its own, that cover is saved to the item's
+`artworkUrl` (never overwriting existing art) — so pulling a release from Apple
+Music now brings its artwork along too.
 
 ## Browser playback
 

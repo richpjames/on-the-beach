@@ -1,25 +1,32 @@
-import { eq, and } from "drizzle-orm";
+import { eq, and, isNull } from "drizzle-orm";
 import { db } from "./db/index";
 import { musicItems, musicLinks, sources, artists } from "./db/schema";
 import { parseUrl } from "./utils";
-import { searchAppleMusic } from "./scraper";
+import { searchAppleMusic, type ServiceSearchResult } from "./scraper";
 
 export interface ItemInfoForLookup {
   title: string;
   artistName: string | null;
   primarySource: string | null;
   primaryUrl: string | null;
+  /** The item's current cover art, if any — a lookup only fills a gap, never overwrites. */
+  artworkUrl: string | null;
 }
 
 export type FetchItemForLookupFn = (id: number) => Promise<ItemInfoForLookup | null>;
 export type GetExistingAppleMusicLinkFn = (itemId: number) => Promise<string | null>;
 export type SaveAppleMusicLinkFn = (itemId: number, url: string) => Promise<void>;
-export type SearchAppleMusicFn = (title: string, artist: string | null) => Promise<string | null>;
+export type SaveArtworkFn = (itemId: number, artworkUrl: string) => Promise<void>;
+export type SearchAppleMusicFn = (
+  title: string,
+  artist: string | null,
+) => Promise<ServiceSearchResult | null>;
 
 export interface AppleMusicBackfillDeps {
   fetchItem: FetchItemForLookupFn;
   getExistingLink: GetExistingAppleMusicLinkFn;
   saveLink: SaveAppleMusicLinkFn;
+  saveArtwork: SaveArtworkFn;
   search: SearchAppleMusicFn;
 }
 
@@ -53,6 +60,7 @@ async function defaultFetchItemForLookup(id: number): Promise<ItemInfoForLookup 
       artistName: artists.name,
       primarySource: sources.name,
       primaryUrl: musicLinks.url,
+      artworkUrl: musicItems.artworkUrl,
     })
     .from(musicItems)
     .leftJoin(artists, eq(musicItems.artistId, artists.id))
@@ -72,6 +80,7 @@ async function defaultFetchItemForLookup(id: number): Promise<ItemInfoForLookup 
     artistName: row.artistName ?? null,
     primarySource: row.primarySource ?? null,
     primaryUrl: row.primaryUrl ?? null,
+    artworkUrl: row.artworkUrl ?? null,
   };
 }
 
@@ -108,10 +117,23 @@ async function defaultSaveAppleMusicLink(itemId: number, url: string): Promise<v
   }
 }
 
+/**
+ * Persist cover art discovered during a lookup, but only when the item still has
+ * none — the `IS NULL` guard leaves any artwork the user set (or an earlier
+ * lookup found) untouched.
+ */
+async function defaultSaveAppleMusicArtwork(itemId: number, artworkUrl: string): Promise<void> {
+  await db
+    .update(musicItems)
+    .set({ artworkUrl })
+    .where(and(eq(musicItems.id, itemId), isNull(musicItems.artworkUrl)));
+}
+
 export const defaultAppleMusicBackfillDeps: AppleMusicBackfillDeps = {
   fetchItem: defaultFetchItemForLookup,
   getExistingLink: defaultGetExistingAppleMusicLink,
   saveLink: defaultSaveAppleMusicLink,
+  saveArtwork: defaultSaveAppleMusicArtwork,
   search: searchAppleMusic,
 };
 
@@ -146,13 +168,19 @@ export async function backfillAppleMusicLink(
     return { status: "existing", url: existing };
   }
 
-  const appleMusicUrl = await deps.search(item.title, item.artistName);
-  if (!appleMusicUrl) {
+  const result = await deps.search(item.title, item.artistName);
+  if (!result) {
     return { status: "not_found" };
   }
 
-  await deps.saveLink(itemId, appleMusicUrl);
-  return { status: "added", url: appleMusicUrl };
+  await deps.saveLink(itemId, result.url);
+
+  // Backfill cover art from the same lookup when the item has none of its own.
+  if (result.artworkUrl && !item.artworkUrl) {
+    await deps.saveArtwork(itemId, result.artworkUrl);
+  }
+
+  return { status: "added", url: result.url };
 }
 
 /**

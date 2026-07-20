@@ -1018,7 +1018,41 @@ describe("searchAppleMusic", () => {
       ]),
     );
     const result = await searchAppleMusic("Blue Lines", "Massive Attack");
-    expect(result).toBe("https://music.apple.com/gb/album/blue-lines/123");
+    expect(result?.url).toBe("https://music.apple.com/gb/album/blue-lines/123");
+    mock.restore();
+  });
+
+  test("returns the cover artwork, upscaled to 1200x1200, alongside the URL", async () => {
+    spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      mockItunesResponse([
+        {
+          collectionName: "Blue Lines",
+          artistName: "Massive Attack",
+          collectionViewUrl: "https://music.apple.com/gb/album/blue-lines/123",
+          artworkUrl100: "https://is1-ssl.mzstatic.com/image/thumb/Music/abc/100x100bb.jpg",
+        },
+      ]),
+    );
+    const result = await searchAppleMusic("Blue Lines", "Massive Attack");
+    expect(result).toEqual({
+      url: "https://music.apple.com/gb/album/blue-lines/123",
+      artworkUrl: "https://is1-ssl.mzstatic.com/image/thumb/Music/abc/1200x1200bb.jpg",
+    });
+    mock.restore();
+  });
+
+  test("returns a null artworkUrl when the iTunes result has no artwork", async () => {
+    spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      mockItunesResponse([
+        {
+          collectionName: "Blue Lines",
+          artistName: "Massive Attack",
+          collectionViewUrl: "https://music.apple.com/gb/album/blue-lines/123",
+        },
+      ]),
+    );
+    const result = await searchAppleMusic("Blue Lines", "Massive Attack");
+    expect(result?.artworkUrl).toBeNull();
     mock.restore();
   });
 
@@ -1034,7 +1068,7 @@ describe("searchAppleMusic", () => {
     );
     // DB title is "Michael Nyman (1981 album)" — Apple Music has "Michael Nyman"
     const result = await searchAppleMusic("Michael Nyman (1981 album)", "Michael Nyman");
-    expect(result).toBe("https://music.apple.com/gb/album/michael-nyman/456");
+    expect(result?.url).toBe("https://music.apple.com/gb/album/michael-nyman/456");
     mock.restore();
   });
 
@@ -1049,7 +1083,7 @@ describe("searchAppleMusic", () => {
       ]),
     );
     const result = await searchAppleMusic("Music Has the Right to Children", "Boards of Canada");
-    expect(result).toBe("https://music.apple.com/album/boc/789");
+    expect(result?.url).toBe("https://music.apple.com/album/boc/789");
     mock.restore();
   });
 
@@ -1085,7 +1119,7 @@ describe("searchAppleMusic", () => {
       ]),
     );
     const result = await searchAppleMusic("A Song", "Artist");
-    expect(result).toBe("https://music.apple.com/track/999");
+    expect(result?.url).toBe("https://music.apple.com/track/999");
     mock.restore();
   });
 
@@ -1100,7 +1134,7 @@ describe("searchAppleMusic", () => {
       ]),
     );
     const result = await searchAppleMusic("Blue Lines", "Massive Attack");
-    expect(result).toBe("https://music.apple.com/gb/album/blue-lines/123");
+    expect(result?.url).toBe("https://music.apple.com/gb/album/blue-lines/123");
     mock.restore();
   });
 
@@ -1115,7 +1149,7 @@ describe("searchAppleMusic", () => {
       ]),
     );
     const result = await searchAppleMusic("A Song", "Artist");
-    expect(result).toBe("https://music.apple.com/us/album/name/456");
+    expect(result?.url).toBe("https://music.apple.com/us/album/name/456");
     mock.restore();
   });
 });
