@@ -102,13 +102,30 @@
     if (!target || !trackEl) return;
     if ((event.target as HTMLElement).id === thumbId) return;
 
+    const scrollRange = target.scrollHeight - target.clientHeight;
+    if (scrollRange <= 0) return;
+
+    const maxThumbTop = Math.max(trackEl.clientHeight - thumbHeight, 0);
+    if (maxThumbTop <= 0) return;
+
+    // Jump the thumb so its centre sits under the pointer, then scroll there,
+    // rather than paging by a fixed step. This makes a click travel to the
+    // clicked region instead of hopping around.
+    event.preventDefault();
     const trackRect = trackEl.getBoundingClientRect();
     const clickOffset = event.clientY - trackRect.top;
-    const direction = clickOffset < thumbTop ? -1 : 1;
-    target.scrollBy({
-      top: direction * Math.max(80, target.clientHeight * 0.8),
-      behavior: "auto",
-    });
+    const nextTop = Math.max(0, Math.min(maxThumbTop, clickOffset - thumbHeight / 2));
+    target.scrollTop = (nextTop / maxThumbTop) * scrollRange;
+
+    // Hand off to the drag logic so the thumb sticks to the pointer if the
+    // user keeps dragging after the initial click.
+    if (event.pointerId !== undefined && typeof trackEl.setPointerCapture === "function") {
+      trackEl.setPointerCapture(event.pointerId);
+    }
+    drag = { startY: event.clientY, startTop: nextTop };
+    document.addEventListener("pointermove", onDragMove);
+    document.addEventListener("pointerup", onDragEnd, { once: true });
+    document.addEventListener("pointercancel", onDragEnd, { once: true });
   }
 
   function onDragMove(event: PointerEvent): void {
