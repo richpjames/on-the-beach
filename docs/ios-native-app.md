@@ -56,7 +56,9 @@ iOS share sheet ──► ShareExtension compose form ──► POST /api/ingest
 | `native/ShareExtension/*.swift`      | hand-authored   | yes        |
 | `native/ShareExtension/Info.plist`   | hand-authored   | yes        |
 | `native/ShareExtension/Secrets.xcconfig` | you create locally | no (gitignored) |
+| `native/Widget/*.swift`, `Info.plist`, `OTBWidget.entitlements` | hand-authored | yes |
 | `scripts/add-share-extension.rb`  | hand-authored   | yes        |
+| `scripts/add-widget-extension.rb` | hand-authored   | yes        |
 | `assets/logo.png`                 | hand-authored (the one brand master) | yes |
 | `scripts/generate-brand-assets.sh` | hand-authored  | yes        |
 | `public/favicon*`, `public/*-chrome-*`, `apple-touch-icon.png` | generated from `assets/logo.png` | yes |
@@ -64,10 +66,10 @@ iOS share sheet ──► ShareExtension compose form ──► POST /api/ingest
 
 The whole `ios/` directory is generated, not committed, so it's never stale
 relative to the Capacitor version. Regenerate it any time by removing `ios/` and
-running `bun run cap:add` followed by `ruby scripts/add-share-extension.rb` to
-re-inject the extension target. Because the extension target is scripted (not
-hand-clicked in Xcode), CI can reproduce the whole build on every PR — see
-`.github/workflows/ios-build.yml`.
+running `bun run cap:add` followed by `ruby scripts/add-share-extension.rb` and
+`ruby scripts/add-widget-extension.rb` to re-inject the extension targets.
+Because the targets are scripted (not hand-clicked in Xcode), CI can reproduce
+the whole build on every PR — see `.github/workflows/ios-build.yml`.
 
 `add-share-extension.rb` also patches two host-app details that Capacitor gets
 wrong for our case, so they survive every regenerate:
@@ -100,6 +102,39 @@ renditions and rewrites `Contents.json`. Requires ImageMagick (`magick`).
 To rebrand: replace `assets/logo.png` and run `bun run brand:assets` (then
 `bun run cap:sync` to copy the web assets into the app).
 
+## Home-screen Widget
+
+A small (square) **WidgetKit** widget shows how many releases are still queued
+**To Listen** — the one glanceable number for a listening tracker. It's the
+widget sibling of the Share Extension: hand-authored SwiftUI in
+`native/Widget/OTBWidget.swift`, injected into the generated Xcode project by
+`scripts/add-widget-extension.rb` (extension point
+`com.apple.widgetkit-extension`), and compiled in CI by the same `ios-build.yml`
+job that builds the app and Share Extension.
+
+- **Data.** The widget fetches `GET /api/ingest/stats` (added in
+  `server/routes/ingest.ts`), which returns `{ "to_listen": N }`. It's
+  Bearer-authed with the **same** ingest key the Share Extension uses, so there's
+  nothing new to configure: the widget's `Info.plist` carries `OTBBaseURL`
+  (committed) and `OTBIngestAPIKey` (`$(OTB_INGEST_API_KEY)`, substituted at
+  build time), and its target reuses `native/ShareExtension/Secrets.xcconfig` as
+  its base configuration — one gitignored secret for the whole app. Any failure
+  (no key, offline, server error) renders a dash rather than an error.
+- **Refresh.** The timeline refreshes roughly every 30 minutes; WidgetKit budgets
+  background reloads, so the count is eventually-consistent, not live.
+- **Styling.** Like the Share Extension, the widget can't reach the web app's
+  stylesheet, so the Windows 98 / Winamp look (black playlist well, electric-blue
+  accent, Verdana chrome type) is mirrored in the file's `OTBTheme`.
+- **Mac Catalyst + sandbox.** `SUPPORTS_MACCATALYST` is enabled and
+  `native/Widget/OTBWidget.entitlements` grants the sandboxed extension outbound
+  network (macOS always sandboxes an app extension; without
+  `com.apple.security.network.client` the stats GET is silently denied) — exactly
+  as the Share Extension does. It's wired via `CODE_SIGN_ENTITLEMENTS[sdk=macosx*]`
+  so iOS device signing is untouched.
+
+To add it to your home screen: long-press the home screen ▸ **+** ▸ search **On
+The Beach** ▸ pick the small **To Listen** widget. Tapping it opens the app.
+
 ## Prerequisites (mac only)
 
 - macOS with **Xcode** and command line tools.
@@ -118,6 +153,7 @@ bun install
 bun run build        # produces build/client — cap sync needs webDir to exist
 bun run cap:add      # cap add ios — creates ios/App/ (gitignored)
 ruby scripts/add-share-extension.rb   # inject the Share Extension target (§2)
+ruby scripts/add-widget-extension.rb  # inject the Widget target (after §2)
 bun run brand:assets # capybara app icon + splash into ios/ (needs ImageMagick)
 bun run cap:open     # cap open ios — opens ios/App/App.xcworkspace in Xcode
 ```

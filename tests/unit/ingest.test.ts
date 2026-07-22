@@ -11,6 +11,7 @@ const mockListStacks = mock();
 const mockResolveOrCreateStack = mock();
 const mockAttachItemToStack = mock();
 const mockSetItemReminder = mock();
+const mockCountToListen = mock();
 
 // Mock the music-item-creator module before importing any route, overriding
 // only the functions the ingest routes call. bun's mock.module() persists
@@ -40,6 +41,7 @@ function makeApp() {
       resolveOrCreateStack: mockResolveOrCreateStack,
       attachItemToStack: mockAttachItemToStack,
       setItemReminder: mockSetItemReminder,
+      countToListen: mockCountToListen,
     }),
   );
   return app;
@@ -507,6 +509,65 @@ describe("GET /api/ingest/stacks", () => {
       { id: 1, name: "Jazz finds" },
       { id: 2, name: "To buy" },
     ]);
+  });
+});
+
+describe("GET /api/ingest/stats", () => {
+  const originalEnv = { ...process.env };
+
+  beforeEach(() => {
+    process.env.INGEST_API_KEY = "test-secret";
+    delete process.env.INGEST_ENABLED;
+    mockCountToListen.mockReset();
+  });
+
+  afterEach(() => {
+    process.env = { ...originalEnv };
+  });
+
+  function getStats(app: Hono, opts?: { apiKey?: string }) {
+    const headers: Record<string, string> = {};
+    if (opts?.apiKey) headers.Authorization = `Bearer ${opts.apiKey}`;
+    return app.request("http://localhost/api/ingest/stats", { headers });
+  }
+
+  it("returns 503 when INGEST_API_KEY is not set", async () => {
+    delete process.env.INGEST_API_KEY;
+    const app = makeApp();
+    const res = await getStats(app, { apiKey: "anything" });
+    expect(res.status).toBe(503);
+  });
+
+  it("returns 503 when INGEST_ENABLED is false", async () => {
+    process.env.INGEST_ENABLED = "false";
+    const app = makeApp();
+    const res = await getStats(app, { apiKey: "test-secret" });
+    expect(res.status).toBe(503);
+  });
+
+  it("returns 401 when no Authorization header is provided", async () => {
+    const app = makeApp();
+    const res = await getStats(app);
+    expect(res.status).toBe(401);
+    expect(mockCountToListen).not.toHaveBeenCalled();
+  });
+
+  it("returns 401 when wrong API key is provided", async () => {
+    const app = makeApp();
+    const res = await getStats(app, { apiKey: "wrong-key" });
+    expect(res.status).toBe(401);
+    expect(mockCountToListen).not.toHaveBeenCalled();
+  });
+
+  it("returns the to-listen count", async () => {
+    mockCountToListen.mockResolvedValue(42);
+
+    const app = makeApp();
+    const res = await getStats(app, { apiKey: "test-secret" });
+
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body).toEqual({ to_listen: 42 });
   });
 });
 

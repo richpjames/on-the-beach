@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { asc, eq } from "drizzle-orm";
+import { asc, count, eq } from "drizzle-orm";
 import { extractMusicUrls } from "../email-parser";
 import { createMusicItemDirect, createMusicItemsFromUrl } from "../music-item-creator";
 import { scheduleAppleMusicBackfill } from "../apple-music-backfill";
@@ -47,6 +47,7 @@ export type ListStacksFn = () => Promise<IngestStack[]>;
 export type ResolveOrCreateStackFn = (name: string) => Promise<IngestStack>;
 export type AttachItemToStackFn = (itemId: number, stackId: number) => Promise<void>;
 export type SetItemReminderFn = (itemId: number, remindAt: Date) => Promise<void>;
+export type CountToListenFn = () => Promise<number>;
 
 export interface IngestRoutesDeps {
   scanPhoto?: ScanPhotoFn;
@@ -55,6 +56,7 @@ export interface IngestRoutesDeps {
   resolveOrCreateStack?: ResolveOrCreateStackFn;
   attachItemToStack?: AttachItemToStackFn;
   setItemReminder?: SetItemReminderFn;
+  countToListen?: CountToListenFn;
 }
 
 /** Every list, id + name, alphabetised — the payload the extension's picker shows. */
@@ -97,6 +99,20 @@ async function defaultResolveOrCreateStack(name: string): Promise<IngestStack> {
 
 async function defaultAttachItemToStack(itemId: number, stackId: number): Promise<void> {
   await db.insert(musicItemStacks).values({ musicItemId: itemId, stackId }).onConflictDoNothing();
+}
+
+/**
+ * Count the items still queued to listen to — the number the iOS home-screen
+ * widget shows. Just `listen_status = 'to-listen'` (the only non-listened
+ * state); the `idx_music_items_listen_status` index keeps it cheap.
+ */
+async function defaultCountToListen(): Promise<number> {
+  const row = await db
+    .select({ value: count() })
+    .from(musicItems)
+    .where(eq(musicItems.listenStatus, "to-listen"))
+    .get();
+  return row?.value ?? 0;
 }
 
 /** Set an item's scheduled reminder date — the share sheet's "Remind me". */
@@ -162,6 +178,7 @@ export function createIngestRoutes(deps: IngestRoutesDeps = {}): Hono {
   const resolveOrCreateStack = deps.resolveOrCreateStack ?? defaultResolveOrCreateStack;
   const attachItemToStack = deps.attachItemToStack ?? defaultAttachItemToStack;
   const setItemReminder = deps.setItemReminder ?? defaultSetItemReminder;
+  const countToListen = deps.countToListen ?? defaultCountToListen;
 
   const routes = new Hono();
 
@@ -183,6 +200,27 @@ export function createIngestRoutes(deps: IngestRoutesDeps = {}): Hono {
     }
 
     return c.json({ stacks: await listStacks() });
+  });
+
+  // GET /stats — glanceable counts for the iOS home-screen widget. Bearer-authed
+  // with the ingest key (same as /stacks) because the widget extension can't use
+  // the session-authed app API. Kept tiny on purpose: one number the widget draws.
+  routes.get("/stats", async (c) => {
+    const apiKey = process.env.INGEST_API_KEY;
+    if (!apiKey) {
+      return c.json({ error: "Ingest not configured" }, 503);
+    }
+
+    if (process.env.INGEST_ENABLED === "false") {
+      return c.json({ error: "Ingest disabled" }, 503);
+    }
+
+    const auth = c.req.header("Authorization");
+    if (auth !== `Bearer ${apiKey}`) {
+      return c.json({ error: "Unauthorized" }, 401);
+    }
+
+    return c.json({ to_listen: await countToListen() });
   });
 
   routes.post("/email", async (c) => {

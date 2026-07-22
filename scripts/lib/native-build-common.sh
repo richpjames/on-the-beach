@@ -78,6 +78,9 @@ native_regenerate() {
   bun run cap:add
   native_restore_app_icon
   ruby scripts/add-share-extension.rb
+  # Widget injection runs after the share extension (which owns the app-level
+  # Catalyst / deployment-target / CFBundleName patches).
+  ruby scripts/add-widget-extension.rb
 }
 
 # --- Restore the committed app icon ------------------------------------------
