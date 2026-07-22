@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- macOS/Mac Catalyst only (wired via CODE_SIGN_ENTITLEMENTS[sdk=macosx*] in
+	     scripts/add-widget-extension.rb, so iOS device signing is untouched).
+
+	     macOS ALWAYS runs an app extension inside the "plugin" App Sandbox, and a
+	     WidgetKit extension is no exception. Without network.client the widget's
+	     URLSession GET to /api/ingest/stats is silently denied and the count never
+	     loads (the widget just shows a dash). These two keys grant the extension
+	     outbound network inside its sandbox. Same rationale as the Share
+	     Extension's entitlements. -->
+	<key>com.apple.security.app-sandbox</key>
+	<true/>
+	<key>com.apple.security.network.client</key>
+	<true/>
+</dict>
+</plist>

@@ -1,14 +1,15 @@
 name: iOS Build
 
-# Compiles the native iOS app *and its Share Extension* on PRs that touch native
-# code, so a broken ShareViewController.swift (or Capacitor/Info.plist change)
-# fails the check instead of only surfacing when someone next opens Xcode.
+# Compiles the native iOS app *and its Share Extension and Widget* on PRs that
+# touch native code, so a broken ShareViewController.swift / OTBWidget.swift (or
+# Capacitor/Info.plist change) fails the check instead of only surfacing when
+# someone next opens Xcode.
 #
 # The whole `ios/` project is generated (see docs/ios-native-app.md), so this job
-# reproduces it from scratch: cap add -> inject the extension target with
-# scripts/add-share-extension.rb -> xcodebuild. It builds for the iOS Simulator
-# with signing disabled, so it needs no certificates, provisioning profiles, or
-# the real ingest key.
+# reproduces it from scratch: cap add -> inject the extension targets with
+# scripts/add-share-extension.rb + scripts/add-widget-extension.rb -> xcodebuild.
+# It builds for the iOS Simulator with signing disabled, so it needs no
+# certificates, provisioning profiles, or the real ingest key.
 #
 # Path-filtered because macOS runners bill at 10x Linux minutes — no point paying
 # that when a PR only touches web code (the shell loads the live site anyway).
@@ -20,6 +21,7 @@ on:
       - "native/**"
       - "capacitor.config.ts"
       - "scripts/add-share-extension.rb"
+      - "scripts/add-widget-extension.rb"
       - ".github/workflows/ios-build.yml"
       - "package.json"
       - "bun.lock"
@@ -86,6 +88,24 @@ jobs:
 
       - name: Inject Share Extension target
         run: ruby scripts/add-share-extension.rb
+
+      - name: Inject Widget extension target
+        # Runs after the Share Extension injector (which owns the app-level
+        # Catalyst / deployment-target / CFBundleName patches). Building the App
+        # scheme also builds this embedded widget target, so OTBWidget.swift is
+        # genuinely compiled by the xcodebuild steps below.
+        run: ruby scripts/add-widget-extension.rb
+
+      - name: Verify Widget macOS entitlements
+        # Same regression guard as the Share Extension: macOS always sandboxes an
+        # app extension, so without com.apple.security.network.client the widget's
+        # stats GET is silently denied and the count never loads. Assert the
+        # entitlements file grants network and the injector wired it (macOS-scoped)
+        # onto the widget target.
+        run: |
+          grep -q 'com.apple.security.network.client' native/Widget/OTBWidget.entitlements
+          grep -q 'com.apple.security.app-sandbox' native/Widget/OTBWidget.entitlements
+          grep -q 'native/Widget/OTBWidget.entitlements' ios/App/App.xcodeproj/project.pbxproj
 
       - name: Verify Share Extension macOS entitlements
         # Regression guard for a bug that only bit the real Mac app: macOS always
