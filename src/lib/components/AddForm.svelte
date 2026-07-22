@@ -3,9 +3,9 @@
   import type { StackWithCount } from "../../types";
   import type { AddFormValues } from "../../ui/domain/add-form";
   import { getCoverScanErrorMessage, toListSearchQuery } from "../../ui/domain/add-form";
-  import { constrainDimensions } from "../../ui/domain/scan";
   import { addFormMachine, RECORD_DURATION_MS } from "../../ui/state/add-form-machine";
   import { api } from "../api";
+  import { encodeImageFile } from "../encode-image";
   import type { MachineHandle } from "../use-machine.svelte";
   import StackDropdown from "./StackDropdown.svelte";
 
@@ -123,59 +123,9 @@
   async function onScanFileChange(): Promise<void> {
     const file = scanInputEl?.files?.[0];
     if (!file || !scanInputEl) return;
-    const imageBase64 = await encodeScanImage(file);
+    const imageBase64 = await encodeImageFile(file);
     form.send({ type: "SCAN_FILE_SELECTED", imageBase64 });
     scanInputEl.value = "";
-  }
-
-  async function encodeScanImage(file: File): Promise<string> {
-    const imageDataUrl = await readFileAsDataUrl(file);
-    const image = await loadImage(imageDataUrl);
-    const { width, height } = constrainDimensions(image.width, image.height, 1024);
-
-    const canvas = document.createElement("canvas");
-    canvas.width = width;
-    canvas.height = height;
-
-    const context = canvas.getContext("2d");
-    if (!context) {
-      throw new Error("Canvas context unavailable");
-    }
-
-    context.drawImage(image, 0, 0, width, height);
-    const encoded = canvas.toDataURL("image/jpeg", 0.85);
-    const parts = encoded.split(",", 2);
-    if (parts.length !== 2 || !parts[1]) {
-      throw new Error("Failed to encode scan image");
-    }
-
-    return parts[1];
-  }
-
-  function readFileAsDataUrl(file: Blob): Promise<string> {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => {
-        if (typeof reader.result !== "string") {
-          reject(new Error("Failed to read image file"));
-          return;
-        }
-        resolve(reader.result);
-      };
-      reader.onerror = () => {
-        reject(reader.error ?? new Error("Failed to read image file"));
-      };
-      reader.readAsDataURL(file);
-    });
-  }
-
-  function loadImage(dataUrl: string): Promise<HTMLImageElement> {
-    return new Promise((resolve, reject) => {
-      const image = new Image();
-      image.onload = () => resolve(image);
-      image.onerror = () => reject(new Error("Failed to load image"));
-      image.src = dataUrl;
-    });
   }
 
   // ── Recognize ("Listen") ───────────────────────────────────────────────────
