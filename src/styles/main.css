@@ -3126,6 +3126,12 @@ a:hover {
   color: #0000cc;
 }
 
+/* Sits under the "Listen on Apple Music" button as a distinct "open the
+   release on Apple Music" affordance, on its own line. */
+.release-page__source-link--apple {
+  display: block;
+}
+
 .release-page__listen-btn {
   display: inline-flex;
   align-items: center;

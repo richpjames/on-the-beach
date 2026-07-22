@@ -500,6 +500,12 @@
               onclick={() => listenAppleMusic(data.appleMusicListen!)}
               >▶ Listen on Apple Music</button
             >
+            <a
+              class="release-page__source-link release-page__source-link--apple"
+              href={data.appleMusicListen.href}
+              target="_blank"
+              rel="noopener noreferrer">View on Apple Music</a
+            >
           {/if}
           {#if data.mixcloudWidgetSrc}
             <iframe
@@ -517,6 +523,12 @@
                 data-am-mode="musickit"
                 onclick={() => listenLookupAppleMusic(lookupLink!.url)}
                 >▶ Listen on Apple Music</button
+              >
+              <a
+                class="release-page__source-link release-page__source-link--apple"
+                href={lookupLink.url}
+                target="_blank"
+                rel="noopener noreferrer">View on Apple Music</a
               >
             {:else if lookupLink}
               <a

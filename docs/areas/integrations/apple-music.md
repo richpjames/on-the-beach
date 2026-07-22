@@ -70,7 +70,9 @@ Music now brings its artwork along too.
   play/pause, seek bar, and a "Sign in to Apple Music" prompt) for that mode.
 - The release page's "Listen on Apple Music" button starts MusicKit playback on
   desktop; on touch devices it hands off to the native Apple Music app/site, as
-  the other listen buttons do.
+  the other listen buttons do. A separate "View on Apple Music" link sits beneath
+  it so the release can always be opened on Apple Music itself, even on desktop
+  where the button launches the in-app player instead.
 
 Playing a full track requires the listener to authorise their own Apple Music
 subscription once (from the player or the Settings page). Without a
