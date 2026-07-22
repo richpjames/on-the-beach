@@ -801,6 +801,9 @@ describe("POST /api/ingest/photo", () => {
     mockSaveImage.mockResolvedValue("/uploads/abc.jpg");
     mockScan.mockReset();
     mockScan.mockResolvedValue(null);
+    mockResolveOrCreateStack.mockReset();
+    mockAttachItemToStack.mockReset();
+    mockSetItemReminder.mockReset();
   });
 
   afterEach(() => {
@@ -1082,5 +1085,123 @@ describe("POST /api/ingest/photo", () => {
     const body = await res.json();
     expect(body.error).toContain("photo");
     expect(mockSaveImage).not.toHaveBeenCalled();
+  });
+
+  it("files the created item into the chosen lists", async () => {
+    mockCreateDirect.mockResolvedValue({ item: { id: 42, title: "Untitled" }, created: true });
+    mockResolveOrCreateStack.mockImplementation(
+      async (name: string) => ({ "Jazz finds": { id: 3, name }, Wishlist: { id: 5, name } })[name],
+    );
+
+    const app = makeApp();
+    const res = await makePhotoRequest(
+      app,
+      { imageBase64: validBase64, listNames: ["Jazz finds", "Wishlist"] },
+      { apiKey: "test-secret" },
+    );
+
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(mockResolveOrCreateStack).toHaveBeenCalledWith("Jazz finds");
+    expect(mockResolveOrCreateStack).toHaveBeenCalledWith("Wishlist");
+    expect(mockAttachItemToStack).toHaveBeenCalledWith(42, 3);
+    expect(mockAttachItemToStack).toHaveBeenCalledWith(42, 5);
+    expect(body.lists).toEqual([
+      { id: 3, name: "Jazz finds" },
+      { id: 5, name: "Wishlist" },
+    ]);
+  });
+
+  it("accepts the legacy single listName", async () => {
+    mockCreateDirect.mockResolvedValue({ item: { id: 7, title: "Untitled" }, created: true });
+    mockResolveOrCreateStack.mockResolvedValue({ id: 3, name: "Jazz finds" });
+
+    const app = makeApp();
+    const res = await makePhotoRequest(
+      app,
+      { imageBase64: validBase64, listName: "Jazz finds" },
+      { apiKey: "test-secret" },
+    );
+
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(mockAttachItemToStack).toHaveBeenCalledWith(7, 3);
+    expect(body.lists).toEqual([{ id: 3, name: "Jazz finds" }]);
+  });
+
+  it("does not touch lists when none are given", async () => {
+    mockCreateDirect.mockResolvedValue({ item: { id: 1, title: "Untitled" }, created: true });
+
+    const app = makeApp();
+    const res = await makePhotoRequest(app, { imageBase64: validBase64 }, { apiKey: "test-secret" });
+
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(mockResolveOrCreateStack).not.toHaveBeenCalled();
+    expect(mockAttachItemToStack).not.toHaveBeenCalled();
+    expect(body.lists).toEqual([]);
+  });
+
+  it("sets a reminder on the created item", async () => {
+    mockCreateDirect.mockResolvedValue({ item: { id: 8, title: "Untitled" }, created: true });
+
+    const app = makeApp();
+    const res = await makePhotoRequest(
+      app,
+      { imageBase64: validBase64, remindAt: "2026-08-01" },
+      { apiKey: "test-secret" },
+    );
+
+    expect(res.status).toBe(200);
+    expect(mockSetItemReminder).toHaveBeenCalledTimes(1);
+    const [itemId, date] = mockSetItemReminder.mock.calls[0];
+    expect(itemId).toBe(8);
+    expect((date as Date).toISOString()).toBe(new Date("2026-08-01").toISOString());
+  });
+
+  it("returns 400 for an invalid reminder date and saves nothing", async () => {
+    const app = makeApp();
+    const res = await makePhotoRequest(
+      app,
+      { imageBase64: validBase64, remindAt: "not-a-date" },
+      { apiKey: "test-secret" },
+    );
+
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.error).toContain("remindAt");
+    expect(mockSaveImage).not.toHaveBeenCalled();
+    expect(mockCreateDirect).not.toHaveBeenCalled();
+  });
+
+  it("files a multipart upload into lists and sets a reminder", async () => {
+    mockCreateDirect.mockResolvedValue({ item: { id: 5, title: "Untitled" }, created: true });
+    mockResolveOrCreateStack.mockImplementation(
+      async (name: string) => ({ "Jazz finds": { id: 3, name }, Wishlist: { id: 5, name } })[name],
+    );
+
+    const imageBytes = new Uint8Array([1, 2, 3, 4]);
+    const form = new FormData();
+    form.append("photo", new File([imageBytes], "cover.jpg", { type: "image/jpeg" }));
+    form.append("listNames", "Jazz finds");
+    form.append("listNames", "Wishlist");
+    form.append("remindAt", "2026-08-01");
+
+    const app = makeApp();
+    const res = await app.request("http://localhost/api/ingest/photo", {
+      method: "POST",
+      headers: { Authorization: "Bearer test-secret" },
+      body: form,
+    });
+
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(mockAttachItemToStack).toHaveBeenCalledWith(5, 3);
+    expect(mockAttachItemToStack).toHaveBeenCalledWith(5, 5);
+    expect(mockSetItemReminder).toHaveBeenCalledWith(5, expect.any(Date));
+    expect(body.lists).toEqual([
+      { id: 3, name: "Jazz finds" },
+      { id: 5, name: "Wishlist" },
+    ]);
   });
 });

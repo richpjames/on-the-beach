@@ -57,7 +57,16 @@ final class ShareViewController: UIViewController {
         case failure(String)
     }
 
-    private var sharedURL: URL?
+    /// What the user is sharing: a link (posted to `/api/ingest/link`) or an
+    /// image (posted to `/api/ingest/photo`). The compose form, note, list
+    /// picker, and reminder are identical either way — only the endpoint and
+    /// payload differ.
+    private enum SharedContent {
+        case link(URL)
+        case image(Data)
+    }
+
+    private var sharedContent: SharedContent?
     private var stackNames: [String] = []
     private var selectedListNames: [String] = []
 
@@ -100,10 +109,17 @@ final class ShareViewController: UIViewController {
         compose.onPickList = { [weak self] in self?.pushListPicker() }
         compose.onSubmit = { [weak self] note, remindAt in self?.submit(note: note, remindAt: remindAt) }
 
-        extractSharedURL { [weak self] url in
+        extractSharedContent { [weak self] content in
             guard let self else { return }
-            self.sharedURL = url
-            self.compose.setURL(url)
+            self.sharedContent = content
+            switch content {
+            case .link(let url):
+                self.compose.setURL(url)
+            case .image(let data):
+                self.compose.setImage(UIImage(data: data))
+            case nil:
+                self.compose.setURL(nil)
+            }
         }
         fetchStacks()
     }
@@ -129,12 +145,12 @@ final class ShareViewController: UIViewController {
     // MARK: - Submit / cancel
 
     private func submit(note: String, remindAt: Date?) {
-        guard let url = sharedURL else {
+        guard let sharedContent else {
             cancel()
             return
         }
-        compose.setPosting(true)
-        postLink(url: url, note: note, listNames: selectedListNames, remindAt: remindAt) { [weak self] result in
+
+        let handle: (PostResult) -> Void = { [weak self] result in
             guard let self else { return }
             switch result {
             case .success(let message):
@@ -143,6 +159,26 @@ final class ShareViewController: UIViewController {
                 self.compose.setPosting(false)
                 self.presentError(message)
             }
+        }
+
+        compose.setPosting(true)
+        switch sharedContent {
+        case .link(let url):
+            postLink(
+                url: url,
+                note: note,
+                listNames: selectedListNames,
+                remindAt: remindAt,
+                completion: handle
+            )
+        case .image(let data):
+            postPhoto(
+                imageData: data,
+                note: note,
+                listNames: selectedListNames,
+                remindAt: remindAt,
+                completion: handle
+            )
         }
     }
 
@@ -217,37 +253,56 @@ final class ShareViewController: UIViewController {
         extensionContext?.cancelRequest(withError: error)
     }
 
-    // MARK: - Extracting the shared URL
+    // MARK: - Extracting the shared content
 
-    /// Walks the extension's input items looking for a URL. Handles the shapes
-    /// the system delivers: a real `public.url` attachment (most apps) and a
-    /// `public.plain-text` blob that contains a URL somewhere in it (Safari
-    /// often shares "Page Title\nhttps://…"). If neither attachment yields a
-    /// URL, falls back to the item's attributed text — some apps (e.g. Apple
-    /// Music) carry the link there rather than as an attachment.
+    /// Walks the extension's input items to work out what's being shared: a
+    /// link or an image.
     ///
-    /// Whatever the branch, `url(from:)` does the decoding, because the loaded
-    /// item is not always a `URL`: on macOS a `public.url` item arrives as
-    /// `Data` holding the URL string (see below), and text branches arrive as
+    /// A **link** is preferred when present — the common case is a music URL,
+    /// and a shared web page often carries a thumbnail image we don't want. So
+    /// we look for a URL first (a real `public.url` attachment, most apps),
+    /// then a `public.plain-text` blob that embeds a URL (Safari often shares
+    /// "Page Title\nhttps://…"), and only if neither yields a link do we fall
+    /// back to an **image** attachment (a shared photo, e.g. a record cover).
+    /// The very last resort is a URL recovered from the item's attributed text
+    /// — some apps (e.g. Apple Music) carry the link there rather than as an
+    /// attachment.
+    ///
+    /// For links, `url(from:)` does the decoding, because the loaded item is
+    /// not always a `URL`: on macOS a `public.url` item arrives as `Data`
+    /// holding the URL string (see below), and text branches arrive as
     /// `String`. Getting that coercion wrong is what left the Add button
     /// permanently disabled when sharing from Apple Music on macOS.
-    private func extractSharedURL(completion: @escaping (URL?) -> Void) {
+    private func extractSharedContent(completion: @escaping (SharedContent?) -> Void) {
         let items = (extensionContext?.inputItems as? [NSExtensionItem]) ?? []
         let providers = items.flatMap { $0.attachments ?? [] }
 
         let urlType = UTType.url.identifier
         let textType = UTType.plainText.identifier
+        let imageType = UTType.image.identifier
 
-        // Last resort: recover a link from the item's attributed text.
+        let imageProvider = providers.first { $0.hasItemConformingToTypeIdentifier(imageType) }
+
+        // No link found: use a shared image if there is one, otherwise recover a
+        // link from the item's attributed text as a final fallback.
         let fallback: () -> Void = {
-            let text = items.compactMap { $0.attributedContentText?.string }.joined(separator: "\n")
-            completion(Self.firstURL(in: text))
+            if let imageProvider {
+                self.loadImage(from: imageProvider) { data in
+                    if let data {
+                        completion(.image(data))
+                    } else {
+                        completion(Self.linkFromText(items))
+                    }
+                }
+            } else {
+                completion(Self.linkFromText(items))
+            }
         }
 
         if let provider = providers.first(where: { $0.hasItemConformingToTypeIdentifier(urlType) }) {
             provider.loadItem(forTypeIdentifier: urlType, options: nil) { item, _ in
                 DispatchQueue.main.async {
-                    if let url = Self.url(from: item) { completion(url) } else { fallback() }
+                    if let url = Self.url(from: item) { completion(.link(url)) } else { fallback() }
                 }
             }
             return
@@ -256,13 +311,66 @@ final class ShareViewController: UIViewController {
         if let provider = providers.first(where: { $0.hasItemConformingToTypeIdentifier(textType) }) {
             provider.loadItem(forTypeIdentifier: textType, options: nil) { item, _ in
                 DispatchQueue.main.async {
-                    if let url = Self.url(from: item) { completion(url) } else { fallback() }
+                    if let url = Self.url(from: item) { completion(.link(url)) } else { fallback() }
                 }
             }
             return
         }
 
         fallback()
+    }
+
+    /// Recovers a `.link` from the input items' attributed text, or `nil`.
+    private nonisolated static func linkFromText(_ items: [NSExtensionItem]) -> SharedContent? {
+        let text = items.compactMap { $0.attributedContentText?.string }.joined(separator: "\n")
+        return firstURL(in: text).map { .link($0) }
+    }
+
+    /// Loads an image attachment and hands back downscaled JPEG bytes on the
+    /// main queue, or `nil` if it couldn't be decoded.
+    private func loadImage(from provider: NSItemProvider, completion: @escaping (Data?) -> Void) {
+        provider.loadItem(forTypeIdentifier: UTType.image.identifier, options: nil) { item, _ in
+            let data = Self.imageData(from: item)
+            DispatchQueue.main.async { completion(data) }
+        }
+    }
+
+    /// Coerces whatever `loadItem` hands back for an image into downscaled JPEG
+    /// bytes. Depending on the source app the item is a file `URL`, raw `Data`,
+    /// or a `UIImage`. We normalise to a `UIImage`, then re-encode via
+    /// `downscaledJPEG(_:)` so the upload stays under the server's size cap
+    /// (see `MAX_IMAGE_BASE64_LENGTH` in server/uploads.ts); a full-resolution
+    /// phone photo would otherwise be rejected as too large.
+    private nonisolated static func imageData(from item: NSSecureCoding?) -> Data? {
+        let image: UIImage?
+        if let uiImage = item as? UIImage {
+            image = uiImage
+        } else if let url = item as? URL, let data = try? Data(contentsOf: url) {
+            image = UIImage(data: data)
+        } else if let data = item as? Data {
+            image = UIImage(data: data)
+        } else {
+            image = nil
+        }
+        return image.flatMap(downscaledJPEG)
+    }
+
+    /// Downscales an image so its longest edge is at most 1024px and encodes it
+    /// as JPEG — mirroring the web app's `encodeImageFile` (src/lib/encode-image.ts)
+    /// so both share paths produce uploads comfortably under the server limit.
+    private nonisolated static func downscaledJPEG(_ image: UIImage) -> Data? {
+        let maxEdge: CGFloat = 1024
+        let longest = max(image.size.width, image.size.height)
+        let scale = longest > maxEdge ? maxEdge / longest : 1
+        let target = CGSize(width: image.size.width * scale, height: image.size.height * scale)
+
+        let format = UIGraphicsImageRendererFormat.default()
+        format.scale = 1
+        let renderer = UIGraphicsImageRenderer(size: target, format: format)
+        let resized = renderer.image { _ in
+            image.draw(in: CGRect(origin: .zero, size: target))
+        }
+        return resized.jpegData(compressionQuality: 0.85)
     }
 
     /// Coerces whatever `NSItemProvider.loadItem` hands back into a URL.
@@ -369,6 +477,59 @@ final class ShareViewController: UIViewController {
         }.resume()
     }
 
+    /// Posts a shared image to `/api/ingest/photo`. The image is sent as base64
+    /// JSON — the same shape the web add-form's scan flow uses — alongside the
+    /// same note, lists, and reminder the link path sends, so the server files
+    /// and schedules the created item identically. The response is decoded by
+    /// the shared `successMessage(from:)`, so the confirmation toast ("Added to
+    /// Jazz, Chill") reads the same for a photo as for a link.
+    private func postPhoto(
+        imageData: Data,
+        note: String,
+        listNames: [String],
+        remindAt: Date?,
+        completion: @escaping (PostResult) -> Void
+    ) {
+        guard let endpoint = URL(string: baseURL + "/api/ingest/photo") else {
+            completion(.failure("Misconfigured server URL."))
+            return
+        }
+        guard !apiKey.isEmpty else {
+            completion(.failure("Missing ingest API key in build config."))
+            return
+        }
+
+        var payload: [String: Any] = ["imageBase64": imageData.base64EncodedString()]
+        if !note.isEmpty { payload["notes"] = note }
+        if !listNames.isEmpty { payload["listNames"] = listNames }
+        if let remindAt { payload["remindAt"] = Self.scheduleFormatter.string(from: remindAt) }
+
+        var request = URLRequest(url: endpoint)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+        request.httpBody = try? JSONSerialization.data(withJSONObject: payload)
+        request.timeoutInterval = 30
+
+        URLSession.shared.dataTask(with: request) { data, response, error in
+            let result: PostResult
+            if let error {
+                result = .failure("Couldn't reach On The Beach: \(error.localizedDescription)")
+            } else {
+                let status = (response as? HTTPURLResponse)?.statusCode ?? 0
+                if (200...299).contains(status) {
+                    result = .success(Self.successMessage(from: data))
+                } else if status == 401 {
+                    result = .failure("Unauthorized — check the ingest API key.")
+                } else {
+                    let body = data.flatMap { String(data: $0, encoding: .utf8) } ?? ""
+                    result = .failure("Add failed (\(status)). \(body)")
+                }
+            }
+            DispatchQueue.main.async { completion(result) }
+        }.resume()
+    }
+
     /// Builds the confirmation toast text from the ingest response: "Added",
     /// "Added to Jazz, Chill", or "Already saved" when the link was a duplicate
     /// (still worth confirming — a re-share still files it into lists and sets
@@ -401,6 +562,8 @@ private final class ComposeFormController: UIViewController, UITextViewDelegate 
     var onPickList: (() -> Void)?
 
     private let urlLabel = UILabel()
+    private let imagePreview = UIImageView()
+    private let imageWell = BeveledView(style: .field, fill: OTBTheme.chromeWhite)
     private let noteView = UITextView()
     private let notePlaceholder = UILabel()
     private let listValueLabel = UILabel()
@@ -428,6 +591,15 @@ private final class ComposeFormController: UIViewController, UITextViewDelegate 
         urlLabel.textColor = OTBTheme.navy
         urlLabel.numberOfLines = 2
         urlLabel.lineBreakMode = .byTruncatingMiddle
+
+        // A shared image gets a sunken white well preview, seated inside the 2px
+        // bevel like the note field. Hidden until an image is actually shared.
+        imagePreview.contentMode = .scaleAspectFit
+        imagePreview.clipsToBounds = true
+        imagePreview.translatesAutoresizingMaskIntoConstraints = false
+        imageWell.translatesAutoresizingMaskIntoConstraints = false
+        imageWell.addSubview(imagePreview)
+        imageWell.isHidden = true
 
         // A sunken white well for the note, matching the app's --bevel-field inputs.
         noteView.font = OTBTheme.ui(14)
@@ -461,7 +633,7 @@ private final class ComposeFormController: UIViewController, UITextViewDelegate 
         let listRow = makeListRow()
         let scheduleRow = makeScheduleRow()
 
-        let stack = UIStackView(arrangedSubviews: [urlLabel, noteField, listRow, scheduleRow, datePicker])
+        let stack = UIStackView(arrangedSubviews: [urlLabel, imageWell, noteField, listRow, scheduleRow, datePicker])
         stack.axis = .vertical
         stack.spacing = 12
         stack.translatesAutoresizingMaskIntoConstraints = false
@@ -472,6 +644,11 @@ private final class ComposeFormController: UIViewController, UITextViewDelegate 
             stack.topAnchor.constraint(equalTo: guide.topAnchor, constant: 16),
             stack.leadingAnchor.constraint(equalTo: guide.leadingAnchor, constant: 16),
             stack.trailingAnchor.constraint(equalTo: guide.trailingAnchor, constant: -16),
+            imageWell.heightAnchor.constraint(equalToConstant: 140),
+            imagePreview.topAnchor.constraint(equalTo: imageWell.topAnchor, constant: 2),
+            imagePreview.bottomAnchor.constraint(equalTo: imageWell.bottomAnchor, constant: -2),
+            imagePreview.leadingAnchor.constraint(equalTo: imageWell.leadingAnchor, constant: 2),
+            imagePreview.trailingAnchor.constraint(equalTo: imageWell.trailingAnchor, constant: -2),
             noteField.heightAnchor.constraint(equalToConstant: 96),
             noteView.topAnchor.constraint(equalTo: noteField.topAnchor, constant: 2),
             noteView.bottomAnchor.constraint(equalTo: noteField.bottomAnchor, constant: -2),
@@ -559,7 +736,26 @@ private final class ComposeFormController: UIViewController, UITextViewDelegate 
 
     func setURL(_ url: URL?) {
         urlLabel.text = url?.absoluteString
-        addButton.isEnabled = (url != nil) && !isPosting
+        urlLabel.isHidden = url == nil
+        imageWell.isHidden = true
+        setHasContent(url != nil)
+    }
+
+    /// Shows the shared image in the preview well and enables Add. Called
+    /// instead of `setURL` when the share payload is a photo rather than a link.
+    func setImage(_ image: UIImage?) {
+        imagePreview.image = image
+        imageWell.isHidden = image == nil
+        urlLabel.isHidden = true
+        setHasContent(image != nil)
+    }
+
+    /// Tracks whether there's anything to post (a URL or an image), so both the
+    /// initial extraction and `setPosting` gate the Add button off the same flag.
+    private var hasContent = false
+    private func setHasContent(_ value: Bool) {
+        hasContent = value
+        addButton.isEnabled = value && !isPosting
     }
 
     /// Reflects the chosen lists in the "List" row: "None", the single name, or
@@ -580,7 +776,7 @@ private final class ComposeFormController: UIViewController, UITextViewDelegate 
         } else {
             spinner.stopAnimating()
             navigationItem.rightBarButtonItem = addButton
-            addButton.isEnabled = urlLabel.text != nil
+            addButton.isEnabled = hasContent
         }
     }
 
