@@ -6,7 +6,7 @@
 - `server/routes/music-items.ts` owns listing, create/update/delete, filtering, sorting, stack-aware queries, and saved ordering.
 - `server/routes/stacks.ts` owns stack CRUD, item membership, and parent/child stack hierarchy rules.
 - `server/routes/release.ts` owns image upload, cover scanning, MusicBrainz lookup, and Apple Music enrichment.
-- `server/routes/ingest.ts` owns authenticated email and single-link ingestion endpoints.
+- `server/routes/ingest.ts` owns authenticated email, single-link, and photo ingestion endpoints (the share sheet posts links to `/link` and images to `/photo`, both of which can file the item into lists and set a reminder).
 - `server/routes/rss.ts` exposes the feed surfaces.
 
 ## Page data (SvelteKit)

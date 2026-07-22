@@ -34,6 +34,15 @@ for free by building the same targets with **Mac Catalyst** (see [Enable macOS
   name. On **Add** it `POST`s the URL — plus `notes` and `listName` when set — to
   `POST /api/ingest/link` with a `Bearer` token. The extension talks to the server
   directly, so a share works even when the app isn't running.
+- **Sharing an image** works the same way. When the payload is a photo rather than a
+  link (e.g. a record cover shared from Photos), the extension shows the same compose
+  form — with an image preview in place of the URL line — and the same note, list,
+  and reminder controls. The image is downscaled to a 1024px JPEG (mirroring the web
+  add-form, so it stays under the server's upload size cap) and `POST`ed as base64 to
+  `POST /api/ingest/photo`, which saves the artwork, scans it for release metadata,
+  and files the created item into the chosen lists / reminder just like a link. A
+  link is preferred when the share carries both (a shared web page often includes a
+  thumbnail image we don't want).
 - Posting is **synchronous**: the form stays on screen showing an "Adding…" spinner
   until the request finishes. On success it flashes a brief checkmark toast built
   from the server's response — "Added", "Added to Jazz, Chill", or "Already saved"
@@ -44,8 +53,10 @@ for free by building the same targets with **Mac Catalyst** (see [Enable macOS
   always a live controller to present the toast and alert on.
 
 ```
-iOS share sheet ──► ShareExtension compose form ──► POST /api/ingest/link ──► item created
-        (note + list picker)          GET /api/ingest/stacks ──┘  (filed into list)
+iOS share sheet ──► ShareExtension compose form ──┬─► POST /api/ingest/link  ──► item created
+        (note + list picker)  GET /api/ingest/stacks┘   (a link)                  (filed into list)
+                                                    └─► POST /api/ingest/photo ──► item created
+                                                        (an image)                (scanned + filed)
 ```
 
 ## What lives in the repo vs. what's generated
@@ -255,15 +266,16 @@ consider rotating `INGEST_API_KEY`.
 ## Troubleshooting
 
 - **Extension doesn't appear in the share sheet** — make sure you shared a web
-  URL or page (the activation rule in `Info.plist` targets web URLs, web pages,
-  and text). Reboot the device once after first install; iOS caches extension
-  registrations.
+  URL, text, or an image (the activation rule in `Info.plist` targets web URLs,
+  text, and images). Reboot the device once after first install; iOS caches
+  extension registrations.
 - **"Missing ingest API key in build config."** — `Secrets.xcconfig` isn't wired
   as the target's configuration file, or `OTB_INGEST_API_KEY` is empty.
 - **401 Unauthorized** — the key in `Secrets.xcconfig` doesn't match the
   server's `INGEST_API_KEY`, or ingest is disabled (`INGEST_ENABLED=false`).
 - **Add failed (4xx/5xx)** — the alert includes the server's response body;
-  check the server logs for `POST /api/ingest/link`.
+  check the server logs for `POST /api/ingest/link` (a shared link) or
+  `POST /api/ingest/photo` (a shared image).
 - **"ios platform already exists"** on `cap add` — a leftover `ios/` directory
   is present. It's fully generated and gitignored, so just `rm -rf ios` and run
   `bun run cap:add` again. (The hand-authored sources live in `native/`, not

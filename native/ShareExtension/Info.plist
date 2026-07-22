@@ -35,17 +35,21 @@
 		<key>NSExtensionAttributes</key>
 		<dict>
 			<!-- Offer the extension whenever the share payload contains a web
-			     URL or text that may embed a URL. NSExtensionActivationSupportsWebPage
-			     is intentionally NOT used: it requires an NSExtensionJavaScriptPreprocessingFile,
-			     and without one the whole activation rule is malformed and iOS silently
-			     drops the extension from the share sheet. We only need the URL, which
-			     WebURL/Text already cover. -->
+			     URL, text that may embed a URL, or an image (a shared photo, e.g.
+			     a record cover). NSExtensionActivationSupportsWebPage is
+			     intentionally NOT used: it requires an
+			     NSExtensionJavaScriptPreprocessingFile, and without one the whole
+			     activation rule is malformed and iOS silently drops the extension
+			     from the share sheet. We only need the URL, which WebURL/Text
+			     already cover. -->
 			<key>NSExtensionActivationRule</key>
 			<dict>
 				<key>NSExtensionActivationSupportsWebURLWithMaxCount</key>
 				<integer>1</integer>
 				<key>NSExtensionActivationSupportsText</key>
 				<true/>
+				<key>NSExtensionActivationSupportsImageWithMaxCount</key>
+				<integer>1</integer>
 			</dict>
 		</dict>
 	</dict>
