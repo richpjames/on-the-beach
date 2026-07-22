@@ -398,28 +398,46 @@ export function createIngestRoutes(deps: IngestRoutesDeps = {}): Hono {
     let imageBase64: unknown;
     let notes: unknown;
     let from: unknown;
+    // Lists and an optional reminder date the item should be filed with — the
+    // share sheet sends these for a photo just as it does for a link, so a
+    // shared image lands in the same lists (and gets the same "Remind me" date)
+    // as a shared URL would.
+    let listNames: string[] = [];
+    let remindAtRaw: unknown;
 
     const contentType = c.req.header("Content-Type") ?? "";
 
     if (contentType.includes("multipart/form-data")) {
       // iPhone Shortcuts and other clients send the photo as a file field.
-      let form: Record<string, string | File>;
+      // `all: true` collects repeated fields (e.g. several `listNames`) into an
+      // array while leaving single-valued fields untouched.
+      let form: Record<string, string | File | (string | File)[]>;
       try {
-        form = (await c.req.parseBody()) as Record<string, string | File>;
+        form = await c.req.parseBody({ all: true });
       } catch (err) {
         console.error("[api] POST /api/ingest/photo invalid form data:", err);
         return c.json({ error: "Invalid form data" }, 400);
       }
 
-      const file = form.photo ?? form.image ?? form.file;
+      const fileField = form.photo ?? form.image ?? form.file;
+      const file = Array.isArray(fileField) ? fileField[0] : fileField;
       if (!(file instanceof File)) {
         return c.json({ error: "photo file is required" }, 400);
       }
 
       const buffer = Buffer.from(await file.arrayBuffer());
       imageBase64 = buffer.toString("base64");
-      notes = form.notes;
-      from = form.from;
+      notes = Array.isArray(form.notes) ? form.notes[0] : form.notes;
+      from = Array.isArray(form.from) ? form.from[0] : form.from;
+      listNames = collectListNames({
+        listName: Array.isArray(form.listName) ? form.listName[0] : form.listName,
+        listNames: Array.isArray(form.listNames)
+          ? form.listNames
+          : form.listNames !== undefined
+            ? [form.listNames]
+            : [],
+      });
+      remindAtRaw = Array.isArray(form.remindAt) ? form.remindAt[0] : form.remindAt;
     } else {
       let body: unknown;
       try {
@@ -433,13 +451,24 @@ export function createIngestRoutes(deps: IngestRoutesDeps = {}): Hono {
         return c.json({ error: "Invalid JSON payload" }, 400);
       }
 
-      ({ imageBase64, notes, from } = body as Record<string, unknown>);
+      const record = body as Record<string, unknown>;
+      ({ imageBase64, notes, from } = record);
+      listNames = collectListNames(record);
+      remindAtRaw = record.remindAt;
     }
 
     const validation = validateImageBase64(imageBase64);
     if (!validation.ok) {
       return c.json({ error: validation.error }, 400);
     }
+
+    // Validate the reminder before saving anything, so a mis-formatted date
+    // fails cleanly instead of leaving an orphaned upload behind.
+    const remindAtResult = parseRemindAt({ remindAt: remindAtRaw });
+    if ("error" in remindAtResult) {
+      return c.json({ error: remindAtResult.error }, 400);
+    }
+    const remindAt = remindAtResult.date;
 
     let artworkUrl: string;
     try {
@@ -474,6 +503,17 @@ export function createIngestRoutes(deps: IngestRoutesDeps = {}): Hono {
         notes: noteParts.length ? noteParts.join(" — ") : undefined,
       });
 
+      // File the new item into every chosen list (creating any that are new),
+      // then apply the reminder — mirroring the /link path so the share sheet's
+      // list and "Remind me" controls behave the same for a photo.
+      const lists = await Promise.all(listNames.map((name) => resolveOrCreateStack(name)));
+      for (const list of lists) {
+        await attachItemToStack(result.item.id, list.id);
+      }
+      if (remindAt) {
+        await setItemReminder(result.item.id, remindAt);
+      }
+
       scheduleAppleMusicBackfill(result.item.id);
 
       return c.json({
@@ -487,6 +527,7 @@ export function createIngestRoutes(deps: IngestRoutesDeps = {}): Hono {
             artworkUrl,
           },
         ],
+        lists,
         scan: scan
           ? {
               artist: scan.artist,
