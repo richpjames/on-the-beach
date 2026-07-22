@@ -6,6 +6,7 @@
   import type { ItemSuggestion, ListenStatus } from "../../types";
   import { parseAppleMusicCatalogUrl } from "../../../shared/apple-music";
   import { api, apiFetch } from "../api";
+  import { encodeImageFile } from "../encode-image";
   import { player } from "../player.svelte";
   import StarRating from "./StarRating.svelte";
   import SuggestionPickerModal from "./SuggestionPickerModal.svelte";
@@ -226,13 +227,7 @@
     const previousUrl = editArtworkUrl;
 
     try {
-      const dataUrl = await new Promise<string>((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(reader.result as string);
-        reader.onerror = reject;
-        reader.readAsDataURL(file);
-      });
-      const base64 = dataUrl.split(",")[1];
+      const base64 = await encodeImageFile(file);
       const { artworkUrl } = await api.uploadReleaseImage(base64);
       editArtworkUrl = artworkUrl;
     } catch (err) {
