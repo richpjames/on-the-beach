@@ -103,6 +103,11 @@ struct OTBProvider: TimelineProvider {
 // MARK: - View
 
 struct OTBWidgetEntryView: View {
+    // Which family this instance is rendering — drives the per-surface layout.
+    // The Home Screen family keeps the full app look; the Lock Screen accessory
+    // families use compact layouts the system draws in monochrome (custom colors
+    // are ignored there), so they carry the app's *type* and wording instead.
+    @Environment(\.widgetFamily) private var family
     var entry: OTBEntry
 
     private var countText: String {
@@ -110,7 +115,56 @@ struct OTBWidgetEntryView: View {
         return "\(n)"
     }
 
+    private var releaseWord: String {
+        entry.toListen == 1 ? "release" : "releases"
+    }
+
     var body: some View {
+        switch family {
+        case .accessoryInline:
+            // A single line beside the Lock Screen clock, e.g. "12 to listen".
+            Text("\(countText) to listen")
+                .font(OTBTheme.mono(11))
+
+        case .accessoryCircular:
+            // Circular Lock Screen slot: the glanceable number over the standard
+            // translucent accessory background.
+            ZStack {
+                AccessoryWidgetBackground()
+                VStack(spacing: 0) {
+                    Text(countText)
+                        .font(OTBTheme.number(22))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.4)
+                    Text("QUEUED")
+                        .font(OTBTheme.mono(8))
+                }
+            }
+            .containerBackground(for: .widget) { Color.clear }
+
+        case .accessoryRectangular:
+            // Wide Lock Screen slot: number + the same TO LISTEN / releases lines
+            // the Home Screen widget uses, so it reads as the same app.
+            HStack(spacing: 10) {
+                Text(countText)
+                    .font(OTBTheme.number(34))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.4)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("TO LISTEN").font(OTBTheme.mono(11))
+                    Text(releaseWord).font(OTBTheme.ui(11))
+                }
+            }
+            .containerBackground(for: .widget) { Color.clear }
+
+        default:
+            homeScreen
+        }
+    }
+
+    // The original Home Screen (systemSmall) layout — the full app aesthetic:
+    // black playlist well, electric-blue count, Verdana/Courier chrome.
+    private var homeScreen: some View {
         VStack(alignment: .leading, spacing: 4) {
             Text("TO LISTEN")
                 .font(OTBTheme.mono(11))
@@ -126,7 +180,7 @@ struct OTBWidgetEntryView: View {
                 .lineLimit(1)
                 .minimumScaleFactor(0.4)
 
-            Text(entry.toListen == 1 ? "release" : "releases")
+            Text(releaseWord)
                 .font(OTBTheme.ui(11))
                 .foregroundStyle(OTBTheme.playlistText.opacity(0.7))
                 .lineLimit(1)
@@ -150,7 +204,14 @@ struct OTBWidget: Widget {
         }
         .configurationDisplayName("To Listen")
         .description("How many releases are queued to listen to.")
-        .supportedFamilies([.systemSmall])
+        // Home Screen (systemSmall) keeps the full app look; the accessory
+        // families put the same count on the Lock Screen (rendered monochrome).
+        .supportedFamilies([
+            .systemSmall,
+            .accessoryCircular,
+            .accessoryRectangular,
+            .accessoryInline,
+        ])
     }
 }
 
