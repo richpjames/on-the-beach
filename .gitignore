@@ -46,7 +46,9 @@ eval/fixtures/pending-review.json
 # scripts/lib/native-build-common.sh restores into the project after `cap add`.
 !native/AppIcon.appiconset/*.png
 
-uploads
+# Runtime cover-image uploads dir (UPLOADS_DIR default). Anchored to the repo
+# root so it doesn't also swallow src/routes/uploads/ (the serving route).
+/uploads
 
 # SvelteKit
 .svelte-kit/
