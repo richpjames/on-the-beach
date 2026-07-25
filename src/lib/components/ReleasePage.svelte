@@ -464,38 +464,48 @@
               rel="noopener noreferrer">{data.sourceLink.label}</a
             >
           {/if}
-          {#if data.bandcampEmbed}
-            <button
-              class="release-page__listen-btn"
-              data-src={data.bandcampEmbed.src}
-              data-title={item.title}
-              data-artist={item.artist_name ?? ""}
-              data-href={data.bandcampEmbed.href}
-              onclick={() => listen(data.bandcampEmbed!)}>▶ Listen</button
-            >
-          {/if}
-          {#if data.youtubeEmbed}
-            <button
-              class="release-page__listen-btn"
-              data-src={data.youtubeEmbed.src}
-              data-title={item.title}
-              data-artist={item.artist_name ?? ""}
-              data-player-type="video"
-              data-href={data.youtubeEmbed.href}
-              onclick={() => listen(data.youtubeEmbed!)}>▶ Watch</button
-            >
-          {/if}
-          {#if data.appleMusicListen}
-            <button
-              class="release-page__listen-btn release-page__listen-btn--apple"
-              data-am-mode={data.appleMusicListen.mode}
-              data-title={item.title}
-              data-artist={item.artist_name ?? ""}
-              data-href={data.appleMusicListen.href}
-              onclick={() => listenAppleMusic(data.appleMusicListen!)}
-              >▶ Listen on Apple Music</button
-            >
-          {/if}
+          <div class="release-page__actions">
+            {#if data.bandcampEmbed}
+              <button
+                class="release-page__listen-btn"
+                data-src={data.bandcampEmbed.src}
+                data-title={item.title}
+                data-artist={item.artist_name ?? ""}
+                data-href={data.bandcampEmbed.href}
+                onclick={() => listen(data.bandcampEmbed!)}>▶ Bandcamp</button
+              >
+            {/if}
+            {#if data.youtubeEmbed}
+              <button
+                class="release-page__listen-btn"
+                data-src={data.youtubeEmbed.src}
+                data-title={item.title}
+                data-artist={item.artist_name ?? ""}
+                data-player-type="video"
+                data-href={data.youtubeEmbed.href}
+                onclick={() => listen(data.youtubeEmbed!)}>▶ YouTube</button
+              >
+            {/if}
+            {#if data.appleMusicListen}
+              <button
+                class="release-page__listen-btn release-page__listen-btn--apple"
+                data-am-mode={data.appleMusicListen.mode}
+                data-title={item.title}
+                data-artist={item.artist_name ?? ""}
+                data-href={data.appleMusicListen.href}
+                onclick={() => listenAppleMusic(data.appleMusicListen!)}
+                >▶ Apple Music</button
+              >
+            {/if}
+            {#if lookupLink && lookupIsPlayableAppleMusic}
+              <button
+                class="release-page__listen-btn release-page__listen-btn--apple"
+                data-am-mode="musickit"
+                onclick={() => listenLookupAppleMusic(lookupLink!.url)}
+                >▶ Apple Music</button
+              >
+            {/if}
+          </div>
           {#if data.mixcloudWidgetSrc}
             <iframe
               class="release-page__mixcloud-embed"
@@ -506,14 +516,7 @@
             ></iframe>
           {/if}
           <div id="secondary-links">
-            {#if lookupLink && lookupIsPlayableAppleMusic}
-              <button
-                class="release-page__listen-btn release-page__listen-btn--apple"
-                data-am-mode="musickit"
-                onclick={() => listenLookupAppleMusic(lookupLink!.url)}
-                >▶ Listen on Apple Music</button
-              >
-            {:else if lookupLink}
+            {#if lookupLink && !lookupIsPlayableAppleMusic}
               <a
                 class="release-page__source-link"
                 href={lookupLink.url}

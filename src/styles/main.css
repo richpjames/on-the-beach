@@ -115,6 +115,17 @@ textarea {
   --window-gutter: 12px;
   --window-top-space: clamp(16px, 4vh, 32px);
   --taskbar-height: 28px;
+
+  /* ── iPhone hardware (notch, rounded corners, home indicator) ──
+     The teal desktop bleeds into the unsafe areas like wallpaper; every
+     interactive surface (window, taskbar, dock) stays inside these. */
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-right: env(safe-area-inset-right, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left: env(safe-area-inset-left, 0px);
+  /* Total space the taskbar occupies from the bottom edge. Use this — not
+     --taskbar-height — for anything that must clear the taskbar. */
+  --taskbar-clearance: calc(var(--taskbar-height) + var(--safe-bottom));
 }
 
 /* ═══════════════════════════════════════════════════
@@ -144,10 +155,23 @@ body {
   color: #000000;
   line-height: 1.3;
   font-size: var(--text-base);
-  width: min(calc(100% - (var(--window-gutter) * 2)), var(--window-max-width));
-  margin: var(--window-top-space) auto calc(var(--window-top-space) + var(--taskbar-height));
-  height: calc(100vh - (var(--window-top-space) * 2) - var(--taskbar-height));
-  max-height: calc(100vh - (var(--window-top-space) * 2) - var(--taskbar-height));
+  /* The window is inset from every physical edge: gutters plus whatever the
+     hardware steals (notch ears in landscape, home indicator below). */
+  width: min(
+    calc(100% - (var(--window-gutter) * 2) - var(--safe-left) - var(--safe-right)),
+    var(--window-max-width)
+  );
+  margin: calc(var(--window-top-space) + var(--safe-top)) auto
+    calc(var(--window-top-space) + var(--taskbar-clearance));
+  height: calc(
+    100vh - (var(--window-top-space) * 2) - var(--safe-top) - var(--taskbar-clearance)
+  );
+  height: calc(
+    100dvh - (var(--window-top-space) * 2) - var(--safe-top) - var(--taskbar-clearance)
+  );
+  max-height: calc(
+    100dvh - (var(--window-top-space) * 2) - var(--safe-top) - var(--taskbar-clearance)
+  );
   background: var(--chrome);
   border-width: 2px;
   border-style: solid;
@@ -390,6 +414,11 @@ select.input {
    BUTTONS — Raised 3D Windows buttons
 ═══════════════════════════════════════════════════ */
 .btn {
+  /* Flex centering: <a class="btn"> would otherwise top-align its label
+     inside the fixed control height (buttons centre natively, links don't). */
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   padding: 2px 12px;
   border-width: 2px;
   border-style: solid;
@@ -596,6 +625,13 @@ select.input {
   pointer-events: none;
 }
 
+.rating-stars.star-rating--large {
+  /* The release panel stretches this full-width; with row-reverse the stars
+     would pack to the right edge while everything else sits left. flex-end
+     in row-reverse = visual left, keeping one shared left axis. */
+  justify-content: flex-end;
+}
+
 .rating-stars.star-rating--large .rating-stars__star {
   width: 30px;
   height: 30px;
@@ -635,11 +671,12 @@ select.input {
    panel — a single raised frame, no gap — and the stack scrollbar only
    appears when the tabs actually overflow. (Small screens dock the filter
    section at the bottom instead; see the mobile block.) */
-@media (min-width: 521px) {
-  .stack-scrollbar.is-disabled {
-    display: none;
-  }
+/* An empty scrollbar track is dead chrome at any width. */
+.stack-scrollbar.is-disabled {
+  display: none;
+}
 
+@media (min-width: 521px) {
   .stack-section {
     background: var(--chrome-panel);
     border-width: 2px 2px 0 2px;
@@ -1469,12 +1506,13 @@ select.input {
     position: fixed;
     left: 0;
     right: 0;
-    bottom: var(--taskbar-height);
+    bottom: var(--taskbar-clearance);
     z-index: 9998; /* over content, under the taskbar (9999) and modals (10000) */
     background: var(--chrome-panel);
     border-top: 2px solid var(--chrome-white);
     box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.3);
-    padding: var(--space-2);
+    padding: var(--space-2) calc(var(--space-2) + var(--safe-right)) var(--space-2)
+      calc(var(--space-2) + var(--safe-left));
   }
 
   .browse-tools {
@@ -1865,7 +1903,7 @@ a:hover {
   right: 0;
   z-index: 100;
   /* When scrolled into view in page flow, clear the fixed taskbar. */
-  scroll-margin-bottom: calc(var(--taskbar-height) + 8px);
+  scroll-margin-bottom: calc(var(--taskbar-clearance) + 8px);
   min-width: 160px;
   background: var(--chrome);
   border-width: 2px;
@@ -2268,7 +2306,9 @@ a:hover {
   bottom: 0;
   left: 0;
   right: 0;
-  height: var(--taskbar-height);
+  /* The chrome extends under the home indicator; the controls don't. */
+  height: var(--taskbar-clearance);
+  padding: 0 var(--safe-right) var(--safe-bottom) var(--safe-left);
   background: var(--chrome);
   border-top: 2px solid var(--chrome-white);
   display: flex;
@@ -2300,7 +2340,7 @@ a:hover {
 .start-menu {
   position: absolute;
   bottom: calc(100% + 1px);
-  left: 2px;
+  left: calc(2px + var(--safe-left));
   display: flex;
   min-width: 220px;
   background: var(--chrome);
@@ -2492,8 +2532,8 @@ a:hover {
 ═══════════════════════════════════════════════════ */
 .player-window {
   position: fixed;
-  bottom: calc(var(--taskbar-height) + 8px);
-  right: 12px;
+  bottom: calc(var(--taskbar-clearance) + 8px);
+  right: calc(12px + var(--safe-right));
   width: 480px;
   max-width: calc(100vw - 24px);
   height: 263px;
@@ -3126,6 +3166,18 @@ a:hover {
   color: #0000cc;
 }
 
+.release-page__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  align-items: center;
+  margin-top: var(--space-4);
+}
+
+.release-page__actions:empty {
+  display: none;
+}
+
 .release-page__listen-btn {
   display: inline-flex;
   align-items: center;
@@ -3138,7 +3190,6 @@ a:hover {
   border-color: var(--bevel-raised);
   cursor: pointer;
   color: #000000;
-  margin-top: var(--space-4);
 }
 
 .release-page__listen-btn:hover {
@@ -3147,13 +3198,72 @@ a:hover {
 
 .release-page__listen-btn:active {
   border-color: var(--bevel-sunken);
-  padding: 3px 11px 1px 13px;
+  /* Base padding is 4px 12px; shift the label 1px down-right without
+     changing the button's outer size. */
+  padding: 5px 11px 3px 13px;
 }
 
 .release-page__footer {
   display: flex;
   justify-content: flex-end;
   gap: var(--space-4);
+}
+
+/* ── Phone refinements ── */
+@media (max-width: 520px) {
+  /* Play buttons share the row edge-to-edge instead of huddling on the
+     left with dead space beside them. Two-up when several are present;
+     an odd last button takes the full remaining width. */
+  .release-page__actions {
+    gap: var(--space-2);
+  }
+
+  .release-page__actions .release-page__listen-btn {
+    flex: 1 1 calc(50% - var(--space-2));
+    justify-content: center;
+    min-height: var(--control-h);
+  }
+}
+
+/* Landscape phone: the stacked artwork-then-panel column wastes a wide,
+   short screen. Put artwork and info side by side and size the artwork to
+   the viewport height so the panel gets the rest. */
+@media (orientation: landscape) and (max-height: 500px) {
+  :root {
+    /* Height is the scarce dimension — shrink the desktop breathing room
+       so the window content actually fits between notch and taskbar. */
+    --window-top-space: 8px;
+  }
+
+  .music-list {
+    min-height: 60px;
+  }
+
+  .release-page__body {
+    flex-direction: row;
+    align-items: flex-start;
+    gap: var(--space-5);
+  }
+
+  .release-page__artwork {
+    /* Kill the column-mode auto margins: in a row they'd absorb the free
+       space and shove the info panel to the far edge. Cap by viewport
+       height so the whole cover is visible without scrolling (the 170px
+       covers window chrome, nav row, and paddings). */
+    margin: 0;
+    max-width: min(40vw, calc(100dvh - 170px), 300px);
+    max-height: min(calc(100dvh - 170px), 300px);
+  }
+
+  .release-page__artwork-play,
+  .release-page__body > .release-page__artwork {
+    flex-shrink: 0;
+  }
+
+  .release-page__content {
+    flex: 1;
+    min-width: 0;
+  }
 }
 
 /* ═══════════════════════════════════════════════════
