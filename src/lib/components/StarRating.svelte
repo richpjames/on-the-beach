@@ -1,8 +1,10 @@
 <script lang="ts">
-  import { normalizeStarRating } from "../../ui/components/star-rating";
-
-  const MAX_RATING = 5;
-  const HALF_STEP = 0.5;
+  import {
+    MAX_STARS,
+    normalizeStarRating,
+    ratingForPointer,
+    starFill,
+  } from "../../ui/components/star-rating-model";
 
   let {
     itemId,
@@ -17,54 +19,42 @@
     onRate: (next: number | null) => Promise<void>;
   } = $props();
 
+  // The committed rating, mirrored from props (optimistically updated on click).
   let selected = $state<number | null>(null);
   $effect.pre(() => {
     selected = normalizeStarRating(rating);
   });
 
+  // The live hover value; null when the pointer is away. Never persisted.
   let preview = $state<number | null>(null);
   let pending = $state(false);
 
+  // What the stars actually paint: hover wins over the committed selection.
   const effective = $derived(preview ?? selected);
 
-  type Fill = "empty" | "half" | "full";
+  // Descending so DOM order is 5..1; `row-reverse` paints them left-to-right.
+  const stars = Array.from({ length: MAX_STARS }, (_, i) => MAX_STARS - i);
 
-  function fillFor(value: number | null, starValue: number): Fill {
-    if (value === null) return "empty";
-    if (value >= starValue) return "full";
-    if (Math.abs(value - (starValue - HALF_STEP)) < 0.001) return "half";
-    return "empty";
-  }
-
-  function resolveValueFromPointer(starValue: number, event: MouseEvent): number | null {
-    // Keyboard-triggered click events select the whole star.
-    if (event.detail === 0) return starValue;
-
-    const button = (event.currentTarget ?? event.target) as HTMLElement;
-    const rect = button.getBoundingClientRect();
-    if (rect.width <= 0) return starValue;
-
-    const isLeftHalf = event.clientX - rect.left < rect.width / 2;
-    return normalizeStarRating(isLeftHalf ? starValue - HALF_STEP : starValue);
+  /** Fraction (0..1) of how far across a star button the pointer sits. */
+  function pointerFraction(event: PointerEvent | MouseEvent): number {
+    const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
+    if (rect.width <= 0) return 1;
+    const x = event.clientX - rect.left;
+    return Math.min(1, Math.max(0, x / rect.width));
   }
 
   function onPointerMove(starValue: number, event: PointerEvent): void {
     if (pending) return;
-    preview = resolveValueFromPointer(starValue, event);
+    // A hover is purely positional — always derive the half from where we are.
+    preview = ratingForPointer(starValue, pointerFraction(event));
   }
 
   function onPointerLeave(): void {
     preview = null;
   }
 
-  async function onClick(starValue: number, event: MouseEvent): Promise<void> {
-    if (pending) return;
-    const value = resolveValueFromPointer(starValue, event);
-    if (value === null) return;
-
+  async function commit(next: number | null): Promise<void> {
     const previous = selected;
-    const next = previous === value ? null : value;
-
     preview = null;
     selected = next;
     pending = true;
@@ -78,6 +68,17 @@
       pending = false;
     }
   }
+
+  async function onClick(starValue: number, event: MouseEvent): Promise<void> {
+    if (pending) return;
+    // Keyboard activation (Enter/Space) reports detail 0 and has no position —
+    // it means "the whole star". A mouse click uses the pointer geometry.
+    const value =
+      event.detail === 0 ? starValue : ratingForPointer(starValue, pointerFraction(event));
+    if (value === null) return;
+    // Clicking the already-selected value clears the rating.
+    await commit(selected === value ? null : value);
+  }
 </script>
 
 <div
@@ -90,9 +91,9 @@
   aria-label="Rating"
   onpointerleave={onPointerLeave}
 >
-  {#each Array.from({ length: MAX_RATING }, (_, index) => MAX_RATING - index) as value (value)}
-    {@const fill = fillFor(effective, value)}
-    {@const selectedFill = fillFor(selected, value)}
+  {#each stars as value (value)}
+    {@const fill = starFill(effective, value)}
+    {@const selectedFill = starFill(selected, value)}
     <button
       type="button"
       class="rating-stars__star"
