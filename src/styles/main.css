@@ -1473,11 +1473,24 @@ select.input {
     white-space: nowrap;
   }
 
-  .filter-btn--action {
-    /* Pick One spans the full width of its own row below the filters rather
-       than floating in an empty right corner. */
+  /* Pick One spans the full width of its own row below the filters rather
+     than floating in an empty right corner. The flex item is the
+     .pick-random wrapper (added for press-and-hold), so the row treatment
+     lives there and the button stretches to fill it. */
+  .pick-random {
     flex: 1 0 100%;
     margin-left: 0;
+  }
+
+  .pick-random .filter-btn--action {
+    flex: 1 1 auto;
+  }
+
+  /* The dock sits at the bottom of the screen, so the rating menu opens
+     upward (matching .browse-tools__panel) instead of under the taskbar. */
+  .pick-random__menu {
+    top: auto;
+    bottom: calc(100% + 2px);
   }
 
   /* Wrap instead of horizontal scroll: every filter (and Pick One) stays
