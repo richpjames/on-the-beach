@@ -66,6 +66,21 @@ final class ShareViewController: UIViewController {
         case image(Data)
     }
 
+    /// What extraction found: something postable, an image attachment we
+    /// couldn't decode or compress, or nothing usable at all. The failure cases
+    /// are kept apart so the form can say which one happened instead of just
+    /// showing an empty preview with Add greyed out.
+    private enum SharedInput {
+        case content(SharedContent)
+        case unreadableImage
+        case nothing
+    }
+
+    /// Shown when a shared image can't be decoded or compressed into something
+    /// postable — the one failure that happens before any request is made.
+    private static let unreadablePhotoMessage =
+        "Couldn't read that photo — try sharing it from Photos instead."
+
     private var sharedContent: SharedContent?
     private var stackNames: [String] = []
     private var selectedListNames: [String] = []
@@ -112,16 +127,28 @@ final class ShareViewController: UIViewController {
         compose.onPickList = { [weak self] in self?.pushListPicker() }
         compose.onSubmit = { [weak self] in self?.submit() }
 
-        extractSharedContent { [weak self] content in
+        extractSharedContent { [weak self] input in
             guard let self else { return }
-            self.sharedContent = content
-            switch content {
-            case .link(let url):
-                self.compose.setURL(url)
-            case .image(let data):
-                self.compose.setImage(UIImage(data: data))
-            case nil:
-                self.compose.setURL(nil)
+            switch input {
+            case .content(let content):
+                self.sharedContent = content
+                switch content {
+                case .link(let url):
+                    self.compose.setURL(url)
+                case .image(let data):
+                    if let image = UIImage(data: data) {
+                        self.compose.setImage(image)
+                    } else {
+                        self.sharedContent = nil
+                        self.compose.setUnavailable(Self.unreadablePhotoMessage)
+                    }
+                }
+            case .unreadableImage:
+                self.sharedContent = nil
+                self.compose.setUnavailable(Self.unreadablePhotoMessage)
+            case .nothing:
+                self.sharedContent = nil
+                self.compose.setUnavailable("Nothing to add from this share.")
             }
             // Extraction is async, so the picker may already be on screen when
             // the content lands — ungate its Add button too.
@@ -161,7 +188,9 @@ final class ShareViewController: UIViewController {
     /// send exactly the same note, lists, and reminder.
     private func submit() {
         guard let sharedContent else {
-            cancel()
+            // Add is disabled without content, so this shouldn't be reachable —
+            // but silently dismissing the sheet would look like a successful add.
+            presentError("There's nothing here to add.")
             return
         }
         let note = compose.noteText
@@ -298,7 +327,7 @@ final class ShareViewController: UIViewController {
     /// holding the URL string (see below), and text branches arrive as
     /// `String`. Getting that coercion wrong is what left the Add button
     /// permanently disabled when sharing from Apple Music on macOS.
-    private func extractSharedContent(completion: @escaping (SharedContent?) -> Void) {
+    private func extractSharedContent(completion: @escaping (SharedInput) -> Void) {
         let items = (extensionContext?.inputItems as? [NSExtensionItem]) ?? []
         let providers = items.flatMap { $0.attachments ?? [] }
 
@@ -314,20 +343,28 @@ final class ShareViewController: UIViewController {
             if let imageProvider {
                 self.loadImage(from: imageProvider) { data in
                     if let data {
-                        completion(.image(data))
+                        completion(.content(.image(data)))
                     } else {
-                        completion(Self.linkFromText(items))
+                        // The share carried an image we couldn't decode or
+                        // compress. A link recovered from the text is still
+                        // worth posting; otherwise say so rather than leaving
+                        // the form blank.
+                        completion(Self.linkFromText(items) ?? .unreadableImage)
                     }
                 }
             } else {
-                completion(Self.linkFromText(items))
+                completion(Self.linkFromText(items) ?? .nothing)
             }
         }
 
         if let provider = providers.first(where: { $0.hasItemConformingToTypeIdentifier(urlType) }) {
             provider.loadItem(forTypeIdentifier: urlType, options: nil) { item, _ in
                 DispatchQueue.main.async {
-                    if let url = Self.url(from: item) { completion(.link(url)) } else { fallback() }
+                    if let url = Self.url(from: item) {
+                        completion(.content(.link(url)))
+                    } else {
+                        fallback()
+                    }
                 }
             }
             return
@@ -336,7 +373,11 @@ final class ShareViewController: UIViewController {
         if let provider = providers.first(where: { $0.hasItemConformingToTypeIdentifier(textType) }) {
             provider.loadItem(forTypeIdentifier: textType, options: nil) { item, _ in
                 DispatchQueue.main.async {
-                    if let url = Self.url(from: item) { completion(.link(url)) } else { fallback() }
+                    if let url = Self.url(from: item) {
+                        completion(.content(.link(url)))
+                    } else {
+                        fallback()
+                    }
                 }
             }
             return
@@ -345,10 +386,10 @@ final class ShareViewController: UIViewController {
         fallback()
     }
 
-    /// Recovers a `.link` from the input items' attributed text, or `nil`.
-    private nonisolated static func linkFromText(_ items: [NSExtensionItem]) -> SharedContent? {
+    /// Recovers a link from the input items' attributed text, or `nil`.
+    private nonisolated static func linkFromText(_ items: [NSExtensionItem]) -> SharedInput? {
         let text = items.compactMap { $0.attributedContentText?.string }.joined(separator: "\n")
-        return firstURL(in: text).map { .link($0) }
+        return firstURL(in: text).map { .content(.link($0)) }
     }
 
     /// Loads an image attachment and hands back downscaled JPEG bytes on the
@@ -534,7 +575,11 @@ final class ShareViewController: UIViewController {
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
-        request.httpBody = try? JSONSerialization.data(withJSONObject: payload)
+        guard let body = try? JSONSerialization.data(withJSONObject: payload) else {
+            completion(.failure("Couldn't prepare that link to send."))
+            return
+        }
+        request.httpBody = body
         request.timeoutInterval = 20
 
         URLSession.shared.dataTask(with: request) { data, response, error in
@@ -545,11 +590,8 @@ final class ShareViewController: UIViewController {
                 let status = (response as? HTTPURLResponse)?.statusCode ?? 0
                 if (200...299).contains(status) {
                     result = .success(Self.successMessage(from: data))
-                } else if status == 401 {
-                    result = .failure("Unauthorized — check the ingest API key.")
                 } else {
-                    let body = data.flatMap { String(data: $0, encoding: .utf8) } ?? ""
-                    result = .failure("Add failed (\(status)). \(body)")
+                    result = .failure(Self.failureMessage(status: status, data: data, isPhoto: false))
                 }
             }
             DispatchQueue.main.async { completion(result) }
@@ -587,7 +629,11 @@ final class ShareViewController: UIViewController {
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
-        request.httpBody = try? JSONSerialization.data(withJSONObject: payload)
+        guard let body = try? JSONSerialization.data(withJSONObject: payload) else {
+            completion(.failure("Couldn't prepare that photo to send."))
+            return
+        }
+        request.httpBody = body
         request.timeoutInterval = 30
 
         URLSession.shared.dataTask(with: request) { data, response, error in
@@ -598,15 +644,53 @@ final class ShareViewController: UIViewController {
                 let status = (response as? HTTPURLResponse)?.statusCode ?? 0
                 if (200...299).contains(status) {
                     result = .success(Self.successMessage(from: data))
-                } else if status == 401 {
-                    result = .failure("Unauthorized — check the ingest API key.")
                 } else {
-                    let body = data.flatMap { String(data: $0, encoding: .utf8) } ?? ""
-                    result = .failure("Add failed (\(status)). \(body)")
+                    result = .failure(Self.failureMessage(status: status, data: data, isPhoto: true))
                 }
             }
             DispatchQueue.main.async { completion(result) }
         }.resume()
+    }
+
+    /// Turns a non-2xx response into something the person sharing can act on.
+    ///
+    /// The old message pasted the raw response body into the alert, which for a
+    /// 413 is the adapter's HTML error page rather than anything readable — so
+    /// an upload that was too big looked like a generic failure. Known statuses
+    /// get plain English; anything else falls back to the server's JSON `error`
+    /// field (never a raw HTML body) alongside the status code.
+    private nonisolated static func failureMessage(status: Int, data: Data?, isPhoto: Bool) -> String {
+        switch status {
+        case 401:
+            return "Unauthorized — check the ingest API key."
+        case 413:
+            return isPhoto
+                ? "That photo was too big to send, even after compressing it. Try sharing a smaller image."
+                : "That share was too big to send."
+        case 503:
+            return "On The Beach isn't accepting shares right now. Try again later."
+        case 500...599:
+            return "On The Beach couldn't save that (\(status)). Try again in a moment."
+        default:
+            if let detail = serverError(from: data) {
+                return "\(detail) (\(status))"
+            }
+            return "Add failed (\(status))."
+        }
+    }
+
+    /// Pulls the `error` field out of the API's JSON error body, if that's what
+    /// came back. Returns nil for an empty or non-JSON body (e.g. an HTML error
+    /// page), so those never reach the alert verbatim.
+    private nonisolated static func serverError(from data: Data?) -> String? {
+        guard let data,
+              let payload = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let message = payload["error"] as? String
+        else { return nil }
+
+        let trimmed = message.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+        return trimmed.count > 200 ? String(trimmed.prefix(200)) + "…" : trimmed
     }
 
     /// Builds the confirmation toast text from the ingest response: "Added",
@@ -835,8 +919,23 @@ private final class ComposeFormController: UIViewController, UITextViewDelegate 
     func setURL(_ url: URL?) {
         urlLabel.text = url?.absoluteString
         urlLabel.isHidden = url == nil
+        urlLabel.numberOfLines = 2
+        urlLabel.lineBreakMode = .byTruncatingMiddle
         imageWell.isHidden = true
         setHasContent(url != nil)
+    }
+
+    /// Explains, in the line the URL normally occupies, why there's nothing to
+    /// post — an image we couldn't read, or a share with nothing usable in it.
+    /// Add stays disabled either way; without this the sheet just showed an
+    /// empty form and left the user guessing.
+    func setUnavailable(_ message: String) {
+        urlLabel.text = message
+        urlLabel.isHidden = false
+        urlLabel.numberOfLines = 0
+        urlLabel.lineBreakMode = .byWordWrapping
+        imageWell.isHidden = true
+        setHasContent(false)
     }
 
     /// Shows the shared image in the preview well and enables Add. Called

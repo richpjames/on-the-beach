@@ -50,6 +50,13 @@ export function toListSearchQuery(value: string): string {
 }
 
 export function getCoverScanErrorMessage(error: unknown): string {
+  // The image is compressed down to the upload budget before it's sent (see
+  // src/lib/encode-image.ts), so a 413 means even the smallest encode was too
+  // big — worth saying so rather than blaming the scan.
+  if (error instanceof Error && error.message.includes("413")) {
+    return "That image was too big to upload. Try a smaller photo.";
+  }
+
   if (error instanceof Error && error.message.includes("uploadReleaseImage")) {
     return "Couldn't save the image. Enter details manually.";
   }

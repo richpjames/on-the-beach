@@ -162,6 +162,9 @@ describe("app domain helpers", () => {
       "Scan unavailable",
     );
     expect(getCoverScanErrorMessage(new Error("other"))).toContain("Couldn't read the cover");
+    expect(getCoverScanErrorMessage(new Error("uploadReleaseImage failed: 413"))).toContain(
+      "too big to upload",
+    );
   });
 
   it("constrains image dimensions while preserving aspect ratio", () => {
