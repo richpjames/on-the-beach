@@ -24,6 +24,6 @@ EXPOSE 3000
 # on startup by the db layer (bun:sqlite).
 #
 # stdout/stderr are piped through `ts` so every line shown in Coolify carries an
-# absolute Madrid-time timestamp, e.g. "[2026-07-26 18:04:11 CEST] [api] ...".
+# absolute Madrid-time timestamp, e.g. "[2026-07-26 18:04:11] [api] ...".
 # pipefail preserves the server's exit status through the pipe.
-CMD ["sh", "-c", "set -o pipefail; bun build/index.js 2>&1 | ts '[%Y-%m-%d %H:%M:%S %Z]'"]
+CMD ["sh", "-c", "set -o pipefail; bun build/index.js 2>&1 | ts '[%Y-%m-%d %H:%M:%S]'"]
