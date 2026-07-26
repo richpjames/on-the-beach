@@ -81,7 +81,8 @@
       "Bash(npm test:*)",
       "Read(//tmp/**)",
       "Bash(echo \"exit=$?\")",
-      "Bash(grep -E \"Host |HostName \" ~/.ssh/config 2>/dev/null | head -30)"
+      "Bash(grep -E \"Host |HostName \" ~/.ssh/config 2>/dev/null | head -30)",
+      "mcp__bf7c680d-5fdc-5ef4-b4a0-abadb619bf0a__delete_trigger"
     ]
   },
   "remote": {
