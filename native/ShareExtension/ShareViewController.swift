@@ -81,6 +81,9 @@ final class ShareViewController: UIViewController {
 
     private let compose = ComposeFormController()
     private lazy var navController = UINavigationController(rootViewController: compose)
+    /// The list picker while it's on screen, so posting state and the Add gate
+    /// can be kept in step with the compose form's.
+    private weak var listPicker: ListPickerViewController?
 
     // Read from the extension's Info.plist. `OTBBaseURL` is committed; the API
     // key is injected from a gitignored xcconfig at build time (see
@@ -107,7 +110,7 @@ final class ShareViewController: UIViewController {
 
         compose.onCancel = { [weak self] in self?.cancel() }
         compose.onPickList = { [weak self] in self?.pushListPicker() }
-        compose.onSubmit = { [weak self] note, remindAt in self?.submit(note: note, remindAt: remindAt) }
+        compose.onSubmit = { [weak self] in self?.submit() }
 
         extractSharedContent { [weak self] content in
             guard let self else { return }
@@ -120,6 +123,9 @@ final class ShareViewController: UIViewController {
             case nil:
                 self.compose.setURL(nil)
             }
+            // Extraction is async, so the picker may already be on screen when
+            // the content lands — ungate its Add button too.
+            self.listPicker?.canAdd = self.compose.canSubmit
         }
         fetchStacks()
     }
@@ -139,16 +145,27 @@ final class ShareViewController: UIViewController {
             }
             self.compose.setListNames(names)
         }
+        // Picking a list is usually the last thing the user does, so the picker
+        // carries its own Add button: post from here rather than making them
+        // walk back to the compose form just to tap the same button.
+        picker.canAdd = compose.canSubmit
+        picker.onAdd = { [weak self] in self?.submit() }
+        listPicker = picker
         navController.pushViewController(picker, animated: true)
     }
 
     // MARK: - Submit / cancel
 
-    private func submit(note: String, remindAt: Date?) {
+    /// Posts the shared content with whatever the compose form currently holds.
+    /// Called from the form's Add button and from the list picker's, so both
+    /// send exactly the same note, lists, and reminder.
+    private func submit() {
         guard let sharedContent else {
             cancel()
             return
         }
+        let note = compose.noteText
+        let remindAt = compose.remindAt
 
         let handle: (PostResult) -> Void = { [weak self] result in
             guard let self else { return }
@@ -156,12 +173,12 @@ final class ShareViewController: UIViewController {
             case .success(let message):
                 self.presentSuccess(message)
             case .failure(let message):
-                self.compose.setPosting(false)
+                self.setPosting(false)
                 self.presentError(message)
             }
         }
 
-        compose.setPosting(true)
+        setPosting(true)
         switch sharedContent {
         case .link(let url):
             postLink(
@@ -180,6 +197,14 @@ final class ShareViewController: UIViewController {
                 completion: handle
             )
         }
+    }
+
+    /// Applies the "Adding…" state to every screen in the stack, so whichever
+    /// one the user submitted from shows the spinner and is locked against
+    /// re-entry (including navigating between them mid-request).
+    private func setPosting(_ posting: Bool) {
+        compose.setPosting(posting)
+        listPicker?.setPosting(posting)
     }
 
     /// Flashes a checkmark toast over the form, then closes the sheet. Completing
@@ -558,8 +583,24 @@ final class ShareViewController: UIViewController {
 /// container via closures.
 private final class ComposeFormController: UIViewController, UITextViewDelegate {
     var onCancel: (() -> Void)?
-    var onSubmit: ((String, Date?) -> Void)?
+    var onSubmit: (() -> Void)?
     var onPickList: (() -> Void)?
+
+    /// The note as typed, trimmed. Read by the container on submit — from this
+    /// screen's Add button or the list picker's — so the form stays the single
+    /// source of truth for what gets posted.
+    var noteText: String {
+        noteView.text.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    /// The chosen reminder day, or `nil` when "Remind me" is off.
+    var remindAt: Date? {
+        scheduleSwitch.isOn ? datePicker.date : nil
+    }
+
+    /// Whether there's anything to post yet — mirrored onto the list picker's
+    /// Add button so both are gated on the same condition.
+    var canSubmit: Bool { hasContent && !isPosting }
 
     private let urlLabel = UILabel()
     private let imagePreview = UIImageView()
@@ -585,6 +626,9 @@ private final class ComposeFormController: UIViewController, UITextViewDelegate 
         navigationItem.rightBarButtonItem = addButton
         // Nothing to post until a URL is extracted.
         addButton.isEnabled = false
+        // The bar is the blue title-bar gradient, so a default grey spinner all
+        // but disappears on it.
+        spinner.color = .white
 
         // The shared URL reads like a terminal line: mono type, navy on chrome.
         urlLabel.font = OTBTheme.mono(11)
@@ -791,11 +835,7 @@ private final class ComposeFormController: UIViewController, UITextViewDelegate 
         }
     }
 
-    @objc private func didTapAdd() {
-        let note = noteView.text.trimmingCharacters(in: .whitespacesAndNewlines)
-        let remindAt = scheduleSwitch.isOn ? datePicker.date : nil
-        onSubmit?(note, remindAt)
-    }
+    @objc private func didTapAdd() { onSubmit?() }
 
     // MARK: - UITextViewDelegate
 
@@ -810,14 +850,30 @@ private final class ComposeFormController: UIViewController, UITextViewDelegate 
 /// plus a "New list…" row that prompts for a name. Tapping a list toggles it; an
 /// item can belong to any number of lists (or none). The full selection is
 /// reported via `onSelectionChanged` after every change — the server resolves the
-/// names (creating any new), so no id round-trip is needed. The user commits by
-/// tapping back out of the picker.
+/// names (creating any new), so no id round-trip is needed.
+///
+/// There's also an **Add** button in the top right, mirroring the compose form's:
+/// choosing a list is normally the last decision, so the user can post from here
+/// and close the sheet without first navigating back.
 private final class ListPickerViewController: UITableViewController {
     var onSelectionChanged: (([String]) -> Void)?
+    var onAdd: (() -> Void)?
+
+    /// Mirrors the compose form's Add gate — there's nothing to post until the
+    /// shared link or image has been extracted.
+    var canAdd = false {
+        didSet { addButton.isEnabled = canAdd && !isPosting }
+    }
 
     private var names: [String]
     // Selection order is preserved so the compose row and payload stay stable.
     private var selected: [String]
+
+    private lazy var addButton = UIBarButtonItem(
+        title: "Add", style: .done, target: self, action: #selector(didTapAdd)
+    )
+    private let spinner = UIActivityIndicatorView(style: .medium)
+    private var isPosting = false
 
     init(stacks: [String], selected: [String]) {
         self.names = stacks
@@ -837,7 +893,32 @@ private final class ListPickerViewController: UITableViewController {
         tableView.backgroundColor = OTBTheme.playlistBg
         tableView.separatorColor = OTBTheme.navyBorder
         tableView.tintColor = OTBTheme.accent // checkmark colour
+
+        navigationItem.rightBarButtonItem = addButton
+        addButton.isEnabled = canAdd
+        // The bar is the blue title-bar gradient, so a default grey spinner all
+        // but disappears on it.
+        spinner.color = .white
     }
+
+    /// While a post is in flight, swap Add for a spinner and lock the screen —
+    /// including the back button, so the request can't be re-entered from the
+    /// compose form.
+    func setPosting(_ posting: Bool) {
+        isPosting = posting
+        tableView.isUserInteractionEnabled = !posting
+        navigationItem.hidesBackButton = posting
+        if posting {
+            spinner.startAnimating()
+            navigationItem.rightBarButtonItem = UIBarButtonItem(customView: spinner)
+        } else {
+            spinner.stopAnimating()
+            navigationItem.rightBarButtonItem = addButton
+            addButton.isEnabled = canAdd
+        }
+    }
+
+    @objc private func didTapAdd() { onAdd?() }
 
     // Section 0: existing lists (checkmark = selected). Section 1: "New list…".
     override func numberOfSections(in tableView: UITableView) -> Int { 2 }
