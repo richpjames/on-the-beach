@@ -317,9 +317,19 @@ consider rotating `INGEST_API_KEY`.
   as the target's configuration file, or `OTB_INGEST_API_KEY` is empty.
 - **401 Unauthorized** — the key in `Secrets.xcconfig` doesn't match the
   server's `INGEST_API_KEY`, or ingest is disabled (`INGEST_ENABLED=false`).
-- **Add failed (4xx/5xx)** — the alert includes the server's response body;
-  check the server logs for `POST /api/ingest/link` (a shared link) or
-  `POST /api/ingest/photo` (a shared image).
+- **Add failed (4xx/5xx)** — the alert explains the known statuses in plain
+  English (401 key mismatch, 413 too large, 503 ingest off, 5xx server error)
+  and otherwise shows the API's JSON `error` field with the status code. Raw
+  HTML error pages are never shown, so check the server logs for
+  `POST /api/ingest/link` (a shared link) or `POST /api/ingest/photo` (a shared
+  image) when the message is just a status.
+- **"That photo was too big to send…"** — a 413. The extension compresses down a
+  quality/size ladder before posting, so this means even the smallest encode
+  exceeded the server's request body limit; share a smaller image, or raise
+  `BODY_SIZE_LIMIT` in the server's environment.
+- **"Couldn't read that photo…"** — the shared image couldn't be decoded or
+  compressed at all, so there was nothing to post. The form says so with Add
+  disabled rather than showing an empty preview.
 - **"ios platform already exists"** on `cap add` — a leftover `ios/` directory
   is present. It's fully generated and gitignored, so just `rm -rf ios` and run
   `bun run cap:add` again. (The hand-authored sources live in `native/`, not
