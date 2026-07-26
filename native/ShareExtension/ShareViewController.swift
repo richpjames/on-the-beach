@@ -380,11 +380,65 @@ final class ShareViewController: UIViewController {
         return image.flatMap(downscaledJPEG)
     }
 
+    /// The downscale/quality ladder to walk while the encoded photo is still
+    /// too big. Mirrors `imageCompressionAttempts` in src/ui/domain/scan.ts.
+    private nonisolated static func compressionAttempts(
+        maxEdge: CGFloat,
+        quality: CGFloat
+    ) -> [(maxEdge: CGFloat, quality: CGFloat)] {
+        [
+            (maxEdge, quality),
+            (maxEdge, quality * 0.75),
+            ((maxEdge * 0.75).rounded(), quality * 0.7),
+            ((maxEdge * 0.5).rounded(), quality * 0.6),
+            ((maxEdge * 0.35).rounded(), quality * 0.5),
+        ]
+    }
+
     /// Downscales an image so its longest edge is at most 1024px and encodes it
     /// as JPEG — mirroring the web app's `encodeImageFile` (src/lib/encode-image.ts)
-    /// so both share paths produce uploads comfortably under the server limit.
+    /// so both share paths produce uploads the server will accept.
+    ///
+    /// A 1024px sleeve at quality 0.85 usually lands well under the limit, but a
+    /// detailed cover can still encode past it, so we compress harder down the
+    /// ladder until the base64 payload fits rather than posting a doomed request.
+    /// If nothing fits we post the smallest attempt anyway — a rejection then is
+    /// no worse than not trying.
     private nonisolated static func downscaledJPEG(_ image: UIImage) -> Data? {
-        let maxEdge: CGFloat = 1024
+        // Ceiling for the base64 payload we post, in characters — the same budget
+        // the web app uses (`MAX_UPLOAD_BASE64_LENGTH` in src/ui/domain/scan.ts).
+        // The binding limit is SvelteKit's request body limit, which 413s an
+        // oversized upload before the ingest route ever runs.
+        let maxUploadBase64Length = 460_000
+        var smallest: Data?
+
+        for attempt in compressionAttempts(maxEdge: 1024, quality: 0.85) {
+            guard let data = encodedJPEG(image, maxEdge: attempt.maxEdge, quality: attempt.quality)
+            else { continue }
+
+            if base64Length(ofByteCount: data.count) <= maxUploadBase64Length {
+                return data
+            }
+            if let current = smallest, data.count >= current.count {
+                continue
+            }
+            smallest = data
+        }
+
+        return smallest
+    }
+
+    /// Base64 encodes 3 bytes into 4 characters, padded up to the next multiple
+    /// of 4 — so we can size the payload without building the string.
+    private nonisolated static func base64Length(ofByteCount count: Int) -> Int {
+        ((count + 2) / 3) * 4
+    }
+
+    private nonisolated static func encodedJPEG(
+        _ image: UIImage,
+        maxEdge: CGFloat,
+        quality: CGFloat
+    ) -> Data? {
         let longest = max(image.size.width, image.size.height)
         let scale = longest > maxEdge ? maxEdge / longest : 1
         let target = CGSize(width: image.size.width * scale, height: image.size.height * scale)
@@ -395,7 +449,7 @@ final class ShareViewController: UIViewController {
         let resized = renderer.image { _ in
             image.draw(in: CGRect(origin: .zero, size: target))
         }
-        return resized.jpegData(compressionQuality: 0.85)
+        return resized.jpegData(compressionQuality: quality)
     }
 
     /// Coerces whatever `NSItemProvider.loadItem` hands back into a URL.

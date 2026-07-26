@@ -1,4 +1,8 @@
-import { constrainDimensions } from "../ui/domain/scan";
+import {
+  constrainDimensions,
+  imageCompressionAttempts,
+  MAX_UPLOAD_BASE64_LENGTH,
+} from "../ui/domain/scan";
 
 const DEFAULT_MAX_EDGE = 1024;
 const DEFAULT_QUALITY = 0.85;
@@ -29,21 +33,7 @@ function loadImage(dataUrl: string): Promise<HTMLImageElement> {
   });
 }
 
-/**
- * Read an image file, downscale it so its longest edge is at most `maxEdge`,
- * and re-encode it as a JPEG. Returns the base64 payload (no data-URL prefix).
- *
- * Downscaling keeps the upload comfortably under the server's size limit
- * (see `MAX_IMAGE_BASE64_LENGTH` in server/uploads.ts); full-resolution phone
- * photos would otherwise be rejected.
- */
-export async function encodeImageFile(
-  file: Blob,
-  maxEdge: number = DEFAULT_MAX_EDGE,
-  quality: number = DEFAULT_QUALITY,
-): Promise<string> {
-  const imageDataUrl = await readFileAsDataUrl(file);
-  const image = await loadImage(imageDataUrl);
+function encodeAtSize(image: HTMLImageElement, maxEdge: number, quality: number): string {
   const { width, height } = constrainDimensions(image.width, image.height, maxEdge);
 
   const canvas = document.createElement("canvas");
@@ -63,4 +53,40 @@ export async function encodeImageFile(
   }
 
   return parts[1];
+}
+
+/**
+ * Read an image file, downscale it so its longest edge is at most `maxEdge`,
+ * and re-encode it as a JPEG. Returns the base64 payload (no data-URL prefix).
+ *
+ * Downscaling alone doesn't guarantee a payload the server will accept — a
+ * detailed sleeve at 1024px can still encode past SvelteKit's request body
+ * limit, which 413s the upload before the route sees it. So the encode is
+ * retried down the `imageCompressionAttempts` ladder until it fits within
+ * `MAX_UPLOAD_BASE64_LENGTH`, compressing harder instead of failing.
+ */
+export async function encodeImageFile(
+  file: Blob,
+  maxEdge: number = DEFAULT_MAX_EDGE,
+  quality: number = DEFAULT_QUALITY,
+): Promise<string> {
+  const imageDataUrl = await readFileAsDataUrl(file);
+  const image = await loadImage(imageDataUrl);
+
+  let smallest = "";
+  for (const attempt of imageCompressionAttempts(maxEdge, quality)) {
+    const encoded = encodeAtSize(image, attempt.maxEdge, attempt.quality);
+    if (encoded.length <= MAX_UPLOAD_BASE64_LENGTH) {
+      return encoded;
+    }
+    // Each rung is smaller than the last, but guard against an encoder that
+    // doesn't shrink monotonically so the fallback is genuinely the smallest.
+    if (!smallest || encoded.length < smallest.length) {
+      smallest = encoded;
+    }
+  }
+
+  // Nothing on the ladder fit. Send the smallest anyway — the server may still
+  // accept it, and a rejection is no worse than refusing to try.
+  return smallest;
 }
