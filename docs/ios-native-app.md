@@ -42,8 +42,10 @@ for free by building the same targets with **Mac Catalyst** (see [Enable macOS
 - **Sharing an image** works the same way. When the payload is a photo rather than a
   link (e.g. a record cover shared from Photos), the extension shows the same compose
   form — with an image preview in place of the URL line — and the same note, list,
-  and reminder controls. The image is downscaled to a 1024px JPEG (mirroring the web
-  add-form, so it stays under the server's upload size cap) and `POST`ed as base64 to
+  and reminder controls. The image is downscaled to a 1024px JPEG and re-encoded at
+  progressively lower quality/size until the base64 payload fits the upload budget
+  (mirroring the web add-form's `encodeImageFile`, so a detailed sleeve compresses
+  further instead of being rejected with a 413) and `POST`ed as base64 to
   `POST /api/ingest/photo`, which saves the artwork, scans it for release metadata,
   and files the created item into the chosen lists / reminder just like a link. A
   link is preferred when the share carries both (a shared web page often includes a

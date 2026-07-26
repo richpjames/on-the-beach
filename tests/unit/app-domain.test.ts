@@ -13,7 +13,11 @@ import {
   buildContextKey,
   applyOrder,
 } from "../../src/ui/domain/music-list";
-import { constrainDimensions } from "../../src/ui/domain/scan";
+import {
+  constrainDimensions,
+  imageCompressionAttempts,
+  MAX_UPLOAD_BASE64_LENGTH,
+} from "../../src/ui/domain/scan";
 
 describe("app domain helpers", () => {
   it("detects whether add form has any user input", () => {
@@ -163,6 +167,28 @@ describe("app domain helpers", () => {
   it("constrains image dimensions while preserving aspect ratio", () => {
     expect(constrainDimensions(500, 300, 1024)).toEqual({ width: 500, height: 300 });
     expect(constrainDimensions(2000, 1000, 1000)).toEqual({ width: 1000, height: 500 });
+  });
+
+  it("keeps the upload budget under SvelteKit's default body size limit", () => {
+    expect(MAX_UPLOAD_BASE64_LENGTH).toBeLessThan(524_288);
+  });
+
+  it("steps image compression down from the requested settings", () => {
+    const attempts = imageCompressionAttempts(1024, 0.85);
+
+    expect(attempts[0]).toEqual({ maxEdge: 1024, quality: 0.85 });
+    expect(attempts).toHaveLength(5);
+
+    // Every rung must encode to fewer bytes than the one before it, or the
+    // retry loop would spin without ever getting under the limit.
+    const costs = attempts.map((attempt) => attempt.maxEdge ** 2 * attempt.quality);
+    for (let i = 1; i < costs.length; i++) {
+      expect(costs[i]).toBeLessThan(costs[i - 1]!);
+    }
+    for (const attempt of attempts) {
+      expect(attempt.quality).toBeGreaterThan(0);
+      expect(attempt.maxEdge).toBeGreaterThan(0);
+    }
   });
 
   it("builds context keys for all filter/stack combinations", () => {
