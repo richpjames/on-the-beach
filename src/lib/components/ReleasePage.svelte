@@ -505,6 +505,27 @@
                 >▶ Apple Music</button
               >
             {/if}
+            {#if lookupLink && !lookupIsPlayableAppleMusic}
+              <a
+                class="release-page__link-btn"
+                href={lookupLink.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                title={lookupLink.label}
+                aria-label={lookupLink.label}>🔗</a
+              >
+            {/if}
+            {#each secondaryLinks as link (link.id)}
+              {@const label = link.display_name ?? link.source_name ?? "Link"}
+              <a
+                class="release-page__link-btn"
+                href={link.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                title={label}
+                aria-label={label}>🔗</a
+              >
+            {/each}
           </div>
           {#if data.mixcloudWidgetSrc}
             <iframe
@@ -515,24 +536,6 @@
               allow="autoplay"
             ></iframe>
           {/if}
-          <div id="secondary-links">
-            {#if lookupLink && !lookupIsPlayableAppleMusic}
-              <a
-                class="release-page__source-link"
-                href={lookupLink.url}
-                target="_blank"
-                rel="noopener noreferrer">{lookupLink.label}</a
-              >
-            {/if}
-          </div>
-          {#each secondaryLinks as link (link.id)}
-            <a
-              class="release-page__source-link"
-              href={link.url}
-              target="_blank"
-              rel="noopener noreferrer">{link.display_name ?? link.source_name ?? "Link"}</a
-            >
-          {/each}
         </div>
 
         <div id="edit-mode" hidden={!editMode}>

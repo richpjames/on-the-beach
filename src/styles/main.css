@@ -3216,6 +3216,32 @@ a:hover {
   padding: 5px 11px 3px 13px;
 }
 
+/* An external link (e.g. "Apple Music") sits in the same horizontal row as
+   the play buttons, but as a compact icon-only button — just a link glyph. */
+.release-page__link-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-2) var(--space-3);
+  font-size: var(--text-base);
+  line-height: 1;
+  text-decoration: none;
+  background: var(--chrome);
+  border-width: 2px;
+  border-style: solid;
+  border-color: var(--bevel-raised);
+  cursor: pointer;
+  color: #000000;
+}
+
+.release-page__link-btn:hover {
+  background: var(--chrome-light);
+}
+
+.release-page__link-btn:active {
+  border-color: var(--bevel-sunken);
+}
+
 .release-page__footer {
   display: flex;
   justify-content: flex-end;
