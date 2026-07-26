@@ -48,6 +48,13 @@ Add two persistent volumes in Coolify:
 
 Run one manual deploy to confirm baseline.
 
+> **Log timestamps**: The Dockerfile pipes container stdout/stderr through `ts`
+> (moreutils) with `TZ=Europe/Madrid`, so every line in the Coolify log viewer is
+> prefixed with an absolute Madrid-time stamp, e.g.
+> `[2026-07-26 18:04:11 CEST] [api] POST /api/ingest/email ...`. No Coolify
+> configuration is needed; leave `TZ` unset to override only if you want a
+> different zone.
+
 ## 3. Basic Auth (Traefik labels)
 
 Generate bcrypt credentials:

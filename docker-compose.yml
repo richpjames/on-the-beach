@@ -9,6 +9,8 @@ services:
       DATABASE_PATH: /app/data/on_the_beach.db
       UPLOADS_DIR: /app/uploads
       NODE_ENV: production
+      # Madrid local time for the process and the log timestamps (see Dockerfile).
+      TZ: Europe/Madrid
     volumes:
       - app-data:/app/data
       - app-uploads:/app/uploads
