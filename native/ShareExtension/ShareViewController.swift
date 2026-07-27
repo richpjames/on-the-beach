@@ -322,6 +322,14 @@ final class ShareViewController: UIViewController {
     /// — some apps (e.g. Apple Music) carry the link there rather than as an
     /// attachment.
     ///
+    /// One wrinkle: a `public.url` item isn't always a web link. macOS Photos
+    /// (and Finder) export the shared photo to a temporary file and vend its
+    /// `file://` URL as the `public.url` attachment, with no `public.image` one.
+    /// So a URL is only treated as a link when it has a non-`file` scheme; a
+    /// `file://` URL is read as image bytes and posted as a photo instead —
+    /// otherwise the extension posted the `file://` string to `/api/ingest/link`
+    /// and the share failed with the server's "Missing or invalid url".
+    ///
     /// For links, `url(from:)` does the decoding, because the loaded item is
     /// not always a `URL`: on macOS a `public.url` item arrives as `Data`
     /// holding the URL string (see below), and text branches arrive as
@@ -357,28 +365,44 @@ final class ShareViewController: UIViewController {
             }
         }
 
-        if let provider = providers.first(where: { $0.hasItemConformingToTypeIdentifier(urlType) }) {
-            provider.loadItem(forTypeIdentifier: urlType, options: nil) { item, _ in
+        // Turns a loaded `public.url` / `public.plain-text` item into shared
+        // content. A remote link (http/https, or anything with a non-file scheme)
+        // is posted as a link; a `file://` URL is a local file — macOS Photos and
+        // Finder export the shared photo to a temporary file and vend its file URL
+        // instead of a `public.image` attachment, so treating it as a link posts a
+        // `file://` string the server rejects with "Missing or invalid url". We
+        // read those bytes and post them as a photo, falling back to any image
+        // attachment (or text link) if the file isn't a decodable image. The heavy
+        // read/decode runs off the main thread; only the UI callbacks hop back.
+        let handleLoadedURL: (NSSecureCoding?) -> Void = { item in
+            guard let url = Self.url(from: item) else {
+                DispatchQueue.main.async { fallback() }
+                return
+            }
+            if url.isFileURL {
+                let data = Self.imageData(fromFileURL: url)
                 DispatchQueue.main.async {
-                    if let url = Self.url(from: item) {
-                        completion(.content(.link(url)))
+                    if let data {
+                        completion(.content(.image(data)))
                     } else {
                         fallback()
                     }
                 }
+            } else {
+                DispatchQueue.main.async { completion(.content(.link(url))) }
+            }
+        }
+
+        if let provider = providers.first(where: { $0.hasItemConformingToTypeIdentifier(urlType) }) {
+            provider.loadItem(forTypeIdentifier: urlType, options: nil) { item, _ in
+                handleLoadedURL(item)
             }
             return
         }
 
         if let provider = providers.first(where: { $0.hasItemConformingToTypeIdentifier(textType) }) {
             provider.loadItem(forTypeIdentifier: textType, options: nil) { item, _ in
-                DispatchQueue.main.async {
-                    if let url = Self.url(from: item) {
-                        completion(.content(.link(url)))
-                    } else {
-                        fallback()
-                    }
-                }
+                handleLoadedURL(item)
             }
             return
         }
@@ -419,6 +443,21 @@ final class ShareViewController: UIViewController {
             image = nil
         }
         return image.flatMap(downscaledJPEG)
+    }
+
+    /// Reads a shared `file://` URL as downscaled JPEG bytes, or `nil` if it
+    /// isn't a decodable image. macOS Photos and Finder share a photo by
+    /// exporting it to a temporary file and handing over that file's URL rather
+    /// than a `public.image` attachment, so this is the path a Mac photo share
+    /// actually takes. A security-scoped resource is opened while reading when
+    /// one is required (a harmless no-op when it isn't).
+    private nonisolated static func imageData(fromFileURL url: URL) -> Data? {
+        let scoped = url.startAccessingSecurityScopedResource()
+        defer { if scoped { url.stopAccessingSecurityScopedResource() } }
+        guard let data = try? Data(contentsOf: url), let image = UIImage(data: data) else {
+            return nil
+        }
+        return downscaledJPEG(image)
     }
 
     /// The downscale/quality ladder to walk while the encoded photo is still
