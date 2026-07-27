@@ -11,6 +11,8 @@ services:
       NODE_ENV: production
       # Madrid local time for the process and the log timestamps (see Dockerfile).
       TZ: Europe/Madrid
+      # Photo uploads exceed adapter-node's 512KB default; see the Dockerfile.
+      BODY_SIZE_LIMIT: 4M
     volumes:
       - app-data:/app/data
       - app-uploads:/app/uploads

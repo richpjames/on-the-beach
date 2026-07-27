@@ -7,7 +7,13 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: deploy-${{ github.workflow }}-${{ github.ref }}
+  # "Test" completes twice for a merge — once for the pull_request run and once
+  # for the push to main — so this workflow fires twice. Only the push one gets
+  # past the job's `if`; the other skips. Keyed on `github.ref` alone both land
+  # in the same group, and the skipped run's arrival cancels the real deploy
+  # mid-flight — which is why two merges in a row left the version at 1.0.197
+  # with no bump commit. Including the triggering run's event keeps them apart.
+  group: deploy-${{ github.workflow }}-${{ github.event.workflow_run.event || github.event_name }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
