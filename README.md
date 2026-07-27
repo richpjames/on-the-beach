@@ -45,6 +45,7 @@ Open http://localhost:3000.
 | `DATABASE_PATH`           | No       | `on_the_beach.db`      | Path to the SQLite database file                                                                                                                 |
 | `PORT`                    | No       | `3000`                 | HTTP server port                                                                                                                                 |
 | `UPLOADS_DIR`             | No       | `uploads`              | Directory for uploaded cover images                                                                                                              |
+| `BODY_SIZE_LIMIT`         | No       | `512K` (adapter-node)  | Max request body. The default is smaller than a shared record sleeve, so photo uploads 413 before the route runs — the Docker image sets `4M`.   |
 | `MISTRAL_API_KEY`         | No       | —                      | Enables AI cover scanning and unsupported music-link extraction                                                                                  |
 | `MISTRAL_LINK_MODEL`      | No       | `mistral-small-latest` | Model for unsupported music-link extraction via chat completions.                                                                                |
 | `MISTRAL_SCAN_MODEL`      | No       | `mistral-ocr-latest`   | Model for cover scanning. Non-OCR models use chat-completions mode.                                                                              |
