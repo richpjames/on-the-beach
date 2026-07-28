@@ -17,6 +17,7 @@
     currentStack,
     currentFilter,
     searchQuery,
+    backHref,
     orderLocked,
     onSelectStack,
     onRefreshList,
@@ -32,6 +33,8 @@
     currentStack: number | null;
     currentFilter: FilterSelection;
     searchQuery: string;
+    /** The list URL release links point back to; null until it's resolvable. */
+    backHref: string | null;
     orderLocked: boolean;
     onSelectStack: (stackId: number) => void;
     onRefreshList: () => void;
@@ -254,6 +257,7 @@
         {#each items as item (item.id)}
           <MusicCard
             {item}
+            {backHref}
             {onStatusChanged}
             {onDelete}
             {onStacksChanged}

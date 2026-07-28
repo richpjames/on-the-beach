@@ -37,28 +37,47 @@ export type AppEvent =
   | { type: "BROWSE_PANELS_CLOSED" }
   | { type: "ITEM_CREATED" }
   | { type: "LIST_REFRESH" }
+  | {
+      type: "VIEW_RESTORED";
+      stackId: number | null;
+      filter: ListenStatus | "all" | "scheduled";
+      searchQuery: string;
+      sort: MusicItemSort;
+      sortDirection: MusicItemSortDirection;
+    }
   | { type: "REMINDERS_READY"; itemIds: number[] };
 
-/** Seed for server-rendered pages (stack scope comes from the URL). */
+/** Seed for server-rendered pages (the whole browsing view comes from the URL). */
 export interface AppInput {
   stacks?: StackWithCount[];
   currentStack?: number | null;
+  currentFilter?: ListenStatus | "all" | "scheduled";
+  searchQuery?: string;
+  currentSort?: MusicItemSort;
+  currentSortDirection?: MusicItemSortDirection;
+  /**
+   * Set when the seeded view differs from what the server rendered, so the
+   * client refetches the list on mount instead of showing the default one.
+   */
+  needsListRefresh?: boolean;
 }
 
 export const appMachine = createMachine({
   types: {} as { context: AppContext; events: AppEvent; input: AppInput },
   context: ({ input }) => ({
-    currentFilter: input?.currentStack != null ? ("all" as const) : ("to-listen" as const),
+    currentFilter:
+      input?.currentFilter ??
+      (input?.currentStack != null ? ("all" as const) : ("to-listen" as const)),
     currentStack: input?.currentStack ?? null,
-    searchQuery: "",
-    currentSort: "date-added" as const,
-    currentSortDirection: "desc" as const,
+    searchQuery: input?.searchQuery ?? "",
+    currentSort: input?.currentSort ?? ("date-added" as const),
+    currentSortDirection: input?.currentSortDirection ?? ("desc" as const),
     stacks: input?.stacks ?? [],
     isReady: false,
     stackManageOpen: false,
     searchPanelOpen: false,
     sortPanelOpen: false,
-    listVersion: 0,
+    listVersion: input?.needsListRefresh ? 1 : 0,
     stackBarVersion: 0,
   }),
   on: {
@@ -145,6 +164,19 @@ export const appMachine = createMachine({
     },
     LIST_REFRESH: {
       actions: assign(({ context }) => ({ listVersion: context.listVersion + 1 })),
+    },
+    // The address bar moved under us (browser back/forward across list URLs):
+    // adopt the whole view it describes rather than just the stack scope.
+    VIEW_RESTORED: {
+      actions: assign(({ context, event }) => ({
+        currentStack: event.stackId,
+        currentFilter: event.filter,
+        searchQuery: event.searchQuery,
+        currentSort: event.sort,
+        currentSortDirection: event.sortDirection,
+        listVersion: context.listVersion + 1,
+        stackBarVersion: context.stackBarVersion + 1,
+      })),
     },
     REMINDERS_READY: {},
   },

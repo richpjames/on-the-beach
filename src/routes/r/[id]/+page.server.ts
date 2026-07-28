@@ -9,6 +9,7 @@ import {
   extractYouTubePlaylistId,
 } from "../../../../server/utils";
 import { parseAppleMusicCatalogUrl, type AppleMusicResource } from "../../../../shared/apple-music";
+import { sanitizeListHref } from "../../../ui/domain/list-url";
 import type { MusicItemFull } from "../../../types";
 
 const SOURCE_DISPLAY_NAMES: Record<string, string> = {
@@ -158,7 +159,7 @@ function mixcloudWidgetSrc(item: MusicItemFull): string | null {
   return `https://www.mixcloud.com/widget/iframe/?hide_cover=1&feed=${encodeURIComponent(pathname)}`;
 }
 
-export const load: PageServerLoad = async ({ params }) => {
+export const load: PageServerLoad = async ({ params, url }) => {
   const id = Number(params.id);
   if (!Number.isInteger(id) || id <= 0) {
     error(400, "Invalid ID");
@@ -181,6 +182,10 @@ export const load: PageServerLoad = async ({ params }) => {
 
   return {
     item,
+    // Where the back button goes. List pages carry their browsing state in the
+    // URL and pass it along as `from`, so back returns to the exact view the
+    // release was opened from instead of dumping the user on the home list.
+    backHref: sanitizeListHref(url.searchParams.get("from")) ?? "/",
     backdropUrl: safeArtworkUrl(item.artwork_url ?? ""),
     artworkUrl: safeArtworkUrl(item.artwork_url ?? ""),
     sourceLink,
