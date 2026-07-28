@@ -36,6 +36,14 @@
   );
   const selectedStack = $derived(stacks.find((stack) => stack.id === currentStack));
 
+  // The bar is a two-row grid that flows left-to-right, so tabs read in
+  // alphabetical order along the top row before wrapping onto the second one.
+  // Row-wise flow needs an explicit column count: the first column is pinned to
+  // "All" (row 1) and the manage cog (row 2), and the remaining tabs — the
+  // stacks plus the delete tab while it is showing — split across both rows.
+  const flowingTabCount = $derived(visibleStacks.length + (selectedStack ? 1 : 0));
+  const columnCount = $derived(1 + Math.ceil(flowingTabCount / 2));
+
   // Keep the active tab visible when the selection changes.
   $effect(() => {
     void currentStack;
@@ -56,7 +64,12 @@
 </script>
 
 <div class="stack-bar-shell">
-  <div id="stack-bar" class="stack-bar" bind:this={barEl}>
+  <div
+    id="stack-bar"
+    class="stack-bar"
+    style="--stack-bar-columns: {columnCount}"
+    bind:this={barEl}
+  >
     <button
       class="stack-tab{currentStack === null ? ' active' : ''}"
       data-stack="all"
