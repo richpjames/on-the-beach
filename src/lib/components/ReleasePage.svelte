@@ -212,7 +212,7 @@
   async function deleteItem(): Promise<void> {
     if (!confirm("Delete this release?")) return;
     const ok = await api.deleteMusicItem(item.id).catch(() => false);
-    if (ok) await goto("/");
+    if (ok) await goto(data.backHref);
   }
 
   // ── Artwork upload ─────────────────────────────────────────────────────────
@@ -381,7 +381,7 @@
 <main class="main">
   <div class="release-page">
     <div class="release-page__nav">
-      <a href="/" class="btn">◄</a>
+      <a href={data.backHref} class="btn">◄</a>
     </div>
 
     <div class="release-page__body">

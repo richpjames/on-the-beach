@@ -2,6 +2,7 @@
   import Case from "case";
   import { tick } from "svelte";
   import type { ListenStatus, MusicItemFull, StackWithCount } from "../../types";
+  import { buildReleaseHref } from "../../ui/domain/list-url";
   import { STATUS_LABELS } from "../../ui/domain/status";
   import { api } from "../api";
   import { registerOpenPopover, unregisterPopover } from "../popover-registry";
@@ -11,12 +12,15 @@
 
   let {
     item,
+    backHref,
     onStatusChanged,
     onDelete,
     onStacksChanged,
     onStackDropdownClosed,
   }: {
     item: MusicItemFull;
+    /** The list view to return to from the release page. */
+    backHref: string | null;
     onStatusChanged: (itemId: number, status: ListenStatus) => Promise<void>;
     onDelete: (itemId: number) => Promise<void>;
     /** A stack was created or the item's stack memberships changed. */
@@ -25,7 +29,7 @@
     onStackDropdownClosed: () => void;
   } = $props();
 
-  const releaseHref = $derived(`/r/${item.id}`);
+  const releaseHref = $derived(buildReleaseHref(item.id, backHref));
 
   // ── Action menu ────────────────────────────────────────────────────────────
   let menuOpen = $state(false);

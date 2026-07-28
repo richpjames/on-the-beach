@@ -49,6 +49,59 @@ describe("app state machine", () => {
     expect(actor.getSnapshot().context.currentStack).toBeNull();
   });
 
+  it("seeds the whole browsing view from input", () => {
+    const actor = createActor(appMachine, {
+      input: {
+        currentStack: 4,
+        currentFilter: "listened",
+        searchQuery: "dub",
+        currentSort: "star-rating",
+        currentSortDirection: "asc",
+        needsListRefresh: true,
+      },
+    }).start();
+
+    const ctx = actor.getSnapshot().context;
+    expect(ctx.currentStack).toBe(4);
+    expect(ctx.currentFilter).toBe("listened");
+    expect(ctx.searchQuery).toBe("dub");
+    expect(ctx.currentSort).toBe("star-rating");
+    expect(ctx.currentSortDirection).toBe("asc");
+    // Non-zero so the mounted list refetches past the server-rendered default.
+    expect(ctx.listVersion).toBe(1);
+  });
+
+  it("starts at listVersion 0 when the seeded view is the default one", () => {
+    const actor = createActor(appMachine, { input: { currentStack: 4 } }).start();
+
+    expect(actor.getSnapshot().context.listVersion).toBe(0);
+  });
+
+  it("adopts the whole view on VIEW_RESTORED", () => {
+    const actor = createActor(appMachine, { input: {} }).start();
+
+    actor.send({ type: "STACK_SELECTED", stackId: 4 });
+    actor.send({ type: "SEARCH_UPDATED", query: "dub" });
+    const before = actor.getSnapshot().context.listVersion;
+
+    actor.send({
+      type: "VIEW_RESTORED",
+      stackId: null,
+      filter: "listened",
+      searchQuery: "",
+      sort: "date-listened",
+      sortDirection: "asc",
+    });
+
+    const ctx = actor.getSnapshot().context;
+    expect(ctx.currentStack).toBeNull();
+    expect(ctx.currentFilter).toBe("listened");
+    expect(ctx.searchQuery).toBe("");
+    expect(ctx.currentSort).toBe("date-listened");
+    expect(ctx.currentSortDirection).toBe("asc");
+    expect(ctx.listVersion).toBe(before + 1);
+  });
+
   it("resets active stack when deleted", () => {
     const actor = createActor(appMachine, { input: {} }).start();
 
