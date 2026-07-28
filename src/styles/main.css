@@ -703,8 +703,10 @@ select.input {
 .stack-bar {
   display: grid;
   grid-template-rows: repeat(2, auto);
-  grid-auto-flow: column;
-  grid-auto-columns: max-content;
+  /* Row-wise flow so tabs read left-to-right across the top row before
+     wrapping onto the second. StackBar sets the column count. */
+  grid-auto-flow: row;
+  grid-template-columns: repeat(var(--stack-bar-columns, 1), max-content);
   align-items: end;
   align-content: end;
   justify-content: start;
