@@ -3,12 +3,16 @@ import { eq } from "drizzle-orm";
 import { Hono } from "hono";
 import { createSettingsRoutes } from "../../server/routes/settings";
 import { db } from "../../server/db/index";
-import { itemSuggestions, musicItems } from "../../server/db/schema";
+import { appSettings, itemSuggestions, musicItems } from "../../server/db/schema";
 import {
   getLookupService,
   setLookupService,
   getReleaseLengthPreference,
   setReleaseLengthPreference,
+  getArtistWatchSettings,
+  setArtistWatchSettings,
+  DEFAULT_ARTIST_WATCH_SETTINGS,
+  ARTIST_WATCH_KEYS,
 } from "../../server/settings";
 
 function makeApp(): Hono {
@@ -104,7 +108,7 @@ describe("PUT /api/settings", () => {
       body: JSON.stringify({ lookupService: "spotify" }),
     });
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({
+    expect(await res.json()).toMatchObject({
       lookupService: "spotify",
       releaseLengthPreference: "longer",
       changed: true,
@@ -120,7 +124,7 @@ describe("PUT /api/settings", () => {
       body: JSON.stringify({ releaseLengthPreference: "shorter" }),
     });
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({
+    expect(await res.json()).toMatchObject({
       lookupService: "apple_music",
       releaseLengthPreference: "shorter",
       changed: true,
@@ -136,7 +140,7 @@ describe("PUT /api/settings", () => {
       body: JSON.stringify({ lookupService: "apple_music", releaseLengthPreference: "longer" }),
     });
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({
+    expect(await res.json()).toMatchObject({
       lookupService: "apple_music",
       releaseLengthPreference: "longer",
       changed: false,
@@ -183,5 +187,72 @@ describe("PUT /api/settings", () => {
       body: "{not json",
     });
     expect(res.status).toBe(400);
+  });
+});
+
+describe("artist watch settings", () => {
+  beforeEach(async () => {
+    await setArtistWatchSettings(DEFAULT_ARTIST_WATCH_SETTINGS);
+  });
+
+  test("an unset freshness window falls back to the default, not to zero", async () => {
+    // `Number(null)` is 0 — a valid window — so "unset" has to be ruled out
+    // before parsing or every fresh install alerts on nothing.
+    await db.delete(appSettings).where(eq(appSettings.key, ARTIST_WATCH_KEYS.freshnessMonths));
+
+    expect((await getArtistWatchSettings()).freshnessMonths).toBe(18);
+  });
+
+  test("an explicit zero window is honoured", async () => {
+    await setArtistWatchSettings({ freshnessMonths: 0 });
+
+    expect((await getArtistWatchSettings()).freshnessMonths).toBe(0);
+  });
+
+  test("GET exposes the artist watch block with its defaults", async () => {
+    const app = makeApp();
+    const body = await (await app.request("http://localhost/api/settings")).json();
+
+    expect(body.artistWatch.enabled).toBe(true);
+    expect(body.artistWatch.freshnessMonths).toBe(18);
+    // Conservative by default: alerting on every archival edit is noise.
+    expect(body.artistWatch.alertOnCatalogueAdditions).toBe(false);
+    expect(body.artistWatch.scheduleAnnouncedReleases).toBe(true);
+    expect(body.artistWatch.excludedSecondaryTypes).toContain("compilation");
+  });
+
+  test("PUT round-trips the artist watch toggles", async () => {
+    const app = makeApp();
+    const res = await app.request("http://localhost/api/settings", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        artistWatchEnabled: false,
+        alertFreshnessMonths: 6,
+        alertOnCatalogueAdditions: true,
+        alertExcludedSecondaryTypes: ["Live", "Remix"],
+        scheduleAnnouncedReleases: false,
+      }),
+    });
+
+    expect(res.status).toBe(200);
+    const stored = await getArtistWatchSettings();
+    expect(stored.enabled).toBe(false);
+    expect(stored.freshnessMonths).toBe(6);
+    expect(stored.alertOnCatalogueAdditions).toBe(true);
+    expect(stored.excludedSecondaryTypes).toEqual(["live", "remix"]);
+    expect(stored.scheduleAnnouncedReleases).toBe(false);
+  });
+
+  test("rejects a non-numeric freshness window rather than coercing it", async () => {
+    const app = makeApp();
+    const res = await app.request("http://localhost/api/settings", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ alertFreshnessMonths: "soon" }),
+    });
+
+    expect(res.status).toBe(400);
+    expect((await getArtistWatchSettings()).freshnessMonths).toBe(18);
   });
 });

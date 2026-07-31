@@ -13,6 +13,11 @@ import type {
   LookupReleaseResult,
   RecognizeResult,
   ItemSuggestion,
+  ReleaseAlert,
+  ReleaseAlertStatus,
+  TrackedArtist,
+  ArtistFollowState,
+  MbArtistCandidateView,
 } from "../types";
 
 import { CSRF_COOKIE_NAME, CSRF_HEADER_NAME } from "../../server/csrf";
@@ -365,6 +370,84 @@ export class ApiClient {
     await this.request(`/api/music-items/${itemId}/reminder`, "Clear reminder", {
       method: "DELETE",
     });
+  }
+
+  // ── New-release alerts ───────────────────────────────────────
+
+  async listReleaseAlerts(
+    statuses: ReleaseAlertStatus[] = ["pending", "seen"],
+  ): Promise<{ alerts: ReleaseAlert[]; pendingCount: number }> {
+    return this.requestJson<{ alerts: ReleaseAlert[]; pendingCount: number }>(
+      `/api/release-alerts?status=${statuses.join(",")}`,
+      "listReleaseAlerts",
+    );
+  }
+
+  async addReleaseAlert(
+    alertId: number,
+  ): Promise<{ item: MusicItemFull; remindAt: string | null }> {
+    return this.requestJson<{ item: MusicItemFull; remindAt: string | null }>(
+      `/api/release-alerts/${alertId}/add`,
+      "addReleaseAlert",
+      { method: "POST" },
+    );
+  }
+
+  async dismissReleaseAlert(alertId: number): Promise<void> {
+    await this.request(`/api/release-alerts/${alertId}/dismiss`, "dismissReleaseAlert", {
+      method: "POST",
+    });
+  }
+
+  async markReleaseAlertsSeen(): Promise<number> {
+    const body = await this.requestJson<{ seen: number }>(
+      "/api/release-alerts/mark-seen",
+      "markReleaseAlertsSeen",
+      { method: "POST" },
+    );
+    return body.seen;
+  }
+
+  // ── Tracked artists ──────────────────────────────────────────
+
+  async listTrackedArtists(): Promise<TrackedArtist[]> {
+    const body = await this.requestJson<{ artists: TrackedArtist[] }>(
+      "/api/artists/tracked",
+      "listTrackedArtists",
+    );
+    return body.artists;
+  }
+
+  async setArtistFollowState(artistId: number, followState: ArtistFollowState): Promise<void> {
+    await this.request(
+      `/api/artists/${artistId}/follow`,
+      "setArtistFollowState",
+      this.jsonRequest("PUT", { followState }),
+    );
+  }
+
+  async setArtistMbid(artistId: number, musicbrainzArtistId: string): Promise<void> {
+    await this.request(
+      `/api/artists/${artistId}/mbid`,
+      "setArtistMbid",
+      this.jsonRequest("PUT", { musicbrainzArtistId }),
+    );
+  }
+
+  async getArtistMbidCandidates(artistId: number): Promise<MbArtistCandidateView[]> {
+    const body = await this.requestJson<{ candidates: MbArtistCandidateView[] }>(
+      `/api/artists/${artistId}/mbid-candidates`,
+      "getArtistMbidCandidates",
+    );
+    return body.candidates;
+  }
+
+  async pollArtistNow(artistId: number): Promise<{ alertsRaised: number; status: string }> {
+    return this.requestJson<{ alertsRaised: number; status: string }>(
+      `/api/artists/${artistId}/poll`,
+      "pollArtistNow",
+      { method: "POST" },
+    );
   }
 
   async getPendingReminders(): Promise<Array<{ id: number; title: string }>> {

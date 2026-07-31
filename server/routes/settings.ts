@@ -8,8 +8,52 @@ import {
   setReleaseLengthPreference,
   isReleaseLengthPreference,
   RELEASE_LENGTH_PREFERENCES,
+  getArtistWatchSettings,
+  setArtistWatchSettings,
+  type ArtistWatchSettings,
 } from "../settings";
 import { ensureSuggestionsForToListenArtists } from "../suggestions";
+
+/**
+ * Pick the artist-watch fields out of a settings payload, rejecting values of
+ * the wrong shape rather than coercing them — a `freshnessMonths` of "soon"
+ * should be a 400, not an 18.
+ */
+function readArtistWatchUpdate(
+  body: Record<string, unknown>,
+): { update: Partial<ArtistWatchSettings> } | { error: string } {
+  const update: Partial<ArtistWatchSettings> = {};
+
+  const booleans: Array<[string, keyof ArtistWatchSettings]> = [
+    ["artistWatchEnabled", "enabled"],
+    ["alertOnCatalogueAdditions", "alertOnCatalogueAdditions"],
+    ["scheduleAnnouncedReleases", "scheduleAnnouncedReleases"],
+  ];
+  for (const [field, key] of booleans) {
+    const value = body[field];
+    if (value === undefined) continue;
+    if (typeof value !== "boolean") return { error: `${field} must be a boolean` };
+    (update[key] as boolean) = value;
+  }
+
+  if (body.alertFreshnessMonths !== undefined) {
+    const months = body.alertFreshnessMonths;
+    if (typeof months !== "number" || !Number.isFinite(months) || months < 0) {
+      return { error: "alertFreshnessMonths must be a non-negative number" };
+    }
+    update.freshnessMonths = months;
+  }
+
+  if (body.alertExcludedSecondaryTypes !== undefined) {
+    const types = body.alertExcludedSecondaryTypes;
+    if (!Array.isArray(types) || types.some((type) => typeof type !== "string")) {
+      return { error: "alertExcludedSecondaryTypes must be an array of strings" };
+    }
+    update.excludedSecondaryTypes = (types as string[]).map((type) => type.trim().toLowerCase());
+  }
+
+  return { update };
+}
 
 export function createSettingsRoutes(): Hono {
   const routes = new Hono();
@@ -22,6 +66,7 @@ export function createSettingsRoutes(): Hono {
       lookupServices: LOOKUP_SERVICES,
       releaseLengthPreference,
       releaseLengthPreferences: RELEASE_LENGTH_PREFERENCES,
+      artistWatch: await getArtistWatchSettings(),
     });
   });
 
@@ -37,8 +82,18 @@ export function createSettingsRoutes(): Hono {
       return c.json({ error: "Invalid JSON payload" }, 400);
     }
 
-    const { lookupService, releaseLengthPreference } = body as Record<string, unknown>;
-    if (lookupService === undefined && releaseLengthPreference === undefined) {
+    const payload = body as Record<string, unknown>;
+    const { lookupService, releaseLengthPreference } = payload;
+
+    const artistWatch = readArtistWatchUpdate(payload);
+    if ("error" in artistWatch) return c.json({ error: artistWatch.error }, 400);
+    const hasArtistWatchUpdate = Object.keys(artistWatch.update).length > 0;
+
+    if (
+      lookupService === undefined &&
+      releaseLengthPreference === undefined &&
+      !hasArtistWatchUpdate
+    ) {
       return c.json({ error: "Provide lookupService and/or releaseLengthPreference" }, 400);
     }
     if (lookupService !== undefined && !isLookupService(lookupService)) {
@@ -73,10 +128,16 @@ export function createSettingsRoutes(): Hono {
       }
     }
 
+    if (hasArtistWatchUpdate) {
+      await setArtistWatchSettings(artistWatch.update);
+      changed = true;
+    }
+
     return c.json(
       {
         lookupService: await getLookupService(),
         releaseLengthPreference: await getReleaseLengthPreference(),
+        artistWatch: await getArtistWatchSettings(),
         changed,
       },
       200,

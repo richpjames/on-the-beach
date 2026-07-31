@@ -4,7 +4,14 @@
 those artists that we haven't seen before, and surface them as alerts the user can accept
 into the library.
 
-**Status:** design only — no code written yet.
+**Status:** implemented. Phases 1–5 all landed together; see `server/artist-identity.ts`,
+`server/artist-watch.ts`, `server/release-alerts.ts`, the `/api/release-alerts` and
+`/api/artists` routes, `/feed/new-releases.rss`, and the `/new-releases` view.
+
+Two details settled during the build, both noted inline below: the excluded secondary types
+default to the full six-type list from [Noise filters](#noise-filters-defaults-all-overridable-in-settings)
+rather than the four quoted in the settings table, and `release_alerts` carries a `reason`
+column so a card can say *why* it fired without re-deriving it from the release date.
 
 ---
 

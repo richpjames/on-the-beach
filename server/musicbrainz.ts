@@ -6,6 +6,53 @@ const MB_API_BASE = "https://musicbrainz.org/ws/2";
 // placeholder/generic UAs get throttled or blocked (403/503).
 const USER_AGENT = "on-the-beach/1.0 (https://github.com/richpjames/on-the-beach)";
 
+/** A non-2xx response from MusicBrainz, carrying the status for backoff decisions. */
+export class MusicBrainzHttpError extends Error {
+  status: number;
+
+  constructor(status: number, message: string) {
+    super(message);
+    this.name = "MusicBrainzHttpError";
+    this.status = status;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Shared request gate
+//
+// MusicBrainz allows roughly one request per second per client. Two background
+// sweeps now compete for that budget (the suggestion prefetch and the artist
+// release watcher), and each sweep's own throttle only paces itself — run
+// concurrently they quietly double the rate and earn a 503. Every outbound MB
+// request passes through this single serialising gate so the process as a
+// whole stays inside the limit, whichever caller is asking.
+// ---------------------------------------------------------------------------
+
+function minRequestGapMs(): number {
+  const fromEnv = Number(process.env.OTB_MB_MIN_REQUEST_GAP_MS);
+  return Number.isFinite(fromEnv) && fromEnv >= 0 ? fromEnv : 1_100;
+}
+
+const sleep = (ms: number): Promise<void> =>
+  ms > 0 ? new Promise((resolve) => setTimeout(resolve, ms)) : Promise.resolve();
+
+let gateTail: Promise<void> = Promise.resolve();
+
+function mbFetch(url: string): Promise<Response> {
+  const gap = minRequestGapMs();
+  const turn = gateTail.then(() =>
+    fetch(url, { headers: { "User-Agent": USER_AGENT, Accept: "application/json" } }),
+  );
+  // The next caller waits for this request to finish plus the minimum gap.
+  // Failures must not wedge the queue, so the tail swallows them — the
+  // rejection is still delivered to the caller through `turn`.
+  gateTail = turn.then(
+    () => sleep(gap),
+    () => sleep(gap),
+  );
+  return turn;
+}
+
 export interface MusicBrainzFields {
   year: number | null;
   label: string | null;
@@ -124,11 +171,12 @@ interface MbArtistSearchResponse {
 async function fetchArtistMbid(artistName: string): Promise<string | null> {
   const params = new URLSearchParams({ query: artistName, limit: "1", fmt: "json" });
   const url = `${MB_API_BASE}/artist?${params}`;
-  const response = await fetch(url, {
-    headers: { "User-Agent": USER_AGENT, Accept: "application/json" },
-  });
+  const response = await mbFetch(url);
   if (!response.ok) {
-    throw new Error(`MusicBrainz artist search returned ${response.status} for "${artistName}"`);
+    throw new MusicBrainzHttpError(
+      response.status,
+      `MusicBrainz artist search returned ${response.status} for "${artistName}"`,
+    );
   }
   const data = (await response.json()) as MbArtistSearchResponse;
   const first = data.artists?.[0];
@@ -140,11 +188,12 @@ async function fetchArtistReleases(mbid: string): Promise<MbArtistRelease[]> {
   // release-length preference needs them to rank candidates.
   const params = new URLSearchParams({ inc: "releases+media", fmt: "json" });
   const url = `${MB_API_BASE}/artist/${mbid}?${params}`;
-  const response = await fetch(url, {
-    headers: { "User-Agent": USER_AGENT, Accept: "application/json" },
-  });
+  const response = await mbFetch(url);
   if (!response.ok) {
-    throw new Error(`MusicBrainz artist lookup returned ${response.status} for ${mbid}`);
+    throw new MusicBrainzHttpError(
+      response.status,
+      `MusicBrainz artist lookup returned ${response.status} for ${mbid}`,
+    );
   }
   const data = (await response.json()) as MbArtistReleasesResponse;
   return Array.isArray(data.releases) ? (data.releases as MbArtistRelease[]) : [];
@@ -235,6 +284,160 @@ export async function findSuggestedRelease(opts: {
   return picked;
 }
 
+// ---------------------------------------------------------------------------
+// Release groups (artist watch)
+//
+// The suggestion path above browses *releases* because it needs `media` track
+// counts to size a record. The watcher needs the opposite grain: release
+// **groups** are the album-level entity, one per work, so a 2026 Japanese
+// repress of a 1974 album doesn't read as a new record. The two paths coexist.
+// ---------------------------------------------------------------------------
+
+export interface MbReleaseGroup {
+  id: string;
+  title: string;
+  primaryType: string | null;
+  secondaryTypes: string[];
+  /** MB's date verbatim: "1974", "1974-05" and "1974-05-01" are all possible. */
+  firstReleaseDate: string | null;
+}
+
+interface MbReleaseGroupResponse {
+  "release-groups"?: unknown[];
+  "release-group-count"?: unknown;
+}
+
+const RELEASE_GROUP_PAGE_SIZE = 100;
+// Even Sun Ra tops out well short of 1,000 release groups; the cap stops a
+// malformed count from looping the sweep forever.
+const RELEASE_GROUP_MAX_PAGES = 10;
+
+function parseReleaseGroup(raw: unknown): MbReleaseGroup | null {
+  if (!raw || typeof raw !== "object") return null;
+  const group = raw as Record<string, unknown>;
+  if (typeof group.id !== "string" || typeof group.title !== "string") return null;
+
+  const secondary = Array.isArray(group["secondary-types"])
+    ? group["secondary-types"].filter((t): t is string => typeof t === "string")
+    : [];
+
+  return {
+    id: group.id,
+    title: group.title,
+    primaryType: typeof group["primary-type"] === "string" ? group["primary-type"] : null,
+    secondaryTypes: secondary,
+    firstReleaseDate:
+      typeof group["first-release-date"] === "string" && group["first-release-date"].length > 0
+        ? group["first-release-date"]
+        : null,
+  };
+}
+
+/**
+ * Every release group credited to an artist. Paginates only when a page comes
+ * back full — one request covers all but the most prolific artists.
+ *
+ * Throws `MusicBrainzHttpError` on a non-2xx response and the underlying error
+ * on a network failure: the caller has to tell "no releases" apart from "the
+ * lookup failed", because writing a baseline from a partial fetch would make
+ * every missing group alert as new on the next successful poll.
+ */
+export async function fetchArtistReleaseGroups(mbid: string): Promise<MbReleaseGroup[]> {
+  const groups: MbReleaseGroup[] = [];
+
+  for (let page = 0; page < RELEASE_GROUP_MAX_PAGES; page += 1) {
+    const params = new URLSearchParams({
+      artist: mbid,
+      limit: String(RELEASE_GROUP_PAGE_SIZE),
+      offset: String(page * RELEASE_GROUP_PAGE_SIZE),
+      fmt: "json",
+    });
+    const response = await mbFetch(`${MB_API_BASE}/release-group?${params}`);
+    if (!response.ok) {
+      throw new MusicBrainzHttpError(
+        response.status,
+        `MusicBrainz release-group browse returned ${response.status} for ${mbid}`,
+      );
+    }
+
+    const data = (await response.json()) as MbReleaseGroupResponse;
+    const raw = Array.isArray(data["release-groups"]) ? data["release-groups"] : [];
+    for (const entry of raw) {
+      const parsed = parseReleaseGroup(entry);
+      if (parsed) groups.push(parsed);
+    }
+
+    if (raw.length < RELEASE_GROUP_PAGE_SIZE) break;
+  }
+
+  return groups;
+}
+
+// ---------------------------------------------------------------------------
+// Artist search (MBID resolution, last resort)
+// ---------------------------------------------------------------------------
+
+export interface MbArtistCandidate {
+  id: string;
+  name: string;
+  score: number;
+  /** MB's disambiguation comment — the thing that tells two Nirvanas apart. */
+  disambiguation: string | null;
+  country: string | null;
+  type: string | null;
+  lifeSpanBegin: string | null;
+  lifeSpanEnd: string | null;
+}
+
+interface MbArtistCandidateResponse {
+  artists?: unknown[];
+}
+
+/**
+ * Name-search an artist, returning the ranked candidates with the fields a
+ * human needs to disambiguate them. Scoring is left to the caller — see
+ * `pickArtistFromSearch` in server/artist-identity.ts.
+ */
+export async function searchArtistCandidates(
+  artistName: string,
+  limit = 5,
+): Promise<MbArtistCandidate[]> {
+  const params = new URLSearchParams({ query: artistName, limit: String(limit), fmt: "json" });
+  const response = await mbFetch(`${MB_API_BASE}/artist?${params}`);
+  if (!response.ok) {
+    throw new MusicBrainzHttpError(
+      response.status,
+      `MusicBrainz artist search returned ${response.status} for "${artistName}"`,
+    );
+  }
+
+  const data = (await response.json()) as MbArtistCandidateResponse;
+  const raw = Array.isArray(data.artists) ? data.artists : [];
+
+  return raw.flatMap((entry) => {
+    if (!entry || typeof entry !== "object") return [];
+    const artist = entry as Record<string, unknown>;
+    if (typeof artist.id !== "string" || typeof artist.name !== "string") return [];
+    const lifeSpan = (artist["life-span"] ?? {}) as Record<string, unknown>;
+
+    return [
+      {
+        id: artist.id,
+        name: artist.name,
+        score: typeof artist.score === "number" ? artist.score : 0,
+        disambiguation:
+          typeof artist.disambiguation === "string" && artist.disambiguation.length > 0
+            ? artist.disambiguation
+            : null,
+        country: typeof artist.country === "string" ? artist.country : null,
+        type: typeof artist.type === "string" ? artist.type : null,
+        lifeSpanBegin: typeof lifeSpan.begin === "string" ? lifeSpan.begin : null,
+        lifeSpanEnd: typeof lifeSpan.end === "string" ? lifeSpan.end : null,
+      },
+    ];
+  });
+}
+
 export async function lookupRelease(
   artist: string,
   title: string,
@@ -257,12 +460,7 @@ export async function lookupRelease(
   try {
     console.info("[musicbrainz] Searching releases", searchLog);
 
-    const response = await fetch(url, {
-      headers: {
-        "User-Agent": USER_AGENT,
-        Accept: "application/json",
-      },
-    });
+    const response = await mbFetch(url);
 
     if (!response.ok) {
       console.warn(`[musicbrainz] Search returned ${response.status}`, searchLog);

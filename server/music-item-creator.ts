@@ -1,13 +1,19 @@
 import { eq } from "drizzle-orm";
 import { assign, createActor, fromPromise, setup, waitFor } from "xstate";
 import { db } from "./db/index";
-import { musicItems, artists, musicLinks, sources, musicItemStacks, stacks } from "./db/schema";
+import { musicItems, musicLinks, sources } from "./db/schema";
 import { parseUrl, isValidUrl, normalize, capitalize } from "./utils";
 import { scrapeUrl, UnsupportedMusicLinkError } from "./scraper";
 import { enrichSecondaryLinkInBackground } from "./secondary-link-enrichment";
-import { fetchSuggestionInBackground } from "./suggestions";
 import { pickPrimaryReleaseCandidate } from "./link-extractor";
 import { fullItemSelect } from "./queries/full-item-select";
+import {
+  createMusicItemDirect as createMusicItemDirectInStore,
+  fetchFullItem,
+  getOrCreateArtist,
+  queueSuggestionPrefetch,
+  type CreateResult,
+} from "./music-item-store";
 import type {
   AmbiguousLinkPayload,
   CreateMusicItemInput,
@@ -26,26 +32,23 @@ import type {
 // break SSR paths that need the real query builder.
 export { fullItemSelect };
 
-/** Look up an existing artist by normalized name, or create a new one. */
-export async function getOrCreateArtist(name: string): Promise<number> {
-  const normalizedName = normalize(name);
+// Item reads and URL-less writes live in ./music-item-store.ts, out of reach
+// of the process-wide `mock.module` on this file (see that module's header).
+export { getOrCreateArtist, fetchFullItem };
+export type { CreateResult };
 
-  const existing = await db
-    .select({ id: artists.id })
-    .from(artists)
-    .where(eq(artists.normalizedName, normalizedName))
-    .limit(1);
-
-  if (existing[0]) {
-    return existing[0].id;
-  }
-
-  const [created] = await db
-    .insert(artists)
-    .values({ name: capitalize(name), normalizedName })
-    .returning({ id: artists.id });
-
-  return created.id;
+/**
+ * Create a music item without a URL — no scraping, no link inserted.
+ *
+ * A wrapper, deliberately: a bare `export { createMusicItemDirect }` would be
+ * a re-export, and bun's `mock.module` on *this* module follows re-export
+ * chains all the way back to the defining module — which would hand the stub
+ * to callers that import from `./music-item-store` precisely to avoid it.
+ */
+export async function createMusicItemDirect(
+  overrides: Partial<CreateMusicItemInput>,
+): Promise<CreateResult> {
+  return createMusicItemDirectInStore(overrides);
 }
 
 /** Resolve the DB id for a source name (e.g. "bandcamp"). */
@@ -66,60 +69,9 @@ export type { ItemWithStacks } from "./hydrate-item-stacks";
 // that import the helper from `./hydrate-item-stacks` directly. New code
 // should import it from `./hydrate-item-stacks`.
 
-/** Fetch a single full item by its id, including stacks and all links. */
-export async function fetchFullItem(id: number): Promise<MusicItemFull | null> {
-  const rows = await fullItemSelect().where(eq(musicItems.id, id));
-  if (!rows[0]) return null;
-
-  const [stackRows, linkRows] = await Promise.all([
-    db
-      .select({ musicItemId: musicItemStacks.musicItemId, id: stacks.id, name: stacks.name })
-      .from(musicItemStacks)
-      .innerJoin(stacks, eq(stacks.id, musicItemStacks.stackId))
-      .where(eq(musicItemStacks.musicItemId, id)),
-    db
-      .select({
-        id: musicLinks.id,
-        url: musicLinks.url,
-        source_name: sources.name,
-        display_name: sources.displayName,
-        is_primary: musicLinks.isPrimary,
-      })
-      .from(musicLinks)
-      .leftJoin(sources, eq(musicLinks.sourceId, sources.id))
-      .where(eq(musicLinks.musicItemId, id)),
-  ]);
-
-  const item = {
-    ...(rows[0] as unknown as MusicItemFull),
-    stacks: [] as Array<{ id: number; name: string }>,
-    links: [] as Array<{
-      id: number;
-      url: string;
-      source_name: string | null;
-      display_name: string | null;
-      is_primary: boolean;
-    }>,
-  };
-  item.stacks = stackRows.map((r) => ({ id: r.id, name: r.name }));
-  item.links = linkRows.map((r) => ({
-    id: r.id,
-    url: r.url,
-    source_name: r.source_name,
-    display_name: r.display_name,
-    is_primary: r.is_primary,
-  }));
-  return item;
-}
-
 // ---------------------------------------------------------------------------
 // Shared creation logic
 // ---------------------------------------------------------------------------
-
-export interface CreateResult {
-  item: MusicItemFull;
-  created: boolean;
-}
 
 interface ReleaseCandidateInput {
   candidateId?: string;
@@ -244,23 +196,6 @@ async function insertMusicItemWithLink(
   queueSuggestionPrefetch(item);
 
   return item;
-}
-
-/**
- * Prefetch another release by the same artist so the "you might also like"
- * prompt has one ready when this item is later marked listened. Lives here —
- * not in the routes — so every creation path (web form, share extension,
- * email/photo ingest, accepted suggestions) triggers it. Non-blocking.
- */
-function queueSuggestionPrefetch(item: MusicItemFull): void {
-  if (item.listen_status !== "to-listen" || !item.artist_name) return;
-
-  fetchSuggestionInBackground({
-    id: item.id,
-    artist_name: item.artist_name,
-    year: item.year,
-    musicbrainz_artist_id: item.musicbrainz_artist_id,
-  });
 }
 
 function resolveSelectedCandidate(
@@ -597,53 +532,4 @@ export async function createMusicItemsFromUrl(
   }
 
   return snapshot.context.results;
-}
-
-/**
- * Create a music item without a URL — no scraping, no link inserted.
- * Used for physical records or items known only from memory.
- */
-export async function createMusicItemDirect(
-  overrides: Partial<CreateMusicItemInput>,
-): Promise<CreateResult> {
-  const title = overrides.title || "Untitled";
-  const artistName = overrides.artistName;
-
-  let artistId: number | null = null;
-  if (artistName) {
-    artistId = await getOrCreateArtist(artistName);
-  }
-
-  const [inserted] = await db
-    .insert(musicItems)
-    .values({
-      title: capitalize(title),
-      normalizedTitle: normalize(title),
-      itemType: overrides.itemType ?? "album",
-      artistId,
-      listenStatus: overrides.listenStatus ?? "to-listen",
-      purchaseIntent: overrides.purchaseIntent ?? "no",
-      notes: overrides.notes ?? null,
-      artworkUrl: overrides.artworkUrl ?? null,
-      label: overrides.label ?? null,
-      year: overrides.year ?? null,
-      country: overrides.country ?? null,
-      genre: overrides.genre ?? null,
-      catalogueNumber: overrides.catalogueNumber ?? null,
-      musicbrainzReleaseId: overrides.musicbrainzReleaseId ?? null,
-      musicbrainzArtistId: overrides.musicbrainzArtistId ?? null,
-    })
-    .returning({ id: musicItems.id });
-
-  const item = await fetchFullItem(inserted.id);
-  if (!item) {
-    throw new Error("Failed to fetch created item");
-  }
-
-  // Direct items (physical / from-memory) have no primary link, so they're
-  // always eligible for a secondary-link lookup. Non-blocking.
-  enrichSecondaryLinkInBackground(inserted.id);
-  queueSuggestionPrefetch(item);
-
-  return { item, created: true };
 }
