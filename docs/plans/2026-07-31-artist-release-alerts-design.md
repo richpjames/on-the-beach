@@ -27,8 +27,10 @@ Three moving parts:
    `artists`, with a confidence marker, so an artist is the unit of tracking.
 2. **Release snapshot** — per artist, the set of MusicBrainz *release groups* we've seen.
    The first poll is a silent baseline; every later poll diffs against it.
-3. **Alerts** — new release groups become `release_alerts` rows, surfaced in-app, over
-   RSS, and acceptable into the library as a normal `to-listen` item.
+3. **Alerts** — new release groups become `release_alerts` rows, surfaced in-app and over
+   RSS. Accepting one files an item into a New Releases stack; if the record isn't out
+   yet, it's scheduled to arrive in To Listen on release day via the existing reminder
+   cron.
 
 ---
 
@@ -66,8 +68,10 @@ interesting one. But firing an alert for every archival edit is noisy, so the ag
 release is a **filter on presentation**, not on detection:
 
 - Always record the new release group in `artist_releases`.
-- Raise an alert when `first-release-date` is within the freshness window
-  (default 18 months), **or** when the setting `alert_on_catalogue_additions` is on.
+- Raise an alert when `first-release-date` is within the freshness window — the last 18
+  months by default, **and any date in the future** (see [Announced
+  releases](#announced-releases)) — **or** when the setting
+  `alert_on_catalogue_additions` is on.
 
 That way turning the setting on later surfaces history we already captured, rather than
 needing a re-scan.
@@ -87,6 +91,41 @@ would immediately dump 40 alerts. Only rows first seen after the baseline can al
 
 ---
 
+## Announced releases
+
+MusicBrainz routinely carries records with a `first-release-date` in the future —
+announced-but-unreleased albums. These are the most valuable alerts in the system, and they
+have somewhere obvious to go: the existing remind-to-listen machinery.
+
+Accepting an alert for a future-dated release creates the item with `remind_at` set to the
+release date. `processReminders()` (hourly, `server/reminders.ts`) then does the rest — on
+release day it flips the item to `to-listen` and stamps `addedToListenAt`. Until then the
+item sits in the Scheduled bucket, already excluded from the To Listen feeds by the
+`isNull(musicItems.remindAt)` predicate in `server/routes/rss.ts`. No new scheduling code:
+the alert just hands off to a cron that already runs.
+
+**Partial dates.** MB dates are frequently incomplete, and the reminder column is a real
+timestamp, so map them explicitly:
+
+| `first-release-date` | `remind_at` |
+|---|---|
+| `2026-09-18` | that date |
+| `2026-09` | 1st of that month |
+| `2027` (future year) | 1st January of that year |
+| `2026` (current year) | none — add as `to-listen` directly |
+
+A year-only date in the current year can't be scheduled meaningfully — it may already have
+passed — so the item goes straight into To Listen rather than being scheduled into the past.
+
+**Date drift.** Announced dates slip; delayed albums are the norm, not the exception. On
+each poll, compare the stored `first_release_date` against MB's current value, and when it
+has moved, update the snapshot row. If that release group has an accepted item still
+carrying an unfired reminder (join through `release_alerts.music_item_id`, `remind_at` not
+null and `reminder_pending` false), move `remind_at` to match. A delayed record shouldn't
+surface as "out now" three months early — and the user never touched that date manually, so
+overwriting it is safe. Reminders the user set themselves are never touched; only ones this
+system created, which is why the alert → item link matters.
+
 ## Which artists get tracked
 
 Derived, with an explicit override — no separate "follow" action to remember.
@@ -103,9 +142,10 @@ On top of that, `artists.follow_state`:
 `muted` is the important one. Compilation credits, "Various Artists"-alikes, and one-off
 features generate alerts nobody wants, and the only person who can tell is the user.
 
-**Open question for later:** should `to-listen`-only artists be tracked too? Arguably yes —
-the user picked them up somewhere. Starting with `listened` keeps the first sweep small and
-the semantics honest to the request; widening it is a one-line predicate change.
+`to-listen`-only artists are **not** tracked. Having something queued isn't evidence you
+want the artist's whole future output — a record sits in To Listen precisely because you
+haven't formed that opinion yet. Listening is the signal. (The predicate lives in one
+place, so widening it later is a one-line change.)
 
 ---
 
@@ -208,10 +248,19 @@ A new `server/artist-watch.ts`, started from `src/hooks.server.ts` alongside the
 reminder and suggestion intervals, guarded by the same `globalThis` flag pattern and
 no-opping under `OTB_DISABLE_EXTERNAL_LOOKUPS`.
 
-**Cadence.** Sweep wakes every hour; each run drains artists where
-`next_poll_at <= now`, oldest first, throttled at the existing 2.5 s (env-overridable,
-matching `OTB_SUGGESTION_SWEEP_THROTTLE_MS`). MusicBrainz allows ~1 req/s; at 2.5 s that's
-~1,400 artists/hour, which comfortably exceeds any realistic personal library.
+**Cadence.** The sweep runs **daily**; each run drains artists where `next_poll_at <= now`,
+oldest first, throttled at the existing 2.5 s (env-overridable, matching
+`OTB_SUGGESTION_SWEEP_THROTTLE_MS`). MusicBrainz allows ~1 req/s; at 2.5 s that's ~1,400
+artists an hour, so even a large library finishes its due set in minutes.
+
+Daily is the right grain given the per-artist intervals below — an hourly wake would find
+nothing to do 23 times out of 24. It also sets the alert latency floor: a record added to
+MusicBrainz this morning surfaces within a day of its artist next coming due, which is well
+inside the useful window for something that is, at best, news of the week.
+
+Due-ness lives in the database (`next_poll_at`), not in the timer, so a restart never
+double-polls and never skips: the sweep runs on startup and then every 24 h, and both paths
+ask the same question. That matters for a deployment that restarts more than once a day.
 
 Per artist, one request (100 release groups covers all but the most prolific; paginate only
 when the response is full).
@@ -234,7 +283,8 @@ of the run. Reset the counter on success. Errors are logged and never thrown out
 sweep — one bad artist must not stop the queue.
 
 **Sweep budget.** Stop after 200 artists per run so a cold start with a big library spreads
-over hours instead of hammering MB for a solid day.
+across several days instead of hammering MB in one sitting. With baselines raising no
+alerts, that ramp is invisible to the user.
 
 ---
 
@@ -244,17 +294,27 @@ Three surfaces, in build order.
 
 ### 1. In-app: a "New Releases" view
 
-Not a real `stacks` row — alerts aren't music items until accepted. A dedicated view
-reached from the taskbar, showing pending alerts as cards: artwork (Cover Art Archive by
-release-group MBID, already wired for suggestions), artist, title, type, first-release date,
-and the reason it fired ("new release" vs "added to MusicBrainz").
+The queue itself is not a `stacks` row — alerts aren't music items until accepted. A
+dedicated view reached from the taskbar, showing pending alerts as cards: artwork (Cover Art
+Archive by release-group MBID, already wired for suggestions), artist, title, type,
+first-release date, and the reason it fired — "announced", "new release", or "added to
+MusicBrainz".
 
 Actions per card, matching `SuggestionPickerModal`'s vocabulary:
 
-- **Add** → creates a `to-listen` item via `music-item-creator` with the MB metadata
-  prefilled; alert → `added`, `music_item_id` set.
+- **Add** → creates an item via `music-item-creator` with the MB metadata prefilled, files
+  it in the **New Releases** stack, and sets `remind_at` when the release is still
+  announced-only (see [Announced releases](#announced-releases)); alert → `added`,
+  `music_item_id` set.
 - **Dismiss** → alert → `dismissed`. Never re-fires (unique index on the release).
 - **Mute artist** → `follow_state = 'muted'`, dismisses that artist's pending alerts.
+
+**The New Releases stack** is a real stack, created on first accept. Reference it by id in
+`app_settings` (`new_releases_stack_id`) rather than by name — `stacks.name` is unique and
+user-editable, so name-matching would silently create a duplicate the moment the user
+renames it. Recreate only if the stored id no longer resolves. Items land there *in
+addition* to normal status handling, so the stack accumulates as a running record of what
+the watcher has fed the library, and it nests like any other stack.
 
 A count badge on the taskbar entry when any alert is `pending`. Marking the view as viewed
 flips `pending` → `seen` so the badge clears without forcing a decision on each card.
@@ -270,11 +330,21 @@ item shape, which is a worthwhile tidy-up of that module anyway.
 1978 record surfacing today should appear at the top of the reader, which is when the news
 actually happened).
 
-### 3. Later: iOS
+### 3. Out of scope: the notification UI
 
-`native/` has a share extension and a widget but no push plumbing, and a widget listing
-pending alerts is a much smaller job than APNs. Out of scope here; the `release_alerts`
-table is the API either would read.
+A dedicated notification surface — a proper notifications centre, and eventually push —
+is wanted, but not in this work. It is deliberately *not* the New Releases view above:
+that view is the alert queue, a place to go and triage. Notifications are delivery, they'll
+carry more than release alerts (reminders firing, ingest results), and they deserve their
+own design.
+
+Two things here are built to receive it. `release_alerts` is already the queue a
+notification layer would read — status transitions, timestamps and the artist join are all
+there. And `native/` has a share extension and a widget but no push plumbing; a widget
+listing pending alerts would be a far smaller job than APNs if an interim step is wanted.
+
+Until that exists, RSS is the delivery mechanism: the user's reader does the alerting, at
+zero infrastructure cost.
 
 ---
 
@@ -285,9 +355,11 @@ New keys in `app_settings` (existing key/value pattern, single-user app):
 | Key | Default | Effect |
 |---|---|---|
 | `artist_watch_enabled` | `true` | Master switch for the sweep |
-| `alert_freshness_months` | `18` | Age window for "new release" alerts |
+| `alert_freshness_months` | `18` | Age window for "new release" alerts; future dates always qualify |
 | `alert_on_catalogue_additions` | `false` | Also alert on newly-added older records |
 | `alert_excluded_secondary_types` | `compilation,live,remix,dj-mix` | Noise filter |
+| `new_releases_stack_id` | — | Stack accepted alerts are filed into; set on first accept |
+| `schedule_announced_releases` | `true` | Set `remind_at` from a future release date on accept |
 
 Exposed through the existing `GET`/`PUT /api/settings` handlers, plus an artist-management
 panel listing tracked artists with their MBID confidence, last poll, and a mute toggle.
@@ -323,20 +395,23 @@ and 3. Unit tests for the confidence rules, especially the ambiguous-name reject
 
 **Phase 2 — snapshot + poller.** Migrations for `artist_releases` and `release_alerts`.
 `server/musicbrainz.ts` grows `fetchArtistReleaseGroups(mbid)`. `server/artist-watch.ts`
-holds the queue, the diff, the baseline rule and the filters. Wire the interval into
+holds the queue, the diff, the baseline rule and the filters. Wire the daily interval into
 `src/hooks.server.ts`. Tests with a stubbed fetch: baseline silence, new group alerts,
-repeat poll doesn't re-alert, secondary-type filtering, backoff on failure.
+repeat poll doesn't re-alert, secondary-type filtering, future-dated releases alerting
+regardless of the freshness window, backoff on failure.
 
-**Phase 3 — API + RSS.** `server/routes/release-alerts.ts`, mounted in `server/app.ts`;
-generalise the RSS renderer and add the feed. Route tests in the style of
-`tests/unit/release-route.test.ts`.
+**Phase 3 — API + RSS.** `server/routes/release-alerts.ts`, mounted in `server/app.ts`.
+Accept handling — the New Releases stack, and `remind_at` from partial dates — lands here;
+the date-mapping table above is pure logic and wants direct unit tests. Generalise the RSS
+renderer and add the feed. Route tests in the style of `tests/unit/release-route.test.ts`.
 
 **Phase 4 — UI.** New Releases view, taskbar badge with count, artist-management panel in
 settings. Retro chrome throughout (Encarta / Win97), and the alert cards need to hold up at
 mobile width — a Playwright spec alongside the existing visual tests, per `AGENTS.md`.
 
-**Phase 5 — polish.** Adaptive intervals and jitter, per-artist "check now", cover art on
-alert cards, and the settings toggles.
+**Phase 5 — polish.** Adaptive intervals and jitter, date-drift reconciliation for
+scheduled announced releases, per-artist "check now", cover art on alert cards, and the
+settings toggles.
 
 Phases 1–2 alone make the system *correct but invisible* — alerts accumulate in the table.
 That's a deliberate ordering: it lets the poller bake against real data for a week before
@@ -369,13 +444,21 @@ baseline when every page fetched cleanly.
 
 ---
 
-## Open questions
+## Decisions
 
-1. Track `to-listen` artists too, or `listened` only to start?
-2. Should accepting an alert put the item in a specific stack (e.g. "New Releases"), or
-   just the general to-listen list?
-3. Is the RSS feed enough for delivery, or is a real notification path (email via the
-   existing ingest infrastructure, iOS push) wanted sooner than Phase 5?
-4. Should the freshness window default to alerting on *upcoming* releases too —
-   MusicBrainz often lists announced records with future `first-release-date`s, which is
-   arguably the most useful alert of all.
+Settled during design review:
+
+1. **Listened artists only.** `to-listen` is not evidence of wanting an artist's future
+   output.
+2. **Accepted alerts go to a New Releases stack**, referenced by id in settings.
+3. **Poll daily.** Per-artist intervals stay at 7 / 21 / 60 days; the daily sweep just
+   drains whatever is due.
+4. **Announced releases are alerted on and scheduled**, handing off to the existing
+   remind-to-listen cron via `remind_at`.
+5. **A dedicated notification UI is wanted but out of scope.** RSS is the interim delivery
+   mechanism; `release_alerts` is the queue that surface will read.
+
+Still open:
+
+- Whether date-drift reconciliation (Phase 5) should also *un*-schedule a release whose
+  date is removed from MusicBrainz entirely, or leave the reminder standing.
