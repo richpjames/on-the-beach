@@ -114,8 +114,20 @@ export interface CreateResult {
  * Create a music item without a URL — no scraping, no link inserted.
  * Used for physical records or items known only from memory.
  */
+export interface CreateMusicItemDirectOptions {
+  /**
+   * Skip the secondary-link lookup. For a record that isn't released yet there
+   * is nothing on the streaming services to find, and the lookup stamps
+   * `apple_music_lookup_at` on a miss just as it does on a hit — so a single
+   * futile attempt now would keep the item out of the backfill for good, and
+   * it would never pick up a link once the record actually came out.
+   */
+  skipLinkEnrichment?: boolean;
+}
+
 export async function createMusicItemDirect(
   overrides: Partial<CreateMusicItemInput>,
+  options: CreateMusicItemDirectOptions = {},
 ): Promise<CreateResult> {
   const title = overrides.title || "Untitled";
   const artistName = overrides.artistName;
@@ -153,7 +165,11 @@ export async function createMusicItemDirect(
 
   // Direct items (physical / from-memory) have no primary link, so they're
   // always eligible for a secondary-link lookup. Non-blocking.
-  enrichSecondaryLinkInBackground(inserted.id);
+  if (!options.skipLinkEnrichment) {
+    enrichSecondaryLinkInBackground(inserted.id);
+  }
+  // The suggestion prefetch runs either way: it's keyed to the artist, not to
+  // this release, so it's just as useful for a record that isn't out yet.
   queueSuggestionPrefetch(item);
 
   return { item, created: true };

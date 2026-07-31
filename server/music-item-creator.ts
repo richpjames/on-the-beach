@@ -12,6 +12,7 @@ import {
   fetchFullItem,
   getOrCreateArtist,
   queueSuggestionPrefetch,
+  type CreateMusicItemDirectOptions,
   type CreateResult,
 } from "./music-item-store";
 import type {
@@ -35,7 +36,7 @@ export { fullItemSelect };
 // Item reads and URL-less writes live in ./music-item-store.ts, out of reach
 // of the process-wide `mock.module` on this file (see that module's header).
 export { getOrCreateArtist, fetchFullItem };
-export type { CreateResult };
+export type { CreateResult, CreateMusicItemDirectOptions };
 
 /**
  * Create a music item without a URL — no scraping, no link inserted.
@@ -47,8 +48,9 @@ export type { CreateResult };
  */
 export async function createMusicItemDirect(
   overrides: Partial<CreateMusicItemInput>,
+  options?: CreateMusicItemDirectOptions,
 ): Promise<CreateResult> {
-  return createMusicItemDirectInStore(overrides);
+  return createMusicItemDirectInStore(overrides, options);
 }
 
 /** Resolve the DB id for a source name (e.g. "bandcamp"). */

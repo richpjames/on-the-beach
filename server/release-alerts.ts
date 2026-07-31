@@ -1,4 +1,4 @@
-import { and, desc, eq, inArray } from "drizzle-orm";
+import { and, count, desc, eq, inArray, ne } from "drizzle-orm";
 import { db } from "./db/index";
 import {
   artistReleases,
@@ -101,11 +101,14 @@ export async function listReleaseAlerts(
 }
 
 export async function countPendingAlerts(): Promise<number> {
-  const rows = await db
-    .select({ id: releaseAlerts.id })
+  // Aggregate rather than counting rows in JS: this runs on every taskbar
+  // navigation and every alert-list request.
+  const row = await db
+    .select({ value: count() })
     .from(releaseAlerts)
-    .where(eq(releaseAlerts.status, "pending"));
-  return rows.length;
+    .where(eq(releaseAlerts.status, "pending"))
+    .get();
+  return row?.value ?? 0;
 }
 
 /** Bulk `pending` → `seen`, so the taskbar badge clears without forcing a decision. */
@@ -231,35 +234,67 @@ export async function acceptAlert(
 
   if (!alert || alert.status === "added") return null;
 
-  const settings = await getArtistWatchSettings();
-  const remindAt = settings.scheduleAnnouncedReleases
-    ? remindAtForReleaseDate(alert.firstReleaseDate, now)
-    : null;
-
-  const { item } = await createMusicItemDirect({
-    title: alert.title,
-    artistName: alert.artistName,
-    itemType: itemTypeForReleaseGroup(alert.primaryType),
-    listenStatus: "to-listen",
-    year: alert.firstReleaseYear ?? undefined,
-  });
-
-  if (remindAt) {
-    await db
-      .update(musicItems)
-      .set({ remindAt, reminderPending: false, updatedAt: now })
-      .where(eq(musicItems.id, item.id));
-  }
-
-  // Items land in the stack *in addition* to normal status handling, so it
-  // accumulates as a running record of what the watcher has fed the library.
-  const stackId = await ensureNewReleasesStack();
-  await db.insert(musicItemStacks).values({ musicItemId: item.id, stackId }).onConflictDoNothing();
-
-  await db
+  // Claim the alert before creating anything. Reading the status and acting on
+  // it are two steps, so without a claim two concurrent accepts of the same
+  // alert both pass the check above and both create an item. Flipping the
+  // status under a `status != 'added'` predicate makes exactly one of them win;
+  // the loser sees zero rows and bails.
+  const claimed = await db
     .update(releaseAlerts)
-    .set({ status: "added", musicItemId: item.id, resolvedAt: now })
-    .where(eq(releaseAlerts.id, alertId));
+    .set({ status: "added", resolvedAt: now })
+    .where(and(eq(releaseAlerts.id, alertId), ne(releaseAlerts.status, "added")))
+    .returning({ id: releaseAlerts.id });
+  if (claimed.length === 0) return null;
 
-  return { itemId: item.id, remindAt };
+  try {
+    const settings = await getArtistWatchSettings();
+    const remindAt = settings.scheduleAnnouncedReleases
+      ? remindAtForReleaseDate(alert.firstReleaseDate, now)
+      : null;
+
+    const { item } = await createMusicItemDirect(
+      {
+        title: alert.title,
+        artistName: alert.artistName,
+        itemType: itemTypeForReleaseGroup(alert.primaryType),
+        listenStatus: "to-listen",
+        year: alert.firstReleaseYear ?? undefined,
+      },
+      // A record that isn't out yet has nothing to find on the streaming
+      // services, and the lookup stamps an attempt marker that would stop the
+      // item being re-queried once it actually is released.
+      { skipLinkEnrichment: remindAt !== null },
+    );
+
+    if (remindAt) {
+      await db
+        .update(musicItems)
+        .set({ remindAt, reminderPending: false, updatedAt: now })
+        .where(eq(musicItems.id, item.id));
+    }
+
+    // Items land in the stack *in addition* to normal status handling, so it
+    // accumulates as a running record of what the watcher has fed the library.
+    const stackId = await ensureNewReleasesStack();
+    await db
+      .insert(musicItemStacks)
+      .values({ musicItemId: item.id, stackId })
+      .onConflictDoNothing();
+
+    await db
+      .update(releaseAlerts)
+      .set({ musicItemId: item.id })
+      .where(eq(releaseAlerts.id, alertId));
+
+    return { itemId: item.id, remindAt };
+  } catch (err) {
+    // The claim is only good if the work behind it succeeded — otherwise the
+    // alert would sit as `added` with no item to show for it, unreachable from
+    // the queue and impossible to retry.
+    await db
+      .update(releaseAlerts)
+      .set({ status: alert.status, resolvedAt: null })
+      .where(eq(releaseAlerts.id, alertId));
+    throw err;
+  }
 }
