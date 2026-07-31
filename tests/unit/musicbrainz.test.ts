@@ -1,5 +1,11 @@
 import { afterEach, describe, expect, mock, spyOn, test } from "bun:test";
-import { lookupRelease, findSuggestedRelease } from "../../server/musicbrainz";
+import {
+  lookupRelease,
+  findSuggestedRelease,
+  fetchArtistReleaseGroups,
+  searchArtistCandidates,
+  MusicBrainzHttpError,
+} from "../../server/musicbrainz";
 
 function makeMbArtistSearchResponse(artists: unknown[]): Response {
   return new Response(JSON.stringify({ artists }), {
@@ -463,5 +469,144 @@ describe("lookupRelease", () => {
     const result = await lookupRelease("Artist", "Title");
     expect(result?.musicbrainzReleaseId).toBeNull();
     expect(result?.musicbrainzArtistId).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Release groups & artist search (artist watch)
+// ---------------------------------------------------------------------------
+
+function makeReleaseGroupResponse(groups: unknown[]): Response {
+  return new Response(JSON.stringify({ "release-groups": groups }), {
+    headers: { "content-type": "application/json" },
+  });
+}
+
+function releaseGroup(overrides: Record<string, unknown> = {}): Record<string, unknown> {
+  return {
+    id: `rg-${Math.random().toString(36).slice(2)}`,
+    title: "A Record",
+    "primary-type": "Album",
+    "secondary-types": [],
+    "first-release-date": "2026-06-01",
+    ...overrides,
+  };
+}
+
+describe("fetchArtistReleaseGroups", () => {
+  afterEach(() => {
+    mock.restore();
+  });
+
+  test("parses a page of release groups", async () => {
+    spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      makeReleaseGroupResponse([
+        releaseGroup({
+          id: "rg-1",
+          title: "On the Beach",
+          "secondary-types": ["Live"],
+          "first-release-date": "1974-07-19",
+        }),
+      ]),
+    );
+
+    const groups = await fetchArtistReleaseGroups("artist-uuid");
+
+    expect(groups).toEqual([
+      {
+        id: "rg-1",
+        title: "On the Beach",
+        primaryType: "Album",
+        secondaryTypes: ["Live"],
+        firstReleaseDate: "1974-07-19",
+      },
+    ]);
+  });
+
+  test("keeps a missing first-release-date as null rather than inventing one", async () => {
+    spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      makeReleaseGroupResponse([releaseGroup({ "first-release-date": "" })]),
+    );
+
+    const groups = await fetchArtistReleaseGroups("artist-uuid");
+
+    expect(groups[0].firstReleaseDate).toBeNull();
+  });
+
+  test("paginates only when a page comes back full", async () => {
+    const fetchSpy = spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(
+        makeReleaseGroupResponse(Array.from({ length: 100 }, () => releaseGroup())),
+      )
+      .mockResolvedValueOnce(makeReleaseGroupResponse([releaseGroup()]));
+
+    const groups = await fetchArtistReleaseGroups("artist-uuid");
+
+    expect(groups).toHaveLength(101);
+    expect(fetchSpy).toHaveBeenCalledTimes(2);
+    expect(String(fetchSpy.mock.calls[1][0])).toContain("offset=100");
+  });
+
+  test("throws with the status so the caller can tell a 503 from a miss", async () => {
+    // A partial fetch must never be written as a baseline: every group it
+    // missed would alert as new on the next successful poll.
+    spyOn(globalThis, "fetch").mockResolvedValueOnce(new Response("", { status: 503 }));
+
+    let caught: unknown;
+    try {
+      await fetchArtistReleaseGroups("artist-uuid");
+    } catch (err) {
+      caught = err;
+    }
+
+    expect(caught).toBeInstanceOf(MusicBrainzHttpError);
+    expect((caught as MusicBrainzHttpError).status).toBe(503);
+  });
+});
+
+describe("searchArtistCandidates", () => {
+  afterEach(() => {
+    mock.restore();
+  });
+
+  test("returns the fields a human needs to tell two artists apart", async () => {
+    spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      makeMbArtistSearchResponse([
+        {
+          id: "us-band",
+          name: "Nirvana",
+          score: 100,
+          disambiguation: "90s US grunge band",
+          country: "US",
+          type: "Group",
+          "life-span": { begin: "1987", end: "1994" },
+        },
+      ]),
+    );
+
+    const candidates = await searchArtistCandidates("Nirvana");
+
+    expect(candidates).toEqual([
+      {
+        id: "us-band",
+        name: "Nirvana",
+        score: 100,
+        disambiguation: "90s US grunge band",
+        country: "US",
+        type: "Group",
+        lifeSpanBegin: "1987",
+        lifeSpanEnd: "1994",
+      },
+    ]);
+  });
+
+  test("skips malformed entries rather than failing the whole search", async () => {
+    spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      makeMbArtistSearchResponse([{ name: "No Id" }, { id: "ok", name: "Real", score: 90 }]),
+    );
+
+    const candidates = await searchArtistCandidates("Whoever");
+
+    expect(candidates.map((candidate) => candidate.id)).toEqual(["ok"]);
   });
 });

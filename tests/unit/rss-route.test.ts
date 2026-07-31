@@ -3,6 +3,7 @@ import { Hono } from "hono";
 import { createRssRoutes } from "../../server/routes/rss";
 import type { MusicItemFull } from "../../src/types";
 import type { PrimaryFeedKey } from "../../shared/rss";
+import type { ReleaseAlertView } from "../../server/release-alerts";
 
 type StackInfo = { id: number; name: string };
 
@@ -39,13 +40,39 @@ function makeItem(overrides: Partial<MusicItemFull> = {}): MusicItemFull {
   };
 }
 
+function makeAlert(overrides: Partial<ReleaseAlertView> = {}): ReleaseAlertView {
+  return {
+    id: 1,
+    status: "pending",
+    reason: "announced",
+    created_at: "2026-07-31T09:00:00.000Z",
+    resolved_at: null,
+    music_item_id: null,
+    artist_id: 1,
+    artist_name: "Neil Young",
+    musicbrainz_artist_id: "mb-artist",
+    release_id: 1,
+    mb_release_group_id: "mb-release-group",
+    title: "On the Beach",
+    primary_type: "Album",
+    secondary_types: [],
+    first_release_date: "2026-09-18",
+    first_release_year: 2026,
+    ...overrides,
+  };
+}
+
 function makeApp(
   fetchStack: (stackId: number) => Promise<StackInfo | null>,
   fetchStackItems: (stackId: number) => Promise<MusicItemFull[]>,
   fetchPrimaryFeedItems: (feed: PrimaryFeedKey) => Promise<MusicItemFull[]>,
+  fetchReleaseAlerts: () => Promise<ReleaseAlertView[]> = async () => [],
 ): Hono {
   const app = new Hono();
-  app.route("/feed", createRssRoutes(fetchStack, fetchStackItems, fetchPrimaryFeedItems));
+  app.route(
+    "/feed",
+    createRssRoutes(fetchStack, fetchStackItems, fetchPrimaryFeedItems, fetchReleaseAlerts),
+  );
   return app;
 }
 
@@ -101,6 +128,72 @@ describe("GET /feed/:filter.rss", () => {
     const body = await res.text();
 
     expect(body).toContain("<title>Four Tet — Rounds</title>");
+  });
+});
+
+describe("GET /feed/new-releases.rss", () => {
+  const noStacks = mock(async (_id: number) => null);
+  const noItems = mock(async (_id: number) => []);
+  const noFeedItems = mock(async (_feed: PrimaryFeedKey) => []);
+
+  test("renders one entry per alert, artist and title combined", async () => {
+    const app = makeApp(noStacks, noItems, noFeedItems, async () => [
+      makeAlert({ artist_name: "Four Tet", title: "Three" }),
+    ]);
+
+    const res = await app.request("http://localhost/feed/new-releases.rss");
+    const body = await res.text();
+
+    expect(res.status).toBe(200);
+    expect(res.headers.get("Content-Type")).toContain("application/rss+xml");
+    expect(body).toContain("<title>On the Beach — New Releases</title>");
+    expect(body).toContain("<title>Four Tet — Three</title>");
+  });
+
+  test("guid is stable per alert", async () => {
+    const app = makeApp(noStacks, noItems, noFeedItems, async () => [makeAlert({ id: 42 })]);
+
+    const body = await (await app.request("http://localhost/feed/new-releases.rss")).text();
+
+    expect(body).toContain('<guid isPermaLink="false">release-alert-42</guid>');
+  });
+
+  test("pubDate is when the alert fired, not when the record came out", async () => {
+    // A 1978 record surfacing today is news today, and belongs at the top of
+    // the reader rather than buried in 1978.
+    const app = makeApp(noStacks, noItems, noFeedItems, async () => [
+      makeAlert({
+        created_at: "2026-07-31T09:00:00.000Z",
+        first_release_date: "1978-04-01",
+        reason: "catalogue-addition",
+      }),
+    ]);
+
+    const body = await (await app.request("http://localhost/feed/new-releases.rss")).text();
+
+    expect(body).toContain("<pubDate>Fri, 31 Jul 2026");
+    expect(body).not.toContain("<pubDate>Sat, 01 Apr 1978");
+  });
+
+  test("the description says why the alert fired", async () => {
+    const app = makeApp(noStacks, noItems, noFeedItems, async () => [
+      makeAlert({ reason: "announced", first_release_date: "2026-09-18" }),
+    ]);
+
+    const body = await (await app.request("http://localhost/feed/new-releases.rss")).text();
+
+    expect(body).toContain("Announced release");
+    expect(body).toContain("Album · 2026-09-18");
+    expect(body).toContain("https://musicbrainz.org/release-group/mb-release-group");
+  });
+
+  test("an empty queue is still a valid feed", async () => {
+    const app = makeApp(noStacks, noItems, noFeedItems, async () => []);
+
+    const body = await (await app.request("http://localhost/feed/new-releases.rss")).text();
+
+    expect(body).not.toContain("<item>");
+    expect(body).toContain("</rss>");
   });
 });
 

@@ -10,17 +10,38 @@ export const sources = sqliteTable("sources", {
     .$defaultFn(() => new Date()),
 });
 
-export const artists = sqliteTable("artists", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
-  name: text("name").notNull(),
-  normalizedName: text("normalized_name").notNull().unique(),
-  createdAt: integer("created_at", { mode: "timestamp" })
-    .notNull()
-    .$defaultFn(() => new Date()),
-  updatedAt: integer("updated_at", { mode: "timestamp" })
-    .notNull()
-    .$defaultFn(() => new Date()),
-});
+export const artists = sqliteTable(
+  "artists",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    name: text("name").notNull(),
+    normalizedName: text("normalized_name").notNull().unique(),
+    createdAt: integer("created_at", { mode: "timestamp" })
+      .notNull()
+      .$defaultFn(() => new Date()),
+    updatedAt: integer("updated_at", { mode: "timestamp" })
+      .notNull()
+      .$defaultFn(() => new Date()),
+    // ---- Artist watch (see server/artist-identity.ts, server/artist-watch.ts) ----
+    // The artist's MusicBrainz id, promoted from music_items so that an artist —
+    // not an item — is the unit of release tracking.
+    musicbrainzArtistId: text("musicbrainz_artist_id"),
+    // 'confirmed' | 'probable' | 'unresolved'. Only the first two are polled:
+    // no alerts is the correct failure mode, alerts for the wrong band is not.
+    mbidConfidence: text("mbid_confidence"),
+    // Last resolution attempt, hit or miss — throttles re-resolution.
+    mbidResolvedAt: integer("mbid_resolved_at", { mode: "timestamp" }),
+    // 'auto' | 'always' | 'muted'. `auto` defers to the derived rule (tracked
+    // iff the artist has a listened item).
+    followState: text("follow_state").notNull().default("auto"),
+    lastPolledAt: integer("last_polled_at", { mode: "timestamp" }),
+    // Due time — the sweep's work queue. Held in the database, not the timer,
+    // so a restart neither skips nor double-polls.
+    nextPollAt: integer("next_poll_at", { mode: "timestamp" }),
+    pollFailureCount: integer("poll_failure_count").notNull().default(0),
+  },
+  (table) => [index("idx_artists_next_poll_at").on(table.nextPollAt)],
+);
 
 export const musicItems = sqliteTable(
   "music_items",
@@ -177,4 +198,69 @@ export const itemSuggestions = sqliteTable(
       .$defaultFn(() => new Date()),
   },
   (table) => [index("idx_item_suggestions_source_item_id").on(table.sourceItemId)],
+);
+
+/**
+ * Every MusicBrainz release group we've seen for a tracked artist. The first
+ * successful poll writes the artist's whole discography with `isBaseline` set
+ * and raises no alerts; only rows first seen after that can alert.
+ */
+export const artistReleases = sqliteTable(
+  "artist_releases",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    artistId: integer("artist_id")
+      .notNull()
+      .references(() => artists.id, { onDelete: "cascade" }),
+    mbReleaseGroupId: text("mb_release_group_id").notNull(),
+    title: text("title").notNull(),
+    normalizedTitle: text("normalized_title").notNull(),
+    primaryType: text("primary_type"),
+    secondaryTypes: text("secondary_types"), // JSON array
+    // MusicBrainz's date verbatim — partial dates ("1974", "1974-05") are
+    // normal and coercing them to a full Date invents precision.
+    firstReleaseDate: text("first_release_date"),
+    firstReleaseYear: integer("first_release_year"),
+    isBaseline: integer("is_baseline", { mode: "boolean" }).notNull().default(false),
+    firstSeenAt: integer("first_seen_at", { mode: "timestamp" })
+      .notNull()
+      .$defaultFn(() => new Date()),
+  },
+  (table) => [
+    unique("artist_releases_artist_group").on(table.artistId, table.mbReleaseGroupId),
+    index("idx_artist_releases_artist_id").on(table.artistId),
+  ],
+);
+
+/**
+ * The user-facing alert queue. The unique index on `artistReleaseId` is the
+ * idempotency guarantee: a release can alert once, ever, however the sweep is
+ * retried or restarted.
+ */
+export const releaseAlerts = sqliteTable(
+  "release_alerts",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    artistId: integer("artist_id")
+      .notNull()
+      .references(() => artists.id, { onDelete: "cascade" }),
+    artistReleaseId: integer("artist_release_id")
+      .notNull()
+      .references(() => artistReleases.id, { onDelete: "cascade" }),
+    // pending | seen | added | dismissed
+    status: text("status").notNull().default("pending"),
+    // Why it fired: announced | new-release | catalogue-addition
+    reason: text("reason").notNull().default("new-release"),
+    musicItemId: integer("music_item_id").references(() => musicItems.id, {
+      onDelete: "set null",
+    }),
+    createdAt: integer("created_at", { mode: "timestamp" })
+      .notNull()
+      .$defaultFn(() => new Date()),
+    resolvedAt: integer("resolved_at", { mode: "timestamp" }),
+  },
+  (table) => [
+    unique("release_alerts_release").on(table.artistReleaseId),
+    index("idx_release_alerts_status").on(table.status),
+  ],
 );

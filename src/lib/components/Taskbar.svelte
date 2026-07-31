@@ -18,6 +18,23 @@
     return () => clearInterval(interval);
   });
 
+  // ── New-release alerts ──────────────────────────────────────────────────────
+  // A count of pending alerts on the taskbar, the way a tray icon would carry
+  // one. Visiting the queue marks them seen, which clears the badge without
+  // forcing a decision on each card.
+  let pendingAlerts = $state(0);
+
+  onMount(() => {
+    void api
+      .listReleaseAlerts(["pending"])
+      .then((result) => {
+        pendingAlerts = result.pendingCount;
+      })
+      .catch(() => {
+        pendingAlerts = 0;
+      });
+  });
+
   // ── Start menu ──────────────────────────────────────────────────────────────
   // One canonical, discoverable home for every primary action. The actions
   // drive main-page controls by id — the same contract the e2e specs use.
@@ -213,6 +230,12 @@
         >
           <span class="start-menu__icon" aria-hidden="true">🗂️</span>Manage stacks
         </button>
+        <a class="start-menu__item" role="menuitem" href="/new-releases" onclick={closeStartMenu}>
+          <span class="start-menu__icon" aria-hidden="true">📻</span>New releases
+          {#if pendingAlerts > 0}
+            <span class="start-menu__count">{pendingAlerts}</span>
+          {/if}
+        </a>
         <div class="start-menu__divider" role="separator"></div>
         <a class="start-menu__item" role="menuitem" href="/feed/to-listen.rss" onclick={closeStartMenu}>
           <span class="start-menu__icon" aria-hidden="true">📡</span>RSS feed
@@ -237,6 +260,17 @@
     <span aria-hidden="true">♫</span>
     <span id="taskbar-np-label">{player.active ? player.label : ""}</span>
   </button>
+  {#if pendingAlerts > 0}
+    <a
+      id="taskbar-alerts"
+      class="taskbar__task taskbar__task--alerts"
+      href="/new-releases"
+      title="{pendingAlerts} new release{pendingAlerts === 1 ? '' : 's'} waiting"
+    >
+      <span aria-hidden="true">📻</span>
+      <span class="taskbar__badge" id="taskbar-alerts-count">{pendingAlerts}</span>
+    </a>
+  {/if}
   {#if showClock}
     <div id="clock-popup" class="clock-popup" hidden={!popupOpen}>
       <div class="clock-popup__title">📅 Scheduled reminders</div>

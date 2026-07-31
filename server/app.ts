@@ -6,6 +6,8 @@ import { releaseRoutes } from "./routes/release";
 import { appleMusicRoutes } from "./routes/apple-music";
 import { settingsRoutes } from "./routes/settings";
 import { rssRoutes } from "./routes/rss";
+import { releaseAlertRoutes } from "./routes/release-alerts";
+import { artistRoutes } from "./routes/artists";
 
 /**
  * The REST API and RSS feeds are served by Hono route modules, mounted into
@@ -25,6 +27,8 @@ apiApp.route("/api/ingest", ingestRoutes);
 apiApp.route("/api/release", releaseRoutes);
 apiApp.route("/api/apple-music", appleMusicRoutes);
 apiApp.route("/api/settings", settingsRoutes);
+apiApp.route("/api/release-alerts", releaseAlertRoutes);
+apiApp.route("/api/artists", artistRoutes);
 apiApp.route("/feed", rssRoutes);
 
 // Test-only routes, enabled when the server runs under NODE_ENV=test

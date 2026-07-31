@@ -3854,3 +3854,340 @@ a:hover {
   font-size: var(--text-sm);
   color: var(--chrome-darker);
 }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   New-release alerts
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/* Taskbar tray: a count of pending alerts, the way a tray icon carries one. */
+.taskbar__task--alerts {
+  text-decoration: none;
+  color: inherit;
+  cursor: pointer;
+  max-width: none;
+  padding: 2px 8px;
+}
+
+.taskbar__badge {
+  min-width: 16px;
+  padding: 0 4px;
+  background: var(--danger);
+  color: #ffffff;
+  font-size: var(--text-2xs);
+  font-weight: bold;
+  line-height: 14px;
+  text-align: center;
+  border: 1px solid var(--chrome-darker);
+}
+
+.start-menu__count {
+  margin-left: auto;
+  min-width: 16px;
+  padding: 0 4px;
+  background: var(--danger);
+  color: #ffffff;
+  font-size: var(--text-2xs);
+  font-weight: bold;
+  line-height: 14px;
+  text-align: center;
+  border: 1px solid var(--chrome-darker);
+}
+
+.alerts {
+  max-width: 680px;
+  margin: 0 auto;
+  padding: var(--space-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+.alerts__back {
+  align-self: flex-start;
+}
+
+.alerts__header {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.alerts__heading {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--text-xl);
+}
+
+.alerts__hint {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--chrome-dark);
+}
+
+.alerts__feed-link {
+  align-self: flex-start;
+  font-size: var(--text-xs);
+  color: var(--chrome-darker);
+}
+
+.alerts__empty {
+  border-width: 2px;
+  border-style: solid;
+  border-color: var(--bevel-field);
+  background: var(--chrome-panel);
+  padding: var(--space-6);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  text-align: center;
+  font-size: var(--text-md);
+}
+
+.alerts__list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.alert-card {
+  display: grid;
+  grid-template-columns: 64px 1fr auto;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-3);
+  background: var(--chrome-panel);
+  border-width: 2px;
+  border-style: solid;
+  border-color: var(--bevel-raised);
+}
+
+.alert-card--busy {
+  opacity: 0.6;
+}
+
+.alert-card__artwork {
+  width: 64px;
+  height: 64px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--chrome-mid);
+  border-width: 1px;
+  border-style: solid;
+  border-color: var(--bevel-field);
+  overflow: hidden;
+}
+
+.alert-card__artwork img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.alert-card__artwork-placeholder {
+  font-size: var(--text-xl);
+  color: var(--chrome-darker);
+}
+
+.alert-card__main {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.alert-card__artist {
+  font-size: var(--text-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--chrome-darker);
+}
+
+.alert-card__title {
+  font-size: var(--text-md);
+  font-weight: bold;
+}
+
+.alert-card__meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-xs);
+  color: var(--chrome-dark);
+}
+
+.badge--reason {
+  font-size: var(--text-2xs);
+  font-weight: bold;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 1px 5px;
+  border: 1px solid var(--chrome-darker);
+  background: var(--chrome);
+  color: var(--chrome-darker);
+}
+
+/* Announced records are the ones worth spotting from across the room. */
+.badge--announced {
+  background: var(--win-blue);
+  border-color: var(--win-blue);
+  color: #ffffff;
+}
+
+.badge--new-release {
+  background: #0a7d2c;
+  border-color: #0a7d2c;
+  color: #ffffff;
+}
+
+.alert-card__actions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+/* On a phone the three-column card stops working: stack it, and let the
+   actions run across the full width as a row of thumb-sized targets. */
+@media (max-width: 560px) {
+  .alert-card {
+    grid-template-columns: 48px 1fr;
+    grid-template-areas:
+      "art main"
+      "actions actions";
+  }
+
+  .alert-card__artwork {
+    grid-area: art;
+    width: 48px;
+    height: 48px;
+  }
+
+  .alert-card__main {
+    grid-area: main;
+  }
+
+  .alert-card__actions {
+    grid-area: actions;
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
+
+  .alert-card__actions .btn {
+    flex: 1 1 auto;
+    min-height: var(--touch-icon);
+  }
+}
+
+/* ── Tracked artists panel ── */
+
+.artist-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  border-width: 2px;
+  border-style: solid;
+  border-color: var(--bevel-field);
+  background: var(--chrome-light);
+  max-height: 340px;
+  overflow-y: auto;
+}
+
+.artist-list__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border-bottom: 1px solid var(--chrome-mid);
+}
+
+.artist-list__row:last-child {
+  border-bottom: none;
+}
+
+.artist-list__main {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  flex: 1 1 160px;
+  min-width: 0;
+}
+
+.artist-list__name {
+  font-size: var(--text-md);
+}
+
+.artist-list__meta {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.artist-list__polled {
+  font-size: var(--text-xs);
+  color: var(--chrome-dark);
+}
+
+.artist-list__actions {
+  display: flex;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.artist-list__candidates {
+  flex: 1 1 100%;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: var(--space-2);
+  background: var(--chrome-panel);
+  border-width: 1px;
+  border-style: solid;
+  border-color: var(--bevel-field);
+}
+
+.artist-list__candidate {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: var(--space-2);
+  border: none;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  font-family: var(--font-ui);
+}
+
+.artist-list__candidate:hover,
+.artist-list__candidate:focus-visible {
+  background: var(--win-blue);
+  color: #ffffff;
+  outline: none;
+}
+
+.artist-list__candidate-name {
+  font-size: var(--text-base);
+  font-weight: bold;
+}
+
+.artist-list__candidate-detail {
+  font-size: var(--text-xs);
+}
+
+.settings__option--field {
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.settings__number {
+  width: 60px;
+  padding: 2px 4px;
+  border-width: 2px;
+  border-style: solid;
+  border-color: var(--bevel-field);
+  background: var(--chrome-white);
+  font-size: var(--text-base);
+}

@@ -4,6 +4,8 @@ import { musicItems, artists, musicLinks, sources, stacks, musicItemStacks } fro
 import { eq, and, inArray, isNull } from "drizzle-orm";
 import type { MusicItemFull } from "../../src/types";
 import type { PrimaryFeedKey } from "../../shared/rss";
+import type { ReleaseAlertView } from "../release-alerts";
+import { listReleaseAlerts } from "../release-alerts";
 
 type StackInfo = { id: number; name: string };
 type FeedInfo = { title: string; description: string };
@@ -11,6 +13,21 @@ type FeedInfo = { title: string; description: string };
 export type FetchStackFn = (stackId: number) => Promise<StackInfo | null>;
 export type FetchStackItemsFn = (stackId: number) => Promise<MusicItemFull[]>;
 export type FetchPrimaryFeedItemsFn = (feed: PrimaryFeedKey) => Promise<MusicItemFull[]>;
+export type FetchReleaseAlertsFn = () => Promise<ReleaseAlertView[]>;
+
+/**
+ * The renderer's unit of work. Feeds that aren't lists of music items — the
+ * new-release alerts, for one — map onto this rather than pretending to be
+ * `MusicItemFull`.
+ */
+export interface FeedEntry {
+  guid: string;
+  title: string;
+  link: string;
+  /** ISO 8601; rendered as RFC 2822. */
+  pubDate: string;
+  description: string;
+}
 
 // ---------------------------------------------------------------------------
 // XML helpers
@@ -87,21 +104,65 @@ function renderItemDescription(item: MusicItemFull): string {
   return lines.join("\n");
 }
 
-function renderRss(feed: FeedInfo, items: MusicItemFull[], baseUrl: string): string {
-  const itemsXml = items
-    .map((item) => {
-      const title = escapeXml(itemTitle(item));
-      const link = escapeXml(`${baseUrl}/r/${item.id}`);
-      const pubDate = toRfc2822(item.created_at);
-      const guid = `music-item-${item.id}`;
-      const description = renderItemDescription(item);
+/** A music item as a feed entry. */
+function itemToEntry(item: MusicItemFull, baseUrl: string): FeedEntry {
+  return {
+    guid: `music-item-${item.id}`,
+    title: itemTitle(item),
+    link: `${baseUrl}/r/${item.id}`,
+    pubDate: item.created_at,
+    description: renderItemDescription(item),
+  };
+}
+
+const ALERT_REASON_LABELS: Record<string, string> = {
+  announced: "Announced release",
+  "new-release": "New release",
+  "catalogue-addition": "Added to MusicBrainz",
+};
+
+function renderAlertDescription(alert: ReleaseAlertView): string {
+  const lines: string[] = [ALERT_REASON_LABELS[alert.reason] ?? "New release"];
+
+  const metaParts: string[] = [];
+  if (alert.primary_type) metaParts.push(capitalize(alert.primary_type));
+  for (const type of alert.secondary_types) metaParts.push(capitalize(type));
+  if (alert.first_release_date) metaParts.push(alert.first_release_date);
+  if (metaParts.length > 0) lines.push(metaParts.join(" · "));
+
+  lines.push(`MusicBrainz: https://musicbrainz.org/release-group/${alert.mb_release_group_id}`);
+
+  return lines.join("\n");
+}
+
+/**
+ * An alert as a feed entry. `pubDate` is when the alert fired, not the release
+ * date — a 1978 record surfacing today is news today, and should appear at the
+ * top of the reader rather than buried in 1978.
+ */
+function alertToEntry(alert: ReleaseAlertView, baseUrl: string): FeedEntry {
+  return {
+    guid: `release-alert-${alert.id}`,
+    title: `${alert.artist_name} — ${alert.title}`,
+    link: `${baseUrl}/new-releases`,
+    pubDate: alert.created_at,
+    description: renderAlertDescription(alert),
+  };
+}
+
+function renderRss(feed: FeedInfo, entries: FeedEntry[]): string {
+  const itemsXml = entries
+    .map((entry) => {
+      const title = escapeXml(entry.title);
+      const link = escapeXml(entry.link);
+      const pubDate = toRfc2822(entry.pubDate);
 
       return `    <item>
       <title>${title}</title>
       <link>${link}</link>
       <pubDate>${pubDate}</pubDate>
-      <guid isPermaLink="false">${guid}</guid>
-      <description><![CDATA[${description}]]></description>
+      <guid isPermaLink="false">${entry.guid}</guid>
+      <description><![CDATA[${entry.description}]]></description>
     </item>`;
     })
     .join("\n");
@@ -302,6 +363,7 @@ export function createRssRoutes(
   fetchStack: FetchStackFn = defaultFetchStack,
   fetchStackItems: FetchStackItemsFn = defaultFetchStackItems,
   fetchPrimaryFeedItems: FetchPrimaryFeedItemsFn = defaultFetchPrimaryFeedItems,
+  fetchReleaseAlerts: FetchReleaseAlertsFn = () => listReleaseAlerts(["pending", "seen"]),
 ): Hono {
   const routes = new Hono();
 
@@ -313,8 +375,7 @@ export function createRssRoutes(
         title: "On the Beach — All",
         description: "All items in On the Beach",
       },
-      items,
-      baseUrl,
+      items.map((item) => itemToEntry(item, baseUrl)),
     );
 
     return c.body(xml, 200, {
@@ -330,8 +391,7 @@ export function createRssRoutes(
         title: "On the Beach — To Listen",
         description: 'Items with status "To Listen" in On the Beach',
       },
-      items,
-      baseUrl,
+      items.map((item) => itemToEntry(item, baseUrl)),
     );
 
     return c.body(xml, 200, {
@@ -347,8 +407,25 @@ export function createRssRoutes(
         title: "On the Beach — Listened",
         description: 'Items with status "Listened" in On the Beach',
       },
-      items,
-      baseUrl,
+      items.map((item) => itemToEntry(item, baseUrl)),
+    );
+
+    return c.body(xml, 200, {
+      "Content-Type": "application/rss+xml; charset=utf-8",
+    });
+  });
+
+  // The closest thing to a push notification this app can offer without
+  // notification infrastructure: the user's existing reader does the alerting.
+  routes.get("/new-releases.rss", async (c) => {
+    const alerts = await fetchReleaseAlerts();
+    const baseUrl = new URL(c.req.url).origin;
+    const xml = renderRss(
+      {
+        title: "On the Beach — New Releases",
+        description: "New releases by artists you've listened to",
+      },
+      alerts.map((alert) => alertToEntry(alert, baseUrl)),
     );
 
     return c.body(xml, 200, {
@@ -376,8 +453,7 @@ export function createRssRoutes(
         title: `On the Beach — ${stack.name}`,
         description: `Items in the ${stack.name} stack on On the Beach`,
       },
-      items,
-      baseUrl,
+      items.map((item) => itemToEntry(item, baseUrl)),
     );
 
     return c.body(xml, 200, {

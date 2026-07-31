@@ -2,6 +2,7 @@ import { json, type Handle } from "@sveltejs/kit";
 import { building } from "$app/environment";
 import { processReminders } from "../server/reminders";
 import { ensureSuggestionsForToListenArtists } from "../server/suggestions";
+import { sweepArtistReleases, SWEEP_INTERVAL_MS } from "../server/artist-watch";
 import {
   CSRF_COOKIE_NAME,
   CSRF_HEADER_NAME,
@@ -16,6 +17,7 @@ import {
 const globalState = globalThis as typeof globalThis & {
   __otbRemindersStarted?: boolean;
   __otbSuggestionSweepStarted?: boolean;
+  __otbArtistWatchStarted?: boolean;
 };
 if (!building && !globalState.__otbRemindersStarted) {
   globalState.__otbRemindersStarted = true;
@@ -44,6 +46,24 @@ if (!building && !globalState.__otbSuggestionSweepStarted) {
         console.error("[suggestions] interval sweep failed:", err),
       ),
     60 * 60 * 1000,
+  );
+}
+
+// ---------- Artist release watch ----------
+// Ask MusicBrainz what the artists you've listened to have put out, and raise
+// an alert for anything we haven't seen before. Runs on startup and then
+// daily; which artists are actually *due* is held in the database
+// (artists.next_poll_at), not in this timer, so a restart neither skips an
+// artist nor polls one twice. No-ops under OTB_DISABLE_EXTERNAL_LOOKUPS.
+if (!building && !globalState.__otbArtistWatchStarted) {
+  globalState.__otbArtistWatchStarted = true;
+  sweepArtistReleases().catch((err) => console.error("[artist-watch] startup sweep failed:", err));
+  setInterval(
+    () =>
+      sweepArtistReleases().catch((err) =>
+        console.error("[artist-watch] interval sweep failed:", err),
+      ),
+    SWEEP_INTERVAL_MS,
   );
 }
 

@@ -18,7 +18,7 @@ export function isLookupService(value: unknown): value is LookupService {
 const LOOKUP_SERVICE_KEY = "lookup_service";
 const DEFAULT_LOOKUP_SERVICE: LookupService = "apple_music";
 
-async function getSetting(key: string): Promise<string | null> {
+export async function getSetting(key: string): Promise<string | null> {
   const rows = await db
     .select({ value: appSettings.value })
     .from(appSettings)
@@ -27,7 +27,7 @@ async function getSetting(key: string): Promise<string | null> {
   return rows[0]?.value ?? null;
 }
 
-async function putSetting(key: string, value: string): Promise<void> {
+export async function putSetting(key: string, value: string): Promise<void> {
   await db
     .insert(appSettings)
     .values({ key, value, updatedAt: new Date() })
@@ -102,4 +102,133 @@ export async function setReleaseLengthPreference(
   await putSetting(RELEASE_LENGTH_PREFERENCE_KEY, preference);
   await db.delete(itemSuggestions).where(eq(itemSuggestions.status, "pending"));
   return { changed: true };
+}
+
+// ---------------------------------------------------------------------------
+// Artist watch / new-release alerts
+// ---------------------------------------------------------------------------
+
+export const ARTIST_WATCH_KEYS = {
+  enabled: "artist_watch_enabled",
+  freshnessMonths: "alert_freshness_months",
+  catalogueAdditions: "alert_on_catalogue_additions",
+  excludedSecondaryTypes: "alert_excluded_secondary_types",
+  newReleasesStackId: "new_releases_stack_id",
+  scheduleAnnounced: "schedule_announced_releases",
+} as const;
+
+export interface ArtistWatchSettings {
+  /** Master switch for the sweep. */
+  enabled: boolean;
+  /** Age window, in months, for "new release" alerts. Future dates always qualify. */
+  freshnessMonths: number;
+  /** Also alert on records newly *added to MusicBrainz* however old they are. */
+  alertOnCatalogueAdditions: boolean;
+  /** Secondary types that never raise an alert, lower-cased. */
+  excludedSecondaryTypes: string[];
+  /** Set `remind_at` from a future release date when an alert is accepted. */
+  scheduleAnnouncedReleases: boolean;
+}
+
+// The noise filter defaults: archival editing churn the user did not ask about.
+const DEFAULT_EXCLUDED_SECONDARY_TYPES = [
+  "compilation",
+  "live",
+  "remix",
+  "dj-mix",
+  "interview",
+  "audiobook",
+];
+
+export const DEFAULT_ARTIST_WATCH_SETTINGS: ArtistWatchSettings = {
+  enabled: true,
+  freshnessMonths: 18,
+  alertOnCatalogueAdditions: false,
+  excludedSecondaryTypes: DEFAULT_EXCLUDED_SECONDARY_TYPES,
+  scheduleAnnouncedReleases: true,
+};
+
+function parseBoolean(value: string | null, fallback: boolean): boolean {
+  if (value === null) return fallback;
+  return value === "true" || value === "1";
+}
+
+export async function getArtistWatchSettings(): Promise<ArtistWatchSettings> {
+  const [enabled, freshness, catalogue, excluded, schedule] = await Promise.all([
+    getSetting(ARTIST_WATCH_KEYS.enabled),
+    getSetting(ARTIST_WATCH_KEYS.freshnessMonths),
+    getSetting(ARTIST_WATCH_KEYS.catalogueAdditions),
+    getSetting(ARTIST_WATCH_KEYS.excludedSecondaryTypes),
+    getSetting(ARTIST_WATCH_KEYS.scheduleAnnounced),
+  ]);
+
+  // `Number(null)` is 0, which is a perfectly valid freshness window — so the
+  // unset case has to be ruled out before parsing, or the default never applies.
+  const months = freshness === null ? Number.NaN : Number(freshness);
+
+  return {
+    enabled: parseBoolean(enabled, DEFAULT_ARTIST_WATCH_SETTINGS.enabled),
+    freshnessMonths:
+      Number.isFinite(months) && months >= 0
+        ? months
+        : DEFAULT_ARTIST_WATCH_SETTINGS.freshnessMonths,
+    alertOnCatalogueAdditions: parseBoolean(
+      catalogue,
+      DEFAULT_ARTIST_WATCH_SETTINGS.alertOnCatalogueAdditions,
+    ),
+    excludedSecondaryTypes:
+      excluded === null
+        ? DEFAULT_ARTIST_WATCH_SETTINGS.excludedSecondaryTypes
+        : excluded
+            .split(",")
+            .map((type) => type.trim().toLowerCase())
+            .filter(Boolean),
+    scheduleAnnouncedReleases: parseBoolean(
+      schedule,
+      DEFAULT_ARTIST_WATCH_SETTINGS.scheduleAnnouncedReleases,
+    ),
+  };
+}
+
+export async function setArtistWatchSettings(
+  update: Partial<ArtistWatchSettings>,
+): Promise<ArtistWatchSettings> {
+  if (update.enabled !== undefined) {
+    await putSetting(ARTIST_WATCH_KEYS.enabled, String(update.enabled));
+  }
+  if (update.freshnessMonths !== undefined) {
+    await putSetting(ARTIST_WATCH_KEYS.freshnessMonths, String(update.freshnessMonths));
+  }
+  if (update.alertOnCatalogueAdditions !== undefined) {
+    await putSetting(
+      ARTIST_WATCH_KEYS.catalogueAdditions,
+      String(update.alertOnCatalogueAdditions),
+    );
+  }
+  if (update.excludedSecondaryTypes !== undefined) {
+    await putSetting(
+      ARTIST_WATCH_KEYS.excludedSecondaryTypes,
+      update.excludedSecondaryTypes.join(","),
+    );
+  }
+  if (update.scheduleAnnouncedReleases !== undefined) {
+    await putSetting(ARTIST_WATCH_KEYS.scheduleAnnounced, String(update.scheduleAnnouncedReleases));
+  }
+
+  return getArtistWatchSettings();
+}
+
+/**
+ * The stack accepted alerts are filed into, referenced **by id**. `stacks.name`
+ * is unique and user-editable, so name-matching would silently create a
+ * duplicate the moment the user renames it.
+ */
+export async function getNewReleasesStackId(): Promise<number | null> {
+  const value = await getSetting(ARTIST_WATCH_KEYS.newReleasesStackId);
+  const id = Number(value);
+  return Number.isInteger(id) && id > 0 ? id : null;
+}
+
+export async function setNewReleasesStackId(stackId: number): Promise<void> {
+  await putSetting(ARTIST_WATCH_KEYS.newReleasesStackId, String(stackId));
 }

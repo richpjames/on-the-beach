@@ -230,3 +230,53 @@ export interface ItemSuggestion {
   status: string;
   createdAt: string;
 }
+
+// ── Artist tracking & new-release alerts ────────────────────────────────────
+
+export type ReleaseAlertStatus = "pending" | "seen" | "added" | "dismissed";
+/** Why an alert fired: it's announced, it's recent, or MusicBrainz just got it. */
+export type ReleaseAlertReason = "announced" | "new-release" | "catalogue-addition";
+export type ArtistFollowState = "auto" | "always" | "muted";
+export type MbidConfidence = "confirmed" | "probable" | "unresolved";
+
+export interface ReleaseAlert {
+  id: number;
+  status: ReleaseAlertStatus;
+  reason: ReleaseAlertReason;
+  created_at: string;
+  resolved_at: string | null;
+  music_item_id: number | null;
+  artist_id: number;
+  artist_name: string;
+  musicbrainz_artist_id: string | null;
+  release_id: number;
+  mb_release_group_id: string;
+  title: string;
+  primary_type: string | null;
+  secondary_types: string[];
+  /** MusicBrainz's date verbatim — may be partial ("2026", "2026-09"). */
+  first_release_date: string | null;
+  first_release_year: number | null;
+}
+
+export interface TrackedArtist {
+  id: number;
+  name: string;
+  musicbrainz_artist_id: string | null;
+  mbid_confidence: MbidConfidence;
+  follow_state: ArtistFollowState;
+  last_polled_at: string | null;
+  next_poll_at: string | null;
+  poll_failure_count: number;
+}
+
+export interface MbArtistCandidateView {
+  id: string;
+  name: string;
+  score: number;
+  disambiguation: string | null;
+  country: string | null;
+  type: string | null;
+  lifeSpanBegin: string | null;
+  lifeSpanEnd: string | null;
+}
