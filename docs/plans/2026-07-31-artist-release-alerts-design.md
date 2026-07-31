@@ -126,6 +126,15 @@ surface as "out now" three months early — and the user never touched that date
 overwriting it is safe. Reminders the user set themselves are never touched; only ones this
 system created, which is why the alert → item link matters.
 
+When MusicBrainz drops the date **entirely** — the group still exists, but
+`first-release-date` is gone — clear `remind_at` rather than leaving the old reminder
+standing. A removed date means the release date is now unknown, and a reminder derived from
+a value MusicBrainz has retracted is asserting something nobody stands behind any more.
+Clearing it drops the item out of Scheduled and into To Listen, which does mean surfacing a
+record that may not be out yet — that's the accepted cost. The alternative is holding the
+item in Scheduled forever against a phantom date, which fails silently, and silent is
+worse.
+
 ## Which artists get tracked
 
 Derived, with an explicit override — no separate "follow" action to remember.
@@ -457,8 +466,8 @@ Settled during design review:
    remind-to-listen cron via `remind_at`.
 5. **A dedicated notification UI is wanted but out of scope.** RSS is the interim delivery
    mechanism; `release_alerts` is the queue that surface will read.
+6. **A release whose date is removed from MusicBrainz is un-scheduled** — clear
+   `remind_at` and let the item fall into To Listen, rather than holding it against a date
+   that no longer exists.
 
-Still open:
-
-- Whether date-drift reconciliation (Phase 5) should also *un*-schedule a release whose
-  date is removed from MusicBrainz entirely, or leave the reminder standing.
+No open questions outstanding.
