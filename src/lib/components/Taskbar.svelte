@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount } from "svelte";
+  import { afterNavigate } from "$app/navigation";
   import type { MusicItemFull } from "../../types";
   import { api } from "../api";
   import { player } from "../player.svelte";
@@ -24,7 +25,12 @@
   // forcing a decision on each card.
   let pendingAlerts = $state(0);
 
-  onMount(() => {
+  // Refetched after every navigation rather than once on mount. The taskbar
+  // lives in the root layout, so it never remounts on client-side navigation —
+  // a count fetched at mount would stay lit after /new-releases marked the
+  // queue seen, until a full page reload. `afterNavigate` also fires on the
+  // initial mount, so this covers first paint too.
+  afterNavigate(() => {
     void api
       .listReleaseAlerts(["pending"])
       .then((result) => {

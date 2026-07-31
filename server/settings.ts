@@ -206,6 +206,10 @@ export async function setArtistWatchSettings(
     );
   }
   if (update.excludedSecondaryTypes !== undefined) {
+    // Stored comma-joined, which is safe only because MusicBrainz secondary
+    // types are a closed vocabulary with no commas in it ("compilation",
+    // "live", "dj-mix"…). A free-text value here would not survive the round
+    // trip through `getArtistWatchSettings`.
     await putSetting(
       ARTIST_WATCH_KEYS.excludedSecondaryTypes,
       update.excludedSecondaryTypes.join(","),

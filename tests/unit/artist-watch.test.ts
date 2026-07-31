@@ -303,6 +303,38 @@ describe("pollArtist", () => {
     expect(stored.every((row) => row.isBaseline)).toBe(true);
   });
 
+  test("an interrupted baseline resumes as a baseline rather than alerting", async () => {
+    // A process that dies mid-baseline leaves rows behind but never stamps
+    // `last_polled_at`. The rest of the discography must not then drip out as
+    // alerts on the next poll.
+    const artist = await makeTrackedArtist(`Interrupted Band ${Date.now()}`);
+    await db.insert(artistReleases).values({
+      artistId: artist.id,
+      mbReleaseGroupId: "rg-partial",
+      title: "Got There First",
+      normalizedTitle: normalize("Got There First"),
+      primaryType: "Album",
+      secondaryTypes: "[]",
+      firstReleaseDate: "2026-06-01",
+      firstReleaseYear: 2026,
+      isBaseline: true,
+      firstSeenAt: NOW,
+    });
+
+    spyOn(musicbrainz, "fetchArtistReleaseGroups").mockResolvedValue([
+      group({ id: "rg-partial" }),
+      group({ id: "rg-rest-1" }),
+      group({ id: "rg-rest-2" }),
+    ]);
+
+    const outcome = await pollArtist(await reload(artist.id), settings(), NOW);
+
+    expect(outcome.baseline).toBe(true);
+    expect(outcome.newReleases).toBe(2);
+    expect(outcome.alertsRaised).toBe(0);
+    expect(await alertsFor(artist.id)).toHaveLength(0);
+  });
+
   test("a group first seen after the baseline raises one alert", async () => {
     const mbSpy = spyOn(musicbrainz, "fetchArtistReleaseGroups").mockResolvedValue([
       group({ id: "rg-known" }),

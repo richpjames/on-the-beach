@@ -220,6 +220,32 @@ describe("POST /api/release-alerts/:id/add", () => {
     expect(second.status).toBe(404);
   });
 
+  test("concurrent accepts create exactly one item", async () => {
+    // The sequential case above is covered by the status check; this is the
+    // interleaved one it can't catch. Both requests read the alert as
+    // acceptable before either writes, so only an atomic claim keeps them from
+    // both creating an item for the same release.
+    const { alertId } = await makeAlert({ title: "Raced Record" });
+    const app = makeApp();
+
+    const responses = await Promise.all([
+      app.request(`http://localhost/api/release-alerts/${alertId}/add`, { method: "POST" }),
+      app.request(`http://localhost/api/release-alerts/${alertId}/add`, { method: "POST" }),
+    ]);
+
+    expect(responses.filter((res) => res.ok)).toHaveLength(1);
+
+    const created = await db
+      .select({ id: musicItems.id })
+      .from(musicItems)
+      .where(eq(musicItems.normalizedTitle, normalize("Raced Record")));
+    expect(created).toHaveLength(1);
+
+    const alert = await db.select().from(releaseAlerts).where(eq(releaseAlerts.id, alertId)).get();
+    expect(alert?.status).toBe("added");
+    expect(alert?.musicItemId).toBe(created[0].id);
+  });
+
   test("404s for an alert that doesn't exist", async () => {
     const app = makeApp();
     const res = await app.request("http://localhost/api/release-alerts/999999/add", {
@@ -296,13 +322,30 @@ describe("PUT /api/artists/:id/mbid", () => {
     const res = await app.request(`http://localhost/api/artists/${artistId}/mbid`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ musicbrainzArtistId: "picked-by-hand" }),
+      body: JSON.stringify({ musicbrainzArtistId: "a74b1b7f-71a5-4011-9441-d0b5e4122711" }),
     });
     expect(res.status).toBe(200);
 
     const artist = await db.select().from(artists).where(eq(artists.id, artistId)).get();
-    expect(artist?.musicbrainzArtistId).toBe("picked-by-hand");
+    expect(artist?.musicbrainzArtistId).toBe("a74b1b7f-71a5-4011-9441-d0b5e4122711");
     expect(artist?.mbidConfidence).toBe("confirmed");
+  });
+
+  test("rejects an MBID that isn't a UUID", async () => {
+    // A confirmed MBID drives every future poll, so a paste error should fail
+    // here rather than as a run of MusicBrainz 404s weeks later.
+    const { artistId } = await makeAlert();
+    const app = makeApp();
+
+    const res = await app.request(`http://localhost/api/artists/${artistId}/mbid`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ musicbrainzArtistId: "picked-by-hand" }),
+    });
+    expect(res.status).toBe(400);
+
+    const artist = await db.select().from(artists).where(eq(artists.id, artistId)).get();
+    expect(artist?.musicbrainzArtistId).not.toBe("picked-by-hand");
   });
 
   test("rejects a missing MBID", async () => {

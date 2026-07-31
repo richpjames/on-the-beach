@@ -10,6 +10,8 @@ import { setArtistMbid } from "../artist-identity";
 const FOLLOW_STATES = ["auto", "always", "muted"] as const;
 type FollowState = (typeof FOLLOW_STATES)[number];
 
+const MBID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 function parseId(value: string): number | null {
   const id = Number(value);
   return Number.isInteger(id) && id > 0 ? id : null;
@@ -108,6 +110,12 @@ export function createArtistRoutes(): Hono {
     const mbid = (body as { musicbrainzArtistId?: unknown } | null)?.musicbrainzArtistId;
     if (typeof mbid !== "string" || mbid.trim().length === 0) {
       return c.json({ error: "musicbrainzArtistId is required" }, 400);
+    }
+    // A confirmed MBID drives every future poll for this artist, so catch a
+    // mistyped or half-pasted one here rather than discovering it as a run of
+    // 404s from MusicBrainz weeks later.
+    if (!MBID_PATTERN.test(mbid.trim())) {
+      return c.json({ error: "musicbrainzArtistId must be a UUID" }, 400);
     }
 
     const updated = await setArtistMbid(id, mbid.trim());

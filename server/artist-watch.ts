@@ -339,7 +339,14 @@ export async function pollArtist(
 
   // The first successful poll records the whole discography silently. Only
   // rows first seen after the baseline can ever alert.
-  const isBaselinePoll = artist.lastPolledAt === null && existing.length === 0;
+  //
+  // Keyed on `last_polled_at` alone, deliberately: it is stamped only after
+  // every insert below has landed, so a process that dies mid-baseline leaves
+  // it null and the next poll resumes as a baseline. Also requiring
+  // `existing.length === 0` would make that interrupted run look like an
+  // established artist, and the rest of the discography would drip out as
+  // alerts three per sweep.
+  const isBaselinePoll = artist.lastPolledAt === null;
 
   let newReleases = 0;
   let rescheduled = 0;
@@ -497,9 +504,16 @@ export function parseSecondaryTypes(raw: string | null): string[] {
 
 /**
  * Announced dates slip; delayed albums are the norm. When MusicBrainz moves a
- * date, move the reminder we derived from it — but only ours. The alert →
- * item link is what tells the two apart: reminders the user set themselves are
- * never touched.
+ * date, move the reminder we derived from it — but only ours. The alert → item
+ * link is what tells the two apart: a reminder on an item that never came from
+ * an alert is never touched.
+ *
+ * The link proves the item's *origin*, not that its date is still untouched —
+ * if the user hand-edited `remind_at` on an accepted item, a later MusicBrainz
+ * date change will overwrite that edit. Distinguishing the two would mean
+ * recording the date we set and comparing, which is more bookkeeping than a
+ * rare case is worth: the release date moving is the more likely reason the
+ * two disagree.
  *
  * When MusicBrainz drops the date entirely, clear `remind_at` rather than
  * leaving a reminder standing against a value nobody stands behind any more.
@@ -647,6 +661,14 @@ export async function pollArtistNow(artistId: number): Promise<PollOutcome | nul
     .where(eq(artists.id, artistId))
     .get();
   if (!artist) return null;
+
+  // Same guard the sweep and the candidate search carry: "check now" is still
+  // an external lookup, and an environment that switched them off means it.
+  // Below the existence check, so a bad id still 404s rather than reporting a
+  // skipped poll for an artist that doesn't exist.
+  if (process.env.OTB_DISABLE_EXTERNAL_LOOKUPS) {
+    return { status: "skipped", baseline: false, newReleases: 0, alertsRaised: 0, rescheduled: 0 };
+  }
 
   if (!artist.musicbrainzArtistId) {
     const resolution = await resolveArtistMbid(artistId);
