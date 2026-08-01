@@ -136,6 +136,12 @@ export function createReleaseRoutes(
 
     const yearHint = typeof year === "string" && year.trim() ? year.trim() : undefined;
 
+    // Enrichment is best-effort, so under OTB_DISABLE_EXTERNAL_LOOKUPS (tests)
+    // answer "nothing found" rather than reaching MusicBrainz/Cover Art Archive.
+    if (process.env.OTB_DISABLE_EXTERNAL_LOOKUPS) {
+      return c.json({}, 200);
+    }
+
     try {
       const mbFields = await lookupReleaseFn(artist.trim(), title.trim(), yearHint);
       if (!mbFields) {
