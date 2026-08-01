@@ -43,7 +43,12 @@ function group(overrides: Partial<musicbrainz.MbReleaseGroup> = {}): musicbrainz
 /** An artist with one listened item — the derived tracking rule's happy path. */
 async function makeTrackedArtist(
   name: string,
-  options: { listenStatus?: "to-listen" | "listened"; followState?: string; mbid?: string } = {},
+  options: {
+    listenStatus?: "to-listen" | "listened";
+    followState?: string;
+    mbid?: string;
+    rating?: number;
+  } = {},
 ): Promise<TrackedArtistRow> {
   const [artist] = await db
     .insert(artists)
@@ -61,6 +66,7 @@ async function makeTrackedArtist(
     normalizedTitle: normalize(`${name} Debut`),
     artistId: artist.id,
     listenStatus: options.listenStatus ?? "listened",
+    rating: options.rating ?? null,
   });
 
   return (await db
@@ -661,6 +667,43 @@ describe("tracked artists", () => {
 
     expect((await listTrackedArtists()).map((a) => a.id)).not.toContain(muted.id);
   });
+
+  test("the rating bar drops listened artists whose releases fall below it", async () => {
+    const loved = await makeTrackedArtist(`Loved Band ${Date.now()}`, { rating: 4.5 });
+    const middling = await makeTrackedArtist(`Middling Band ${Date.now()}`, { rating: 2 });
+    const unrated = await makeTrackedArtist(`Unrated Band ${Date.now()}`);
+
+    const gated = (await listTrackedArtists(settings({ minArtistRating: 4 }))).map((a) => a.id);
+    expect(gated).toContain(loved.id);
+    expect(gated).not.toContain(middling.id);
+    expect(gated).not.toContain(unrated.id);
+
+    // With the bar off (the default), having listened is still enough.
+    const open = (await listTrackedArtists(settings())).map((a) => a.id);
+    expect(open).toContain(loved.id);
+    expect(open).toContain(middling.id);
+    expect(open).toContain(unrated.id);
+  });
+
+  test("a rating alone doesn't track an artist nothing was listened to by", async () => {
+    // The bar narrows the listened rule; it doesn't replace it.
+    const ratedButQueued = await makeTrackedArtist(`Rated Queue ${Date.now()}`, {
+      listenStatus: "to-listen",
+      rating: 5,
+    });
+
+    const tracked = (await listTrackedArtists(settings({ minArtistRating: 4 }))).map((a) => a.id);
+    expect(tracked).not.toContain(ratedButQueued.id);
+  });
+
+  test("follow_state 'always' bypasses the rating bar", async () => {
+    const forced = await makeTrackedArtist(`Always Unrated ${Date.now()}`, {
+      followState: "always",
+    });
+
+    const tracked = (await listTrackedArtists(settings({ minArtistRating: 5 }))).map((a) => a.id);
+    expect(tracked).toContain(forced.id);
+  });
 });
 
 describe("sweepArtistReleases", () => {
@@ -718,5 +761,27 @@ describe("sweepArtistReleases", () => {
     expect(mbSpy).toHaveBeenCalledWith("mbid-sweep-due");
     expect(mbSpy).not.toHaveBeenCalledWith("mbid-sweep-later");
     expect((await reload(due.id)).lastPolledAt).not.toBeNull();
+  });
+
+  test("the rating bar keeps below-bar artists out of the poll queue", async () => {
+    await setArtistWatchSettings({ minArtistRating: 4 });
+    const mbSpy = spyOn(musicbrainz, "fetchArtistReleaseGroups").mockResolvedValue([
+      group({ id: "rg-rated-sweep" }),
+    ]);
+    spyOn(musicbrainz, "searchArtistCandidates").mockResolvedValue([]);
+
+    await makeTrackedArtist(`Sweep Loved ${Date.now()}`, {
+      mbid: "mbid-sweep-loved",
+      rating: 4.5,
+    });
+    await makeTrackedArtist(`Sweep Middling ${Date.now()}`, {
+      mbid: "mbid-sweep-middling",
+      rating: 2,
+    });
+
+    await sweepArtistReleases(NOW);
+
+    expect(mbSpy).toHaveBeenCalledWith("mbid-sweep-loved");
+    expect(mbSpy).not.toHaveBeenCalledWith("mbid-sweep-middling");
   });
 });

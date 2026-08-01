@@ -365,6 +365,21 @@
           />
           <span>months</span>
         </label>
+        <label class="settings__option settings__option--field">
+          <span>Only watch artists with a release rated at least</span>
+          <input
+            type="number"
+            class="settings__number"
+            name="min-artist-rating"
+            min="0"
+            max="5"
+            step="0.5"
+            value={watch.minArtistRating}
+            onchange={(event) =>
+              saveWatch({ alertMinArtistRating: Number(event.currentTarget.value) })}
+          />
+          <span>stars (0 = any artist you've listened to)</span>
+        </label>
       </form>
       <p id="artist-watch-status" class="settings__status" role="status" aria-live="polite">
         {watchStatusMessage}

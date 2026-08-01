@@ -115,7 +115,11 @@ export const ARTIST_WATCH_KEYS = {
   excludedSecondaryTypes: "alert_excluded_secondary_types",
   newReleasesStackId: "new_releases_stack_id",
   scheduleAnnounced: "schedule_announced_releases",
+  minArtistRating: "alert_min_artist_rating",
 } as const;
+
+/** Star ratings run 0.5–5 in half steps (see src/ui/components/star-rating.ts). */
+export const MAX_STAR_RATING = 5;
 
 export interface ArtistWatchSettings {
   /** Master switch for the sweep. */
@@ -128,6 +132,11 @@ export interface ArtistWatchSettings {
   excludedSecondaryTypes: string[];
   /** Set `remind_at` from a future release date when an alert is accepted. */
   scheduleAnnouncedReleases: boolean;
+  /**
+   * Only auto-track artists with at least one release rated this many stars
+   * or higher. 0 disables the bar (any listened artist qualifies).
+   */
+  minArtistRating: number;
 }
 
 // The noise filter defaults: archival editing churn the user did not ask about.
@@ -146,6 +155,7 @@ export const DEFAULT_ARTIST_WATCH_SETTINGS: ArtistWatchSettings = {
   alertOnCatalogueAdditions: false,
   excludedSecondaryTypes: DEFAULT_EXCLUDED_SECONDARY_TYPES,
   scheduleAnnouncedReleases: true,
+  minArtistRating: 0,
 };
 
 function parseBoolean(value: string | null, fallback: boolean): boolean {
@@ -154,17 +164,19 @@ function parseBoolean(value: string | null, fallback: boolean): boolean {
 }
 
 export async function getArtistWatchSettings(): Promise<ArtistWatchSettings> {
-  const [enabled, freshness, catalogue, excluded, schedule] = await Promise.all([
+  const [enabled, freshness, catalogue, excluded, schedule, minRating] = await Promise.all([
     getSetting(ARTIST_WATCH_KEYS.enabled),
     getSetting(ARTIST_WATCH_KEYS.freshnessMonths),
     getSetting(ARTIST_WATCH_KEYS.catalogueAdditions),
     getSetting(ARTIST_WATCH_KEYS.excludedSecondaryTypes),
     getSetting(ARTIST_WATCH_KEYS.scheduleAnnounced),
+    getSetting(ARTIST_WATCH_KEYS.minArtistRating),
   ]);
 
   // `Number(null)` is 0, which is a perfectly valid freshness window — so the
   // unset case has to be ruled out before parsing, or the default never applies.
   const months = freshness === null ? Number.NaN : Number(freshness);
+  const rating = minRating === null ? Number.NaN : Number(minRating);
 
   return {
     enabled: parseBoolean(enabled, DEFAULT_ARTIST_WATCH_SETTINGS.enabled),
@@ -187,6 +199,10 @@ export async function getArtistWatchSettings(): Promise<ArtistWatchSettings> {
       schedule,
       DEFAULT_ARTIST_WATCH_SETTINGS.scheduleAnnouncedReleases,
     ),
+    minArtistRating:
+      Number.isFinite(rating) && rating >= 0 && rating <= MAX_STAR_RATING
+        ? rating
+        : DEFAULT_ARTIST_WATCH_SETTINGS.minArtistRating,
   };
 }
 
@@ -217,6 +233,9 @@ export async function setArtistWatchSettings(
   }
   if (update.scheduleAnnouncedReleases !== undefined) {
     await putSetting(ARTIST_WATCH_KEYS.scheduleAnnounced, String(update.scheduleAnnouncedReleases));
+  }
+  if (update.minArtistRating !== undefined) {
+    await putSetting(ARTIST_WATCH_KEYS.minArtistRating, String(update.minArtistRating));
   }
 
   return getArtistWatchSettings();
