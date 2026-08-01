@@ -122,7 +122,7 @@
   <meta name="robots" content="noindex, nofollow" />
 </svelte:head>
 
-<main class="main">
+<main class="main main--scroll">
   <div class="alerts">
     <a href="/" class="btn btn--ghost alerts__back">◄ Back</a>
 

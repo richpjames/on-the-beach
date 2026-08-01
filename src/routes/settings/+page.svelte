@@ -251,7 +251,7 @@
   <meta name="robots" content="noindex, nofollow" />
 </svelte:head>
 
-<main class="main">
+<main class="main main--scroll">
   <div class="settings">
     <a href="/" class="btn btn--ghost settings__back">◄ Back</a>
 

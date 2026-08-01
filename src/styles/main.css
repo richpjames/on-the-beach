@@ -265,6 +265,15 @@ body {
   min-height: 0;
 }
 
+/* Pages whose content is a single long column — settings, the alert queue —
+   scroll inside the window. The list on the main page brings its own scroll
+   container, but these don't, and `body` is a fixed-height window with
+   `overflow: hidden`: without this the overflow is clipped at the window's
+   edge and simply unreachable. */
+.main--scroll {
+  overflow-y: auto;
+}
+
 /* ═══════════════════════════════════════════════════
    ADD SECTION — Winamp-style input panel
 ═══════════════════════════════════════════════════ */
@@ -1351,6 +1360,13 @@ select.input {
 
   body:not(.release-page-body) .main {
     flex: 0 0 auto;
+  }
+
+  /* Small screens scroll the whole window instead of panes within it (see the
+     `body` rule above), so the long-column pages hand scrolling back to the
+     document rather than nesting a second scroll container inside it. */
+  .main--scroll {
+    overflow-y: visible;
   }
 
   .music-scrollbar {
