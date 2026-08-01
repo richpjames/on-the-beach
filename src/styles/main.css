@@ -3184,19 +3184,6 @@ a:hover {
   align-items: center;
 }
 
-.release-page__source-link {
-  display: inline-block;
-  margin-top: var(--space-3);
-  font-size: var(--text-base);
-  color: #000080;
-  text-decoration: underline;
-  text-underline-offset: 3px;
-}
-
-.release-page__source-link:hover {
-  color: #0000cc;
-}
-
 .release-page__actions {
   display: flex;
   flex-wrap: wrap;
