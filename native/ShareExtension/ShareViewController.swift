@@ -51,10 +51,29 @@ final class ShareViewController: UIViewController {
         }
     }
 
-    /// Outcome of a post attempt: a confirmation or error message to show the user.
+    /// The `409 ambiguous_link` response from `POST /api/ingest/link`: the
+    /// shared page names several releases and the server wants the user to
+    /// pick which ones to add. Same payload shape the web app's link picker
+    /// consumes from `POST /api/music-items`.
+    struct AmbiguousLinkResponse: Decodable {
+        struct Candidate: Decodable {
+            let candidateId: String
+            let artist: String?
+            let title: String
+        }
+
+        let kind: String
+        let message: String?
+        let candidates: [Candidate]
+    }
+
+    /// Outcome of a post attempt: a confirmation or error message to show the
+    /// user, or — for a link only — a page with several releases on it that
+    /// needs the user to pick which to add before posting again.
     private enum PostResult {
         case success(String)
         case failure(String)
+        case needsReleaseSelection(message: String, candidates: [AmbiguousLinkResponse.Candidate])
     }
 
     /// What the user is sharing: a link (posted to `/api/ingest/link`) or an
@@ -99,6 +118,9 @@ final class ShareViewController: UIViewController {
     /// The list picker while it's on screen, so posting state and the Add gate
     /// can be kept in step with the compose form's.
     private weak var listPicker: ListPickerViewController?
+    /// The release picker while it's on screen (after a multi-release page came
+    /// back ambiguous), so posting state locks it like the other screens.
+    private weak var releasePicker: ReleasePickerViewController?
 
     // Read from the extension's Info.plist. `OTBBaseURL` is committed; the API
     // key is injected from a gitignored xcconfig at build time (see
@@ -184,9 +206,15 @@ final class ShareViewController: UIViewController {
     // MARK: - Submit / cancel
 
     /// Posts the shared content with whatever the compose form currently holds.
-    /// Called from the form's Add button and from the list picker's, so both
-    /// send exactly the same note, lists, and reminder.
-    private func submit() {
+    /// Called from the form's Add button, the list picker's, and — with the
+    /// chosen candidate ids — the release picker's, so all send exactly the
+    /// same note, lists, and reminder.
+    ///
+    /// `selectedCandidateIds` is empty on a first post. When the shared page
+    /// names several releases the server answers 409 with the candidates
+    /// instead of adding anything; we show the release picker and come back
+    /// through here with the user's selection.
+    private func submit(selectedCandidateIds: [String] = []) {
         guard let sharedContent else {
             // Add is disabled without content, so this shouldn't be reachable —
             // but silently dismissing the sheet would look like a successful add.
@@ -204,6 +232,9 @@ final class ShareViewController: UIViewController {
             case .failure(let message):
                 self.setPosting(false)
                 self.presentError(message)
+            case .needsReleaseSelection(let message, let candidates):
+                self.setPosting(false)
+                self.pushReleasePicker(message: message, candidates: candidates)
             }
         }
 
@@ -215,6 +246,7 @@ final class ShareViewController: UIViewController {
                 note: note,
                 listNames: selectedListNames,
                 remindAt: remindAt,
+                selectedCandidateIds: selectedCandidateIds,
                 completion: handle
             )
         case .image(let data):
@@ -234,6 +266,21 @@ final class ShareViewController: UIViewController {
     private func setPosting(_ posting: Bool) {
         compose.setPosting(posting)
         listPicker?.setPosting(posting)
+        releasePicker?.setPosting(posting)
+    }
+
+    /// Pushes the release picker after the server reported the shared page
+    /// mentions several releases. Add posts the link again with the chosen
+    /// candidate ids; back returns to whatever screen the user submitted from
+    /// with everything they'd already filled in intact.
+    private func pushReleasePicker(
+        message: String,
+        candidates: [AmbiguousLinkResponse.Candidate]
+    ) {
+        let picker = ReleasePickerViewController(message: message, candidates: candidates)
+        picker.onAdd = { [weak self] ids in self?.submit(selectedCandidateIds: ids) }
+        releasePicker = picker
+        navController.pushViewController(picker, animated: true)
     }
 
     /// Flashes a checkmark toast over the form, then closes the sheet. Completing
@@ -553,6 +600,7 @@ final class ShareViewController: UIViewController {
         note: String,
         listNames: [String],
         remindAt: Date?,
+        selectedCandidateIds: [String] = [],
         completion: @escaping (PostResult) -> Void
     ) {
         guard let endpoint = URL(string: baseURL + "/api/ingest/link") else {
@@ -570,6 +618,8 @@ final class ShareViewController: UIViewController {
         // Send the schedule as a plain yyyy-MM-dd date, matching the web reminder
         // control; the server parses it with `new Date(...)`.
         if let remindAt { payload["remindAt"] = Self.scheduleFormatter.string(from: remindAt) }
+        // The user's answer to an earlier ambiguous (multi-release) response.
+        if !selectedCandidateIds.isEmpty { payload["selectedCandidateIds"] = selectedCandidateIds }
 
         var request = URLRequest(url: endpoint)
         request.httpMethod = "POST"
@@ -590,12 +640,28 @@ final class ShareViewController: UIViewController {
                 let status = (response as? HTTPURLResponse)?.statusCode ?? 0
                 if (200...299).contains(status) {
                     result = .success(Self.successMessage(from: data))
+                } else if status == 409, let ambiguous = Self.ambiguousResponse(from: data) {
+                    result = .needsReleaseSelection(
+                        message: ambiguous.message ?? "This link mentions several releases. Pick one or more to add.",
+                        candidates: ambiguous.candidates
+                    )
                 } else {
                     result = .failure(Self.failureMessage(status: status, data: data, isPhoto: false))
                 }
             }
             DispatchQueue.main.async { completion(result) }
         }.resume()
+    }
+
+    /// Decodes a 409 body as the multi-release payload, or nil when the
+    /// conflict is something else (so it falls through to the error alert).
+    private nonisolated static func ambiguousResponse(from data: Data?) -> AmbiguousLinkResponse? {
+        guard let data,
+              let payload = try? JSONDecoder().decode(AmbiguousLinkResponse.self, from: data),
+              payload.kind == "ambiguous_link",
+              !payload.candidates.isEmpty
+        else { return nil }
+        return payload
     }
 
     /// Posts a shared image to `/api/ingest/photo`. The image is sent as base64
@@ -694,6 +760,7 @@ final class ShareViewController: UIViewController {
     }
 
     /// Builds the confirmation toast text from the ingest response: "Added",
+    /// "Added 3 releases" when a multi-release selection created several items,
     /// "Added to Jazz, Chill", or "Already saved" when the link was a duplicate
     /// (still worth confirming — a re-share still files it into lists and sets
     /// the reminder). An unparseable body is still a 2xx, so fall back to "Added".
@@ -701,8 +768,16 @@ final class ShareViewController: UIViewController {
         guard let data, let payload = try? JSONDecoder().decode(LinkResponse.self, from: data) else {
             return "Added"
         }
-        let duplicate = (payload.itemsCreated ?? 0) == 0 && (payload.itemsSkipped ?? 0) > 0
-        let base = duplicate ? "Already saved" : "Added"
+        let created = payload.itemsCreated ?? 0
+        let duplicate = created == 0 && (payload.itemsSkipped ?? 0) > 0
+        let base: String
+        if created > 1 {
+            base = "Added \(created) releases"
+        } else if duplicate {
+            base = "Already saved"
+        } else {
+            base = "Added"
+        }
         let names = (payload.lists ?? []).map(\.name)
         return names.isEmpty ? base : "\(base) to \(names.joined(separator: ", "))"
     }
@@ -1154,6 +1229,201 @@ private final class ListPickerViewController: UITableViewController {
             self.tableView.reloadData()
         })
         present(alert, animated: true)
+    }
+}
+
+/// A multi-select release picker pushed when the shared page mentions several
+/// releases — the native twin of the web app's LinkPickerModal.
+///
+/// The server answered `409 ambiguous_link` instead of adding anything, so
+/// nothing is saved until the user picks. Every candidate row toggles a
+/// checkmark; a "Select all" row above them checks the lot (or clears it when
+/// everything is already checked). **Add** re-posts the link with the chosen
+/// candidate ids and is disabled until at least one release is picked. Going
+/// back returns to the compose form / list picker with the note, lists, and
+/// reminder untouched — the next Add just asks the server again.
+private final class ReleasePickerViewController: UITableViewController {
+    /// Called with the selected candidate ids when the user taps Add.
+    var onAdd: (([String]) -> Void)?
+
+    private let message: String
+    private let candidates: [ShareViewController.AmbiguousLinkResponse.Candidate]
+    // Selection order is preserved so the posted ids match the tap order.
+    private var selectedIds: [String] = []
+
+    private lazy var addButton = UIBarButtonItem(
+        title: "Add", style: .done, target: self, action: #selector(didTapAdd)
+    )
+    private let spinner = UIActivityIndicatorView(style: .medium)
+    private var isPosting = false
+
+    init(message: String, candidates: [ShareViewController.AmbiguousLinkResponse.Candidate]) {
+        self.message = message
+        self.candidates = candidates
+        super.init(style: .plain)
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+
+    override func viewDidLoad() {
+        super.viewDidLoad()
+        title = "Releases"
+        // Same Winamp black playlist treatment as the list picker.
+        tableView.backgroundColor = OTBTheme.playlistBg
+        tableView.separatorColor = OTBTheme.navyBorder
+        tableView.tintColor = OTBTheme.accent // checkmark colour
+
+        // The server's "pick one or more" prompt, as a chrome banner above the
+        // playlist so the sudden extra screen explains itself.
+        let banner = UILabel()
+        banner.text = message
+        banner.font = OTBTheme.ui(13)
+        banner.textColor = .black
+        banner.numberOfLines = 0
+        let bannerWrap = BeveledView(style: .raised, fill: OTBTheme.chromePanel)
+        banner.translatesAutoresizingMaskIntoConstraints = false
+        bannerWrap.addSubview(banner)
+        NSLayoutConstraint.activate([
+            banner.topAnchor.constraint(equalTo: bannerWrap.topAnchor, constant: 10),
+            banner.bottomAnchor.constraint(equalTo: bannerWrap.bottomAnchor, constant: -10),
+            banner.leadingAnchor.constraint(equalTo: bannerWrap.leadingAnchor, constant: 12),
+            banner.trailingAnchor.constraint(equalTo: bannerWrap.trailingAnchor, constant: -12),
+        ])
+        bannerWrap.frame = CGRect(
+            x: 0,
+            y: 0,
+            width: tableView.bounds.width,
+            height: 1 // resized below once Auto Layout knows the text height
+        )
+        tableView.tableHeaderView = bannerWrap
+
+        navigationItem.rightBarButtonItem = addButton
+        addButton.isEnabled = false
+        // The bar is the blue title-bar gradient, so a default grey spinner all
+        // but disappears on it.
+        spinner.color = .white
+    }
+
+    override func viewDidLayoutSubviews() {
+        super.viewDidLayoutSubviews()
+        // Size the header banner to its text: table header views don't get
+        // Auto Layout for free, so measure and re-set when the height changes.
+        guard let header = tableView.tableHeaderView else { return }
+        let height = header.systemLayoutSizeFitting(
+            CGSize(width: tableView.bounds.width, height: UIView.layoutFittingCompressedSize.height),
+            withHorizontalFittingPriority: .required,
+            verticalFittingPriority: .fittingSizeLevel
+        ).height
+        if abs(header.frame.height - height) > 0.5 {
+            header.frame.size = CGSize(width: tableView.bounds.width, height: height)
+            tableView.tableHeaderView = header
+        }
+    }
+
+    /// While a post is in flight, swap Add for a spinner and lock the screen —
+    /// including the back button, so the request can't be re-entered.
+    func setPosting(_ posting: Bool) {
+        isPosting = posting
+        tableView.isUserInteractionEnabled = !posting
+        navigationItem.hidesBackButton = posting
+        if posting {
+            spinner.startAnimating()
+            navigationItem.rightBarButtonItem = UIBarButtonItem(customView: spinner)
+        } else {
+            spinner.stopAnimating()
+            navigationItem.rightBarButtonItem = addButton
+            addButton.isEnabled = !selectedIds.isEmpty
+        }
+    }
+
+    @objc private func didTapAdd() {
+        guard !selectedIds.isEmpty else { return }
+        onAdd?(selectedIds)
+    }
+
+    // Section 0: "Select all". Section 1: the candidates (checkmark = will be added).
+    override func numberOfSections(in tableView: UITableView) -> Int { 2 }
+
+    override func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
+        section == 0 ? 1 : candidates.count
+    }
+
+    override func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
+        if indexPath.section == 0 {
+            let cell = tableView.dequeueReusableCell(withIdentifier: "selectAll")
+                ?? UITableViewCell(style: .default, reuseIdentifier: "selectAll")
+            cell.backgroundColor = .clear
+            cell.textLabel?.font = OTBTheme.ui(14)
+            cell.textLabel?.textColor = OTBTheme.accent
+            cell.textLabel?.text = selectedIds.count == candidates.count ? "Select none" : "Select all"
+            cell.accessoryType = .none
+            let highlight = UIView()
+            highlight.backgroundColor = OTBTheme.playlistSelectedBg
+            cell.selectedBackgroundView = highlight
+            return cell
+        }
+
+        let cell = tableView.dequeueReusableCell(withIdentifier: "candidate")
+            ?? UITableViewCell(style: .subtitle, reuseIdentifier: "candidate")
+
+        cell.backgroundColor = .clear
+        let highlight = UIView()
+        highlight.backgroundColor = OTBTheme.playlistSelectedBg
+        cell.selectedBackgroundView = highlight
+
+        let candidate = candidates[indexPath.row]
+        cell.textLabel?.text = candidate.title
+        cell.textLabel?.font = OTBTheme.ui(14)
+        cell.textLabel?.textColor = OTBTheme.playlistText
+        cell.detailTextLabel?.text = candidate.artist
+        cell.detailTextLabel?.font = OTBTheme.ui(11)
+        cell.detailTextLabel?.textColor = OTBTheme.accent
+        cell.accessoryType = selectedIds.contains(candidate.candidateId) ? .checkmark : .none
+        return cell
+    }
+
+    /// Zebra-stripe the candidate rows, matching the playlist's alternating
+    /// row backgrounds (--playlist-bg / --playlist-bg-alt).
+    override func tableView(_ tableView: UITableView, willDisplay cell: UITableViewCell, forRowAt indexPath: IndexPath) {
+        guard indexPath.section == 1 else {
+            cell.backgroundColor = OTBTheme.playlistBg
+            return
+        }
+        cell.backgroundColor = indexPath.row.isMultiple(of: 2) ? OTBTheme.playlistBg : OTBTheme.playlistBgAlt
+    }
+
+    override func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
+        tableView.deselectRow(at: indexPath, animated: true)
+
+        if indexPath.section == 0 {
+            // Toggle between everything and nothing.
+            if selectedIds.count == candidates.count {
+                selectedIds = []
+            } else {
+                selectedIds = candidates.map(\.candidateId)
+            }
+            tableView.reloadData()
+            addButton.isEnabled = !selectedIds.isEmpty && !isPosting
+            return
+        }
+
+        toggle(candidates[indexPath.row].candidateId)
+        tableView.reloadRows(at: [indexPath], with: .none)
+        // The "Select all" label flips to "Select none" once everything's checked.
+        tableView.reloadSections(IndexSet(integer: 0), with: .none)
+    }
+
+    /// Add or remove a candidate id from the selection and re-gate Add.
+    private func toggle(_ id: String) {
+        if let index = selectedIds.firstIndex(of: id) {
+            selectedIds.remove(at: index)
+        } else {
+            selectedIds.append(id)
+        }
+        addButton.isEnabled = !selectedIds.isEmpty && !isPosting
     }
 }
 

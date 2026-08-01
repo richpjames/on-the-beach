@@ -39,6 +39,15 @@ for free by building the same targets with **Mac Catalyst** (see [Enable macOS
   a trip back to the first screen just to post. Whichever Add you tap, the same note,
   lists, and reminder are sent, and the in-flight spinner / error alert appear on the
   screen you're on.
+- **Sharing a page with several releases** (e.g. a best-of-the-year blog post) works
+  like the web app's link picker. The server answers `POST /api/ingest/link` with
+  `409 ambiguous_link` and the extracted candidates instead of adding anything; the
+  extension pushes a **release picker** (same Winamp-playlist styling as the list
+  picker) listing each release with a checkmark toggle and a "Select all" row. Its
+  Add button re-posts the same link with `selectedCandidateIds`, and the server
+  creates one item per chosen release — all filed into the same lists, with the same
+  note and reminder. Going back instead keeps everything typed so far and adds
+  nothing.
 - **Sharing an image** works the same way. When the payload is a photo rather than a
   link (e.g. a record cover shared from Photos), the extension shows the same compose
   form — with an image preview in place of the URL line — and the same note, list,

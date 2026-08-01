@@ -115,6 +115,12 @@ export interface CreateMusicItemInput {
   musicbrainzReleaseId?: string;
   musicbrainzArtistId?: string;
   selectedCandidateId?: string;
+  /**
+   * Multi-select counterpart to `selectedCandidateId`, used when a page names
+   * several releases and the client picked more than one — the share sheet's
+   * release picker sends these. One item is created per resolved candidate.
+   */
+  selectedCandidateIds?: string[];
 }
 
 export interface UpdateMusicItemInput {
