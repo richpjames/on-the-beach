@@ -372,6 +372,20 @@
       .filter(Boolean)
       .join(" · "),
   );
+
+  // The primary-source link (e.g. "Spotify", "Discogs") is a plain external
+  // link. Hide it when a play button already targets the same URL — otherwise
+  // it just duplicates that button (e.g. the "▶ YouTube" play button already
+  // links to the same YouTube page).
+  const playHrefs = $derived(
+    new Set(
+      [data.bandcampEmbed?.href, data.youtubeEmbed?.href, data.appleMusicListen?.href].filter(
+        (href): href is string => !!href,
+      ),
+    ),
+  );
+
+  const showSourceLink = $derived(!!data.sourceLink && !playHrefs.has(data.sourceLink.href));
 </script>
 
 <svelte:head>
@@ -456,14 +470,6 @@
               await api.updateMusicItem(item.id, { rating: next });
             }}
           />
-          {#if data.sourceLink}
-            <a
-              class="release-page__source-link"
-              href={data.sourceLink.href}
-              target="_blank"
-              rel="noopener noreferrer">{data.sourceLink.label}</a
-            >
-          {/if}
           <div class="release-page__actions">
             {#if data.bandcampEmbed}
               <button
@@ -503,6 +509,16 @@
                 data-am-mode="musickit"
                 onclick={() => listenLookupAppleMusic(lookupLink!.url)}
                 >▶ Apple Music</button
+              >
+            {/if}
+            {#if showSourceLink}
+              <a
+                class="release-page__link-btn"
+                href={data.sourceLink!.href}
+                target="_blank"
+                rel="noopener noreferrer"
+                title={data.sourceLink!.label}
+                aria-label={data.sourceLink!.label}>🔗</a
               >
             {/if}
             {#if lookupLink && !lookupIsPlayableAppleMusic}
