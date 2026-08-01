@@ -294,6 +294,24 @@ describe("POST /api/release/lookup", () => {
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({});
   });
+
+  test("no-ops under OTB_DISABLE_EXTERNAL_LOOKUPS", async () => {
+    process.env.OTB_DISABLE_EXTERNAL_LOOKUPS = "1";
+    try {
+      const app = makeApp();
+      const res = await app.request("http://localhost/api/release/lookup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ artist: "Radiohead", title: "OK Computer" }),
+      });
+      expect(res.status).toBe(200);
+      expect(await res.json()).toEqual({});
+      expect(mockLookupRelease).not.toHaveBeenCalled();
+      expect(mockFetchCoverArt).not.toHaveBeenCalled();
+    } finally {
+      delete process.env.OTB_DISABLE_EXTERNAL_LOOKUPS;
+    }
+  });
 });
 
 describe("POST /api/release/secondary-link-lookup/:id", () => {

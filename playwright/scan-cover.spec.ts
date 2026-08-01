@@ -55,6 +55,17 @@ test("scan prefill opens details and fills artist/release title", async ({ page 
     });
   });
 
+  // Submitting with artist + title filled triggers a MusicBrainz enrichment
+  // lookup before the create; keep it out of the loop so the test never rides
+  // on third-party availability.
+  await page.route("**/api/release/lookup", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({}),
+    });
+  });
+
   const fixturePath = path.join(process.cwd(), "playwright/fixtures/cover-sample.png");
 
   await page.locator("#scan-file-input").setInputFiles(fixturePath);

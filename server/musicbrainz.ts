@@ -38,10 +38,18 @@ const sleep = (ms: number): Promise<void> =>
 
 let gateTail: Promise<void> = Promise.resolve();
 
+// A wedged MusicBrainz connection would otherwise hang callers indefinitely —
+// fetch has no default timeout — and, worse, hold the gate shut for everyone
+// queued behind it.
+const MB_FETCH_TIMEOUT_MS = 15_000;
+
 function mbFetch(url: string): Promise<Response> {
   const gap = minRequestGapMs();
   const turn = gateTail.then(() =>
-    fetch(url, { headers: { "User-Agent": USER_AGENT, Accept: "application/json" } }),
+    fetch(url, {
+      headers: { "User-Agent": USER_AGENT, Accept: "application/json" },
+      signal: AbortSignal.timeout(MB_FETCH_TIMEOUT_MS),
+    }),
   );
   // The next caller waits for this request to finish plus the minimum gap.
   // Failures must not wedge the queue, so the tail swallows them — the
