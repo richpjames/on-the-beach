@@ -219,6 +219,8 @@ describe("artist watch settings", () => {
     expect(body.artistWatch.alertOnCatalogueAdditions).toBe(false);
     expect(body.artistWatch.scheduleAnnouncedReleases).toBe(true);
     expect(body.artistWatch.excludedSecondaryTypes).toContain("compilation");
+    // Off by default: every listened artist is watched until a bar is set.
+    expect(body.artistWatch.minArtistRating).toBe(0);
   });
 
   test("PUT round-trips the artist watch toggles", async () => {
@@ -232,6 +234,7 @@ describe("artist watch settings", () => {
         alertOnCatalogueAdditions: true,
         alertExcludedSecondaryTypes: ["Live", "Remix"],
         scheduleAnnouncedReleases: false,
+        alertMinArtistRating: 3.5,
       }),
     });
 
@@ -242,6 +245,20 @@ describe("artist watch settings", () => {
     expect(stored.alertOnCatalogueAdditions).toBe(true);
     expect(stored.excludedSecondaryTypes).toEqual(["live", "remix"]);
     expect(stored.scheduleAnnouncedReleases).toBe(false);
+    expect(stored.minArtistRating).toBe(3.5);
+  });
+
+  test("rejects a minimum rating outside the star scale", async () => {
+    const app = makeApp();
+    for (const alertMinArtistRating of [-1, 6, "four"]) {
+      const res = await app.request("http://localhost/api/settings", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ alertMinArtistRating }),
+      });
+      expect(res.status).toBe(400);
+    }
+    expect((await getArtistWatchSettings()).minArtistRating).toBe(0);
   });
 
   test("rejects a non-numeric freshness window rather than coercing it", async () => {

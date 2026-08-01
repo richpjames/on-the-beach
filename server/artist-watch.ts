@@ -210,21 +210,39 @@ export interface TrackedArtistRow {
  * wanting an artist's whole future output — a record sits in To Listen
  * precisely because you haven't formed that opinion yet. Listening is the
  * signal, and this predicate is the one place to widen it.
+ *
+ * With `min_artist_rating` set, the auto rule also demands a release rated at
+ * or above the bar — having merely listened stops being enough. The rated item
+ * needn't be the listened one; any release good enough to earn the rating
+ * vouches for the artist. `always` is an explicit user choice and bypasses the
+ * bar, exactly as it bypasses the listened-item rule.
  */
-function trackedArtistPredicate() {
+function trackedArtistPredicate(minArtistRating: number) {
   const hasListenedItem = sql`EXISTS (
     SELECT 1 FROM ${musicItems}
     WHERE ${musicItems.artistId} = ${artists.id}
       AND ${musicItems.listenStatus} = 'listened'
   )`;
 
+  const hasQualifyingRating = sql`EXISTS (
+    SELECT 1 FROM ${musicItems}
+    WHERE ${musicItems.artistId} = ${artists.id}
+      AND ${musicItems.rating} >= ${minArtistRating}
+  )`;
+
+  const autoTracked =
+    minArtistRating > 0 ? and(hasListenedItem, hasQualifyingRating) : hasListenedItem;
+
   return and(
     sql`${artists.followState} != 'muted'`,
-    or(eq(artists.followState, "always"), hasListenedItem),
+    or(eq(artists.followState, "always"), autoTracked),
   );
 }
 
-export async function listTrackedArtists(): Promise<TrackedArtistRow[]> {
+export async function listTrackedArtists(
+  settings?: ArtistWatchSettings,
+): Promise<TrackedArtistRow[]> {
+  const { minArtistRating } = settings ?? (await getArtistWatchSettings());
   return db
     .select({
       id: artists.id,
@@ -237,12 +255,16 @@ export async function listTrackedArtists(): Promise<TrackedArtistRow[]> {
       pollFailureCount: artists.pollFailureCount,
     })
     .from(artists)
-    .where(trackedArtistPredicate())
+    .where(trackedArtistPredicate(minArtistRating))
     .orderBy(asc(artists.name));
 }
 
 /** Tracked, identified artists whose `next_poll_at` has come round. */
-async function artistsDueForPoll(now: Date, limit: number): Promise<TrackedArtistRow[]> {
+async function artistsDueForPoll(
+  now: Date,
+  limit: number,
+  minArtistRating: number,
+): Promise<TrackedArtistRow[]> {
   return (
     db
       .select({
@@ -258,7 +280,7 @@ async function artistsDueForPoll(now: Date, limit: number): Promise<TrackedArtis
       .from(artists)
       .where(
         and(
-          trackedArtistPredicate(),
+          trackedArtistPredicate(minArtistRating),
           isNotNull(artists.musicbrainzArtistId),
           sql`${artists.musicbrainzArtistId} != ${VARIOUS_ARTISTS_MBID}`,
           inArray(artists.mbidConfidence, ["confirmed", "probable"]),
@@ -600,7 +622,7 @@ export async function sweepArtistReleases(now: Date = new Date()): Promise<Sweep
 
   // Tracked artists we still can't identify get a network resolution attempt,
   // at most once every 30 days each, sharing the sweep's request budget.
-  const trackedIds = new Set((await listTrackedArtists()).map((artist) => artist.id));
+  const trackedIds = new Set((await listTrackedArtists(settings)).map((artist) => artist.id));
   const resolutionQueue = (await artistsDueForResolution(now)).filter((id) => trackedIds.has(id));
 
   for (const artistId of resolutionQueue) {
@@ -616,7 +638,11 @@ export async function sweepArtistReleases(now: Date = new Date()): Promise<Sweep
     }
   }
 
-  const due = await artistsDueForPoll(now, MAX_ARTISTS_PER_SWEEP - requests);
+  const due = await artistsDueForPoll(
+    now,
+    MAX_ARTISTS_PER_SWEEP - requests,
+    settings.minArtistRating,
+  );
 
   for (const artist of due) {
     if (requests >= MAX_ARTISTS_PER_SWEEP) break;

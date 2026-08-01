@@ -10,6 +10,7 @@ import {
   RELEASE_LENGTH_PREFERENCES,
   getArtistWatchSettings,
   setArtistWatchSettings,
+  MAX_STAR_RATING,
   type ArtistWatchSettings,
 } from "../settings";
 import { ensureSuggestionsForToListenArtists } from "../suggestions";
@@ -42,6 +43,19 @@ function readArtistWatchUpdate(
       return { error: "alertFreshnessMonths must be a non-negative number" };
     }
     update.freshnessMonths = months;
+  }
+
+  if (body.alertMinArtistRating !== undefined) {
+    const rating = body.alertMinArtistRating;
+    if (
+      typeof rating !== "number" ||
+      !Number.isFinite(rating) ||
+      rating < 0 ||
+      rating > MAX_STAR_RATING
+    ) {
+      return { error: `alertMinArtistRating must be a number between 0 and ${MAX_STAR_RATING}` };
+    }
+    update.minArtistRating = rating;
   }
 
   if (body.alertExcludedSecondaryTypes !== undefined) {
