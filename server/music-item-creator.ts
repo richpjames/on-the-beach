@@ -200,15 +200,27 @@ async function insertMusicItemWithLink(
   return item;
 }
 
-function resolveSelectedCandidate(
+/**
+ * The candidates a client explicitly picked, in selection order. Accepts both
+ * the single `selectedCandidateId` (web link picker resubmits one at a time)
+ * and the plural `selectedCandidateIds` (the share sheet's release picker
+ * posts its whole selection in one request). Unknown ids are dropped — a
+ * candidate list is regenerated per scrape, so a stale id just falls through
+ * to the ambiguous flow again rather than erroring.
+ */
+function resolveSelectedCandidates(
   candidates: ReleaseCandidateInput[],
-  selectedCandidateId: string | undefined,
-): ReleaseCandidateInput | null {
-  if (!selectedCandidateId) {
-    return null;
+  overrides: Partial<CreateMusicItemInput> | undefined,
+): ReleaseCandidateInput[] {
+  const ids: string[] = [];
+  if (overrides?.selectedCandidateId) ids.push(overrides.selectedCandidateId);
+  for (const id of overrides?.selectedCandidateIds ?? []) {
+    if (typeof id === "string" && id && !ids.includes(id)) ids.push(id);
   }
 
-  return candidates.find((candidate) => candidate.candidateId === selectedCandidateId) ?? null;
+  return ids
+    .map((id) => candidates.find((candidate) => candidate.candidateId === id))
+    .filter((candidate): candidate is ReleaseCandidateInput => candidate != null);
 }
 
 async function resolveReleaseCandidates(
@@ -260,12 +272,10 @@ async function resolveReleaseCandidates(
     throw new UnsupportedMusicLinkError("Couldn't extract a release from this link");
   }
 
-  const selectedCandidate = resolveSelectedCandidate(
-    extractedCandidates,
-    overrides?.selectedCandidateId,
-  );
+  const selectedCandidates = resolveSelectedCandidates(extractedCandidates, overrides);
 
-  if (selectedCandidate) {
+  if (selectedCandidates.length === 1) {
+    const selectedCandidate = selectedCandidates[0]!;
     return {
       normalizedUrl: parsed.normalizedUrl,
       source: parsed.source,
@@ -277,6 +287,17 @@ async function resolveReleaseCandidates(
           itemType: overrides?.itemType ?? selectedCandidate.itemType,
         },
       ],
+    };
+  }
+
+  if (selectedCandidates.length > 1) {
+    // Several releases picked from one page: create each as extracted. The
+    // title/artist/itemType overrides are per-item corrections, so they only
+    // make sense for a single selection and are ignored here.
+    return {
+      normalizedUrl: parsed.normalizedUrl,
+      source: parsed.source,
+      candidates: selectedCandidates,
     };
   }
 

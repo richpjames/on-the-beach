@@ -372,6 +372,115 @@ describe("POST /api/ingest/link with list and notes", () => {
   });
 });
 
+describe("POST /api/ingest/link with multiple releases", () => {
+  const originalEnv = { ...process.env };
+  const url = "https://blog.example.com/best-albums-2026";
+
+  const ambiguousPayload = {
+    kind: "ambiguous_link" as const,
+    url,
+    message: "This link mentions several releases. Pick one or more to add.",
+    candidates: [
+      { candidateId: "first-album", artist: "Artist A", title: "First Album" },
+      { candidateId: "second-album", artist: "Artist B", title: "Second Album" },
+    ],
+  };
+
+  beforeEach(() => {
+    process.env.INGEST_API_KEY = "test-secret";
+    delete process.env.INGEST_ENABLED;
+    mockCreateMany.mockReset();
+    mockResolveOrCreateStack.mockReset();
+    mockAttachItemToStack.mockReset();
+    mockSetItemReminder.mockReset();
+  });
+
+  afterEach(() => {
+    process.env = { ...originalEnv };
+  });
+
+  it("returns 409 with the candidates when the page is ambiguous", async () => {
+    mockCreateMany.mockRejectedValue(new realCreator.AmbiguousLinkSelectionError(ambiguousPayload));
+
+    const app = makeApp();
+    const res = await makeLinkRequest(app, { url }, { apiKey: "test-secret" });
+
+    expect(res.status).toBe(409);
+    const body = await res.json();
+    expect(body.kind).toBe("ambiguous_link");
+    expect(body.url).toBe(url);
+    expect(body.candidates).toHaveLength(2);
+    expect(body.candidates[0].candidateId).toBe("first-album");
+  });
+
+  it("passes selectedCandidateIds through to the item creator", async () => {
+    mockCreateMany.mockResolvedValue([
+      { item: { id: 1, title: "First Album", primary_url: url } as any, created: true },
+      { item: { id: 2, title: "Second Album", primary_url: url } as any, created: true },
+    ]);
+
+    const app = makeApp();
+    const res = await makeLinkRequest(
+      app,
+      { url, selectedCandidateIds: ["first-album", "second-album"] },
+      { apiKey: "test-secret" },
+    );
+
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(mockCreateMany).toHaveBeenCalledWith(url, {
+      selectedCandidateIds: ["first-album", "second-album"],
+    });
+    expect(body.items_created).toBe(2);
+    expect(body.items).toHaveLength(2);
+  });
+
+  it("trims, drops blanks, and de-dupes the selected candidate ids", async () => {
+    mockCreateMany.mockResolvedValue([
+      { item: { id: 1, title: "First Album", primary_url: url } as any, created: true },
+    ]);
+
+    const app = makeApp();
+    const res = await makeLinkRequest(
+      app,
+      { url, selectedCandidateIds: ["first-album", " first-album ", "", 7, null] },
+      { apiKey: "test-secret" },
+    );
+
+    expect(res.status).toBe(200);
+    expect(mockCreateMany).toHaveBeenCalledWith(url, {
+      selectedCandidateIds: ["first-album"],
+    });
+  });
+
+  it("files every created item into the chosen lists and applies the reminder", async () => {
+    mockCreateMany.mockResolvedValue([
+      { item: { id: 1, title: "First Album", primary_url: url } as any, created: true },
+      { item: { id: 2, title: "Second Album", primary_url: url } as any, created: true },
+    ]);
+    mockResolveOrCreateStack.mockResolvedValue({ id: 3, name: "Jazz finds" });
+
+    const app = makeApp();
+    const res = await makeLinkRequest(
+      app,
+      {
+        url,
+        selectedCandidateIds: ["first-album", "second-album"],
+        listName: "Jazz finds",
+        remindAt: "2026-08-15",
+      },
+      { apiKey: "test-secret" },
+    );
+
+    expect(res.status).toBe(200);
+    expect(mockAttachItemToStack).toHaveBeenCalledWith(1, 3);
+    expect(mockAttachItemToStack).toHaveBeenCalledWith(2, 3);
+    expect(mockSetItemReminder).toHaveBeenCalledTimes(2);
+    expect(mockSetItemReminder).toHaveBeenCalledWith(1, new Date("2026-08-15"));
+    expect(mockSetItemReminder).toHaveBeenCalledWith(2, new Date("2026-08-15"));
+  });
+});
+
 describe("POST /api/ingest/link with a scheduled date", () => {
   const originalEnv = { ...process.env };
   const url = "https://artist.bandcamp.com/album/cool-album";
@@ -1133,7 +1242,11 @@ describe("POST /api/ingest/photo", () => {
     mockCreateDirect.mockResolvedValue({ item: { id: 1, title: "Untitled" }, created: true });
 
     const app = makeApp();
-    const res = await makePhotoRequest(app, { imageBase64: validBase64 }, { apiKey: "test-secret" });
+    const res = await makePhotoRequest(
+      app,
+      { imageBase64: validBase64 },
+      { apiKey: "test-secret" },
+    );
 
     expect(res.status).toBe(200);
     const body = await res.json();

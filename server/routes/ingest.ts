@@ -1,7 +1,11 @@
 import { Hono } from "hono";
 import { asc, count, eq } from "drizzle-orm";
 import { extractMusicUrls } from "../email-parser";
-import { createMusicItemDirect, createMusicItemsFromUrl } from "../music-item-creator";
+import {
+  AmbiguousLinkSelectionError,
+  createMusicItemDirect,
+  createMusicItemsFromUrl,
+} from "../music-item-creator";
 import { scheduleAppleMusicBackfill } from "../apple-music-backfill";
 import { isValidUrl } from "../utils";
 import { saveImageFromBase64, validateImageBase64 } from "../uploads";
@@ -137,6 +141,28 @@ function parseRemindAt(body: unknown): { date: Date | null } | { error: string }
   const date = new Date(remindAt);
   if (isNaN(date.getTime())) return { error: "remindAt must be a valid date" };
   return { date };
+}
+
+/**
+ * Gather the release candidate ids a /link request selected — the share
+ * sheet's second POST after a multi-release page came back as 409
+ * `ambiguous_link`. Trims each, drops blanks/non-strings, and de-dupes.
+ */
+function collectSelectedCandidateIds(body: unknown): string[] {
+  if (!body || typeof body !== "object") return [];
+  const { selectedCandidateIds } = body as Record<string, unknown>;
+  if (!Array.isArray(selectedCandidateIds)) return [];
+
+  const seen = new Set<string>();
+  const ids: string[] = [];
+  for (const value of selectedCandidateIds) {
+    if (typeof value !== "string") continue;
+    const trimmed = value.trim();
+    if (!trimmed || seen.has(trimmed)) continue;
+    seen.add(trimmed);
+    ids.push(trimmed);
+  }
+  return ids;
 }
 
 /**
@@ -331,6 +357,11 @@ export function createIngestRoutes(deps: IngestRoutesDeps = {}): Hono {
     const overrides: Partial<CreateMusicItemInput> = {};
     if (notes) overrides.notes = notes;
 
+    // The share sheet's answer to an earlier `ambiguous_link` response: which
+    // of the page's releases to add. One item is created per selected id.
+    const selectedCandidateIds = collectSelectedCandidateIds(body);
+    if (selectedCandidateIds.length) overrides.selectedCandidateIds = selectedCandidateIds;
+
     try {
       const results = Object.keys(overrides).length
         ? await createMusicItemsFromUrl(url, overrides)
@@ -375,6 +406,13 @@ export function createIngestRoutes(deps: IngestRoutesDeps = {}): Hono {
         lists,
       });
     } catch (err) {
+      if (err instanceof AmbiguousLinkSelectionError) {
+        // The page names several releases and none stood out as primary. Hand
+        // the candidates back (same 409 shape as POST /api/music-items) so the
+        // share sheet can show its release picker and re-post a selection.
+        return c.json(err.payload, 409);
+      }
+
       console.error(`[api] POST /api/ingest/link failed for ${url}:`, err);
       return c.json({ error: "Failed to create item" }, 422);
     }
