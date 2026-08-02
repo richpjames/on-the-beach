@@ -10,11 +10,19 @@
     itemId,
     rating,
     className = "",
+    label = "Rating",
     onRate,
   }: {
-    itemId: number;
+    /**
+     * The item being rated, stamped as `data-item-id` for the list code that
+     * scrolls to a card. Omitted when the stars aren't attached to an item —
+     * the settings page uses them to pick a threshold, not to rate anything.
+     */
+    itemId?: number;
     rating: number | null;
     className?: string;
+    /** Group label for screen readers; override when it isn't an item rating. */
+    label?: string;
     /** Persist the new rating; throw to roll back the optimistic update. */
     onRate: (next: number | null) => Promise<void>;
   } = $props();
@@ -88,7 +96,7 @@
   data-item-id={itemId}
   data-rating-value={selected ?? ""}
   role="group"
-  aria-label="Rating"
+  aria-label={label}
   onpointerleave={onPointerLeave}
 >
   {#each stars as value (value)}

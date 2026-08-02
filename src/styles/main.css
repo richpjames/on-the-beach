@@ -4175,6 +4175,30 @@ a:hover {
   flex-wrap: wrap;
 }
 
+/* The stars are the only interactive part of the row, so the row itself no
+   longer offers a label's pointer. */
+.settings__option--stars {
+  cursor: default;
+}
+
+/* The bar's value in words, beside the stars: five glyphs can't show "off",
+   and "3.5" is quicker to read than it is to count. */
+.settings__value {
+  font-size: var(--text-sm);
+  color: var(--chrome-darker);
+}
+
+/* Narrow screens: give the sentence, the stars and the value a line each.
+   Left to wrap, the phrase breaks mid-clause around the star block and the
+   24px targets end up crowded against the text. */
+@media (max-width: 520px) {
+  .settings__option--stars {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--space-1);
+  }
+}
+
 .settings__number {
   width: 60px;
   padding: 2px 4px;

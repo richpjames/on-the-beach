@@ -3,6 +3,7 @@
   import { apiFetch } from "$lib/api";
   import { musickit, authorize, unauthorize, ensureConfigured } from "$lib/musickit.svelte";
   import { api } from "$lib/api";
+  import StarRating from "$lib/components/StarRating.svelte";
   import type { LookupService, ReleaseLengthPreference } from "../../../server/settings";
   import type { ArtistFollowState, MbArtistCandidateView, TrackedArtist } from "../../types";
 
@@ -121,6 +122,15 @@
   // svelte-ignore state_referenced_locally
   let watch = $state({ ...data.artistWatch });
   let watchStatusMessage = $state("");
+
+  // The stars can't paint 0 — the control's own "off" is null — so the bar's
+  // value is spelled out beside them. It also carries the only cue for how to
+  // get back to off, which is the same gesture as clearing a record's rating.
+  const minArtistRatingLabel = $derived(
+    watch.minArtistRating > 0
+      ? `${watch.minArtistRating} star${watch.minArtistRating === 1 ? "" : "s"} (click again to clear)`
+      : "no bar — any artist you've listened to"
+  );
 
   async function saveWatch(update: Record<string, unknown>): Promise<void> {
     watchStatusMessage = "Saving…";
@@ -365,21 +375,17 @@
           />
           <span>months</span>
         </label>
-        <label class="settings__option settings__option--field">
+        <div class="settings__option settings__option--field settings__option--stars">
           <span>Only watch artists with a release rated at least</span>
-          <input
-            type="number"
-            class="settings__number"
-            name="min-artist-rating"
-            min="0"
-            max="5"
-            step="0.5"
-            value={watch.minArtistRating}
-            onchange={(event) =>
-              saveWatch({ alertMinArtistRating: Number(event.currentTarget.value) })}
+          <StarRating
+            rating={watch.minArtistRating > 0 ? watch.minArtistRating : null}
+            label="Minimum artist rating"
+            onRate={(next) => saveWatch({ alertMinArtistRating: next ?? 0 })}
           />
-          <span>stars (0 = any artist you've listened to)</span>
-        </label>
+          <span class="settings__value" data-min-artist-rating={watch.minArtistRating}>
+            {minArtistRatingLabel}
+          </span>
+        </div>
       </form>
       <p id="artist-watch-status" class="settings__status" role="status" aria-live="polite">
         {watchStatusMessage}
