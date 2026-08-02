@@ -37,7 +37,6 @@
 {#if !isReleasePage}
   <footer class="footer">
     <span id="app-version">v{__APP_VERSION__}</span>
-    <a class="footer__settings-link" href="/settings">Settings</a>
   </footer>
 {/if}
 

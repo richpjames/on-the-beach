@@ -243,6 +243,9 @@
           {/if}
         </a>
         <div class="start-menu__divider" role="separator"></div>
+        <a class="start-menu__item" role="menuitem" href="/settings" onclick={closeStartMenu}>
+          <span class="start-menu__icon" aria-hidden="true">⚙️</span>Settings
+        </a>
         <a class="start-menu__item" role="menuitem" href="/feed/to-listen.rss" onclick={closeStartMenu}>
           <span class="start-menu__icon" aria-hidden="true">📡</span>RSS feed
         </a>

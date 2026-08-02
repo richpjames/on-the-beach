@@ -3762,16 +3762,6 @@ a:hover {
 }
 
 /* ── Settings page ──────────────────────────────────────────────────────── */
-.footer__settings-link {
-  margin-left: auto;
-  color: var(--chrome-darker);
-  text-decoration: none;
-}
-
-.footer__settings-link:hover {
-  text-decoration: underline;
-}
-
 .settings {
   max-width: 560px;
   margin: 0 auto;
