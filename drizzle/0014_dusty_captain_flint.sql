@@ -1,0 +1,1 @@
+ALTER TABLE `item_suggestions` ADD `musicbrainz_release_group_id` text;

@@ -233,6 +233,7 @@ export interface ItemSuggestion {
   itemType: string;
   year: number | null;
   musicbrainzReleaseId: string | null;
+  musicbrainzReleaseGroupId: string | null;
   status: string;
   createdAt: string;
 }

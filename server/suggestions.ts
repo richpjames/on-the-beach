@@ -1,7 +1,7 @@
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, isNotNull, isNull } from "drizzle-orm";
 import { db } from "./db/index";
 import { musicItems, artists, itemSuggestions } from "./db/schema";
-import { findSuggestedRelease } from "./musicbrainz";
+import { fetchReleaseGroupIdForRelease, findSuggestedRelease } from "./musicbrainz";
 import { getReleaseLengthPreference } from "./settings";
 import { normalize } from "./utils";
 
@@ -38,6 +38,7 @@ export interface StoredSuggestion {
   itemType: string;
   year: number | null;
   musicbrainzReleaseId: string | null;
+  musicbrainzReleaseGroupId: string | null;
   status: string;
   createdAt: Date;
 }
@@ -183,6 +184,7 @@ async function fetchAndStoreSuggestionLocked(
       itemType: suggestion.itemType,
       year: suggestion.year,
       musicbrainzReleaseId: suggestion.musicbrainzReleaseId,
+      musicbrainzReleaseGroupId: suggestion.musicbrainzReleaseGroupId,
       status: "pending",
     });
     emptyLookupBackoff.delete(backoffKey);
@@ -273,6 +275,55 @@ function sweepThrottleMs(): number {
   return Number.isFinite(fromEnv) && fromEnv >= 0 ? fromEnv : 2_500;
 }
 
+/** How many release-group backfills one sweep will spend MB requests on. */
+const BACKFILL_BATCH_SIZE = 25;
+
+/**
+ * Fill in `musicbrainzReleaseGroupId` for pending suggestions stored before it
+ * was captured. Without it the prompt can only ask Cover Art Archive for the
+ * exact pressing, which usually has no scan — and a pending suggestion sticks
+ * around until it's accepted or dismissed, so these would otherwise stay
+ * artwork-less indefinitely. Failures are left for the next sweep.
+ */
+export async function backfillSuggestionReleaseGroups(
+  limit = BACKFILL_BATCH_SIZE,
+): Promise<number> {
+  if (process.env.OTB_DISABLE_EXTERNAL_LOOKUPS) return 0;
+
+  const rows = await db
+    .select({ id: itemSuggestions.id, releaseId: itemSuggestions.musicbrainzReleaseId })
+    .from(itemSuggestions)
+    .where(
+      and(
+        eq(itemSuggestions.status, "pending"),
+        isNotNull(itemSuggestions.musicbrainzReleaseId),
+        isNull(itemSuggestions.musicbrainzReleaseGroupId),
+      ),
+    )
+    .limit(limit);
+
+  let filled = 0;
+  for (const row of rows) {
+    if (!row.releaseId) continue;
+    try {
+      const groupId = await fetchReleaseGroupIdForRelease(row.releaseId);
+      if (!groupId) continue;
+      await db
+        .update(itemSuggestions)
+        .set({ musicbrainzReleaseGroupId: groupId })
+        .where(eq(itemSuggestions.id, row.id));
+      filled += 1;
+    } catch (err) {
+      console.error("[suggestions] release-group backfill failed for suggestion", row.id, err);
+    }
+  }
+
+  if (filled > 0) {
+    console.log(`[suggestions] backfilled release-group id for ${filled} suggestion(s)`);
+  }
+  return filled;
+}
+
 /**
  * Ensure every artist with at least one 'to-listen' item has a pending
  * suggestion ready. Runs on startup and hourly (see hooks.server.ts) so items
@@ -282,6 +333,11 @@ function sweepThrottleMs(): number {
  */
 export async function ensureSuggestionsForToListenArtists(): Promise<void> {
   if (process.env.OTB_DISABLE_EXTERNAL_LOOKUPS) return;
+
+  // Suggestions already on file come first: an artist with a pending
+  // suggestion is skipped below, so this is the only thing that gets their
+  // artwork working. The shared MB request gate paces these.
+  await backfillSuggestionReleaseGroups();
 
   const candidates = await db
     .selectDistinct({

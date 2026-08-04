@@ -192,6 +192,7 @@ export const itemSuggestions = sqliteTable(
     itemType: text("item_type").notNull().default("album"),
     year: integer("year"),
     musicbrainzReleaseId: text("musicbrainz_release_id"),
+    musicbrainzReleaseGroupId: text("musicbrainz_release_group_id"),
     status: text("status").notNull().default("pending"),
     createdAt: integer("created_at", { mode: "timestamp" })
       .notNull()

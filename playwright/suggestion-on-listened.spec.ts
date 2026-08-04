@@ -60,6 +60,121 @@ test("suggestion modal appears when a release is marked listened on the release 
   expect(position).toBe("fixed");
 });
 
+// A 1x1 transparent PNG, enough for the browser to treat a request as loaded.
+const PIXEL_PNG = Buffer.from(
+  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
+  "base64",
+);
+
+/**
+ * Show the modal for a suggestion carrying the given MusicBrainz ids, by
+ * standing in for the PATCH that surfaces one when an item is marked listened.
+ */
+async function openSuggestionWithIds(
+  page: import("@playwright/test").Page,
+  item: { id: number },
+  ids: { musicbrainzReleaseId: string | null; musicbrainzReleaseGroupId: string | null },
+): Promise<void> {
+  await page.route(`**/api/music-items/${item.id}`, async (route) => {
+    if (route.request().method() !== "PATCH") {
+      await route.fallback();
+      return;
+    }
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        item: { ...item, listen_status: "listened" },
+        suggestion: {
+          id: 999,
+          sourceItemId: item.id,
+          title: "Tri Repetae",
+          artistName: "Autechre",
+          itemType: "album",
+          year: 1995,
+          status: "pending",
+          createdAt: new Date().toISOString(),
+          ...ids,
+        },
+      }),
+    });
+  });
+
+  await page.goto(`/r/${item.id}`);
+  await expect(page.locator("#status-select")).toBeVisible();
+  await page.locator("#status-select").selectOption("listened");
+  await expect(page.locator("#suggestion-picker-modal")).toBeVisible({ timeout: 5_000 });
+}
+
+test("suggestion artwork comes from the release group, which Cover Art Archive actually has", async ({
+  page,
+  request,
+}) => {
+  const res = await request.post("/api/music-items", {
+    data: { title: "Amber", artistName: "Autechre", listenStatus: "to-listen", year: 1994 },
+  });
+  const item = await res.json();
+
+  const requested: string[] = [];
+  await page.route("https://coverartarchive.org/**", async (route) => {
+    requested.push(route.request().url());
+    // Mirror the real thing: the individual pressing has no scan, the group does.
+    if (route.request().url().includes("/release-group/")) {
+      await route.fulfill({ status: 200, contentType: "image/png", body: PIXEL_PNG });
+      return;
+    }
+    await route.fulfill({ status: 404, contentType: "text/plain", body: "Not Found" });
+  });
+
+  await openSuggestionWithIds(page, item, {
+    musicbrainzReleaseId: "release-uuid",
+    musicbrainzReleaseGroupId: "release-group-uuid",
+  });
+
+  const artwork = page.locator(".suggestion-picker__artwork");
+  await expect(artwork).toBeVisible();
+  await expect
+    .poll(() =>
+      requested.some((url) => url.includes("/release-group/release-group-uuid/front-250")),
+    )
+    .toBe(true);
+  // The group answered, so the sparse per-release endpoint is never asked.
+  expect(requested.some((url) => url.includes("/release/release-uuid/"))).toBe(false);
+});
+
+test("suggestion artwork falls back to the release when the group has none", async ({
+  page,
+  request,
+}) => {
+  const res = await request.post("/api/music-items", {
+    data: { title: "Amber", artistName: "Autechre", listenStatus: "to-listen", year: 1994 },
+  });
+  const item = await res.json();
+
+  await page.route("https://coverartarchive.org/**", async (route) => {
+    if (route.request().url().includes("/release-group/")) {
+      await route.fulfill({ status: 404, contentType: "text/plain", body: "Not Found" });
+      return;
+    }
+    await route.fulfill({ status: 200, contentType: "image/png", body: PIXEL_PNG });
+  });
+
+  await openSuggestionWithIds(page, item, {
+    musicbrainzReleaseId: "release-uuid",
+    musicbrainzReleaseGroupId: "release-group-uuid",
+  });
+
+  const artwork = page.locator(".suggestion-picker__artwork");
+  await expect(artwork).toHaveAttribute(
+    "src",
+    "https://coverartarchive.org/release/release-uuid/front-250",
+    { timeout: 5_000 },
+  );
+  await expect
+    .poll(() => artwork.evaluate((img: HTMLImageElement) => img.naturalWidth > 0))
+    .toBe(true);
+});
+
 test("accepting a suggestion adds the release to the to-listen list", async ({ page, request }) => {
   const res = await request.post("/api/music-items", {
     data: { title: "Amber", artistName: "Autechre", listenStatus: "to-listen", year: 1994 },

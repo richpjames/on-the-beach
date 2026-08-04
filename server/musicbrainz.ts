@@ -118,6 +118,18 @@ export interface SuggestedRelease {
   itemType: string;
   year: number | null;
   musicbrainzReleaseId: string | null;
+  /**
+   * The release's parent release-group. Cover Art Archive coverage is far
+   * better at group level than for an individual pressing — most of an
+   * artist's releases are editions nobody uploaded a scan for — so this is
+   * what the suggestion prompt asks for artwork with.
+   */
+  musicbrainzReleaseGroupId: string | null;
+}
+
+interface MbReleaseGroupStub {
+  id?: unknown;
+  "primary-type"?: unknown;
 }
 
 interface MbArtistRelease {
@@ -125,6 +137,7 @@ interface MbArtistRelease {
   title?: unknown;
   date?: unknown;
   "primary-type"?: unknown;
+  "release-group"?: MbReleaseGroupStub;
   media?: unknown;
 }
 
@@ -193,8 +206,11 @@ async function fetchArtistMbid(artistName: string): Promise<string | null> {
 
 async function fetchArtistReleases(mbid: string): Promise<MbArtistRelease[]> {
   // `media` rides along so each release carries its track counts — the
-  // release-length preference needs them to rank candidates.
-  const params = new URLSearchParams({ inc: "releases+media", fmt: "json" });
+  // release-length preference needs them to rank candidates. `release-groups`
+  // nests each release's group inside it, which carries the group MBID (for
+  // Cover Art Archive lookups) and the real `primary-type` — releases have no
+  // primary type of their own, so without it every suggestion read as "album".
+  const params = new URLSearchParams({ inc: "releases+media+release-groups", fmt: "json" });
   const url = `${MB_API_BASE}/artist/${mbid}?${params}`;
   const response = await mbFetch(url);
   if (!response.ok) {
@@ -254,13 +270,20 @@ export async function findSuggestedRelease(opts: {
     return null;
   }
 
-  const ranked = candidates.map((r) => ({
-    title: r.title as string,
-    year: parseYear(r.date),
-    trackCount: parseTrackCount(r.media),
-    musicbrainzReleaseId: typeof r.id === "string" ? r.id : null,
-    itemType: typeof r["primary-type"] === "string" ? r["primary-type"].toLowerCase() : "album",
-  }));
+  const ranked = candidates.map((r) => {
+    const group = r["release-group"];
+    // The group's primary type is the authoritative one; the release-level
+    // field is only ever present in hand-written fixtures.
+    const primaryType = group?.["primary-type"] ?? r["primary-type"];
+    return {
+      title: r.title as string,
+      year: parseYear(r.date),
+      trackCount: parseTrackCount(r.media),
+      musicbrainzReleaseId: typeof r.id === "string" ? r.id : null,
+      musicbrainzReleaseGroupId: typeof group?.id === "string" ? group.id : null,
+      itemType: typeof primaryType === "string" ? primaryType.toLowerCase() : "album",
+    };
+  });
 
   const byYear = (a: { year: number | null }, b: { year: number | null }): number => {
     if (sourceYear === null) {
@@ -290,6 +313,28 @@ export async function findSuggestedRelease(opts: {
   });
 
   return picked;
+}
+
+/**
+ * The release-group MBID a release belongs to. Used to backfill suggestions
+ * stored before the group id was captured, so their artwork lookups can move
+ * off the sparsely-covered per-release endpoint.
+ *
+ * Returns null when MB has no group for the release; throws on transport or
+ * non-2xx responses so the caller can leave the row alone and retry later.
+ */
+export async function fetchReleaseGroupIdForRelease(releaseId: string): Promise<string | null> {
+  const params = new URLSearchParams({ inc: "release-groups", fmt: "json" });
+  const response = await mbFetch(`${MB_API_BASE}/release/${releaseId}?${params}`);
+  if (!response.ok) {
+    throw new MusicBrainzHttpError(
+      response.status,
+      `MusicBrainz release lookup returned ${response.status} for ${releaseId}`,
+    );
+  }
+  const data = (await response.json()) as { "release-group"?: MbReleaseGroupStub };
+  const id = data["release-group"]?.id;
+  return typeof id === "string" ? id : null;
 }
 
 // ---------------------------------------------------------------------------
