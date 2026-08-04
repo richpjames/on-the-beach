@@ -2,6 +2,7 @@ import { afterEach, describe, expect, mock, spyOn, test } from "bun:test";
 import {
   lookupRelease,
   findSuggestedRelease,
+  fetchReleaseGroupIdForRelease,
   fetchArtistReleaseGroups,
   searchArtistCandidates,
   MusicBrainzHttpError,
@@ -248,7 +249,7 @@ describe("findSuggestedRelease", () => {
     expect(result?.title).toBe("Tri Repetae");
   });
 
-  test("requests media with the artist's releases", async () => {
+  test("requests media and release groups with the artist's releases", async () => {
     const fetchSpy = spyOn(globalThis, "fetch").mockResolvedValueOnce(
       makeMbArtistReleasesResponse([]),
     );
@@ -261,7 +262,67 @@ describe("findSuggestedRelease", () => {
     });
 
     const [url] = fetchSpy.mock.calls[0] as [string, RequestInit];
-    expect(url).toContain("inc=releases%2Bmedia");
+    expect(url).toContain("inc=releases%2Bmedia%2Brelease-groups");
+  });
+
+  test("carries the release group's MBID so artwork can be looked up at group level", async () => {
+    spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      makeMbArtistReleasesResponse([
+        {
+          id: "r1",
+          title: "Tri Repetae",
+          date: "1995",
+          "release-group": { id: "rg1", "primary-type": "Album" },
+        },
+      ]),
+    );
+
+    const result = await findSuggestedRelease({
+      mbArtistId: "artist-uuid",
+      artistName: "Autechre",
+      trackedTitles: new Set(),
+      sourceYear: 1995,
+    });
+
+    expect(result?.musicbrainzReleaseGroupId).toBe("rg1");
+  });
+
+  test("takes itemType from the release group — releases have no primary type", async () => {
+    spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      makeMbArtistReleasesResponse([
+        {
+          id: "r1",
+          title: "Anvil Vapre",
+          date: "1995",
+          "release-group": { id: "rg1", "primary-type": "EP" },
+        },
+      ]),
+    );
+
+    const result = await findSuggestedRelease({
+      mbArtistId: "artist-uuid",
+      artistName: "Autechre",
+      trackedTitles: new Set(),
+      sourceYear: 1995,
+    });
+
+    expect(result?.itemType).toBe("ep");
+  });
+
+  test("leaves the release group MBID null when MusicBrainz omits the group", async () => {
+    spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      makeMbArtistReleasesResponse([{ id: "r1", title: "Tri Repetae", date: "1995" }]),
+    );
+
+    const result = await findSuggestedRelease({
+      mbArtistId: "artist-uuid",
+      artistName: "Autechre",
+      trackedTitles: new Set(),
+      sourceYear: 1995,
+    });
+
+    expect(result?.musicbrainzReleaseGroupId).toBeNull();
+    expect(result?.itemType).toBe("album");
   });
 
   test("throws on fetch error so callers can distinguish failure from no-candidates", async () => {
@@ -288,6 +349,43 @@ describe("findSuggestedRelease", () => {
         sourceYear: 1995,
       }),
     ).rejects.toThrow("503");
+  });
+});
+
+describe("fetchReleaseGroupIdForRelease", () => {
+  afterEach(() => {
+    mock.restore();
+  });
+
+  test("returns the release's parent group MBID", async () => {
+    const fetchSpy = spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      new Response(JSON.stringify({ id: "r1", "release-group": { id: "rg1" } }), {
+        headers: { "content-type": "application/json" },
+      }),
+    );
+
+    const result = await fetchReleaseGroupIdForRelease("r1");
+
+    const [url] = fetchSpy.mock.calls[0] as [string, RequestInit];
+    expect(url).toContain("/release/r1?");
+    expect(url).toContain("inc=release-groups");
+    expect(result).toBe("rg1");
+  });
+
+  test("returns null when the release carries no group", async () => {
+    spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      new Response(JSON.stringify({ id: "r1" }), {
+        headers: { "content-type": "application/json" },
+      }),
+    );
+
+    expect(await fetchReleaseGroupIdForRelease("r1")).toBeNull();
+  });
+
+  test("throws on a non-2xx response so the caller can retry later", async () => {
+    spyOn(globalThis, "fetch").mockResolvedValueOnce(new Response("rate limited", { status: 503 }));
+
+    expect(fetchReleaseGroupIdForRelease("r1")).rejects.toThrow("503");
   });
 });
 

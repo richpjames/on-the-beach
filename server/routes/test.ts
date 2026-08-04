@@ -46,6 +46,7 @@ testRoutes.post("/suggestions", async (c) => {
       itemType: body.itemType ?? "album",
       year: body.year ?? null,
       musicbrainzReleaseId: body.musicbrainzReleaseId ?? null,
+      musicbrainzReleaseGroupId: body.musicbrainzReleaseGroupId ?? null,
       status: "pending",
     })
     .returning();

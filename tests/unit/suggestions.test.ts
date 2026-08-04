@@ -5,6 +5,7 @@ import { db } from "../../server/db/index";
 import { artists, itemSuggestions, musicItems } from "../../server/db/schema";
 import { normalize } from "../../server/utils";
 import {
+  backfillSuggestionReleaseGroups,
   fetchAndStoreSuggestion,
   findPendingSuggestionForItem,
   ensureSuggestionForItemNow,
@@ -38,11 +39,32 @@ async function createArtistWithItem(
   return { artistId, itemId: item.id };
 }
 
+/** Insert a pending suggestion row directly, as the prefetch would have. */
+async function seedSuggestion(
+  sourceItemId: number,
+  artistName: string,
+  { releaseId, groupId }: { releaseId: string | null; groupId?: string | null },
+) {
+  return db
+    .insert(itemSuggestions)
+    .values({
+      sourceItemId,
+      title: `Seeded ${sourceItemId}`,
+      artistName,
+      itemType: "album",
+      musicbrainzReleaseId: releaseId,
+      musicbrainzReleaseGroupId: groupId ?? null,
+      status: "pending",
+    })
+    .returning();
+}
+
 const testSuggestion: musicbrainz.SuggestedRelease = {
   title: "Tri Repetae",
   itemType: "album",
   year: 1995,
   musicbrainzReleaseId: "mb-release-uuid",
+  musicbrainzReleaseGroupId: "mb-release-group-uuid",
 };
 
 describe("fetchAndStoreSuggestion", () => {
@@ -382,6 +404,9 @@ describe("ensureSuggestionsForToListenArtists", () => {
     __clearSuggestionSweepBackoff();
     delete process.env.OTB_DISABLE_EXTERNAL_LOOKUPS;
     process.env.OTB_SUGGESTION_SWEEP_THROTTLE_MS = "0";
+    // The sweep opens with the release-group backfill; stub it so rows left by
+    // other tests can't send these cases to the real MusicBrainz.
+    spyOn(musicbrainz, "fetchReleaseGroupIdForRelease").mockResolvedValue(null);
   });
 
   afterEach(() => {
@@ -454,5 +479,85 @@ describe("ensureSuggestionsForToListenArtists", () => {
     await ensureSuggestionsForToListenArtists();
 
     expect(mbSpy).not.toHaveBeenCalled();
+  });
+
+  test("backfills release-group ids for suggestions stored without one", async () => {
+    const name = `Backfill Sweep Band ${Date.now()}`;
+    spyOn(musicbrainz, "findSuggestedRelease").mockResolvedValue(null);
+    const groupSpy = spyOn(musicbrainz, "fetchReleaseGroupIdForRelease").mockResolvedValue(
+      "swept-rg",
+    );
+    const { itemId } = await createArtistWithItem(name, "Backfill Sweep Album");
+    const [row] = await seedSuggestion(itemId, name, { releaseId: "swept-release" });
+
+    await ensureSuggestionsForToListenArtists();
+
+    expect(groupSpy).toHaveBeenCalled();
+    const updated = await db
+      .select()
+      .from(itemSuggestions)
+      .where(eq(itemSuggestions.id, row.id))
+      .get();
+    expect(updated?.musicbrainzReleaseGroupId).toBe("swept-rg");
+  });
+});
+
+describe("backfillSuggestionReleaseGroups", () => {
+  beforeEach(() => {
+    delete process.env.OTB_DISABLE_EXTERNAL_LOOKUPS;
+  });
+
+  afterEach(() => {
+    mock.restore();
+    delete process.env.OTB_DISABLE_EXTERNAL_LOOKUPS;
+  });
+
+  test("skips suggestions that already carry a release-group id", async () => {
+    const name = `Already Grouped ${Date.now()}`;
+    const groupSpy = spyOn(musicbrainz, "fetchReleaseGroupIdForRelease").mockResolvedValue(
+      "rg-new",
+    );
+    const { itemId } = await createArtistWithItem(name, "Grouped Album");
+    const [row] = await seedSuggestion(itemId, name, {
+      releaseId: "release-uuid",
+      groupId: "rg-existing",
+    });
+
+    await backfillSuggestionReleaseGroups();
+
+    expect(groupSpy.mock.calls.some((call) => call[0] === "release-uuid")).toBe(false);
+    const updated = await db
+      .select()
+      .from(itemSuggestions)
+      .where(eq(itemSuggestions.id, row.id))
+      .get();
+    expect(updated?.musicbrainzReleaseGroupId).toBe("rg-existing");
+  });
+
+  test("leaves the row untouched when the lookup fails, so the next sweep retries", async () => {
+    const name = `Backfill Failure ${Date.now()}`;
+    spyOn(musicbrainz, "fetchReleaseGroupIdForRelease").mockRejectedValue(
+      new Error("MusicBrainz release lookup returned 503"),
+    );
+    const { itemId } = await createArtistWithItem(name, "Flaky Album");
+    const [row] = await seedSuggestion(itemId, name, { releaseId: "flaky-release" });
+
+    const filled = await backfillSuggestionReleaseGroups();
+
+    expect(filled).toBe(0);
+    const updated = await db
+      .select()
+      .from(itemSuggestions)
+      .where(eq(itemSuggestions.id, row.id))
+      .get();
+    expect(updated?.musicbrainzReleaseGroupId).toBeNull();
+  });
+
+  test("no-ops under OTB_DISABLE_EXTERNAL_LOOKUPS", async () => {
+    process.env.OTB_DISABLE_EXTERNAL_LOOKUPS = "1";
+    const groupSpy = spyOn(musicbrainz, "fetchReleaseGroupIdForRelease");
+
+    expect(await backfillSuggestionReleaseGroups()).toBe(0);
+    expect(groupSpy).not.toHaveBeenCalled();
   });
 });
