@@ -23,6 +23,8 @@ export interface ScrapedMetadata {
   itemType?: ItemType;
   imageUrl?: string;
   releases?: ExtractedReleaseCandidate[];
+  /** The page's own title (og:title, else <title>) — names the page a release was lifted from. */
+  pageTitle?: string;
   embedMetadata?: Record<string, string>;
   year?: number;
   genre?: string;
@@ -226,6 +228,7 @@ async function scrapeUnknownUrl(url: string, html: string, og: OgData): Promise<
     potentialTitle: primary?.title,
     itemType: primary?.itemType,
     imageUrl: og.ogImage,
+    pageTitle: og.ogTitle || og.title,
     releases,
   };
 }

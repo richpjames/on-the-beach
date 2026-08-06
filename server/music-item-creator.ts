@@ -87,6 +87,40 @@ interface ReleaseCandidateInput {
   embedMetadata?: Record<string, string>;
   year?: number;
   genre?: string;
+  /** Provenance line for a release lifted off a page that named several — see `formatPageSourceNote`. */
+  sourceNote?: string;
+}
+
+const MAX_SOURCE_NOTE_TITLE_CHARS = 120;
+
+/**
+ * The provenance line stamped on items pulled off a page listing several
+ * releases. A single item's title says nothing about the round-up, chart, or
+ * label page it came from, so record the page itself: its title when the
+ * scrape found one, and the URL either way.
+ */
+export function formatPageSourceNote(url: string, pageTitle?: string): string {
+  const title = pageTitle?.replace(/\s+/g, " ").trim();
+  if (!title) return `From ${url}`;
+
+  const truncated =
+    title.length > MAX_SOURCE_NOTE_TITLE_CHARS
+      ? `${title.slice(0, MAX_SOURCE_NOTE_TITLE_CHARS - 1).trimEnd()}…`
+      : title;
+  return `From ${truncated} (${url})`;
+}
+
+/**
+ * Join whatever note the request supplied with the page's provenance line,
+ * using the same " — " separator the photo ingest uses for its "Via photo
+ * from …" suffix. Returns null when there's nothing to store.
+ */
+function composeNotes(notes: string | null | undefined, sourceNote?: string): string | null {
+  const parts = [notes, sourceNote]
+    .map((part) => part?.trim())
+    .filter((part): part is string => Boolean(part));
+
+  return parts.length ? parts.join(" — ") : null;
 }
 
 export class AmbiguousLinkSelectionError extends Error {
@@ -166,7 +200,7 @@ async function insertMusicItemWithLink(
       artistId,
       listenStatus: overrides?.listenStatus ?? "to-listen",
       purchaseIntent: overrides?.purchaseIntent ?? "no",
-      notes: overrides?.notes ?? null,
+      notes: composeNotes(overrides?.notes, candidate.sourceNote),
       artworkUrl: overrides?.artworkUrl ?? candidate.artworkUrl ?? null,
       label: overrides?.label ?? null,
       year: overrides?.year ?? candidate.year ?? null,
@@ -256,17 +290,28 @@ async function resolveReleaseCandidates(
     };
   }
 
-  const extractedCandidates =
-    scraped?.releases?.map((release) => ({
-      candidateId: release.candidateId,
-      title: release.title || "Untitled",
-      artistName: release.artist,
-      itemType: release.itemType ?? "album",
-      artworkUrl: overrides?.artworkUrl ?? scraped?.imageUrl ?? null,
-      confidence: release.confidence,
-      evidence: release.evidence,
-      isPrimary: release.isPrimary,
-    })) ?? [];
+  const releases = scraped?.releases ?? [];
+
+  // A page naming several releases is a round-up, chart, or label page rather
+  // than a release page: which page an item came off is worth keeping, so every
+  // item created from it gets the page stamped on its notes. A page that named
+  // just the one release needs no such note — its link says it all.
+  const sourceNote =
+    releases.length > 1
+      ? formatPageSourceNote(parsed.normalizedUrl, scraped?.pageTitle)
+      : undefined;
+
+  const extractedCandidates = releases.map((release) => ({
+    candidateId: release.candidateId,
+    title: release.title || "Untitled",
+    artistName: release.artist,
+    itemType: release.itemType ?? "album",
+    artworkUrl: overrides?.artworkUrl ?? scraped?.imageUrl ?? null,
+    confidence: release.confidence,
+    evidence: release.evidence,
+    isPrimary: release.isPrimary,
+    sourceNote,
+  }));
 
   if (extractedCandidates.length === 0) {
     throw new UnsupportedMusicLinkError("Couldn't extract a release from this link");
@@ -311,6 +356,7 @@ async function resolveReleaseCandidates(
           artistName: overrides.artistName?.trim() || undefined,
           itemType: overrides.itemType ?? "album",
           artworkUrl: overrides.artworkUrl ?? scraped?.imageUrl ?? null,
+          sourceNote,
         },
       ],
     };
@@ -329,7 +375,10 @@ async function resolveReleaseCandidates(
       return {
         normalizedUrl: parsed.normalizedUrl,
         source: parsed.source,
-        candidates: [chosen],
+        // The page mentioned others but is mainly about this release — it *is*
+        // the release's page, so its link already says where the item came
+        // from and a provenance note would only repeat it.
+        candidates: [{ ...chosen, sourceNote: undefined }],
       };
     }
   }
