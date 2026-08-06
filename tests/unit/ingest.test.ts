@@ -1,7 +1,13 @@
-import { describe, it, expect, mock, beforeEach, afterEach } from "bun:test";
+import { describe, it, expect, mock, beforeEach, afterEach, afterAll } from "bun:test";
 import { Hono } from "hono";
 // Imported before mock.module so the real exports can be passed through below.
 import * as realCreator from "../../server/music-item-creator";
+
+// Held before mock.module runs: it mutates the imported namespace in place, so
+// after mocking `realCreator.createMusicItemsFromUrl` *is* the stub. These are
+// what the afterAll below restores.
+const realCreateMusicItemsFromUrl = realCreator.createMusicItemsFromUrl;
+const realCreateMusicItemDirect = realCreator.createMusicItemDirect;
 
 const mockCreateMany = mock();
 const mockCreateDirect = mock();
@@ -26,6 +32,18 @@ mock.module("../../server/music-item-creator", () => ({
   createMusicItemsFromUrl: mockCreateMany,
   createMusicItemDirect: mockCreateDirect,
 }));
+
+// …and hand the real module back when this file is done. The mock outlives the
+// file otherwise, and test files run in no guaranteed order, so a later file
+// that drives the real creator (creator-page-source-notes.test.ts) would
+// otherwise get these stubs instead.
+afterAll(() => {
+  mock.module("../../server/music-item-creator", () => ({
+    ...realCreator,
+    createMusicItemsFromUrl: realCreateMusicItemsFromUrl,
+    createMusicItemDirect: realCreateMusicItemDirect,
+  }));
+});
 
 // Import after mocks are set up
 const { createIngestRoutes } = await import("../../server/routes/ingest");
