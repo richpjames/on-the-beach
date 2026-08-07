@@ -790,7 +790,7 @@ final class ShareViewController: UIViewController {
 }
 
 /// The compose form: an optional note field, a tappable "List" row, and a
-/// "Remind me" switch that reveals a date picker, with Cancel/Add in the
+/// "Release date" switch that reveals a date picker, with Cancel/Add in the
 /// navigation bar. It owns no state and does no networking — it reports Cancel,
 /// Add (with the note text and any chosen date), and List taps back to its
 /// container via closures.
@@ -806,7 +806,8 @@ private final class ComposeFormController: UIViewController, UITextViewDelegate 
         noteView.text.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
-    /// The chosen reminder day, or `nil` when "Remind me" is off.
+    /// The chosen date, or `nil` when "Release date" is off. Still posted as the
+    /// item's `remindAt` — the server schedules the reminder for that day.
     var remindAt: Date? {
         scheduleSwitch.isOn ? datePicker.date : nil
     }
@@ -824,9 +825,7 @@ private final class ComposeFormController: UIViewController, UITextViewDelegate 
     private let scheduleSwitch = UISwitch()
     private let datePicker = UIDatePicker()
     private let spinner = UIActivityIndicatorView(style: .medium)
-    private lazy var addButton = UIBarButtonItem(
-        title: "Add", style: .done, target: self, action: #selector(didTapAdd)
-    )
+    private lazy var addButton = OTBTheme.addBarButton(target: self, action: #selector(didTapAdd))
 
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -869,7 +868,7 @@ private final class ComposeFormController: UIViewController, UITextViewDelegate 
         notePlaceholder.font = OTBTheme.ui(14)
         notePlaceholder.textColor = OTBTheme.chromeDark
 
-        // Schedule: a compact date picker revealed only when "Remind me" is on, so
+        // Schedule: a compact date picker revealed only when "Release date" is on, so
         // an unscheduled share sends no date. Default to tomorrow, and never let
         // the user pick a past day.
         datePicker.datePickerMode = .date
@@ -958,12 +957,12 @@ private final class ComposeFormController: UIViewController, UITextViewDelegate 
         return container
     }
 
-    /// Builds the "Remind me" row: a title and a switch that reveals the date picker.
+    /// Builds the "Release date" row: a title and a switch that reveals the date picker.
     private func makeScheduleRow() -> UIView {
         let container = BeveledView(style: .raised, fill: OTBTheme.chromePanel)
 
         let title = UILabel()
-        title.text = "Remind me"
+        title.text = "Release date"
         title.font = OTBTheme.ui(14)
         title.textColor = .black
         title.setContentHuggingPriority(.defaultLow, for: .horizontal)
@@ -1056,7 +1055,7 @@ private final class ComposeFormController: UIViewController, UITextViewDelegate 
 
     @objc private func didTapCancel() { onCancel?() }
 
-    /// Reveal or hide the date picker alongside the "Remind me" switch.
+    /// Reveal or hide the date picker alongside the "Release date" switch.
     @objc private func didToggleSchedule() {
         UIView.animate(withDuration: 0.2) {
             self.datePicker.isHidden = !self.scheduleSwitch.isOn
@@ -1097,9 +1096,7 @@ private final class ListPickerViewController: UITableViewController {
     // Selection order is preserved so the compose row and payload stay stable.
     private var selected: [String]
 
-    private lazy var addButton = UIBarButtonItem(
-        title: "Add", style: .done, target: self, action: #selector(didTapAdd)
-    )
+    private lazy var addButton = OTBTheme.addBarButton(target: self, action: #selector(didTapAdd))
     private let spinner = UIActivityIndicatorView(style: .medium)
     private var isPosting = false
 
@@ -1251,9 +1248,7 @@ private final class ReleasePickerViewController: UITableViewController {
     // Selection order is preserved so the posted ids match the tap order.
     private var selectedIds: [String] = []
 
-    private lazy var addButton = UIBarButtonItem(
-        title: "Add", style: .done, target: self, action: #selector(didTapAdd)
-    )
+    private lazy var addButton = OTBTheme.addBarButton(target: self, action: #selector(didTapAdd))
     private let spinner = UIActivityIndicatorView(style: .medium)
     private var isPosting = false
 
@@ -1503,14 +1498,39 @@ enum OTBTheme {
             .foregroundColor: UIColor.white,
             .font: ui(15, bold: true),
         ]
-        let buttonText: [NSAttributedString.Key: Any] = [.font: ui(14)]
+        // Spell the colour out rather than leaning on the bar's tint: the share
+        // extension inherits the system tint, so a bar button left to itself can
+        // come out in whatever colour that happens to be.
+        let buttonText: [NSAttributedString.Key: Any] = [
+            .font: ui(14),
+            .foregroundColor: UIColor.white,
+        ]
         appearance.buttonAppearance.normal.titleTextAttributes = buttonText
-        appearance.doneButtonAppearance.normal.titleTextAttributes = [.font: ui(14, bold: true)]
 
         navigationBar.standardAppearance = appearance
         navigationBar.scrollEdgeAppearance = appearance
         navigationBar.compactAppearance = appearance
         navigationBar.tintColor = .white
+    }
+
+    /// The "Add" button shared by the compose form and both pickers: bold white
+    /// Verdana on the blue title bar.
+    ///
+    /// Deliberately `.plain` rather than `.done`. iOS draws a `.done` item as a
+    /// prominent *filled* bar button tinted by the inherited system tint, which
+    /// in the share extension painted Add as a red pill — nothing to do with the
+    /// app's chrome. Plain keeps it as text we colour ourselves. The bold face
+    /// (set per-item, since the bar's appearance styles plain buttons regular)
+    /// still marks it out as the primary action.
+    static func addBarButton(target: Any?, action: Selector) -> UIBarButtonItem {
+        let button = UIBarButtonItem(title: "Add", style: .plain, target: target, action: action)
+        button.setTitleTextAttributes(
+            [.font: ui(14, bold: true), .foregroundColor: UIColor.white], for: .normal
+        )
+        // Disabled keeps the same face but lets the system dim it, so a gated Add
+        // still reads as unavailable.
+        button.setTitleTextAttributes([.font: ui(14, bold: true)], for: .disabled)
+        return button
     }
 }
 
