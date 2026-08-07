@@ -48,10 +48,10 @@ for free by building the same targets with **Mac Catalyst** (see [Enable macOS
   creates one item per chosen release — all filed into the same lists, with the same
   note and reminder. Going back instead keeps everything typed so far and adds
   nothing.
-- **Sharing an image** works the same way. When the payload is a photo rather than a
-  link (e.g. a record cover shared from Photos), the extension shows the same compose
+- **Sharing images** works the same way. When the payload is photos rather than a
+  link (e.g. record covers shared from Photos), the extension shows the same compose
   form — with an image preview in place of the URL line — and the same note, list,
-  and reminder controls. The image is downscaled to a 1024px JPEG and re-encoded at
+  and reminder controls. Each image is downscaled to a 1024px JPEG and re-encoded at
   progressively lower quality/size until the base64 payload fits the upload budget
   (mirroring the web add-form's `encodeImageFile`, so a detailed sleeve compresses
   further instead of being rejected with a 413) and `POST`ed as base64 to
@@ -59,6 +59,20 @@ for free by building the same targets with **Mac Catalyst** (see [Enable macOS
   and files the created item into the chosen lists / reminder just like a link. A
   link is preferred when the share carries both (a shared web page often includes a
   thumbnail image we don't want).
+- **Several photos at once.** Multi-selecting sleeves in Photos and sharing them
+  adds one item per photo, all with the same note, lists, and reminder. The
+  activation rule allows up to **10** images (`NSExtensionActivationSupportsImageWithMaxCount`
+  in `native/ShareExtension/Info.plist`) — iOS hides the extension outright once a
+  selection exceeds that, so the number is the real cap on a multi-select share. The
+  compose form previews them as a swipeable filmstrip in the well with a "N photos"
+  caption above it. `POST /api/ingest/photo` takes a single image (it saves, scans,
+  and creates one item), so the extension posts them **one at a time**, showing a
+  "2 of 5" caption beside the spinner, and the toast reads "Added 5 photos to Jazz".
+  If one fails part-way the alert says how many made it ("Added 2 of 5 photos…") and
+  the form keeps only the ones still outstanding, so tapping Add again retries just
+  those instead of duplicating what's already saved. Photos that can't be decoded at
+  all are dropped from the selection; the share is only reported unreadable when
+  none of them survive.
 - Posting is **synchronous**: the form stays on screen showing an "Adding…" spinner
   until the request finishes. On success it flashes a brief checkmark toast built
   from the server's response — "Added", "Added to Jazz, Chill", or "Already saved"
@@ -72,7 +86,7 @@ for free by building the same targets with **Mac Catalyst** (see [Enable macOS
 iOS share sheet ──► ShareExtension compose form ──┬─► POST /api/ingest/link  ──► item created
         (note + list picker)  GET /api/ingest/stacks┘   (a link)                  (filed into list)
                                                     └─► POST /api/ingest/photo ──► item created
-                                                        (an image)                (scanned + filed)
+                                                        (one per image)           (scanned + filed)
 ```
 
 ## What lives in the repo vs. what's generated
@@ -338,7 +352,16 @@ consider rotating `INGEST_API_KEY`.
   `BODY_SIZE_LIMIT` in the server's environment.
 - **"Couldn't read that photo…"** — the shared image couldn't be decoded or
   compressed at all, so there was nothing to post. The form says so with Add
-  disabled rather than showing an empty preview.
+  disabled rather than showing an empty preview. With several photos shared it
+  only appears when *none* of them could be read.
+- **"Added 2 of 5 photos…"** — a multi-photo share stopped part-way. The first
+  two are saved; the rest are still on the form (with the note, lists, and
+  reminder intact), so Add retries only those.
+- **Extension missing when several photos are selected** — the selection is
+  larger than `NSExtensionActivationSupportsImageWithMaxCount` (10). iOS drops
+  the extension from the sheet rather than truncating; share fewer at a time, or
+  raise the count in `native/ShareExtension/Info.plist` (each photo is its own
+  upload + vision scan, so a big share is a long queue).
 - **"ios platform already exists"** on `cap add` — a leftover `ios/` directory
   is present. It's fully generated and gitignored, so just `rm -rf ios` and run
   `bun run cap:add` again. (The hand-authored sources live in `native/`, not

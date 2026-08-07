@@ -76,16 +76,17 @@ final class ShareViewController: UIViewController {
         case needsReleaseSelection(message: String, candidates: [AmbiguousLinkResponse.Candidate])
     }
 
-    /// What the user is sharing: a link (posted to `/api/ingest/link`) or an
-    /// image (posted to `/api/ingest/photo`). The compose form, note, list
-    /// picker, and reminder are identical either way — only the endpoint and
-    /// payload differ.
+    /// What the user is sharing: a link (posted to `/api/ingest/link`) or one
+    /// or more images (each posted to `/api/ingest/photo`). The compose form,
+    /// note, list picker, and reminder are identical either way — only the
+    /// endpoint and payload differ, and every photo in a multi-select share is
+    /// filed with the same note, lists, and reminder.
     private enum SharedContent {
         case link(URL)
-        case image(Data)
+        case images([Data])
     }
 
-    /// What extraction found: something postable, an image attachment we
+    /// What extraction found: something postable, image attachments we
     /// couldn't decode or compress, or nothing usable at all. The failure cases
     /// are kept apart so the form can say which one happened instead of just
     /// showing an empty preview with Add greyed out.
@@ -93,6 +94,15 @@ final class ShareViewController: UIViewController {
         case content(SharedContent)
         case unreadableImage
         case nothing
+    }
+
+    /// The result of posting one photo to `/api/ingest/photo`: the lists the
+    /// created item was filed into, or why it failed. A multi-photo share is a
+    /// queue of these, so the outcome is reported per photo and only turned
+    /// into a single toast / alert once the queue drains or stops.
+    private enum PhotoPostOutcome {
+        case added(lists: [String])
+        case failed(String)
     }
 
     /// Shown when a shared image can't be decoded or compressed into something
@@ -157,12 +167,23 @@ final class ShareViewController: UIViewController {
                 switch content {
                 case .link(let url):
                     self.compose.setURL(url)
-                case .image(let data):
-                    if let image = UIImage(data: data) {
-                        self.compose.setImage(image)
-                    } else {
+                case .images(let payloads):
+                    // Keep bytes and previews in step: anything that won't
+                    // decode here is dropped from both, so the filmstrip shows
+                    // exactly what will be posted.
+                    var readable: [Data] = []
+                    var previews: [UIImage] = []
+                    for data in payloads {
+                        guard let image = UIImage(data: data) else { continue }
+                        readable.append(data)
+                        previews.append(image)
+                    }
+                    if previews.isEmpty {
                         self.sharedContent = nil
                         self.compose.setUnavailable(Self.unreadablePhotoMessage)
+                    } else {
+                        self.sharedContent = .images(readable)
+                        self.compose.setImages(previews)
                     }
                 }
             case .unreadableImage:
@@ -249,9 +270,9 @@ final class ShareViewController: UIViewController {
                 selectedCandidateIds: selectedCandidateIds,
                 completion: handle
             )
-        case .image(let data):
-            postPhoto(
-                imageData: data,
+        case .images(let payloads):
+            postPhotos(
+                payloads,
                 note: note,
                 listNames: selectedListNames,
                 remindAt: remindAt,
@@ -263,10 +284,14 @@ final class ShareViewController: UIViewController {
     /// Applies the "Adding…" state to every screen in the stack, so whichever
     /// one the user submitted from shows the spinner and is locked against
     /// re-entry (including navigating between them mid-request).
-    private func setPosting(_ posting: Bool) {
-        compose.setPosting(posting)
-        listPicker?.setPosting(posting)
-        releasePicker?.setPosting(posting)
+    ///
+    /// `progress` is the "2 of 5" caption a multi-photo share shows beside the
+    /// spinner — a queue of uploads takes long enough that a bare spinner looks
+    /// stuck.
+    private func setPosting(_ posting: Bool, progress: String? = nil) {
+        compose.setPosting(posting, progress: progress)
+        listPicker?.setPosting(posting, progress: progress)
+        releasePicker?.setPosting(posting, progress: progress)
     }
 
     /// Pushes the release picker after the server reported the shared page
@@ -357,17 +382,21 @@ final class ShareViewController: UIViewController {
     // MARK: - Extracting the shared content
 
     /// Walks the extension's input items to work out what's being shared: a
-    /// link or an image.
+    /// link or one or more images.
     ///
     /// A **link** is preferred when present — the common case is a music URL,
     /// and a shared web page often carries a thumbnail image we don't want. So
     /// we look for a URL first (a real `public.url` attachment, most apps),
     /// then a `public.plain-text` blob that embeds a URL (Safari often shares
     /// "Page Title\nhttps://…"), and only if neither yields a link do we fall
-    /// back to an **image** attachment (a shared photo, e.g. a record cover).
-    /// The very last resort is a URL recovered from the item's attributed text
-    /// — some apps (e.g. Apple Music) carry the link there rather than as an
-    /// attachment.
+    /// back to the **image** attachments (shared photos, e.g. record covers).
+    /// Selecting several photos in Photos hands us one attachment each, so we
+    /// take *all* of them rather than just the first — the multi-select share
+    /// the Info.plist activation rule now allows. Any that won't decode are
+    /// dropped and the rest still posted; only if none survive do we report the
+    /// share as unreadable. The very last resort is a URL recovered from the
+    /// item's attributed text — some apps (e.g. Apple Music) carry the link
+    /// there rather than as an attachment.
     ///
     /// For links, `url(from:)` does the decoding, because the loaded item is
     /// not always a `URL`: on macOS a `public.url` item arrives as `Data`
@@ -382,25 +411,25 @@ final class ShareViewController: UIViewController {
         let textType = UTType.plainText.identifier
         let imageType = UTType.image.identifier
 
-        let imageProvider = providers.first { $0.hasItemConformingToTypeIdentifier(imageType) }
+        let imageProviders = providers.filter { $0.hasItemConformingToTypeIdentifier(imageType) }
 
-        // No link found: use a shared image if there is one, otherwise recover a
-        // link from the item's attributed text as a final fallback.
+        // No link found: use the shared images if there are any, otherwise
+        // recover a link from the item's attributed text as a final fallback.
         let fallback: () -> Void = {
-            if let imageProvider {
-                self.loadImage(from: imageProvider) { data in
-                    if let data {
-                        completion(.content(.image(data)))
-                    } else {
-                        // The share carried an image we couldn't decode or
-                        // compress. A link recovered from the text is still
-                        // worth posting; otherwise say so rather than leaving
-                        // the form blank.
-                        completion(Self.linkFromText(items) ?? .unreadableImage)
-                    }
-                }
-            } else {
+            guard !imageProviders.isEmpty else {
                 completion(Self.linkFromText(items) ?? .nothing)
+                return
+            }
+            self.loadImages(from: imageProviders) { payloads in
+                if payloads.isEmpty {
+                    // The share carried only images we couldn't decode or
+                    // compress. A link recovered from the text is still worth
+                    // posting; otherwise say so rather than leaving the form
+                    // blank.
+                    completion(Self.linkFromText(items) ?? .unreadableImage)
+                } else {
+                    completion(.content(.images(payloads)))
+                }
             }
         }
 
@@ -439,13 +468,33 @@ final class ShareViewController: UIViewController {
         return firstURL(in: text).map { .content(.link($0)) }
     }
 
-    /// Loads an image attachment and hands back downscaled JPEG bytes on the
-    /// main queue, or `nil` if it couldn't be decoded.
-    private func loadImage(from provider: NSItemProvider, completion: @escaping (Data?) -> Void) {
-        provider.loadItem(forTypeIdentifier: UTType.image.identifier, options: nil) { item, _ in
-            let data = Self.imageData(from: item)
-            DispatchQueue.main.async { completion(data) }
+    /// Loads every image attachment and hands back their downscaled JPEG bytes
+    /// on the main queue, in the order they were shared. Attachments that can't
+    /// be decoded or compressed are dropped, so the result can be shorter than
+    /// the input (and empty when none of them survived).
+    ///
+    /// The providers load in parallel — a multi-select share of full-resolution
+    /// photos spends most of its time decoding and re-encoding, and doing that
+    /// serially would leave the sheet blank for noticeably longer. Each result
+    /// is written to its own slot behind a serial queue, since the callbacks
+    /// arrive on whatever queue `loadItem` chooses.
+    private func loadImages(from providers: [NSItemProvider], completion: @escaping ([Data]) -> Void) {
+        var loaded = [Data?](repeating: nil, count: providers.count)
+        let slots = DispatchQueue(label: "es.ricojam.onthebeach.ShareExtension.images")
+        let group = DispatchGroup()
+
+        for (index, provider) in providers.enumerated() {
+            group.enter()
+            provider.loadItem(forTypeIdentifier: UTType.image.identifier, options: nil) { item, _ in
+                let data = Self.imageData(from: item)
+                slots.async {
+                    loaded[index] = data
+                    group.leave()
+                }
+            }
         }
+
+        group.notify(queue: .main) { completion(loaded.compactMap { $0 }) }
     }
 
     /// Coerces whatever `loadItem` hands back for an image into downscaled JPEG
@@ -664,25 +713,91 @@ final class ShareViewController: UIViewController {
         return payload
     }
 
-    /// Posts a shared image to `/api/ingest/photo`. The image is sent as base64
-    /// JSON — the same shape the web add-form's scan flow uses — alongside the
-    /// same note, lists, and reminder the link path sends, so the server files
-    /// and schedules the created item identically. The response is decoded by
-    /// the shared `successMessage(from:)`, so the confirmation toast ("Added to
-    /// Jazz, Chill") reads the same for a photo as for a link.
-    private func postPhoto(
-        imageData: Data,
+    /// Posts the shared photos to `/api/ingest/photo`, one request per photo,
+    /// in the order they were shared.
+    ///
+    /// The endpoint takes a single image — it saves the artwork, vision-scans it,
+    /// and creates one item — so a multi-select share is a short queue of posts
+    /// rather than one big upload. That also keeps every request inside the
+    /// server's size budget and lets a failure say how far it got. They go one
+    /// at a time rather than in parallel: each post runs a vision scan server
+    /// side, and the "2 of 5" caption only means anything for an ordered queue.
+    ///
+    /// On failure we stop and keep the photos that haven't been posted as the
+    /// pending share, so tapping Add again retries just those instead of
+    /// duplicating the ones already saved.
+    private func postPhotos(
+        _ payloads: [Data],
         note: String,
         listNames: [String],
         remindAt: Date?,
         completion: @escaping (PostResult) -> Void
     ) {
+        let total = payloads.count
+        var pending = payloads
+        // The lists the server reports filing into. They're the same for every
+        // photo (same request payload), so the last answer stands for all.
+        var filedInto: [String] = []
+
+        func postNext() {
+            guard let next = pending.first else {
+                completion(.success(Self.photoSuccessMessage(count: total, lists: filedInto)))
+                return
+            }
+            // A caption is only worth showing when there's a queue to get through.
+            self.setPosting(true, progress: total > 1 ? "\(total - pending.count + 1) of \(total)" : nil)
+
+            self.postPhoto(
+                imageData: next,
+                note: note,
+                listNames: listNames,
+                remindAt: remindAt
+            ) { outcome in
+                switch outcome {
+                case .added(let lists):
+                    pending.removeFirst()
+                    if !lists.isEmpty { filedInto = lists }
+                    postNext()
+                case .failed(let message):
+                    let added = total - pending.count
+                    // Leave only what's outstanding on the form, so a retry
+                    // can't double-add the photos already saved.
+                    self.setPendingPhotos(pending)
+                    completion(.failure(Self.photoFailureMessage(added: added, total: total, message: message)))
+                }
+            }
+        }
+
+        postNext()
+    }
+
+    /// Replaces the queued photos after a multi-photo share failed part-way
+    /// through, so both the preview and the next Add cover only what's left.
+    private func setPendingPhotos(_ payloads: [Data]) {
+        guard !payloads.isEmpty else { return }
+        sharedContent = .images(payloads)
+        compose.setImages(payloads.compactMap { UIImage(data: $0) })
+    }
+
+    /// Posts one shared image to `/api/ingest/photo`. The image is sent as base64
+    /// JSON — the same shape the web add-form's scan flow uses — alongside the
+    /// same note, lists, and reminder the link path sends, so the server files
+    /// and schedules the created item identically. The lists it reports back are
+    /// handed to the caller, which builds the confirmation toast once the whole
+    /// queue has been posted.
+    private func postPhoto(
+        imageData: Data,
+        note: String,
+        listNames: [String],
+        remindAt: Date?,
+        completion: @escaping (PhotoPostOutcome) -> Void
+    ) {
         guard let endpoint = URL(string: baseURL + "/api/ingest/photo") else {
-            completion(.failure("Misconfigured server URL."))
+            completion(.failed("Misconfigured server URL."))
             return
         }
         guard !apiKey.isEmpty else {
-            completion(.failure("Missing ingest API key in build config."))
+            completion(.failed("Missing ingest API key in build config."))
             return
         }
 
@@ -696,26 +811,34 @@ final class ShareViewController: UIViewController {
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
         guard let body = try? JSONSerialization.data(withJSONObject: payload) else {
-            completion(.failure("Couldn't prepare that photo to send."))
+            completion(.failed("Couldn't prepare that photo to send."))
             return
         }
         request.httpBody = body
         request.timeoutInterval = 30
 
         URLSession.shared.dataTask(with: request) { data, response, error in
-            let result: PostResult
+            let outcome: PhotoPostOutcome
             if let error {
-                result = .failure("Couldn't reach On The Beach: \(error.localizedDescription)")
+                outcome = .failed("Couldn't reach On The Beach: \(error.localizedDescription)")
             } else {
                 let status = (response as? HTTPURLResponse)?.statusCode ?? 0
                 if (200...299).contains(status) {
-                    result = .success(Self.successMessage(from: data))
+                    outcome = .added(lists: Self.listNames(from: data))
                 } else {
-                    result = .failure(Self.failureMessage(status: status, data: data, isPhoto: true))
+                    outcome = .failed(Self.failureMessage(status: status, data: data, isPhoto: true))
                 }
             }
-            DispatchQueue.main.async { completion(result) }
+            DispatchQueue.main.async { completion(outcome) }
         }.resume()
+    }
+
+    /// The lists an ingest response reports the item was filed into.
+    private nonisolated static func listNames(from data: Data?) -> [String] {
+        guard let data, let payload = try? JSONDecoder().decode(LinkResponse.self, from: data) else {
+            return []
+        }
+        return (payload.lists ?? []).map(\.name)
     }
 
     /// Turns a non-2xx response into something the person sharing can act on.
@@ -782,10 +905,84 @@ final class ShareViewController: UIViewController {
         return names.isEmpty ? base : "\(base) to \(names.joined(separator: ", "))"
     }
 
+    /// The confirmation toast for a photo share: "Added", "Added 3 photos", plus
+    /// the lists they were filed into. Photos are posted one request each, so
+    /// the count is how many of them succeeded rather than anything the last
+    /// response says.
+    private nonisolated static func photoSuccessMessage(count: Int, lists: [String]) -> String {
+        let base = count > 1 ? "Added \(count) photos" : "Added"
+        return lists.isEmpty ? base : "\(base) to \(lists.joined(separator: ", "))"
+    }
+
+    /// The alert for a photo share that failed. When it's one photo that's just
+    /// the reason; when a queue stopped part-way it leads with how many made it,
+    /// because those are saved and only the rest are still on the form.
+    private nonisolated static func photoFailureMessage(added: Int, total: Int, message: String) -> String {
+        guard added > 0 else { return message }
+        return "Added \(added) of \(total) photos. \(message) Tap Add to retry the rest."
+    }
+
     private func infoValue(_ key: String) -> String? {
         guard let value = Bundle.main.object(forInfoDictionaryKey: key) as? String,
               !value.isEmpty else { return nil }
         return value
+    }
+}
+
+/// The "Adding…" bar item shared by all three screens: a spinner, plus an
+/// optional caption ("2 of 5") for a multi-photo share, whose uploads take long
+/// enough that a bare spinner reads as stuck. Both are white because the
+/// navigation bar is the blue title-bar gradient — a default grey spinner all
+/// but disappears on it.
+private final class PostingIndicator: UIView {
+    private let spinner = UIActivityIndicatorView(style: .medium)
+    private let caption = UILabel()
+    private let stack = UIStackView()
+
+    init() {
+        super.init(frame: .zero)
+
+        spinner.color = .white
+        caption.font = OTBTheme.ui(12, bold: true)
+        caption.textColor = .white
+        caption.isHidden = true
+
+        stack.addArrangedSubview(spinner)
+        stack.addArrangedSubview(caption)
+        stack.axis = .horizontal
+        stack.spacing = 6
+        stack.alignment = .center
+        stack.translatesAutoresizingMaskIntoConstraints = false
+        addSubview(stack)
+        NSLayoutConstraint.activate([
+            stack.topAnchor.constraint(equalTo: topAnchor),
+            stack.bottomAnchor.constraint(equalTo: bottomAnchor),
+            stack.leadingAnchor.constraint(equalTo: leadingAnchor),
+            stack.trailingAnchor.constraint(equalTo: trailingAnchor),
+        ])
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
+
+    /// A bar button item sizes its custom view from this, so report the stack's
+    /// fitting size — left to a zero frame the indicator can lay out to nothing
+    /// and vanish from the bar.
+    override var intrinsicContentSize: CGSize {
+        stack.systemLayoutSizeFitting(UIView.layoutFittingCompressedSize)
+    }
+
+    /// Spins, showing `progress` alongside when there's a queue to report.
+    func start(_ progress: String?) {
+        spinner.startAnimating()
+        caption.text = progress
+        caption.isHidden = progress?.isEmpty ?? true
+        // The caption appearing — or growing from "9 of 10" — changes our width.
+        invalidateIntrinsicContentSize()
+    }
+
+    func stop() {
+        spinner.stopAnimating()
     }
 }
 
@@ -817,14 +1014,19 @@ private final class ComposeFormController: UIViewController, UITextViewDelegate 
     var canSubmit: Bool { hasContent && !isPosting }
 
     private let urlLabel = UILabel()
-    private let imagePreview = UIImageView()
+    /// The shared photos, side by side in a horizontally scrolling filmstrip —
+    /// one image fills the well as before, several become thumbnails you can
+    /// swipe through to check what's about to be added.
+    private let imageStrip = UIStackView()
+    private let imageScroll = UIScrollView()
     private let imageWell = BeveledView(style: .field, fill: OTBTheme.chromeWhite)
     private let noteView = UITextView()
     private let notePlaceholder = UILabel()
     private let listValueLabel = UILabel()
     private let scheduleSwitch = UISwitch()
     private let datePicker = UIDatePicker()
-    private let spinner = UIActivityIndicatorView(style: .medium)
+    private let postingIndicator = PostingIndicator()
+    private lazy var postingItem = UIBarButtonItem(customView: postingIndicator)
     private lazy var addButton = OTBTheme.addBarButton(target: self, action: #selector(didTapAdd))
 
     override func viewDidLoad() {
@@ -838,9 +1040,6 @@ private final class ComposeFormController: UIViewController, UITextViewDelegate 
         navigationItem.rightBarButtonItem = addButton
         // Nothing to post until a URL is extracted.
         addButton.isEnabled = false
-        // The bar is the blue title-bar gradient, so a default grey spinner all
-        // but disappears on it.
-        spinner.color = .white
 
         // The shared URL reads like a terminal line: mono type, navy on chrome.
         urlLabel.font = OTBTheme.mono(11)
@@ -848,13 +1047,18 @@ private final class ComposeFormController: UIViewController, UITextViewDelegate 
         urlLabel.numberOfLines = 2
         urlLabel.lineBreakMode = .byTruncatingMiddle
 
-        // A shared image gets a sunken white well preview, seated inside the 2px
+        // Shared images get a sunken white well preview, seated inside the 2px
         // bevel like the note field. Hidden until an image is actually shared.
-        imagePreview.contentMode = .scaleAspectFit
-        imagePreview.clipsToBounds = true
-        imagePreview.translatesAutoresizingMaskIntoConstraints = false
+        // The well holds a scrolling filmstrip so a multi-photo share shows
+        // every photo rather than only the first.
+        imageStrip.axis = .horizontal
+        imageStrip.spacing = 4
+        imageStrip.translatesAutoresizingMaskIntoConstraints = false
+        imageScroll.showsHorizontalScrollIndicator = false
+        imageScroll.translatesAutoresizingMaskIntoConstraints = false
+        imageScroll.addSubview(imageStrip)
         imageWell.translatesAutoresizingMaskIntoConstraints = false
-        imageWell.addSubview(imagePreview)
+        imageWell.addSubview(imageScroll)
         imageWell.isHidden = true
 
         // A sunken white well for the note, matching the app's --bevel-field inputs.
@@ -901,10 +1105,17 @@ private final class ComposeFormController: UIViewController, UITextViewDelegate 
             stack.leadingAnchor.constraint(equalTo: guide.leadingAnchor, constant: 16),
             stack.trailingAnchor.constraint(equalTo: guide.trailingAnchor, constant: -16),
             imageWell.heightAnchor.constraint(equalToConstant: 140),
-            imagePreview.topAnchor.constraint(equalTo: imageWell.topAnchor, constant: 2),
-            imagePreview.bottomAnchor.constraint(equalTo: imageWell.bottomAnchor, constant: -2),
-            imagePreview.leadingAnchor.constraint(equalTo: imageWell.leadingAnchor, constant: 2),
-            imagePreview.trailingAnchor.constraint(equalTo: imageWell.trailingAnchor, constant: -2),
+            imageScroll.topAnchor.constraint(equalTo: imageWell.topAnchor, constant: 2),
+            imageScroll.bottomAnchor.constraint(equalTo: imageWell.bottomAnchor, constant: -2),
+            imageScroll.leadingAnchor.constraint(equalTo: imageWell.leadingAnchor, constant: 2),
+            imageScroll.trailingAnchor.constraint(equalTo: imageWell.trailingAnchor, constant: -2),
+            // The strip defines the scrollable content; its height is pinned to
+            // the visible well so the thumbnails fill it and only scroll sideways.
+            imageStrip.topAnchor.constraint(equalTo: imageScroll.contentLayoutGuide.topAnchor),
+            imageStrip.bottomAnchor.constraint(equalTo: imageScroll.contentLayoutGuide.bottomAnchor),
+            imageStrip.leadingAnchor.constraint(equalTo: imageScroll.contentLayoutGuide.leadingAnchor),
+            imageStrip.trailingAnchor.constraint(equalTo: imageScroll.contentLayoutGuide.trailingAnchor),
+            imageStrip.heightAnchor.constraint(equalTo: imageScroll.frameLayoutGuide.heightAnchor),
             noteField.heightAnchor.constraint(equalToConstant: 96),
             noteView.topAnchor.constraint(equalTo: noteField.topAnchor, constant: 2),
             noteView.bottomAnchor.constraint(equalTo: noteField.bottomAnchor, constant: -2),
@@ -1012,13 +1223,38 @@ private final class ComposeFormController: UIViewController, UITextViewDelegate 
         setHasContent(false)
     }
 
-    /// Shows the shared image in the preview well and enables Add. Called
-    /// instead of `setURL` when the share payload is a photo rather than a link.
-    func setImage(_ image: UIImage?) {
-        imagePreview.image = image
-        imageWell.isHidden = image == nil
-        urlLabel.isHidden = true
-        setHasContent(image != nil)
+    /// Shows the shared photos in the preview well and enables Add. Called
+    /// instead of `setURL` when the share payload is photos rather than a link.
+    ///
+    /// One photo fills the well exactly as it always did. Several become
+    /// thumbnails in a swipeable filmstrip, with a count on the line the URL
+    /// normally occupies — so a multi-select share says how many are about to
+    /// be added even before you scroll through them.
+    func setImages(_ images: [UIImage]) {
+        for view in imageStrip.arrangedSubviews {
+            view.removeFromSuperview()
+        }
+        for image in images {
+            let thumbnail = UIImageView(image: image)
+            thumbnail.contentMode = .scaleAspectFit
+            thumbnail.clipsToBounds = true
+            imageStrip.addArrangedSubview(thumbnail)
+            // A lone photo spans the well; a filmstrip gets fixed-width frames
+            // so mixed portrait/landscape sleeves line up.
+            let width = images.count > 1
+                ? thumbnail.widthAnchor.constraint(equalToConstant: 120)
+                : thumbnail.widthAnchor.constraint(equalTo: imageScroll.frameLayoutGuide.widthAnchor)
+            width.isActive = true
+        }
+        imageScroll.setContentOffset(.zero, animated: false)
+        imageWell.isHidden = images.isEmpty
+
+        urlLabel.text = images.count > 1 ? "\(images.count) photos" : nil
+        urlLabel.isHidden = images.count < 2
+        urlLabel.numberOfLines = 1
+        urlLabel.lineBreakMode = .byTruncatingTail
+
+        setHasContent(!images.isEmpty)
     }
 
     /// Tracks whether there's anything to post (a URL or an image), so both the
@@ -1037,15 +1273,18 @@ private final class ComposeFormController: UIViewController, UITextViewDelegate 
 
     private var isPosting = false
 
-    /// While posting, swap the Add button for a spinner and block re-entry.
-    func setPosting(_ posting: Bool) {
+    /// While posting, swap the Add button for a spinner (with the "2 of 5"
+    /// caption when a queue of photos is going up) and block re-entry.
+    func setPosting(_ posting: Bool, progress: String? = nil) {
         isPosting = posting
         view.isUserInteractionEnabled = !posting
         if posting {
-            spinner.startAnimating()
-            navigationItem.rightBarButtonItem = UIBarButtonItem(customView: spinner)
+            postingIndicator.start(progress)
+            // The same bar item every time, so updating the caption mid-queue
+            // doesn't swap the view out from under the user.
+            navigationItem.rightBarButtonItem = postingItem
         } else {
-            spinner.stopAnimating()
+            postingIndicator.stop()
             navigationItem.rightBarButtonItem = addButton
             addButton.isEnabled = hasContent
         }
@@ -1097,7 +1336,8 @@ private final class ListPickerViewController: UITableViewController {
     private var selected: [String]
 
     private lazy var addButton = OTBTheme.addBarButton(target: self, action: #selector(didTapAdd))
-    private let spinner = UIActivityIndicatorView(style: .medium)
+    private let postingIndicator = PostingIndicator()
+    private lazy var postingItem = UIBarButtonItem(customView: postingIndicator)
     private var isPosting = false
 
     init(stacks: [String], selected: [String]) {
@@ -1121,23 +1361,21 @@ private final class ListPickerViewController: UITableViewController {
 
         navigationItem.rightBarButtonItem = addButton
         addButton.isEnabled = canAdd
-        // The bar is the blue title-bar gradient, so a default grey spinner all
-        // but disappears on it.
-        spinner.color = .white
     }
 
-    /// While a post is in flight, swap Add for a spinner and lock the screen —
+    /// While a post is in flight, swap Add for a spinner (with the "2 of 5"
+    /// caption when a queue of photos is going up) and lock the screen —
     /// including the back button, so the request can't be re-entered from the
     /// compose form.
-    func setPosting(_ posting: Bool) {
+    func setPosting(_ posting: Bool, progress: String? = nil) {
         isPosting = posting
         tableView.isUserInteractionEnabled = !posting
         navigationItem.hidesBackButton = posting
         if posting {
-            spinner.startAnimating()
-            navigationItem.rightBarButtonItem = UIBarButtonItem(customView: spinner)
+            postingIndicator.start(progress)
+            navigationItem.rightBarButtonItem = postingItem
         } else {
-            spinner.stopAnimating()
+            postingIndicator.stop()
             navigationItem.rightBarButtonItem = addButton
             addButton.isEnabled = canAdd
         }
@@ -1249,7 +1487,8 @@ private final class ReleasePickerViewController: UITableViewController {
     private var selectedIds: [String] = []
 
     private lazy var addButton = OTBTheme.addBarButton(target: self, action: #selector(didTapAdd))
-    private let spinner = UIActivityIndicatorView(style: .medium)
+    private let postingIndicator = PostingIndicator()
+    private lazy var postingItem = UIBarButtonItem(customView: postingIndicator)
     private var isPosting = false
 
     init(message: String, candidates: [ShareViewController.AmbiguousLinkResponse.Candidate]) {
@@ -1297,9 +1536,6 @@ private final class ReleasePickerViewController: UITableViewController {
 
         navigationItem.rightBarButtonItem = addButton
         addButton.isEnabled = false
-        // The bar is the blue title-bar gradient, so a default grey spinner all
-        // but disappears on it.
-        spinner.color = .white
     }
 
     override func viewDidLayoutSubviews() {
@@ -1320,15 +1556,15 @@ private final class ReleasePickerViewController: UITableViewController {
 
     /// While a post is in flight, swap Add for a spinner and lock the screen —
     /// including the back button, so the request can't be re-entered.
-    func setPosting(_ posting: Bool) {
+    func setPosting(_ posting: Bool, progress: String? = nil) {
         isPosting = posting
         tableView.isUserInteractionEnabled = !posting
         navigationItem.hidesBackButton = posting
         if posting {
-            spinner.startAnimating()
-            navigationItem.rightBarButtonItem = UIBarButtonItem(customView: spinner)
+            postingIndicator.start(progress)
+            navigationItem.rightBarButtonItem = postingItem
         } else {
-            spinner.stopAnimating()
+            postingIndicator.stop()
             navigationItem.rightBarButtonItem = addButton
             addButton.isEnabled = !selectedIds.isEmpty
         }
