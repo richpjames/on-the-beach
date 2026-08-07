@@ -35,13 +35,20 @@
 		<key>NSExtensionAttributes</key>
 		<dict>
 			<!-- Offer the extension whenever the share payload contains a web
-			     URL, text that may embed a URL, or an image (a shared photo, e.g.
-			     a record cover). NSExtensionActivationSupportsWebPage is
+			     URL, text that may embed a URL, or images (shared photos, e.g.
+			     record covers). NSExtensionActivationSupportsWebPage is
 			     intentionally NOT used: it requires an
 			     NSExtensionJavaScriptPreprocessingFile, and without one the whole
 			     activation rule is malformed and iOS silently drops the extension
 			     from the share sheet. We only need the URL, which WebURL/Text
-			     already cover. -->
+			     already cover.
+
+			     The image count is what caps a multi-select share from Photos:
+			     iOS hides the extension entirely once the selection exceeds it,
+			     so 1 meant "one sleeve at a time". Each photo is uploaded and
+			     vision-scanned as its own request, so this is a deliberate cap
+			     rather than an open door — 10 covers a stack of sleeves without
+			     turning one share into a minutes-long queue. -->
 			<key>NSExtensionActivationRule</key>
 			<dict>
 				<key>NSExtensionActivationSupportsWebURLWithMaxCount</key>
@@ -49,7 +56,7 @@
 				<key>NSExtensionActivationSupportsText</key>
 				<true/>
 				<key>NSExtensionActivationSupportsImageWithMaxCount</key>
-				<integer>1</integer>
+				<integer>10</integer>
 			</dict>
 		</dict>
 	</dict>
