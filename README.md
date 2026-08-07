@@ -56,6 +56,7 @@ Open http://localhost:3000.
 | `APPLE_MUSIC_KEY_ID`      | No       | —                      | MusicKit key identifier for the `.p8` auth key.                                                                                                  |
 | `APPLE_MUSIC_PRIVATE_KEY` | No       | —                      | Contents of the MusicKit `AuthKey_XXXX.p8` (PKCS#8 PEM; `\n`-escaped newlines accepted).                                                         |
 | `APPLE_MUSIC_STOREFRONT`  | No       | `gb`                   | Two-letter storefront code used for Apple Music catalogue search.                                                                                |
+| `YOUTUBE_API_KEY`         | No       | —                      | YouTube Data API v3 key. Enables the YouTube fallback search for releases the active streaming service doesn't carry.                            |
 
 ## Scripts
 

@@ -3,6 +3,7 @@ import { db } from "./db/index";
 import { artists, musicItems, musicLinks, sources } from "./db/schema";
 import { parseUrl } from "./utils";
 import { searchAppleMusic, searchSpotify, type ServiceSearchResult } from "./scraper";
+import { searchYouTube } from "./youtube-search";
 import { getLookupService, type LookupService } from "./settings";
 
 // ---------------------------------------------------------------------------
@@ -16,6 +17,10 @@ import { getLookupService, type LookupService } from "./settings";
 //   1. Eagerly, fire-and-forget, when an item is created (music-item-creator).
 //   2. Lazily, on demand, when a release page is viewed (routes/release).
 //   3. In bulk, via the one-off backfill script for pre-existing items.
+//
+// When the active service has no match — common for small-label and
+// out-of-print records — a second lookup runs against YouTube, which only
+// yields a link when the match is unambiguous (see server/youtube-search.ts).
 // ---------------------------------------------------------------------------
 
 export interface ServiceConfig {
@@ -42,6 +47,12 @@ export const LOOKUP_SERVICE_CONFIG: Record<LookupService, ServiceConfig> = {
   },
 };
 
+/** The service used when the active one has nothing. */
+export const FALLBACK_SERVICE = {
+  sourceName: "youtube",
+  displayName: "YouTube",
+} as const;
+
 export interface ItemInfoForLookup {
   title: string;
   artistName: string | null;
@@ -60,6 +71,11 @@ export type SearchServiceFn = (
   title: string,
   artist: string | null,
   service: LookupService,
+) => Promise<ServiceSearchResult | null>;
+/** Second-chance search, only consulted when the active service has no match. */
+export type SearchFallbackFn = (
+  title: string,
+  artist: string | null,
 ) => Promise<ServiceSearchResult | null>;
 export type SaveLinkFn = (itemId: number, url: string, sourceName: string) => Promise<void>;
 export type SaveArtworkFn = (itemId: number, artworkUrl: string) => Promise<void>;
@@ -158,6 +174,7 @@ export interface SecondaryLookupDeps {
   fetchItem: FetchItemForLookupFn;
   getExisting: GetExistingLinkFn;
   search: SearchServiceFn;
+  searchFallback: SearchFallbackFn;
   save: SaveLinkFn;
   saveArtwork: SaveArtworkFn;
   stamp: StampLookupFn;
@@ -168,6 +185,7 @@ export const defaultSecondaryLookupDeps: SecondaryLookupDeps = {
   fetchItem: fetchItemForLookup,
   getExisting: getExistingLink,
   search: defaultSearch,
+  searchFallback: (title, artist) => searchYouTube(title, artist),
   save: saveLink,
   saveArtwork,
   stamp: stampLookup,
@@ -176,7 +194,16 @@ export const defaultSecondaryLookupDeps: SecondaryLookupDeps = {
 export type SecondaryLookupOutcome =
   | { kind: "not_found" }
   | { kind: "skipped"; reason: "primary_is_active_service" | "already_attempted" }
-  | { kind: "result"; service: LookupService; serviceDisplayName: string; url: string | null };
+  | {
+      kind: "result";
+      /** The active service the lookup ran against. */
+      service: LookupService;
+      /** Display name of the service `url` points at — the fallback's when it supplied the hit. */
+      serviceDisplayName: string;
+      url: string | null;
+      /** Present only when `url` came from the YouTube fallback rather than the active service. */
+      via?: "fallback";
+    };
 
 /** True when the item's primary link is already on the active service. */
 function primaryIsActiveService(item: ItemInfoForLookup, cfg: ServiceConfig): boolean {
@@ -187,11 +214,44 @@ function primaryIsActiveService(item: ItemInfoForLookup, cfg: ServiceConfig): bo
   );
 }
 
+/** True when the item is already a YouTube link — the fallback has nothing to add. */
+function primaryIsFallbackService(item: ItemInfoForLookup): boolean {
+  if (item.primarySource === FALLBACK_SERVICE.sourceName) return true;
+  if (!item.primaryUrl) return false;
+  return parseUrl(item.primaryUrl).source === FALLBACK_SERVICE.sourceName;
+}
+
+/**
+ * Second chance for a release the active service doesn't carry: search YouTube
+ * and save the result, but only when that search is confident it found the
+ * right recording — it returns null rather than guessing. Any artwork the
+ * fallback reports is ignored; a video thumbnail is not a cover.
+ */
+async function lookupFallbackLink(
+  itemId: number,
+  item: ItemInfoForLookup,
+  deps: SecondaryLookupDeps,
+): Promise<string | null> {
+  // Already a YouTube link, or already carries one — the release page shows it
+  // among the item's own links either way.
+  if (primaryIsFallbackService(item)) return null;
+  if (await deps.getExisting(itemId, FALLBACK_SERVICE.sourceName)) return null;
+
+  const hit = await deps.searchFallback(item.title, item.artistName);
+  if (!hit) return null;
+
+  await deps.save(itemId, hit.url, FALLBACK_SERVICE.sourceName);
+  return hit.url;
+}
+
 /**
  * Core lookup orchestration shared by the route, the eager creation hook, and
  * the backfill script. Resolves a secondary link on the active streaming
  * service for an item that isn't already on that service, persisting a hit and
  * stamping the lookup marker on both a hit and a miss.
+ *
+ * When the active service has nothing, a YouTube search runs as a fallback and
+ * its (high-confidence only) hit is saved as a YouTube secondary link instead.
  */
 export async function lookupSecondaryLinkForItem(
   itemId: number,
@@ -221,6 +281,16 @@ export async function lookupSecondaryLinkForItem(
   await deps.stamp(itemId);
 
   if (!result) {
+    const fallbackUrl = await lookupFallbackLink(itemId, item, deps);
+    if (fallbackUrl) {
+      return {
+        kind: "result",
+        service,
+        serviceDisplayName: FALLBACK_SERVICE.displayName,
+        url: fallbackUrl,
+        via: "fallback",
+      };
+    }
     return { kind: "result", service, serviceDisplayName: cfg.displayName, url: null };
   }
 

@@ -12,6 +12,7 @@ const getService = mock();
 const fetchItem = mock();
 const getExisting = mock();
 const search = mock();
+const searchFallback = mock();
 const save = mock();
 const saveArtwork = mock();
 const stamp = mock();
@@ -21,6 +22,7 @@ const deps: SecondaryLookupDeps = {
   fetchItem,
   getExisting,
   search,
+  searchFallback,
   save,
   saveArtwork,
   stamp,
@@ -48,11 +50,13 @@ beforeEach(() => {
   fetchItem.mockReset();
   getExisting.mockReset();
   search.mockReset();
+  searchFallback.mockReset();
   save.mockReset();
   saveArtwork.mockReset();
   stamp.mockReset();
   getService.mockResolvedValue("apple_music" as LookupService);
   getExisting.mockResolvedValue(null);
+  searchFallback.mockResolvedValue(null);
   save.mockResolvedValue(undefined);
   saveArtwork.mockResolvedValue(undefined);
   stamp.mockResolvedValue(undefined);
@@ -177,6 +181,13 @@ describe("lookupSecondaryLinkForItem", () => {
     expect(stamp).toHaveBeenCalledWith(5);
   });
 
+  test("on a hit: never consults the YouTube fallback", async () => {
+    fetchItem.mockResolvedValue(item());
+    search.mockResolvedValue(hit("https://music.apple.com/gb/album/blue-lines/456"));
+    await lookupSecondaryLinkForItem(5, deps);
+    expect(searchFallback).not.toHaveBeenCalled();
+  });
+
   test("uses the active service from settings (Spotify)", async () => {
     getService.mockResolvedValue("spotify" as LookupService);
     fetchItem.mockResolvedValue(item({ primarySource: "apple_music" }));
@@ -191,6 +202,91 @@ describe("lookupSecondaryLinkForItem", () => {
     expect(getExisting).toHaveBeenCalledWith(9, "spotify");
     expect(search).toHaveBeenCalledWith("Blue Lines", "Massive Attack", "spotify");
     expect(save).toHaveBeenCalledWith(9, "https://open.spotify.com/album/xyz", "spotify");
+  });
+});
+
+describe("YouTube fallback", () => {
+  const video = "https://www.youtube.com/watch?v=abc123";
+
+  test("saves a confident YouTube hit when the active service has nothing", async () => {
+    fetchItem.mockResolvedValue(item());
+    search.mockResolvedValue(null);
+    searchFallback.mockResolvedValue(hit(video));
+
+    const outcome = await lookupSecondaryLinkForItem(7, deps);
+
+    expect(outcome).toEqual({
+      kind: "result",
+      service: "apple_music",
+      serviceDisplayName: "YouTube",
+      url: video,
+      via: "fallback",
+    });
+    expect(searchFallback).toHaveBeenCalledWith("Blue Lines", "Massive Attack");
+    expect(save).toHaveBeenCalledWith(7, video, "youtube");
+    expect(stamp).toHaveBeenCalledWith(7);
+  });
+
+  test("reports a miss when the fallback isn't confident either", async () => {
+    fetchItem.mockResolvedValue(item());
+    search.mockResolvedValue(null);
+    searchFallback.mockResolvedValue(null);
+
+    const outcome = await lookupSecondaryLinkForItem(7, deps);
+
+    expect(outcome).toEqual({
+      kind: "result",
+      service: "apple_music",
+      serviceDisplayName: "Apple Music",
+      url: null,
+    });
+    expect(save).not.toHaveBeenCalled();
+  });
+
+  test("never takes artwork from a fallback hit", async () => {
+    fetchItem.mockResolvedValue(item({ artworkUrl: null }));
+    search.mockResolvedValue(null);
+    searchFallback.mockResolvedValue(hit(video, "https://i.ytimg.com/vi/abc123/maxres.jpg"));
+
+    await lookupSecondaryLinkForItem(7, deps);
+
+    expect(saveArtwork).not.toHaveBeenCalled();
+  });
+
+  test("skips the fallback for an item that is already a YouTube link", async () => {
+    fetchItem.mockResolvedValue(item({ primarySource: "youtube", primaryUrl: video }));
+    search.mockResolvedValue(null);
+
+    const outcome = await lookupSecondaryLinkForItem(7, deps);
+
+    expect(searchFallback).not.toHaveBeenCalled();
+    expect(outcome).toMatchObject({ url: null, serviceDisplayName: "Apple Music" });
+  });
+
+  test("skips the fallback when the item already carries a YouTube link", async () => {
+    fetchItem.mockResolvedValue(item());
+    search.mockResolvedValue(null);
+    getExisting.mockImplementation(async (_id: number, source: string) =>
+      source === "youtube" ? video : null,
+    );
+
+    const outcome = await lookupSecondaryLinkForItem(7, deps);
+
+    expect(searchFallback).not.toHaveBeenCalled();
+    expect(save).not.toHaveBeenCalled();
+    expect(outcome).toMatchObject({ url: null });
+  });
+
+  test("also backs up a Spotify lookup", async () => {
+    getService.mockResolvedValue("spotify" as LookupService);
+    fetchItem.mockResolvedValue(item());
+    search.mockResolvedValue(null);
+    searchFallback.mockResolvedValue(hit(video));
+
+    const outcome = await lookupSecondaryLinkForItem(8, deps);
+
+    expect(outcome).toMatchObject({ service: "spotify", url: video, via: "fallback" });
+    expect(save).toHaveBeenCalledWith(8, video, "youtube");
   });
 });
 
