@@ -25,6 +25,13 @@
 - When a non-Apple-Music item is added (via the API, email/link ingest, or photo ingest) `scheduleAppleMusicBackfill` runs the lookup in the background, so a playable Apple Music link is usually ready before the release page is opened.
 - `POST /api/release/apple-music-lookup/:id` exposes the same logic on demand and is still used as a lazy fallback from the release page for older items.
 
+## YouTube fallback
+
+- Plenty of releases (small labels, out-of-print records) simply aren't on Apple Music or Spotify. When the active service's search comes up empty, `server/secondary-link-enrichment.ts` runs a second lookup through `searchYouTube` (`server/youtube-search.ts`) and saves a hit as a secondary `youtube` link.
+- The fallback only fires on a miss, is skipped for items that are already a YouTube link or already have one, and never contributes artwork — a video thumbnail isn't a cover.
+- YouTube search always returns *something*, so a candidate is only accepted when `judgeYouTubeCandidate` is confident: the release title must appear whole-word in the video title, the artist must own the channel (`<Artist> - Topic`, or a channel named after them) or be named in the video title, and the leftover words must not advertise a cover, live take, remix, karaoke, reaction or similar. Anything short of that yields no link at all.
+- Requires `YOUTUBE_API_KEY` (YouTube Data API v3). Without it the fallback cleanly no-ops, as does everything else under `OTB_DISABLE_EXTERNAL_LOOKUPS`.
+
 ## Frontend tie-in
 
 `src/ui/state/add-form-machine.ts` runs upload and scan in parallel, then uses MusicBrainz lookup as a non-fatal enrichment step before final item creation.

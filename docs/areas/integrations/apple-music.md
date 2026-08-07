@@ -56,6 +56,10 @@ artwork and the item has none of its own, that cover is saved to the item's
 `artworkUrl` (never overwriting existing art) — so pulling a release from Apple
 Music now brings its artwork along too.
 
+When Apple Music has no match at all, the enrichment falls back to a YouTube
+search and saves a link only when that match is unambiguous — see the YouTube
+fallback section of `docs/areas/integrations/scanning-and-enrichment.md`.
+
 ## Browser playback
 
 - `src/lib/musickit.svelte.ts` loads MusicKit JS v3 on demand, configures it
