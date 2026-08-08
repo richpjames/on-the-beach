@@ -96,16 +96,16 @@ jobs:
         # genuinely compiled by the xcodebuild steps below.
         run: ruby scripts/add-widget-extension.rb
 
-      - name: Verify Widget macOS entitlements
-        # Same regression guard as the Share Extension: macOS always sandboxes an
-        # app extension, so without com.apple.security.network.client the widget's
-        # stats GET is silently denied and the count never loads. Assert the
-        # entitlements file grants network and the injector wired it (macOS-scoped)
-        # onto the widget target.
+      - name: Verify Widget sandbox + bundled logo
+        # macOS always sandboxes an app extension, so assert the entitlements
+        # file declares the sandbox and the injector wired it (macOS-scoped) onto
+        # the widget target. The widget's whole content is assets/logo.png, which
+        # it loads by filename, so also assert the injector copied it into the
+        # bundle — without it the widget falls back to a bare wordmark.
         run: |
-          grep -q 'com.apple.security.network.client' native/Widget/OTBWidget.entitlements
           grep -q 'com.apple.security.app-sandbox' native/Widget/OTBWidget.entitlements
           grep -q 'native/Widget/OTBWidget.entitlements' ios/App/App.xcodeproj/project.pbxproj
+          grep -q 'logo.png in Resources' ios/App/App.xcodeproj/project.pbxproj
 
       - name: Verify Share Extension macOS entitlements
         # Regression guard for a bug that only bit the real Mac app: macOS always

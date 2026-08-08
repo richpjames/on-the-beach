@@ -6,14 +6,13 @@
 	     scripts/add-widget-extension.rb, so iOS device signing is untouched).
 
 	     macOS ALWAYS runs an app extension inside the "plugin" App Sandbox, and a
-	     WidgetKit extension is no exception. Without network.client the widget's
-	     URLSession GET to /api/ingest/stats is silently denied and the count never
-	     loads (the widget just shows a dash). These two keys grant the extension
-	     outbound network inside its sandbox. Same rationale as the Share
-	     Extension's entitlements. -->
+	     WidgetKit extension is no exception, so declare it explicitly rather than
+	     leaning on whatever the signing step infers.
+
+	     Unlike the Share Extension there's no network.client here: the widget
+	     draws a logo bundled with it and never makes a request, so it asks for
+	     nothing beyond the sandbox itself. -->
 	<key>com.apple.security.app-sandbox</key>
-	<true/>
-	<key>com.apple.security.network.client</key>
 	<true/>
 </dict>
 </plist>

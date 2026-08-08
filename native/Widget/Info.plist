@@ -19,13 +19,8 @@
 	<key>CFBundleVersion</key>
 	<string>$(CURRENT_PROJECT_VERSION)</string>
 
-	<!-- App configuration, shared with the Share Extension. OTBBaseURL is safe to
-	     commit; OTBIngestAPIKey resolves from Secrets.xcconfig at build time
-	     (gitignored) via the $(OTB_INGEST_API_KEY) substitution. -->
-	<key>OTBBaseURL</key>
-	<string>https://onthebeach.ricojam.es</string>
-	<key>OTBIngestAPIKey</key>
-	<string>$(OTB_INGEST_API_KEY)</string>
+	<!-- No OTBBaseURL / OTBIngestAPIKey here: the widget draws the bundled logo
+	     and makes no requests, so it needs no server config or ingest key. -->
 
 	<!-- A WidgetKit extension has a SwiftUI @main entry point (OTBWidgetBundle),
 	     so there's no NSExtensionPrincipalClass / storyboard — just the point id. -->

@@ -32,9 +32,10 @@ NATIVE_DIR = File.join(REPO_ROOT, "native", "Widget")
 SWIFT_SOURCE = File.join(NATIVE_DIR, "OTBWidget.swift")
 INFO_PLIST = File.join(NATIVE_DIR, "Info.plist")
 ENTITLEMENTS = File.join(NATIVE_DIR, "OTBWidget.entitlements")
-# The widget reuses the Share Extension's ingest key (OTB_INGEST_API_KEY), so
-# there's a single gitignored Secrets.xcconfig to maintain for the whole app.
-SECRETS_XCCONFIG = File.join(REPO_ROOT, "native", "ShareExtension", "Secrets.xcconfig")
+# The widget draws the brand master itself, so the PNG is copied into the
+# extension's bundle (referenced in place — assets/logo.png stays the one
+# source of truth for every icon in the project).
+LOGO = File.join(REPO_ROOT, "assets", "logo.png")
 
 EXT_NAME = "OTBWidget"
 APP_TARGET_NAME = "App"
@@ -52,6 +53,7 @@ end
 die "no Xcode project at #{PROJECT_PATH} — run `bun run cap:add` first" unless File.exist?(PROJECT_PATH)
 die "missing #{SWIFT_SOURCE}" unless File.exist?(SWIFT_SOURCE)
 die "missing #{INFO_PLIST}" unless File.exist?(INFO_PLIST)
+die "missing #{LOGO}" unless File.exist?(LOGO)
 
 project = Xcodeproj::Project.open(PROJECT_PATH)
 
@@ -127,10 +129,10 @@ ext_target.build_configurations.each do |config|
     # Also build the widget for Mac Catalyst so it can appear as a macOS widget.
     # Xcode derives MACOSX_DEPLOYMENT_TARGET from the iOS floor.
     "SUPPORTS_MACCATALYST" => "YES",
-    # macOS ALWAYS sandboxes an app extension, and without network.client the
-    # widget's URLSession GET to /api/ingest/stats is silently denied. Grant the
-    # sandbox + outbound network via an entitlements file, scoped to the macOS
-    # SDK (what Mac Catalyst builds against) so iOS device signing is untouched.
+    # macOS ALWAYS sandboxes an app extension, so declare the sandbox explicitly
+    # via an entitlements file, scoped to the macOS SDK (what Mac Catalyst builds
+    # against) so iOS device signing is untouched. The widget draws a bundled
+    # image and makes no requests, so it asks for no network access.
     "CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" => "../../native/Widget/OTBWidget.entitlements",
   )
 end
@@ -146,18 +148,11 @@ ext_target.add_file_references([swift_ref])
 group.new_file(INFO_PLIST)
 group.new_file(ENTITLEMENTS) if File.exist?(ENTITLEMENTS)
 
-# --- Wire the shared ingest-key xcconfig -------------------------------------
-# Secrets.xcconfig (in native/ShareExtension/) provides OTB_INGEST_API_KEY,
-# substituted into the widget's Info.plist at build time. It's gitignored, so it
-# may be absent on a fresh checkout / in CI; the caller creates it (docs for
-# local, a dummy in CI). A missing base config is a warning, not a hard failure —
-# the target still builds with an empty key (the widget then shows a dash).
-secrets_ref = group.new_file(SECRETS_XCCONFIG)
-ext_target.build_configurations.each do |config|
-  config.base_configuration_reference = secrets_ref
-end
-warn "add-widget-extension: note — #{SECRETS_XCCONFIG} not found; " \
-     "build will use an empty OTB_INGEST_API_KEY" unless File.exist?(SECRETS_XCCONFIG)
+# --- Bundle the logo ----------------------------------------------------------
+# The widget's only content is the brand master, which it loads by filename
+# (`UIImage(named: "logo")`), so copy assets/logo.png into the extension bundle.
+logo_ref = group.new_file(LOGO)
+ext_target.add_resources([logo_ref])
 
 # --- Embed the widget in the app ---------------------------------------------
 app_target.add_dependency(ext_target)
