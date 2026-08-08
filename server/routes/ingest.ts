@@ -228,9 +228,10 @@ export function createIngestRoutes(deps: IngestRoutesDeps = {}): Hono {
     return c.json({ stacks: await listStacks() });
   });
 
-  // GET /stats — glanceable counts for the iOS home-screen widget. Bearer-authed
-  // with the ingest key (same as /stacks) because the widget extension can't use
-  // the session-authed app API. Kept tiny on purpose: one number the widget draws.
+  // GET /stats — the to-listen count for clients that can't use the
+  // session-authed app API, so it's Bearer-authed with the ingest key (same as
+  // /stacks). Originally fed the iOS home-screen widget, which now just shows the
+  // logo; kept as a tiny, generally useful counter.
   routes.get("/stats", async (c) => {
     const apiKey = process.env.INGEST_API_KEY;
     if (!apiKey) {

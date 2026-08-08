@@ -145,36 +145,39 @@ To rebrand: replace `assets/logo.png` and run `bun run brand:assets` (then
 
 ## Home-screen Widget
 
-A small (square) **WidgetKit** widget shows how many releases are still queued
-**To Listen** — the one glanceable number for a listening tracker. It's the
-widget sibling of the Share Extension: hand-authored SwiftUI in
+A small (square) **WidgetKit** widget shows the logo — the surfing capybara on
+the black playlist well — and opens the app when tapped. That's all it does on
+purpose: the app is about enjoying music, not about clearing a queue, so the
+widget is a shortcut and a bit of character rather than a number to drive down.
+It's the widget sibling of the Share Extension: hand-authored SwiftUI in
 `native/Widget/OTBWidget.swift`, injected into the generated Xcode project by
 `scripts/add-widget-extension.rb` (extension point
 `com.apple.widgetkit-extension`), and compiled in CI by the same `ios-build.yml`
 job that builds the app and Share Extension.
 
-- **Data.** The widget fetches `GET /api/ingest/stats` (added in
-  `server/routes/ingest.ts`), which returns `{ "to_listen": N }`. It's
-  Bearer-authed with the **same** ingest key the Share Extension uses, so there's
-  nothing new to configure: the widget's `Info.plist` carries `OTBBaseURL`
-  (committed) and `OTBIngestAPIKey` (`$(OTB_INGEST_API_KEY)`, substituted at
-  build time), and its target reuses `native/ShareExtension/Secrets.xcconfig` as
-  its base configuration — one gitignored secret for the whole app. Any failure
-  (no key, offline, server error) renders a dash rather than an error.
-- **Refresh.** The timeline refreshes roughly every 30 minutes; WidgetKit budgets
-  background reloads, so the count is eventually-consistent, not live.
+- **Data: none.** The widget makes no network requests and needs no ingest key,
+  session or App Group. Its timeline is a single entry with a `.never` refresh
+  policy — there's nothing to reload.
+- **The image.** `scripts/add-widget-extension.rb` copies the brand master
+  `assets/logo.png` into the extension bundle (referenced in place, so the master
+  stays the single source of truth), and the view loads it by filename with
+  `UIImage(named: "logo")`. If that resource ever goes missing the view falls
+  back to a text wordmark rather than an empty tile.
+- **Families.** Home Screen `systemSmall` only. The Lock Screen accessory
+  families are rendered monochrome by the system, which reduces the logo to an
+  unreadable silhouette.
 - **Styling.** Like the Share Extension, the widget can't reach the web app's
   stylesheet, so the Windows 98 / Winamp look (black playlist well, electric-blue
-  accent, Verdana chrome type) is mirrored in the file's `OTBTheme`.
+  accent, Courier chrome type) is mirrored in the file's `OTBTheme`.
 - **Mac Catalyst + sandbox.** `SUPPORTS_MACCATALYST` is enabled and
-  `native/Widget/OTBWidget.entitlements` grants the sandboxed extension outbound
-  network (macOS always sandboxes an app extension; without
-  `com.apple.security.network.client` the stats GET is silently denied) — exactly
-  as the Share Extension does. It's wired via `CODE_SIGN_ENTITLEMENTS[sdk=macosx*]`
-  so iOS device signing is untouched.
+  `native/Widget/OTBWidget.entitlements` declares the App Sandbox (macOS always
+  sandboxes an app extension). Unlike the Share Extension it grants no
+  `com.apple.security.network.client` — the widget never makes a request. It's
+  wired via `CODE_SIGN_ENTITLEMENTS[sdk=macosx*]` so iOS device signing is
+  untouched.
 
 To add it to your home screen: long-press the home screen ▸ **+** ▸ search **On
-The Beach** ▸ pick the small **To Listen** widget. Tapping it opens the app.
+The Beach** ▸ pick the small **On The Beach** widget. Tapping it opens the app.
 
 ## Prerequisites (mac only)
 
