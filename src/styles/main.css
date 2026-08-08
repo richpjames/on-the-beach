@@ -1586,10 +1586,15 @@ select.input {
     width: 100%;
   }
 
+  /* Full-bleed across the dock rather than a narrow overlay on the right, but
+     still opening upward: anchoring below the row (top: 100%) puts the panel
+     under the taskbar, off-screen. `top: auto` also un-does the
+     over-constrained top/bottom pair, which otherwise collapses the height. */
   .browse-tools__panel--sort {
-    top: 100%;
-    left: 0;
-    right: 0;
+    top: auto;
+    bottom: calc(100% + 8px);
+    left: -2px;
+    right: -2px;
     width: auto;
     min-width: 0;
   }
