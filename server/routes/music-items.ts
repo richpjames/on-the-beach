@@ -167,6 +167,43 @@ async function applyArtistUpdate(
   setFields.artistId = null;
 }
 
+/**
+ * The streaming-service catalogue search keys off nothing but the item's title
+ * and artist, so correcting either invalidates an earlier miss: clear the
+ * attempt marker (`lookupAttemptedAt`) so the next release-page view re-queries
+ * under the new name instead of short-circuiting on "already attempted".
+ *
+ * Only a real change resets it — re-saving the edit form with the same title
+ * must not re-open the search. An item that already carries a link on the
+ * active service is unaffected either way: the lookup returns that existing
+ * link before it ever consults the marker.
+ */
+async function applyLookupMarkerReset(id: number, setFields: MusicItemUpdateSet): Promise<void> {
+  const titleChanging = setFields.title !== undefined;
+  const artistChanging = setFields.artistId !== undefined;
+  if (!titleChanging && !artistChanging) {
+    return;
+  }
+
+  const rows = await db
+    .select({ title: musicItems.title, artistId: musicItems.artistId })
+    .from(musicItems)
+    .where(eq(musicItems.id, id))
+    .limit(1);
+
+  const current = rows[0];
+  if (!current) {
+    return;
+  }
+
+  const renamed = titleChanging && setFields.title !== current.title;
+  const reattributed = artistChanging && setFields.artistId !== current.artistId;
+
+  if (renamed || reattributed) {
+    setFields.lookupAttemptedAt = null;
+  }
+}
+
 // ---------------------------------------------------------------------------
 // GET / — list music items
 // ---------------------------------------------------------------------------
@@ -479,6 +516,7 @@ musicItemRoutes.patch("/:id", async (c) => {
   }
 
   await applyArtistUpdate(setFields, input);
+  await applyLookupMarkerReset(id, setFields);
 
   if (Object.keys(setFields).length > 0) {
     setFields.updatedAt = new Date();
