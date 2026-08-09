@@ -60,6 +60,14 @@ When Apple Music has no match at all, the enrichment falls back to a YouTube
 search and saves a link only when that match is unambiguous — see the YouTube
 fallback section of `docs/areas/integrations/scanning-and-enrichment.md`.
 
+A lookup stamps `music_items.apple_music_lookup_at` on both a hit and a miss, so
+a release the catalogue doesn't carry isn't re-queried on every page view. Since
+the search keys off nothing but the item's title and artist, editing either one
+(`PATCH /api/music-items/:id`) clears that marker, and the next release-page view
+searches again under the corrected name — the usual reason an item ends up with
+no listen link is a title that was wrong when it was first looked up. Re-saving
+the edit form without actually changing those fields leaves the marker alone.
+
 ## Browser playback
 
 - `src/lib/musickit.svelte.ts` loads MusicKit JS v3 on demand, configures it
