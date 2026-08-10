@@ -54,3 +54,42 @@ test("links without https", async ({ page }) => {
   // The source badge should link to the full URL with protocol
   await expect(card.locator(".badge--source")).toHaveAttribute("href", expectedNormalizedUrl);
 });
+
+test("a Bandcamp link added by hand is reachable from the release page", async ({ page }) => {
+  const bandcampUrl =
+    "https://seekersinternational.bandcamp.com/album/thewherebetweenyou-me-reissue";
+
+  // A release with no link at all — the case where the added link becomes the
+  // primary one, and so is left out of the secondary "🔗" list in view mode.
+  await page.goto("/");
+  const addButton = page.getByRole("button", { name: "Add" });
+  await addButton.click(); // reveals artist/release fields
+  await page.locator('input[name="title"]').fill("Hand Linked Release");
+  await addButton.click(); // submits
+
+  const card = page.locator(".music-card").first();
+  await expect(card).toBeVisible({ timeout: 10_000 });
+  await card.locator("a.music-card__link").click();
+  await expect(page).toHaveURL(/\/r\/\d+/, { timeout: 10_000 });
+
+  await page.locator("#edit-btn").click();
+  await page.locator("#link-source-input").click();
+  await page.locator('#source-dropdown [data-value="Bandcamp"]').click();
+  await page.locator("#link-url-input").fill(bandcampUrl);
+  await page.locator("#add-link-btn").click();
+
+  // Adding the link scrapes it for the ids the Bandcamp player needs.
+  await expect(page.locator("#link-list .release-page__link-row")).toHaveCount(1, {
+    timeout: 30_000,
+  });
+  await page.locator("#cancel-btn").click();
+
+  // Exactly one control in view mode reaches the link: the ▶ Bandcamp button
+  // when the scrape found an album id, the plain source link when it didn't
+  // (whether it does is left to the route's own test, which doesn't depend on
+  // Bandcamp being up). Before, a first Bandcamp link produced neither.
+  const actions = page.locator(".release-page__actions");
+  await expect(
+    actions.locator(`[data-href="${bandcampUrl}"], a[href="${bandcampUrl}"]`),
+  ).toHaveCount(1, { timeout: 15_000 });
+});

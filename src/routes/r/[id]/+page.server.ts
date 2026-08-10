@@ -170,13 +170,19 @@ export const load: PageServerLoad = async ({ params, url }) => {
     error(404, "Not found — this release doesn't exist.");
   }
 
-  const sourceLink =
-    item.primary_url && !item.primary_url.includes("bandcamp.com")
-      ? {
-          href: item.primary_url,
-          label: sourceDisplayName(item.primary_source ?? parseUrl(item.primary_url).source),
-        }
-      : null;
+  // The plain link out to wherever the release came from. Bandcamp used to be
+  // excluded here, on the assumption that the ▶ Bandcamp button always stands
+  // in for it — but that button needs a scraped `album_id` the link may not
+  // have, and a release whose scrape came up empty was then left with no way to
+  // reach its own URL at all. The page hides this link whenever a play button
+  // already points at the same href, which covers the case the exclusion was
+  // there for.
+  const sourceLink = item.primary_url
+    ? {
+        href: item.primary_url,
+        label: sourceDisplayName(item.primary_source ?? parseUrl(item.primary_url).source),
+      }
+    : null;
 
   const appleMusicConfigured = isAppleMusicConfigured();
 
