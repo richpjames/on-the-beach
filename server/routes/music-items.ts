@@ -23,6 +23,7 @@ import {
   createMusicItemDirect,
 } from "../music-item-creator";
 import { hydrateItemStacks } from "../hydrate-item-stacks";
+import { scrapeLinkEmbedMetadata } from "../link-embed-metadata";
 import { UnsupportedMusicLinkError } from "../scraper";
 import { ensureSuggestionForItemNow, findPendingSuggestionForItem } from "../suggestions";
 import { scheduleAppleMusicBackfill } from "../apple-music-backfill";
@@ -686,9 +687,14 @@ musicItemRoutes.post("/:id/links", async (c) => {
 
   const isPrimary = existing.length === 0;
 
+  // Scraped here rather than at creation time, because this link never went
+  // through the creation path — without it a hand-added Bandcamp link can't
+  // produce a player. Null for every other source, and on any scrape failure.
+  const metadata = await scrapeLinkEmbedMetadata(url);
+
   const [link] = await db
     .insert(musicLinks)
-    .values({ musicItemId: id, sourceId: source.id, url, isPrimary })
+    .values({ musicItemId: id, sourceId: source.id, url, isPrimary, metadata })
     .onConflictDoNothing()
     .returning({ id: musicLinks.id, url: musicLinks.url, isPrimary: musicLinks.isPrimary });
 

@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { goto } from "$app/navigation";
+  import { goto, invalidateAll } from "$app/navigation";
   import { onMount } from "svelte";
   import type { PageData } from "../../routes/r/[id]/$types";
   import type { AppleMusicListen, ListenEmbed } from "../../routes/r/[id]/+page.server";
@@ -297,10 +297,19 @@
       : allSources,
   );
 
+  // The play buttons and the source link are built server-side from the
+  // *primary* link, so editing the link list has to re-run the page load for
+  // view mode to catch up. Re-running it (rather than reloading the window)
+  // keeps whatever else is half-typed in the edit fields.
+  async function refreshListenOptions(): Promise<void> {
+    await invalidateAll();
+  }
+
   async function removeLink(linkId: number): Promise<void> {
     const res = await apiFetch(`/api/music-items/${item.id}/links/${linkId}`, { method: "DELETE" });
     if (res.ok) {
       itemLinks = itemLinks.filter((l) => l.id !== linkId);
+      await refreshListenOptions();
     }
   }
 
@@ -318,6 +327,7 @@
       itemLinks = [...itemLinks, link];
       sourceQuery = "";
       linkUrl = "";
+      await refreshListenOptions();
     } else {
       const err = await res.json().catch(() => ({}) as { error?: string });
       alert(err.error || "Failed to add link");
