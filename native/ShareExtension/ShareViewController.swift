@@ -1310,6 +1310,28 @@ private final class ComposeFormController: UIViewController, UITextViewDelegate 
     }
 }
 
+private extension UITableViewController {
+    /// Resize `tableHeaderView` to the height its own Auto Layout asks for.
+    ///
+    /// Table header views are laid out by frame, not by constraints, so a header
+    /// built with Auto Layout (the list picker's search field, the release
+    /// picker's message banner) keeps whatever height it was given until it's
+    /// measured and re-set. Call from `viewDidLayoutSubviews`; the height check
+    /// stops the re-assignment from looping.
+    func sizeTableHeaderToFit() {
+        guard let header = tableView.tableHeaderView else { return }
+        let height = header.systemLayoutSizeFitting(
+            CGSize(width: tableView.bounds.width, height: UIView.layoutFittingCompressedSize.height),
+            withHorizontalFittingPriority: .required,
+            verticalFittingPriority: .fittingSizeLevel
+        ).height
+        if abs(header.frame.height - height) > 0.5 {
+            header.frame.size = CGSize(width: tableView.bounds.width, height: height)
+            tableView.tableHeaderView = header
+        }
+    }
+}
+
 /// A multi-select list picker pushed onto the compose form's navigation stack.
 ///
 /// Shows every existing list with a checkmark for the ones the item will go into,
@@ -1318,10 +1340,16 @@ private final class ComposeFormController: UIViewController, UITextViewDelegate 
 /// reported via `onSelectionChanged` after every change — the server resolves the
 /// names (creating any new), so no id round-trip is needed.
 ///
+/// A **search field** sits above the rows — the native twin of the web app's
+/// `StackDropdown` box, down to the "Search or add a list…" placeholder. Typing
+/// filters the existing lists, and Return files the item into whatever was typed
+/// (matching an existing list by name, or creating one) so a long collection
+/// doesn't have to be scrolled through on a phone-sized sheet.
+///
 /// There's also an **Add** button in the top right, mirroring the compose form's:
 /// choosing a list is normally the last decision, so the user can post from here
 /// and close the sheet without first navigating back.
-private final class ListPickerViewController: UITableViewController {
+private final class ListPickerViewController: UITableViewController, UITextFieldDelegate {
     var onSelectionChanged: (([String]) -> Void)?
     var onAdd: (() -> Void)?
 
@@ -1334,6 +1362,26 @@ private final class ListPickerViewController: UITableViewController {
     private var names: [String]
     // Selection order is preserved so the compose row and payload stay stable.
     private var selected: [String]
+
+    private let searchField = UITextField()
+    /// The trimmed search text. Empty means "show every list".
+    private var query = ""
+
+    /// The lists section 0 actually shows. `localizedStandardContains` is the
+    /// case- and diacritic-insensitive match the Finder uses, so "cafe" finds
+    /// "Café jazz" and "JAZZ" finds "Jazz finds".
+    private var visibleNames: [String] {
+        query.isEmpty ? names : names.filter { $0.localizedStandardContains(query) }
+    }
+
+    /// The name the "New list" row would create: whatever is in the search field,
+    /// unless it already names an existing list (nothing to create then — the
+    /// row falls back to prompting for a name).
+    private var newListNameFromQuery: String? {
+        guard !query.isEmpty, !names.contains(where: { $0.caseInsensitiveCompare(query) == .orderedSame })
+        else { return nil }
+        return query
+    }
 
     private lazy var addButton = OTBTheme.addBarButton(target: self, action: #selector(didTapAdd))
     private let postingIndicator = PostingIndicator()
@@ -1359,8 +1407,109 @@ private final class ListPickerViewController: UITableViewController {
         tableView.separatorColor = OTBTheme.navyBorder
         tableView.tintColor = OTBTheme.accent // checkmark colour
 
+        let searchHeader = makeSearchHeader()
+        searchHeader.frame = CGRect(
+            x: 0,
+            y: 0,
+            width: tableView.bounds.width,
+            height: 1 // resized to its content in viewDidLayoutSubviews
+        )
+        tableView.tableHeaderView = searchHeader
+        // Flicking through the results puts the keyboard away.
+        tableView.keyboardDismissMode = .onDrag
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(keyboardFrameChanged),
+            name: UIResponder.keyboardWillChangeFrameNotification,
+            object: nil
+        )
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(keyboardWillHide),
+            name: UIResponder.keyboardWillHideNotification,
+            object: nil
+        )
+
         navigationItem.rightBarButtonItem = addButton
         addButton.isEnabled = canAdd
+    }
+
+    override func viewDidLayoutSubviews() {
+        super.viewDidLayoutSubviews()
+        sizeTableHeaderToFit()
+    }
+
+    /// The search row: a sunken white field (the app's `--bevel-field` input)
+    /// on a chrome band, so it reads as window furniture above the black
+    /// playlist rather than as another list row.
+    private func makeSearchHeader() -> UIView {
+        let container = UIView()
+        container.backgroundColor = OTBTheme.chrome
+
+        let well = BeveledView(style: .field, fill: OTBTheme.chromeWhite)
+        well.translatesAutoresizingMaskIntoConstraints = false
+        container.addSubview(well)
+
+        searchField.font = OTBTheme.ui(14)
+        searchField.textColor = .black
+        searchField.tintColor = OTBTheme.winBlue
+        searchField.backgroundColor = .clear
+        searchField.borderStyle = .none
+        searchField.attributedPlaceholder = NSAttributedString(
+            string: "Search or add a list…",
+            attributes: [.foregroundColor: OTBTheme.chromeDark, .font: OTBTheme.ui(14)]
+        )
+        searchField.autocapitalizationType = .sentences
+        searchField.autocorrectionType = .no
+        searchField.clearButtonMode = .whileEditing
+        // Return files the item into the typed name, so there's nothing to
+        // submit while the field is empty.
+        searchField.enablesReturnKeyAutomatically = true
+        searchField.addTarget(self, action: #selector(didChangeQuery), for: .editingChanged)
+        searchField.addTarget(self, action: #selector(didSubmitQuery), for: .primaryActionTriggered)
+        // Only for the clear button, which doesn't reliably report itself as an
+        // edit — everything else comes through `.editingChanged`.
+        searchField.delegate = self
+        searchField.translatesAutoresizingMaskIntoConstraints = false
+        well.addSubview(searchField)
+
+        NSLayoutConstraint.activate([
+            well.topAnchor.constraint(equalTo: container.topAnchor, constant: 8),
+            well.bottomAnchor.constraint(equalTo: container.bottomAnchor, constant: -8),
+            well.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: 12),
+            well.trailingAnchor.constraint(equalTo: container.trailingAnchor, constant: -12),
+            searchField.topAnchor.constraint(equalTo: well.topAnchor, constant: 8),
+            searchField.bottomAnchor.constraint(equalTo: well.bottomAnchor, constant: -8),
+            searchField.leadingAnchor.constraint(equalTo: well.leadingAnchor, constant: 8),
+            searchField.trailingAnchor.constraint(equalTo: well.trailingAnchor, constant: -8),
+        ])
+        return container
+    }
+
+    // MARK: - Keyboard
+
+    /// Keep the rows clear of the keyboard. A table view only manages insets for
+    /// cells it's editing, and this field lives in the header — without this the
+    /// keyboard sits on top of the matches you just filtered down to, which on a
+    /// share sheet is most of the screen.
+    @objc private func keyboardFrameChanged(_ note: Notification) {
+        guard let frame = note.userInfo?[UIResponder.keyboardFrameEndUserInfoKey] as? CGRect else {
+            return
+        }
+        // The keyboard rect arrives in window coordinates; in the table's own
+        // space the overlap is what it hides of the visible rows. The safe-area
+        // inset is already applied to the content, so don't count it twice.
+        let overlap = tableView.convert(frame, from: nil).intersection(tableView.bounds).height
+        setKeyboardInset(max(0, overlap - view.safeAreaInsets.bottom))
+    }
+
+    @objc private func keyboardWillHide() {
+        setKeyboardInset(0)
+    }
+
+    private func setKeyboardInset(_ inset: CGFloat) {
+        tableView.contentInset.bottom = inset
+        tableView.verticalScrollIndicatorInsets.bottom = inset
     }
 
     /// While a post is in flight, swap Add for a spinner (with the "2 of 5"
@@ -1372,6 +1521,8 @@ private final class ListPickerViewController: UITableViewController {
         tableView.isUserInteractionEnabled = !posting
         navigationItem.hidesBackButton = posting
         if posting {
+            // Get the keyboard out of the way of the spinner and the toast.
+            searchField.resignFirstResponder()
             postingIndicator.start(progress)
             navigationItem.rightBarButtonItem = postingItem
         } else {
@@ -1383,11 +1534,39 @@ private final class ListPickerViewController: UITableViewController {
 
     @objc private func didTapAdd() { onAdd?() }
 
+    // MARK: - Search
+
+    /// Re-filter as the user types. Only the rows change — the selection is kept
+    /// whole, so filtering a list out never un-files the item from it.
+    @objc private func didChangeQuery() {
+        query = (searchField.text ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        tableView.reloadData()
+    }
+
+    /// Return files the item into whatever was typed: an existing list when the
+    /// name matches one (any case), otherwise a new list by that name — the same
+    /// shortcut the web dropdown's Enter key gives you.
+    @objc private func didSubmitQuery() {
+        addList(named: query)
+    }
+
+    private func clearSearch() {
+        searchField.text = ""
+        query = ""
+        tableView.reloadData()
+    }
+
+    /// The ⓧ button: restore the full list along with the empty field.
+    func textFieldShouldClear(_ textField: UITextField) -> Bool {
+        clearSearch()
+        return true
+    }
+
     // Section 0: existing lists (checkmark = selected). Section 1: "New list…".
     override func numberOfSections(in tableView: UITableView) -> Int { 2 }
 
     override func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
-        section == 0 ? names.count : 1
+        section == 0 ? visibleNames.count : 1
     }
 
     override func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
@@ -1402,13 +1581,16 @@ private final class ListPickerViewController: UITableViewController {
         cell.selectedBackgroundView = highlight
 
         if indexPath.section == 1 {
-            cell.textLabel?.text = "New list…"
+            // With something typed, the row names what it will create, so a
+            // search that matches nothing turns into "add it" without a detour
+            // through the prompt.
+            cell.textLabel?.text = newListNameFromQuery.map { "New list “\($0)”" } ?? "New list…"
             cell.textLabel?.textColor = OTBTheme.accent
             cell.accessoryType = .none
             return cell
         }
 
-        let name = names[indexPath.row]
+        let name = visibleNames[indexPath.row]
         cell.textLabel?.text = name
         cell.textLabel?.textColor = OTBTheme.playlistText
         cell.accessoryType = selected.contains(name) ? .checkmark : .none
@@ -1429,11 +1611,15 @@ private final class ListPickerViewController: UITableViewController {
         tableView.deselectRow(at: indexPath, animated: true)
 
         if indexPath.section == 1 {
-            promptForNewList()
+            if let typed = newListNameFromQuery {
+                addList(named: typed)
+            } else {
+                promptForNewList()
+            }
             return
         }
 
-        toggle(names[indexPath.row])
+        toggle(visibleNames[indexPath.row])
         tableView.reloadRows(at: [indexPath], with: .none)
     }
 
@@ -1447,21 +1633,34 @@ private final class ListPickerViewController: UITableViewController {
         onSelectionChanged?(selected)
     }
 
+    /// Files the item into a list by name — surfacing it as a checked row,
+    /// creating it if it's brand new. Shared by the "New list…" prompt, the
+    /// search field's Return key, and the "New list “…”" row.
+    ///
+    /// A name that already exists (in any case) selects that list rather than
+    /// adding a near-duplicate row: the server resolves lists by name, so two
+    /// spellings of the same list would file into one anyway. The search is
+    /// cleared afterwards so the row you just checked is visible in the list.
+    private func addList(named rawName: String) {
+        let name = rawName.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !name.isEmpty else { return }
+
+        let listName = names.first { $0.caseInsensitiveCompare(name) == .orderedSame } ?? name
+        if !names.contains(listName) { names.append(listName) }
+        if !selected.contains(listName) {
+            selected.append(listName)
+            onSelectionChanged?(selected)
+        }
+        clearSearch()
+    }
+
     private func promptForNewList() {
         let alert = UIAlertController(title: "New list", message: nil, preferredStyle: .alert)
         alert.addTextField { $0.placeholder = "List name"; $0.autocapitalizationType = .sentences }
         alert.addAction(UIAlertAction(title: "Cancel", style: .cancel))
         alert.addAction(UIAlertAction(title: "Add", style: .default) { [weak self, weak alert] _ in
-            guard let self else { return }
-            let name = alert?.textFields?.first?.text?.trimmingCharacters(in: .whitespacesAndNewlines)
-            guard let name, !name.isEmpty else { return }
-            // Surface the new list as a checked row, and select it if it's brand new.
-            if !self.names.contains(name) { self.names.append(name) }
-            if !self.selected.contains(name) {
-                self.selected.append(name)
-                self.onSelectionChanged?(self.selected)
-            }
-            self.tableView.reloadData()
+            guard let name = alert?.textFields?.first?.text else { return }
+            self?.addList(named: name)
         })
         present(alert, animated: true)
     }
@@ -1540,18 +1739,7 @@ private final class ReleasePickerViewController: UITableViewController {
 
     override func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews()
-        // Size the header banner to its text: table header views don't get
-        // Auto Layout for free, so measure and re-set when the height changes.
-        guard let header = tableView.tableHeaderView else { return }
-        let height = header.systemLayoutSizeFitting(
-            CGSize(width: tableView.bounds.width, height: UIView.layoutFittingCompressedSize.height),
-            withHorizontalFittingPriority: .required,
-            verticalFittingPriority: .fittingSizeLevel
-        ).height
-        if abs(header.frame.height - height) > 0.5 {
-            header.frame.size = CGSize(width: tableView.bounds.width, height: height)
-            tableView.tableHeaderView = header
-        }
+        sizeTableHeaderToFit()
     }
 
     /// While a post is in flight, swap Add for a spinner and lock the screen —
