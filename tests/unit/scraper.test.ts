@@ -1,4 +1,4 @@
-import { describe, test, expect, spyOn, mock } from "bun:test";
+import { describe, test, expect, spyOn, mock, beforeEach, afterEach } from "bun:test";
 import {
   parseOgTags,
   decodeHtmlEntities,
@@ -1007,6 +1007,23 @@ function mockItunesResponse(results: object[]): Response {
 }
 
 describe("searchAppleMusic", () => {
+  // Both lookup paths behind searchAppleMusic no-op under
+  // OTB_DISABLE_EXTERNAL_LOOKUPS, so a stray copy of the flag — left in the
+  // shared process by whichever test file `bun test` happened to run first —
+  // makes every assertion here read `undefined`. Guarantee it's off for these
+  // tests rather than depending on file order.
+  let flagBefore: string | undefined;
+
+  beforeEach(() => {
+    flagBefore = process.env.OTB_DISABLE_EXTERNAL_LOOKUPS;
+    delete process.env.OTB_DISABLE_EXTERNAL_LOOKUPS;
+  });
+
+  afterEach(() => {
+    if (flagBefore === undefined) delete process.env.OTB_DISABLE_EXTERNAL_LOOKUPS;
+    else process.env.OTB_DISABLE_EXTERNAL_LOOKUPS = flagBefore;
+  });
+
   test("returns URL for exact title and artist match", async () => {
     spyOn(globalThis, "fetch").mockResolvedValueOnce(
       mockItunesResponse([
