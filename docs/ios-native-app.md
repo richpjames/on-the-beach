@@ -34,6 +34,12 @@ for free by building the same targets with **Mac Catalyst** (see [Enable macOS
   name. On **Add** it `POST`s the URL — plus `notes` and `listName` when set — to
   `POST /api/ingest/link` with a `Bearer` token. The extension talks to the server
   directly, so a share works even when the app isn't running.
+- The list picker has a **search field** above the rows, the native counterpart of the
+  web app's `StackDropdown` (same "Search or add a list…" placeholder). Typing filters
+  your lists case- and accent-insensitively; pressing Return files the item into the
+  typed name — an existing list if one matches, a new one if not — so a big collection
+  doesn't have to be scrolled. When the search matches nothing, the "New list…" row
+  reads `New list “<what you typed>”` and creates it in one tap.
 - The list picker carries **its own Add button** in the top right, doing exactly what
   the compose form's does. Picking a list is usually the last decision, so this saves
   a trip back to the first screen just to post. Whichever Add you tap, the same note,
@@ -289,8 +295,9 @@ suggests this automatically.
 Plug in an iPhone (share-sheet testing is best on a device), select the **App**
 scheme, and run. To use the extension: open Safari, tap **Share**, and pick
 **On The Beach**. You should see the compose form — type a note if you like, tap
-**List** to file it into a list (existing or new), then tap **Add** — either the
-one on the compose form or the one in the list picker's top right.
+**List** to file it into a list (search for an existing one, or type a name and
+press Return to create it), then tap **Add** — either the one on the compose form
+or the one in the list picker's top right.
 
 ### 6. Enable macOS (Mac Catalyst)
 
