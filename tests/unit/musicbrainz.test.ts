@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, mock, spyOn, test } from "bun:test";
+import { afterEach, beforeEach, describe, expect, mock, spyOn, test } from "bun:test";
 import {
   lookupRelease,
   findSuggestedRelease,
@@ -19,6 +19,18 @@ function makeMbArtistReleasesResponse(releases: unknown[]): Response {
     headers: { "content-type": "application/json" },
   });
 }
+
+// `bun test` runs every file in one process, so `globalThis.fetch` can arrive
+// here still spied on — with responses another file queued and never spent. A
+// `mockResolvedValueOnce` set below would then queue *behind* those, and the
+// first request in this file gets served someone else's body: that's how
+// "returns the release closest in year to sourceYear" came to see zero releases
+// on CI (a `{ artists: [...] }` shape has no `releases` key) while passing
+// locally, where the file order put it first. Start every test from an
+// unmocked fetch rather than trusting whatever ran before.
+beforeEach(() => {
+  mock.restore();
+});
 
 describe("findSuggestedRelease", () => {
   afterEach(() => {

@@ -1,10 +1,28 @@
-import { describe, test, expect, spyOn, mock, afterEach } from "bun:test";
+import { describe, test, expect, spyOn, mock, afterEach, afterAll } from "bun:test";
 import { createMusicItemsFromUrl, formatPageSourceNote } from "../../server/music-item-creator";
 
 // Unsupported pages go through the Mistral extractor, and freshly created items
-// kick off background lookups — keep both off the network.
+// kick off background lookups — keep both off the network. Set at module scope
+// because the Mistral client reads its key when this file's imports evaluate,
+// which is before any hook can run.
+const ENV_BEFORE = {
+  MISTRAL_API_KEY: process.env.MISTRAL_API_KEY,
+  OTB_DISABLE_EXTERNAL_LOOKUPS: process.env.OTB_DISABLE_EXTERNAL_LOOKUPS,
+};
 process.env.MISTRAL_API_KEY = "test-key";
 process.env.OTB_DISABLE_EXTERNAL_LOOKUPS = "1";
+
+// `bun test` runs every file in one process, so anything left in `process.env`
+// here leaks into whichever file runs next — and file order isn't stable across
+// machines. Leaving OTB_DISABLE_EXTERNAL_LOOKUPS set is what turned the Apple
+// Music lookup tests in scraper.test.ts red on CI while they stayed green
+// locally: those code paths no-op under the flag, so they returned null.
+afterAll(() => {
+  for (const [key, value] of Object.entries(ENV_BEFORE)) {
+    if (value === undefined) delete process.env[key];
+    else process.env[key] = value;
+  }
+});
 
 /** The shape `@mistralai/mistralai` expects back from chat.complete. */
 function mockChatCompletionResponse(content: string): Response {
