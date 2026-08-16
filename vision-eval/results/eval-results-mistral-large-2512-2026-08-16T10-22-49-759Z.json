@@ -1,0 +1,1484 @@
+{
+  "run_at": "2026-08-16T10:25:53.998Z",
+  "model": "mistral-large-2512",
+  "total_cases": 101,
+  "strategies": {
+    "A": {
+      "results": [
+        {
+          "id": "the-earons-land-of-hunger",
+          "ground_truth": {
+            "artist": "The Earons",
+            "title": "Land Of Hunger"
+          },
+          "raw_response": "Artist: The Earons | Title: Land Of Hunger",
+          "parsed": {
+            "artist": "The Earons",
+            "title": "Land Of Hunger"
+          },
+          "score": 2,
+          "match_type": "exact"
+        },
+        {
+          "id": "louis-chedid-ainsi-soit-il",
+          "ground_truth": {
+            "artist": "Louis Chedid",
+            "title": "Ainsi Soit-Il"
+          },
+          "raw_response": "The music release shown in the photo is by Louis Chedid. The specific album title indicated at the bottom of the image is \"Ainsi soit-il.\"\n\nArtist: Louis Chedid | Title: Ainsi soit-il",
+          "parsed": {
+            "artist": "Louis Chedid",
+            "title": "Ainsi soit-il"
+          },
+          "score": 2,
+          "match_type": "exact"
+        },
+        {
+          "id": "ed-lincoln-ontem-hoje-sempre",
+          "ground_truth": {
+            "artist": "Ed Lincoln",
+            "title": "Ontem Hoje Sempre"
+          },
+          "raw_response": "Artist: Ed Lincoln | Title: Ontem, Hoje, Sempre",
+          "parsed": {
+            "artist": "Ed Lincoln",
+            "title": "Ontem, Hoje, Sempre"
+          },
+          "score": 2,
+          "match_type": "exact"
+        },
+        {
+          "id": "caetano-veloso-caetano-veloso",
+          "ground_truth": {
+            "artist": "Caetano Veloso",
+            "title": "Caetano Veloso"
+          },
+          "raw_response": "The music release shown in the photo is a reissue of an album by Caetano Veloso. Based on the information provided on the record sleeve, the details are as follows:\n\nArtist: Caetano Veloso | Title: CaeTano VeLoSo",
+          "parsed": {
+            "artist": "Caetano Veloso",
+            "title": "CaeTano VeLoSo"
+          },
+          "score": 2,
+          "match_type": "exact"
+        },
+        {
+          "id": "pipos-4-o-encontro-da-massa",
+          "ground_truth": {
+            "artist": "Pipo's 4",
+            "title": "O Encontro da Massa"
+          },
+          "raw_response": "The music release shown in the photo is by the artist \"Ripos\" and the release is titled \"O Encontro da Massa.\" This appears to be the fourth installment in a series, as indicated by the number \"4\" on the cover.\n\nArtist: Ripos | Title: O Encontro da Massa 4",
+          "parsed": {
+            "artist": "Ripos",
+            "title": "O Encontro da Massa 4"
+          },
+          "score": 0,
+          "match_type": "none"
+        },
+        {
+          "id": "quarteto-em-cy-tamba-trio-som-definitivo",
+          "ground_truth": {
+            "artist": "Quarteto Em Cy & Tamba Trio",
+            "title": "Som Definitivo"
+          },
+          "raw_response": "The music release shown in the photo is a vinyl record by the \"Quarteto em Cy\" in collaboration with the \"Tamba Trio.\" The title of the release is \"Quarteto em Cy e Tamba Trio.\"\n\nArtist: Quarteto em Cy & Tamba Trio | Title: Quarteto em Cy e Tamba Trio",
+          "parsed": {
+            "artist": "Quarteto em Cy & Tamba Trio",
+            "title": "Quarteto em Cy e Tamba Trio"
+          },
+          "score": 1,
+          "match_type": "partial"
+        },
+        {
+          "id": "esperanza-spalding-emilys-devolution",
+          "ground_truth": {
+            "artist": "Esperanza Spalding",
+            "title": "Emily's D+Evolution"
+          },
+          "raw_response": "The music release shown in the photo is by the artist Emily Coxhead. The title of the release is \"D + Evolution.\"\n\nArtist: Emily Coxhead | Title: D + Evolution",
+          "parsed": {
+            "artist": "Emily Coxhead",
+            "title": "D + Evolution"
+          },
+          "score": 0,
+          "match_type": "none"
+        },
+        {
+          "id": "machito-tanga",
+          "ground_truth": {
+            "artist": "Machito & His Afro-Cubans",
+            "title": "Tanga"
+          },
+          "raw_response": "The music release shown in the photo is an album by Machito and his Afro-Cubans. The title of the release is \"Tanga.\"\n\nArtist: Machito and his Afro-Cubans | Title: Tanga",
+          "parsed": {
+            "artist": "Machito and his Afro-Cubans",
+            "title": "Tanga"
+          },
+          "score": 1,
+          "match_type": "partial"
+        },
+        {
+          "id": "orquesta-el-macabeo-salsa-bestial",
+          "ground_truth": {
+            "artist": "Orquesta El Macabeo",
+            "title": "Salsa Bestial"
+          },
+          "raw_response": "The music releases shown in the photo are:\n\nArtist: Various Artists | Title: Salsa Bestial (Osquesta El Macabeo appears on the cover)\nArtist: Various Artists | Title: NYCSalsa 3\n\nThe specific artist names for the compilations are not fully visible in the image, but the titles of the releases are clearly indicated. The first album, \"Salsa Bestial,\" features Osquesta El Macabeo, which is a band name rather than an individual artist. The second album is a compilation titled \"NYC Salsa 3.\" Typically, such albums feature various artists.",
+          "parsed": {
+            "artist": "Various Artists",
+            "title": "Salsa Bestial (Osquesta El Macabeo appears on the cover)"
+          },
+          "score": 0,
+          "match_type": "none"
+        },
+        {
+          "id": "t-rex-t-rex",
+          "ground_truth": {
+            "artist": "T. Rex",
+            "title": "T. Rex"
+          },
+          "raw_response": "The music release shown in the photo is by the band T. Rex. The specific release appears to be a compilation or reissue CD, given the \"SUPRENOS\" branding, which is known for such releases. However, without a clear view of the full title, it is not possible to definitively identify the exact release title from this image alone. The original album that features the image on the cover is likely \"Electric Warrior,\" which is one of T. Rex's most famous albums, but the exact title of this particular CD cannot be confirmed.\n\nArtist: T. Rex | Title: (Not definitively identifiable from the image)",
+          "parsed": {
+            "artist": "T. Rex",
+            "title": "(Not definitively identifiable from the image)"
+          },
+          "score": 1,
+          "match_type": "partial"
+        },
+        {
+          "id": "various-rico-rico",
+          "ground_truth": {
+            "artist": "Various",
+            "title": "Rico Rico - 50 Exitos Tropicales"
+          },
+          "raw_response": "The music release shown in the photo is a compilation album. Based on the image, the specific details are:\n\nArtist: Various Artists\nTitle: Rico Rico - 50 Exitos Tropicales\n\nThis is a collection featuring multiple artists, which is common for compilation albums that aim to showcase a variety of songs within a particular genre or theme. The album appears to focus on tropical music styles.",
+          "parsed": {
+            "artist": "Various Artists",
+            "title": "Rico Rico - 50 Exitos Tropicales"
+          },
+          "score": 1,
+          "match_type": "partial"
+        },
+        {
+          "id": "various-seattle-the-dark-side",
+          "ground_truth": {
+            "artist": "Various",
+            "title": "Seattle... The Dark Side"
+          },
+          "raw_response": "The music release shown in the photo is a mixtape or album associated with the Seattle hip-hop scene. Based on the text and imagery on the cover, it appears to be a project by \"Rhyme Cartel Records.\" The specific release title indicated on the cover is \"Seattle... The Dark Side.\"\n\nArtist: Rhyme Cartel Records | Title: Seattle... The Dark Side",
+          "parsed": {
+            "artist": "Rhyme Cartel Records",
+            "title": "Seattle... The Dark Side"
+          },
+          "score": 1,
+          "match_type": "partial"
+        },
+        {
+          "id": "determine-never-know",
+          "ground_truth": {
+            "artist": "Determine",
+            "title": "Never Know"
+          },
+          "raw_response": "The music release shown in the photo is a single by the artist known as \"New Order.\" The specific design elements, such as the colored pattern and the circular motif, are characteristic of the \"Blue Monday\" single, which is one of New Order's most famous releases. This particular design is from the 1988 reissue of the single.\n\nArtist: New Order | Title: Blue Monday",
+          "parsed": {
+            "artist": "New Order",
+            "title": "Blue Monday"
+          },
+          "score": 0,
+          "match_type": "none"
+        },
+        {
+          "id": "discotex-records-6am-wanna-be-down",
+          "ground_truth": {
+            "artist": "Discotex Records",
+            "title": "6AM / Wanna Be Down"
+          },
+          "raw_response": "The music release shown in the photo is a vinyl record by an artist under the alias \"D. Lee.\" The track on the A side is a remix titled \"1.2.4.A.M. (Remix)\" featuring Skallamooch. However, the specific release title is not fully provided on the label. Typically, for a proper identification, one would look for a catalog number or a more distinct release title, which is not present in this image.\n\nBased on the information available:\nArtist: D. Lee feat. Skallamooch | Title: 1.2.4.A.M. (Remix) / Wanna Be Down",
+          "parsed": {
+            "artist": "D. Lee feat. Skallamooch",
+            "title": "1.2.4.A.M. (Remix) / Wanna Be Down"
+          },
+          "score": 0,
+          "match_type": "none"
+        },
+        {
+          "id": "legends-of-the-dark-ground-cabra",
+          "ground_truth": {
+            "artist": "Legends of the Dark Ground",
+            "title": "Cabra (Seiji Re-Rinse)"
+          },
+          "raw_response": "The vinyl record shown in the photo is a single or an EP by the artist Aphex Twin. The specific release is titled \"Come to Daddy.\"\n\nArtist: Aphex Twin | Title: Come to Daddy",
+          "parsed": {
+            "artist": "Aphex Twin",
+            "title": "Come to Daddy"
+          },
+          "score": 0,
+          "match_type": "none"
+        },
+        {
+          "id": "wedding-hands-in-the-till",
+          "ground_truth": {
+            "artist": "Wedding",
+            "title": "Hands In The Till / A Little Love"
+          },
+          "raw_response": "The image appears to be of a vinyl record, specifically a 7-inch single or an EP. The design suggests it is from the band \"Hands in the Till.\" The release title indicated on the label is \"A Little Love,\" and the main title at the top is \"Wedding.\"\n\nArtist: Hands in the Till | Title: Wedding - A Little Love",
+          "parsed": {
+            "artist": "Hands in the Till",
+            "title": "Wedding - A Little Love"
+          },
+          "score": 0,
+          "match_type": "none"
+        },
+        {
+          "id": "olu-living-free",
+          "ground_truth": {
+            "artist": "Olu",
+            "title": "Living Free"
+          },
+          "raw_response": "Artist: OLU | Title: Living Free (Joi De Vivre Mix)",
+          "parsed": {
+            "artist": "OLU",
+            "title": "Living Free (Joi De Vivre Mix)"
+          },
+          "score": 1,
+          "match_type": "partial"
+        },
+        {
+          "id": "big-bub-i-dont-mind",
+          "ground_truth": {
+            "artist": "Big Bub",
+            "title": "I Don't Mind"
+          },
+          "raw_response": "The music release shown in the photo is a vinyl record single. Based on the information provided on the label:\n\nArtist: Big Bub\nTitle: Don't Mind (Remix) / Trippin' (Remix)",
+          "parsed": {
+            "artist": "Big Bub",
+            "title": "Don't Mind (Remix) / Trippin' (Remix)"
+          },
+          "score": 1,
+          "match_type": "partial"
+        },
+        {
+          "id": "patrick-cowley-menergy",
+          "ground_truth": {
+            "artist": "Patrick Cowley",
+            "title": "Menergy"
+          },
+          "raw_response": "Artist: Patrick Cowley | Title: Menergy",
+          "parsed": {
+            "artist": "Patrick Cowley",
+            "title": "Menergy"
+          },
+          "score": 2,
+          "match_type": "exact"
+        },
+        {
+          "id": "sleepy-brown-i-cant-wait",
+          "ground_truth": {
+            "artist": "Sleepy Brown feat. Outkast",
+            "title": "I Can't Wait"
+          },
+          "raw_response": "The music release shown in the photo is a single by Sleepy Brown featuring OutKast. The release title is \"I Can't Wait\" from the album \"BarberShop 2: Back in Business\" soundtrack.\n\nArtist: Sleepy Brown featuring OutKast | Title: I Can't Wait",
+          "parsed": {
+            "artist": "Sleepy Brown featuring OutKast",
+            "title": "I Can't Wait"
+          },
+          "score": 1,
+          "match_type": "partial"
+        },
+        {
+          "id": "mc-mell-o-first-chronicles",
+          "ground_truth": {
+            "artist": "MC Mell 'O'",
+            "title": "The First Chronicles of D.E.T.T."
+          },
+          "raw_response": "",
+          "parsed": {
+            "artist": "",
+            "title": ""
+          },
+          "score": 0,
+          "match_type": "none",
+          "error": "SDKError: API error occurred: Status 429\nBody: {\"object\":\"error\",\"message\":\"Rate limit exceeded\",\"type\":\"rate_limited\",\"param\":null,\"code\":\"1300\",\"raw_status_code\":429}"
+        },
+        {
+          "id": "natural-black-early-on-before",
+          "ground_truth": {
+            "artist": "Natural Black",
+            "title": "Early On Before"
+          },
+          "raw_response": "",
+          "parsed": {
+            "artist": "",
+            "title": ""
+          },
+          "score": 0,
+          "match_type": "none",
+          "error": "SDKError: API error occurred: Status 429\nBody: {\"object\":\"error\",\"message\":\"Rate limit exceeded\",\"type\":\"rate_limited\",\"param\":null,\"code\":\"1300\",\"raw_status_code\":429}"
+        },
+        {
+          "id": "young-peoples-records-all-aboard",
+          "ground_truth": {
+            "artist": "Young People's Records",
+            "title": "All Aboard!"
+          },
+          "raw_response": "",
+          "parsed": {
+            "artist": "",
+            "title": ""
+          },
+          "score": 0,
+          "match_type": "none",
+          "error": "SDKError: API error occurred: Status 429\nBody: {\"object\":\"error\",\"message\":\"Rate limit exceeded\",\"type\":\"rate_limited\",\"param\":null,\"code\":\"1300\",\"raw_status_code\":429}"
+        },
+        {
+          "id": "mario-telles-mario-telles",
+          "ground_truth": {
+            "artist": "Mario Telles",
+            "title": "Mario Telles"
+          },
+          "raw_response": "",
+          "parsed": {
+            "artist": "",
+            "title": ""
+          },
+          "score": 0,
+          "match_type": "none",
+          "error": "SDKError: API error occurred: Status 429\nBody: {\"object\":\"error\",\"message\":\"Rate limit exceeded\",\"type\":\"rate_limited\",\"param\":null,\"code\":\"1300\",\"raw_status_code\":429}"
+        },
+        {
+          "id": "lecuona-plays-for-two",
+          "ground_truth": {
+            "artist": "Lecuona",
+            "title": "Plays For Two"
+          },
+          "raw_response": "",
+          "parsed": {
+            "artist": "",
+            "title": ""
+          },
+          "score": 0,
+          "match_type": "none",
+          "error": "SDKError: API error occurred: Status 429\nBody: {\"object\":\"error\",\"message\":\"Rate limit exceeded\",\"type\":\"rate_limited\",\"param\":null,\"code\":\"1300\",\"raw_status_code\":429}"
+        },
+        {
+          "id": "aeoliah-crystal-illumination",
+          "ground_truth": {
+            "artist": "Aeoliah",
+            "title": "Crystal Illumination"
+          },
+          "raw_response": "",
+          "parsed": {
+            "artist": "",
+            "title": ""
+          },
+          "score": 0,
+          "match_type": "none",
+          "error": "SDKError: API error occurred: Status 429\nBody: {\"object\":\"error\",\"message\":\"Rate limit exceeded\",\"type\":\"rate_limited\",\"param\":null,\"code\":\"1300\",\"raw_status_code\":429}"
+        },
+        {
+          "id": "coro-minero-de-turon",
+          "ground_truth": {
+            "artist": "Coro Minero de Turón",
+            "title": "Coro Minero de Turón"
+          },
+          "raw_response": "",
+          "parsed": {
+            "artist": "",
+            "title": ""
+          },
+          "score": 0,
+          "match_type": "none",
+          "error": "SDKError: API error occurred: Status 429\nBody: {\"object\":\"error\",\"message\":\"Rate limit exceeded\",\"type\":\"rate_limited\",\"param\":null,\"code\":\"1300\",\"raw_status_code\":429}"
+        },
+        {
+          "id": "maggie-carles-luis-nodal-y-los-magneticos",
+          "ground_truth": {
+            "artist": "Maggie Carlés / Luis Nodal y los Magnéticos",
+            "title": "Maggie Carlés / Luis Nodal y los Magnéticos"
+          },
+          "raw_response": "",
+          "parsed": {
+            "artist": "",
+            "title": ""
+          },
+          "score": 0,
+          "match_type": "none",
+          "error": "SDKError: API error occurred: Status 429\nBody: {\"object\":\"error\",\"message\":\"Rate limit exceeded\",\"type\":\"rate_limited\",\"param\":null,\"code\":\"1300\",\"raw_status_code\":429}"
+        },
+        {
+          "id": "lucho-gatica-antonio-machin",
+          "ground_truth": {
+            "artist": "Lucho Gatica / Antonio Machin",
+            "title": "Lucho Gatica / Antonio Machin"
+          },
+          "raw_response": "",
+          "parsed": {
+            "artist": "",
+            "title": ""
+          },
+          "score": 0,
+          "match_type": "none",
+          "error": "SDKError: API error occurred: Status 429\nBody: {\"object\":\"error\",\"message\":\"Rate limit exceeded\",\"type\":\"rate_limited\",\"param\":null,\"code\":\"1300\",\"raw_status_code\":429}"
+        },
+        {
+          "id": "cesaria-evora-cabo-verde",
+          "ground_truth": {
+            "artist": "Cesaria Evora",
+            "title": "Cabo Verde"
+          },
+          "raw_response": "",
+          "parsed": {
+            "artist": "",
+            "title": ""
+          },
+          "score": 0,
+          "match_type": "none",
+          "error": "SDKError: API error occurred: Status 429\nBody: {\"object\":\"error\",\"message\":\"Rate limit exceeded\",\"type\":\"rate_limited\",\"param\":null,\"code\":\"1300\",\"raw_status_code\":429}"
+        },
+        {
+          "id": "melanie-golden-hour-of-melanie",
+          "ground_truth": {
+            "artist": "Melanie",
+            "title": "Golden Hour Of Melanie"
+          },
+          "raw_response": "",
+          "parsed": {
+            "artist": "",
+            "title": ""
+          },
+          "score": 0,
+          "match_type": "none",
+          "error": "SDKError: API error occurred: Status 429\nBody: {\"object\":\"error\",\"message\":\"Rate limit exceeded\",\"type\":\"rate_limited\",\"param\":null,\"code\":\"1300\",\"raw_status_code\":429}"
+        },
+        {
+          "id": "neil-young-after-the-gold-rush",
+          "ground_truth": {
+            "artist": "Neil Young",
+            "title": "After The Gold Rush"
+          },
+          "raw_response": "",
+          "parsed": {
+            "artist": "",
+            "title": ""
+          },
+          "score": 0,
+          "match_type": "none",
+          "error": "SDKError: API error occurred: Status 429\nBody: {\"object\":\"error\",\"message\":\"Rate limit exceeded\",\"type\":\"rate_limited\",\"param\":null,\"code\":\"1300\",\"raw_status_code\":429}"
+        },
+        {
+          "id": "steve-reich-sextet-six-marimbas",
+          "ground_truth": {
+            "artist": "Steve Reich",
+            "title": "Sextet / Six Marimbas"
+          },
+          "raw_response": "",
+          "parsed": {
+            "artist": "",
+            "title": ""
+          },
+          "score": 0,
+          "match_type": "none",
+          "error": "SDKError: API error occurred: Status 429\nBody: {\"object\":\"error\",\"message\":\"Rate limit exceeded\",\"type\":\"rate_limited\",\"param\":null,\"code\":\"1300\",\"raw_status_code\":429}"
+        },
+        {
+          "id": "gregory-isaacs-lovers-rock",
+          "ground_truth": {
+            "artist": "Gregory Isaacs",
+            "title": "Lovers' Rock"
+          },
+          "raw_response": "",
+          "parsed": {
+            "artist": "",
+            "title": ""
+          },
+          "score": 0,
+          "match_type": "none",
+          "error": "SDKError: API error occurred: Status 429\nBody: {\"object\":\"error\",\"message\":\"Rate limit exceeded\",\"type\":\"rate_limited\",\"param\":null,\"code\":\"1300\",\"raw_status_code\":429}"
+        },
+        {
+          "id": "curtis-mayfield-curtis-live",
+          "ground_truth": {
+            "artist": "Curtis Mayfield",
+            "title": "Curtis/Live!"
+          },
+          "raw_response": "",
+          "parsed": {
+            "artist": "",
+            "title": ""
+          },
+          "score": 0,
+          "match_type": "none",
+          "error": "SDKError: API error occurred: Status 429\nBody: {\"object\":\"error\",\"message\":\"Rate limit exceeded\",\"type\":\"rate_limited\",\"param\":null,\"code\":\"1300\",\"raw_status_code\":429}"
+        },
+        {
+          "id": "j-dilla-donuts",
+          "ground_truth": {
+            "artist": "J Dilla",
+            "title": "Donuts"
+          },
+          "raw_response": "",
+          "parsed": {
+            "artist": "",
+            "title": ""
+          },
+          "score": 0,
+          "match_type": "none",
+          "error": "SDKError: API error occurred: Status 429\nBody: {\"object\":\"error\",\"message\":\"Rate limit exceeded\",\"type\":\"rate_limited\",\"param\":null,\"code\":\"1300\",\"raw_status_code\":429}"
+        },
+        {
+          "id": "hugo-jara-estado-de-animo",
+          "ground_truth": {
+            "artist": "Hugo Jara",
+            "title": "Estado De Animo"
+          },
+          "raw_response": "The music release shown in the photo is a vinyl record with a unique, handmade design. Based on the text \"STUDIOSRAMMØ,\" this appears to be a special or limited edition release by the artist known as Oneohtrix Point Never. The specific release title indicated by the symbols and the style of the cover is likely \"R Plus Seven.\"\n\nArtist: Oneohtrix Point Never | Title: R Plus Seven",
+          "parsed": {
+            "artist": "Oneohtrix Point Never",
+            "title": "R Plus Seven"
+          },
+          "score": 0,
+          "match_type": "none"
+        },
+        {
+          "id": "dorival-caymmi-caymmi",
+          "ground_truth": {
+            "artist": "Dorival Caymmi",
+            "title": "Caymmi"
+          },
+          "raw_response": "The music release shown in the photo is a special edition of an album by the artist M.I.A. The cover art and the name \"CAYMANI\" suggest that this is the album \"Kala,\" which is known for its distinctive cover featuring M.I.A. in a similar pose. This particular edition seems to be a limited or special release, given the unique packaging.\n\nArtist: M.I.A. | Title: Kala",
+          "parsed": {
+            "artist": "M.I.A.",
+            "title": "Kala"
+          },
+          "score": 0,
+          "match_type": "none"
+        },
+        {
+          "id": "dorival-caymmi-caymmi-odeon",
+          "ground_truth": {
+            "artist": "Dorival Caymmi",
+            "title": "Caymmi"
+          },
+          "raw_response": "The music release shown in the photo is by the artist Leon. The album is titled \"Bandera\".\n\nArtist: Leon | Title: Bandera",
+          "parsed": {
+            "artist": "Leon",
+            "title": "Bandera"
+          },
+          "score": 0,
+          "match_type": "none"
+        },
+        {
+          "id": "stevie-wonder-hotter-than-july",
+          "ground_truth": {
+            "artist": "Stevie Wonder",
+            "title": "Hotter Than July"
+          },
+          "raw_response": "The cake in the photo is designed to resemble the album cover of \"Hot Fuss\" by The Killers. The distinctive design elements, such as the stylized text and the image of a person, are characteristic of this album's artwork.\n\nArtist: The Killers | Title: Hot Fuss",
+          "parsed": {
+            "artist": "The Killers",
+            "title": "Hot Fuss"
+          },
+          "score": 0,
+          "match_type": "none"
+        },
+        {
+          "id": "nite-jewel-no-sun",
+          "ground_truth": {
+            "artist": "Nite Jewel",
+            "title": "No Sun"
+          },
+          "raw_response": "The music release shown in the photo is a vinyl record by Nick Cave & The Bad Seeds. The specific release title indicated on the label is \"Nocturama.\"\n\nArtist: Nick Cave & The Bad Seeds | Title: Nocturama",
+          "parsed": {
+            "artist": "Nick Cave & The Bad Seeds",
+            "title": "Nocturama"
+          },
+          "score": 0,
+          "match_type": "none"
+        },
+        {
+          "id": "horace-silver-and-the-jazz-messengers",
+          "ground_truth": {
+            "artist": "Horace Silver and the Jazz Messengers",
+            "title": "Horace Silver and the Jazz Messengers"
+          },
+          "raw_response": "The music release shown in the photo is by Horace Silver. The album is titled \"And The Jazz Messengers.\"\n\nArtist: Horace Silver | Title: And The Jazz Messengers",
+          "parsed": {
+            "artist": "Horace Silver",
+            "title": "And The Jazz Messengers"
+          },
+          "score": 0,
+          "match_type": "none"
+        },
+        {
+          "id": "max-romeo-revelation-time",
+          "ground_truth": {
+            "artist": "Max Romeo",
+            "title": "Revelation Time"
+          },
+          "raw_response": "The music release shown in the photo is a vinyl record by the artist Max Romeo. The title of the release is \"Revelation Time.\"\n\nArtist: Max Romeo | Title: Revelation Time",
+          "parsed": {
+            "artist": "Max Romeo",
+            "title": "Revelation Time"
+          },
+          "score": 2,
+          "match_type": "exact"
+        },
+        {
+          "id": "various-beat-girls-espanol",
+          "ground_truth": {
+            "artist": "Various",
+            "title": "Beat Girls Español!"
+          },
+          "raw_response": "The music release shown in the photo is a compilation album titled \"Beat Girls Español! 1960s She-Pop from Spain.\" This album is not attributed to a single artist but rather features a collection of tracks by various female artists and groups from Spain during the 1960s.\n\nArtist: Various Artists | Title: Beat Girls Español! 1960s She-Pop from Spain",
+          "parsed": {
+            "artist": "Various Artists",
+            "title": "Beat Girls Español! 1960s She-Pop from Spain"
+          },
+          "score": 0,
+          "match_type": "none"
+        },
+        {
+          "id": "team-shadetek-pale-fire",
+          "ground_truth": {
+            "artist": "Team Shadetek",
+            "title": "Pale Fire"
+          },
+          "raw_response": "The music release shown in the photo is by the band \"Pale Fire,\" which appears to be a project or a release associated with \"Team Shadetek.\" Based on the image, this is likely a vinyl record or an EP.\n\nArtist: Team Shadetek & Pale Fire | Title: Pale Fire",
+          "parsed": {
+            "artist": "Team Shadetek & Pale Fire",
+            "title": "Pale Fire"
+          },
+          "score": 1,
+          "match_type": "partial"
+        },
+        {
+          "id": "astrud-gilberto-compact-jazz",
+          "ground_truth": {
+            "artist": "Astrud Gilberto",
+            "title": "Compact Jazz"
+          },
+          "raw_response": "The music release shown in the photo is a part of the \"Compact Jazz\" series, which is a collection of compilation albums featuring various artists. The specific album in the image is by Astrud Gilberto.\n\nArtist: Astrud Gilberto | Title: Compact Jazz: Astrud Gilberto",
+          "parsed": {
+            "artist": "Astrud Gilberto",
+            "title": "Compact Jazz: Astrud Gilberto"
+          },
+          "score": 1,
+          "match_type": "partial"
+        },
+        {
+          "id": "astrud-gilberto-beach-samba",
+          "ground_truth": {
+            "artist": "Astrud Gilberto",
+            "title": "Beach Samba"
+          },
+          "raw_response": "The music release shown in the photo is an album by Astrud Gilberto. The title of the release is \"Beach Samba.\"\n\nArtist: Astrud Gilberto | Title: Beach Samba",
+          "parsed": {
+            "artist": "Astrud Gilberto",
+            "title": "Beach Samba"
+          },
+          "score": 2,
+          "match_type": "exact"
+        },
+        {
+          "id": "various-campeones-xvii-concurso-cancion-asturiana",
+          "ground_truth": {
+            "artist": "Various",
+            "title": "Campeones XVII Concurso de Canción Asturiana"
+          },
+          "raw_response": "The music release shown in the photo is a CD from the \"XVII Concurso de Canción Asturiana,\" which translates to the 17th Contest of Asturian Song. This is not a release by a single artist but rather a compilation featuring various artists who participated in the contest. The association responsible for the contest and presumably the release is \"Asociación Cultural San Luis La Nueva - Langreo.\"\n\nArtist: Various Artists | Title: Campeones XVII Concurso de Canción Asturiana",
+          "parsed": {
+            "artist": "Various Artists",
+            "title": "Campeones XVII Concurso de Canción Asturiana"
+          },
+          "score": 1,
+          "match_type": "partial"
+        },
+        {
+          "id": "paddy-mcaloon-i-trawl-the-megahertz",
+          "ground_truth": {
+            "artist": "Paddy McAloon",
+            "title": "I Trawl the Megahertz"
+          },
+          "raw_response": "The music release shown in the photo is a limited edition art print that accompanies the album \"I Trawl the Megahertz\" by Paddy McAloon. This album was originally released under the Prefab Sprout name, but it was a solo project by Paddy McAloon.\n\nArtist: Paddy McAloon | Title: I Trawl the Megahertz",
+          "parsed": {
+            "artist": "Paddy McAloon",
+            "title": "I Trawl the Megahertz"
+          },
+          "score": 2,
+          "match_type": "exact"
+        },
+        {
+          "id": "maranata-maranata",
+          "ground_truth": {
+            "artist": "Maranata",
+            "title": "Maranata"
+          },
+          "raw_response": "The music release shown in the photo is a cassette tape by the band Veni Domine. The title of the release is \"Maranatha.\"\n\nArtist: Veni Domine | Title: Maranatha",
+          "parsed": {
+            "artist": "Veni Domine",
+            "title": "Maranatha"
+          },
+          "score": 0,
+          "match_type": "none"
+        },
+        {
+          "id": "antonio-carlos-jobim-tide",
+          "ground_truth": {
+            "artist": "Antonio Carlos Jobim",
+            "title": "Tide"
+          },
+          "raw_response": "The music release shown in the photo is an album by Antônio Carlos Jobim, a renowned Brazilian composer, pianist, songwriter, arranger, and singer. The title of this particular release is \"Tide.\"\n\nArtist: Antônio Carlos Jobim | Title: Tide",
+          "parsed": {
+            "artist": "Antônio Carlos Jobim",
+            "title": "Tide"
+          },
+          "score": 1,
+          "match_type": "partial"
+        },
+        {
+          "id": "refused-songs-to-fan-the-flames-of-discontent",
+          "ground_truth": {
+            "artist": "Refused",
+            "title": "Songs to Fan the Flames of Discontent"
+          },
+          "raw_response": "",
+          "parsed": {
+            "artist": "",
+            "title": ""
+          },
+          "score": 0,
+          "match_type": "none",
+          "error": "SDKError: API error occurred: Status 429\nBody: {\"object\":\"error\",\"message\":\"Rate limit exceeded\",\"type\":\"rate_limited\",\"param\":null,\"code\":\"1300\",\"raw_status_code\":429}"
+        },
+        {
+          "id": "collard-roge-satie-4-handed-piano",
+          "ground_truth": {
+            "artist": "Jean-Philippe Collard & Pascal Rogé",
+            "title": "Satie: The 4 Handed Piano"
+          },
+          "raw_response": "",
+          "parsed": {
+            "artist": "",
+            "title": ""
+          },
+          "score": 0,
+          "match_type": "none",
+          "error": "SDKError: API error occurred: Status 429\nBody: {\"object\":\"error\",\"message\":\"Rate limit exceeded\",\"type\":\"rate_limited\",\"param\":null,\"code\":\"1300\",\"raw_status_code\":429}"
+        },
+        {
+          "id": "oren-ambarchi-shebang",
+          "ground_truth": {
+            "artist": "Oren Ambarchi",
+            "title": "Shebang"
+          },
+          "raw_response": "",
+          "parsed": {
+            "artist": "",
+            "title": ""
+          },
+          "score": 0,
+          "match_type": "none",
+          "error": "SDKError: API error occurred: Status 429\nBody: {\"object\":\"error\",\"message\":\"Rate limit exceeded\",\"type\":\"rate_limited\",\"param\":null,\"code\":\"1300\",\"raw_status_code\":429}"
+        },
+        {
+          "id": "laurent-garnier-planet-house-ep",
+          "ground_truth": {
+            "artist": "Laurent Garnier",
+            "title": "Planet House EP"
+          },
+          "raw_response": "",
+          "parsed": {
+            "artist": "",
+            "title": ""
+          },
+          "score": 0,
+          "match_type": "none",
+          "error": "SDKError: API error occurred: Status 429\nBody: {\"object\":\"error\",\"message\":\"Rate limit exceeded\",\"type\":\"rate_limited\",\"param\":null,\"code\":\"1300\",\"raw_status_code\":429}"
+        },
+        {
+          "id": "various-trojan-reggae-party-volume-one",
+          "ground_truth": {
+            "artist": "Various",
+            "title": "Trojan Reggae Party Volume One"
+          },
+          "raw_response": "",
+          "parsed": {
+            "artist": "",
+            "title": ""
+          },
+          "score": 0,
+          "match_type": "none",
+          "error": "SDKError: API error occurred: Status 429\nBody: {\"object\":\"error\",\"message\":\"Rate limit exceeded\",\"type\":\"rate_limited\",\"param\":null,\"code\":\"1300\",\"raw_status_code\":429}"
+        },
+        {
+          "id": "violeta-parra-un-rio-de-sangre",
+          "ground_truth": {
+            "artist": "Violeta Parra",
+            "title": "Un Rio de Sangre"
+          },
+          "raw_response": "",
+          "parsed": {
+            "artist": "",
+            "title": ""
+          },
+          "score": 0,
+          "match_type": "none",
+          "error": "SDKError: API error occurred: Status 429\nBody: {\"object\":\"error\",\"message\":\"Rate limit exceeded\",\"type\":\"rate_limited\",\"param\":null,\"code\":\"1300\",\"raw_status_code\":429}"
+        },
+        {
+          "id": "bob-marley-and-the-wailers-uprising",
+          "ground_truth": {
+            "artist": "Bob Marley & The Wailers",
+            "title": "Uprising"
+          },
+          "raw_response": "",
+          "parsed": {
+            "artist": "",
+            "title": ""
+          },
+          "score": 0,
+          "match_type": "none",
+          "error": "SDKError: API error occurred: Status 429\nBody: {\"object\":\"error\",\"message\":\"Rate limit exceeded\",\"type\":\"rate_limited\",\"param\":null,\"code\":\"1300\",\"raw_status_code\":429}"
+        },
+        {
+          "id": "various-macondo-revisitado",
+          "ground_truth": {
+            "artist": "Various",
+            "title": "Macondo Revisitado"
+          },
+          "raw_response": "",
+          "parsed": {
+            "artist": "",
+            "title": ""
+          },
+          "score": 0,
+          "match_type": "none",
+          "error": "SDKError: API error occurred: Status 429\nBody: {\"object\":\"error\",\"message\":\"Rate limit exceeded\",\"type\":\"rate_limited\",\"param\":null,\"code\":\"1300\",\"raw_status_code\":429}"
+        },
+        {
+          "id": "barry-brown-vibes-of-barry-brown",
+          "ground_truth": {
+            "artist": "Barry Brown",
+            "title": "Vibes of Barry Brown"
+          },
+          "raw_response": "",
+          "parsed": {
+            "artist": "",
+            "title": ""
+          },
+          "score": 0,
+          "match_type": "none",
+          "error": "SDKError: API error occurred: Status 429\nBody: {\"object\":\"error\",\"message\":\"Rate limit exceeded\",\"type\":\"rate_limited\",\"param\":null,\"code\":\"1300\",\"raw_status_code\":429}"
+        },
+        {
+          "id": "barry-brown-barry-brown",
+          "ground_truth": {
+            "artist": "Barry Brown",
+            "title": "Barry Brown"
+          },
+          "raw_response": "",
+          "parsed": {
+            "artist": "",
+            "title": ""
+          },
+          "score": 0,
+          "match_type": "none",
+          "error": "SDKError: API error occurred: Status 429\nBody: {\"object\":\"error\",\"message\":\"Rate limit exceeded\",\"type\":\"rate_limited\",\"param\":null,\"code\":\"1300\",\"raw_status_code\":429}"
+        },
+        {
+          "id": "los-llopis-los-llopis",
+          "ground_truth": {
+            "artist": "Los Llopis",
+            "title": "Los Llopis"
+          },
+          "raw_response": "",
+          "parsed": {
+            "artist": "",
+            "title": ""
+          },
+          "score": 0,
+          "match_type": "none",
+          "error": "SDKError: API error occurred: Status 429\nBody: {\"object\":\"error\",\"message\":\"Rate limit exceeded\",\"type\":\"rate_limited\",\"param\":null,\"code\":\"1300\",\"raw_status_code\":429}"
+        },
+        {
+          "id": "jorge-negrete-jorge-negrete",
+          "ground_truth": {
+            "artist": "Jorge Negrete",
+            "title": "Jorge Negrete"
+          },
+          "raw_response": "",
+          "parsed": {
+            "artist": "",
+            "title": ""
+          },
+          "score": 0,
+          "match_type": "none",
+          "error": "SDKError: API error occurred: Status 429\nBody: {\"object\":\"error\",\"message\":\"Rate limit exceeded\",\"type\":\"rate_limited\",\"param\":null,\"code\":\"1300\",\"raw_status_code\":429}"
+        },
+        {
+          "id": "baden-powell-estudos",
+          "ground_truth": {
+            "artist": "Baden Powell",
+            "title": "Estudos"
+          },
+          "raw_response": "",
+          "parsed": {
+            "artist": "",
+            "title": ""
+          },
+          "score": 0,
+          "match_type": "none",
+          "error": "SDKError: API error occurred: Status 429\nBody: {\"object\":\"error\",\"message\":\"Rate limit exceeded\",\"type\":\"rate_limited\",\"param\":null,\"code\":\"1300\",\"raw_status_code\":429}"
+        },
+        {
+          "id": "tipico-santa-rosa-tipico-santa-rosa",
+          "ground_truth": {
+            "artist": "Tipico Santa Rosa",
+            "title": "Tipico Santa Rosa"
+          },
+          "raw_response": "",
+          "parsed": {
+            "artist": "",
+            "title": ""
+          },
+          "score": 0,
+          "match_type": "none",
+          "error": "SDKError: API error occurred: Status 429\nBody: {\"object\":\"error\",\"message\":\"Rate limit exceeded\",\"type\":\"rate_limited\",\"param\":null,\"code\":\"1300\",\"raw_status_code\":429}"
+        },
+        {
+          "id": "antonio-carlos-e-jocafi-o-primeiro-amor",
+          "ground_truth": {
+            "artist": "Antonio Carlos e Jocafi",
+            "title": "O Primeiro Amor"
+          },
+          "raw_response": "",
+          "parsed": {
+            "artist": "",
+            "title": ""
+          },
+          "score": 0,
+          "match_type": "none",
+          "error": "SDKError: API error occurred: Status 429\nBody: {\"object\":\"error\",\"message\":\"Rate limit exceeded\",\"type\":\"rate_limited\",\"param\":null,\"code\":\"1300\",\"raw_status_code\":429}"
+        },
+        {
+          "id": "jah-thomas-stop-yu-loafin",
+          "ground_truth": {
+            "artist": "Jah Thomas",
+            "title": "Stop Yu Loafin"
+          },
+          "raw_response": "",
+          "parsed": {
+            "artist": "",
+            "title": ""
+          },
+          "score": 0,
+          "match_type": "none",
+          "error": "SDKError: API error occurred: Status 429\nBody: {\"object\":\"error\",\"message\":\"Rate limit exceeded\",\"type\":\"rate_limited\",\"param\":null,\"code\":\"1300\",\"raw_status_code\":429}"
+        },
+        {
+          "id": "yellowman-josey-wales-two-giants-clash",
+          "ground_truth": {
+            "artist": "Yellowman & Josey Wales",
+            "title": "Two Giants Clash"
+          },
+          "raw_response": "",
+          "parsed": {
+            "artist": "",
+            "title": ""
+          },
+          "score": 0,
+          "match_type": "none",
+          "error": "SDKError: API error occurred: Status 429\nBody: {\"object\":\"error\",\"message\":\"Rate limit exceeded\",\"type\":\"rate_limited\",\"param\":null,\"code\":\"1300\",\"raw_status_code\":429}"
+        },
+        {
+          "id": "os-afonsinhos-do-condado-no-parque-mayer",
+          "ground_truth": {
+            "artist": "Os Afonsinhos do Condado",
+            "title": "No Parque Mayer"
+          },
+          "raw_response": "",
+          "parsed": {
+            "artist": "",
+            "title": ""
+          },
+          "score": 0,
+          "match_type": "none",
+          "error": "SDKError: API error occurred: Status 429\nBody: {\"object\":\"error\",\"message\":\"Rate limit exceeded\",\"type\":\"rate_limited\",\"param\":null,\"code\":\"1300\",\"raw_status_code\":429}"
+        },
+        {
+          "id": "aldemaro-romero-y-su-orquesta-de-salon-caracas-de-noche",
+          "ground_truth": {
+            "artist": "Aldemaro Romero y su Orquesta de Salón",
+            "title": "Caracas de Noche"
+          },
+          "raw_response": "",
+          "parsed": {
+            "artist": "",
+            "title": ""
+          },
+          "score": 0,
+          "match_type": "none",
+          "error": "SDKError: API error occurred: Status 429\nBody: {\"object\":\"error\",\"message\":\"Rate limit exceeded\",\"type\":\"rate_limited\",\"param\":null,\"code\":\"1300\",\"raw_status_code\":429}"
+        },
+        {
+          "id": "angela-carrasco-la-candela",
+          "ground_truth": {
+            "artist": "Angela Carrasco",
+            "title": "La Candela"
+          },
+          "raw_response": "",
+          "parsed": {
+            "artist": "",
+            "title": ""
+          },
+          "score": 0,
+          "match_type": "none",
+          "error": "SDKError: API error occurred: Status 429\nBody: {\"object\":\"error\",\"message\":\"Rate limit exceeded\",\"type\":\"rate_limited\",\"param\":null,\"code\":\"1300\",\"raw_status_code\":429}"
+        },
+        {
+          "id": "gran-orquesta-tipica-de-armando-zulueta-frenesi",
+          "ground_truth": {
+            "artist": "Gran Orquesta Típica de Armando Zulueta",
+            "title": "Frenesí"
+          },
+          "raw_response": "",
+          "parsed": {
+            "artist": "",
+            "title": ""
+          },
+          "score": 0,
+          "match_type": "none",
+          "error": "SDKError: API error occurred: Status 429\nBody: {\"object\":\"error\",\"message\":\"Rate limit exceeded\",\"type\":\"rate_limited\",\"param\":null,\"code\":\"1300\",\"raw_status_code\":429}"
+        },
+        {
+          "id": "baden-powell-poema-on-guitar",
+          "ground_truth": {
+            "artist": "Baden Powell",
+            "title": "Poema on Guitar"
+          },
+          "raw_response": "",
+          "parsed": {
+            "artist": "",
+            "title": ""
+          },
+          "score": 0,
+          "match_type": "none",
+          "error": "SDKError: API error occurred: Status 429\nBody: {\"object\":\"error\",\"message\":\"Rate limit exceeded\",\"type\":\"rate_limited\",\"param\":null,\"code\":\"1300\",\"raw_status_code\":429}"
+        },
+        {
+          "id": "baden-powell-face-au-public",
+          "ground_truth": {
+            "artist": "Baden Powell",
+            "title": "Face au Public"
+          },
+          "raw_response": "",
+          "parsed": {
+            "artist": "",
+            "title": ""
+          },
+          "score": 0,
+          "match_type": "none",
+          "error": "SDKError: API error occurred: Status 429\nBody: {\"object\":\"error\",\"message\":\"Rate limit exceeded\",\"type\":\"rate_limited\",\"param\":null,\"code\":\"1300\",\"raw_status_code\":429}"
+        },
+        {
+          "id": "baden-powell-ritmos-de-brasil",
+          "ground_truth": {
+            "artist": "Baden Powell",
+            "title": "Ritmos de Brasil"
+          },
+          "raw_response": "",
+          "parsed": {
+            "artist": "",
+            "title": ""
+          },
+          "score": 0,
+          "match_type": "none",
+          "error": "SDKError: API error occurred: Status 429\nBody: {\"object\":\"error\",\"message\":\"Rate limit exceeded\",\"type\":\"rate_limited\",\"param\":null,\"code\":\"1300\",\"raw_status_code\":429}"
+        },
+        {
+          "id": "bana-eroticorythmotropicalomanie-vol-3",
+          "ground_truth": {
+            "artist": "Bana",
+            "title": "Eroticorythmotropicalomanie Vol. 3"
+          },
+          "raw_response": "",
+          "parsed": {
+            "artist": "",
+            "title": ""
+          },
+          "score": 0,
+          "match_type": "none",
+          "error": "SDKError: API error occurred: Status 429\nBody: {\"object\":\"error\",\"message\":\"Rate limit exceeded\",\"type\":\"rate_limited\",\"param\":null,\"code\":\"1300\",\"raw_status_code\":429}"
+        },
+        {
+          "id": "la-banda-del-caribe-movimiento-sexy",
+          "ground_truth": {
+            "artist": "La Banda del Caribe",
+            "title": "Movimiento Sexy"
+          },
+          "raw_response": "",
+          "parsed": {
+            "artist": "",
+            "title": ""
+          },
+          "score": 0,
+          "match_type": "none",
+          "error": "SDKError: API error occurred: Status 429\nBody: {\"object\":\"error\",\"message\":\"Rate limit exceeded\",\"type\":\"rate_limited\",\"param\":null,\"code\":\"1300\",\"raw_status_code\":429}"
+        },
+        {
+          "id": "the-bhundu-boys-pamberi",
+          "ground_truth": {
+            "artist": "The Bhundu Boys",
+            "title": "Pamberi!"
+          },
+          "raw_response": "",
+          "parsed": {
+            "artist": "",
+            "title": ""
+          },
+          "score": 0,
+          "match_type": "none",
+          "error": "SDKError: API error occurred: Status 429\nBody: {\"object\":\"error\",\"message\":\"Rate limit exceeded\",\"type\":\"rate_limited\",\"param\":null,\"code\":\"1300\",\"raw_status_code\":429}"
+        },
+        {
+          "id": "celia-cruz-johnny-pacheco-de-nuevo",
+          "ground_truth": {
+            "artist": "Celia Cruz & Johnny Pacheco",
+            "title": "De Nuevo"
+          },
+          "raw_response": "Artist: Celia Cruz & Johnny Pacheco | Title: De Nuevo",
+          "parsed": {
+            "artist": "Celia Cruz & Johnny Pacheco",
+            "title": "De Nuevo"
+          },
+          "score": 2,
+          "match_type": "exact"
+        },
+        {
+          "id": "celia-cruz-y-la-sonora-matancera-feliz-encuentro-en-el-carnaval-de-tenerife",
+          "ground_truth": {
+            "artist": "Celia Cruz y La Sonora Matancera",
+            "title": "Feliz Encuentro en el Carnaval de Tenerife"
+          },
+          "raw_response": "Artist: Celia Cruz | Title: Feliz Encuentro en el Carnaval de Tenerife (Los 12 grandes éxitos originales de Celia Cruz y La Sonora Matancera)",
+          "parsed": {
+            "artist": "Celia Cruz",
+            "title": "Feliz Encuentro en el Carnaval de Tenerife (Los 12 grandes éxitos originales de Celia Cruz y La Sonora Matancera)"
+          },
+          "score": 0,
+          "match_type": "none"
+        },
+        {
+          "id": "celia-cruz-con-la-sonora-matancera-la-tierna-conmovedora-bamboleadora",
+          "ground_truth": {
+            "artist": "Celia Cruz con la Sonora Matancera",
+            "title": "La Tierna, Conmovedora, Bamboleadora"
+          },
+          "raw_response": "Artist: Celia Cruz | Title: La Tierna, Conmovedora, Bamboleadora (with la Sonora Matancera)",
+          "parsed": {
+            "artist": "Celia Cruz",
+            "title": "La Tierna, Conmovedora, Bamboleadora (with la Sonora Matancera)"
+          },
+          "score": 0,
+          "match_type": "none"
+        },
+        {
+          "id": "celia-cruz-a-todos-mis-amigos",
+          "ground_truth": {
+            "artist": "Celia Cruz",
+            "title": "A Todos Mis Amigos"
+          },
+          "raw_response": "Artist: Celia Cruz | Title: A Todos Mis Amigos",
+          "parsed": {
+            "artist": "Celia Cruz",
+            "title": "A Todos Mis Amigos"
+          },
+          "score": 2,
+          "match_type": "exact"
+        },
+        {
+          "id": "el-combo-belga-y-sus-furiosos-rumberos-rompiendo-clave",
+          "ground_truth": {
+            "artist": "El Combo Belga y sus Furiosos Rumberos",
+            "title": "Rompiendo Clave"
+          },
+          "raw_response": "Artist: El Combo Belga | Title: Rompiendo Clave y Sus Furiosos Rumberos",
+          "parsed": {
+            "artist": "El Combo Belga",
+            "title": "Rompiendo Clave y Sus Furiosos Rumberos"
+          },
+          "score": 0,
+          "match_type": "none"
+        },
+        {
+          "id": "elba-ramalho-fruto",
+          "ground_truth": {
+            "artist": "Elba Ramalho",
+            "title": "Fruto"
+          },
+          "raw_response": "The image on the T-shirt appears to be related to the heavy metal band \"Sepultura.\" The specific artwork is from the album \"Beneath the Remains,\" but the style of the face paint and the design is more iconic of the album \"Arise,\" which features a similar image on its cover.\n\nArtist: Sepultura | Title: Arise",
+          "parsed": {
+            "artist": "Sepultura",
+            "title": "Arise"
+          },
+          "score": 0,
+          "match_type": "none"
+        },
+        {
+          "id": "eydie-gorme-y-el-trio-los-panchos-cuatro-vidas",
+          "ground_truth": {
+            "artist": "Eydie Gorme y el Trío Los Panchos",
+            "title": "Cuatro Vidas"
+          },
+          "raw_response": "Artist: Eydie Gorme y el Trio Los Panchos | Title: Cuatro Vidas",
+          "parsed": {
+            "artist": "Eydie Gorme y el Trio Los Panchos",
+            "title": "Cuatro Vidas"
+          },
+          "score": 1,
+          "match_type": "partial"
+        },
+        {
+          "id": "jayme-marques-que-cosa-mas-linda",
+          "ground_truth": {
+            "artist": "Jayme Marques",
+            "title": "Que Cosa Mas Linda!"
+          },
+          "raw_response": "The music release shown in the photo is a vinyl record by Jayme Marques. Based on the image, the release title at the top of the cover is \"¡Que Cosa Mas Linda!\".\n\nArtist: Jayme Marques | Title: ¡Que Cosa Mas Linda!",
+          "parsed": {
+            "artist": "Jayme Marques",
+            "title": "¡Que Cosa Mas Linda!"
+          },
+          "score": 2,
+          "match_type": "exact"
+        },
+        {
+          "id": "jayme-marques-sol-de-verano",
+          "ground_truth": {
+            "artist": "Jayme Marques",
+            "title": "Sol de Verano"
+          },
+          "raw_response": "Artist: Jayme Marques | Title: Sol de Verão",
+          "parsed": {
+            "artist": "Jayme Marques",
+            "title": "Sol de Verão"
+          },
+          "score": 1,
+          "match_type": "partial"
+        },
+        {
+          "id": "juan-carlos-senante-chateaubriand-filete-y-salsa",
+          "ground_truth": {
+            "artist": "Juan Carlos Senante",
+            "title": "Chateaubriand (Filete y Salsa)"
+          },
+          "raw_response": "The image appears to be of the cover art for a music release by the artist known as Captain Beefheart. The specific album depicted is \"Safe as Milk.\" However, the artwork shown does not match the original \"Safe as Milk\" album cover. It seems to be a variation or a piece of art inspired by Captain Beefheart's style, possibly from a reissue or a fan-made item.\n\nArtist: Captain Beefheart and His Magic Band | Title: Safe as Milk",
+          "parsed": {
+            "artist": "Captain Beefheart and His Magic Band",
+            "title": "Safe as Milk"
+          },
+          "score": 0,
+          "match_type": "none"
+        },
+        {
+          "id": "juan-luis-guerra-y-440-areito",
+          "ground_truth": {
+            "artist": "Juan Luis Guerra y 440",
+            "title": "Areito"
+          },
+          "raw_response": "Artist: Juan Luis Guerra | Title: Areíto",
+          "parsed": {
+            "artist": "Juan Luis Guerra",
+            "title": "Areíto"
+          },
+          "score": 0,
+          "match_type": "none"
+        },
+        {
+          "id": "juan-luis-guerra-y-440-el-original-440",
+          "ground_truth": {
+            "artist": "Juan Luis Guerra y 4.40",
+            "title": "El Original 4.40"
+          },
+          "raw_response": "Artist: Juan Luis Guerra | Title: Flor de Amor 4.40",
+          "parsed": {
+            "artist": "Juan Luis Guerra",
+            "title": "Flor de Amor 4.40"
+          },
+          "score": 0,
+          "match_type": "none"
+        },
+        {
+          "id": "kamac-pacha-inti-mi-raza",
+          "ground_truth": {
+            "artist": "Kamac Pacha Inti",
+            "title": "Mi Raza"
+          },
+          "raw_response": "Artist: Kamae Pacha Inti | Title: Miraza",
+          "parsed": {
+            "artist": "Kamae Pacha Inti",
+            "title": "Miraza"
+          },
+          "score": 0,
+          "match_type": "none"
+        },
+        {
+          "id": "the-manhattan-transfer-brasil",
+          "ground_truth": {
+            "artist": "The Manhattan Transfer",
+            "title": "Brasil"
+          },
+          "raw_response": "The image on the T-shirt appears to be a promotional graphic for the album \"A Momentary Lapse of Reason\" by Pink Floyd. The design is reminiscent of the artwork associated with this album, particularly the bed scene which is a well-known image from the album's cover art.\n\nArtist: Pink Floyd | Title: A Momentary Lapse of Reason",
+          "parsed": {
+            "artist": "Pink Floyd",
+            "title": "A Momentary Lapse of Reason"
+          },
+          "score": 0,
+          "match_type": "none"
+        },
+        {
+          "id": "luis-kalaff-con-los-alegres-dominicanos-bailemos-merengue",
+          "ground_truth": {
+            "artist": "Luis Kalaff con Los Alegres Dominicanos",
+            "title": "Bailemos Merengue"
+          },
+          "raw_response": "Artist: Luis Kalaf | Title: Innergigue con \"Los Alegres Dominicanos\"",
+          "parsed": {
+            "artist": "Luis Kalaf",
+            "title": "Innergigue con \"Los Alegres Dominicanos\""
+          },
+          "score": 0,
+          "match_type": "none"
+        },
+        {
+          "id": "orquesta-encantada-sabroson",
+          "ground_truth": {
+            "artist": "Orquesta Encantada",
+            "title": "Sabrosón"
+          },
+          "raw_response": "",
+          "parsed": {
+            "artist": "",
+            "title": ""
+          },
+          "score": 0,
+          "match_type": "none",
+          "error": "SDKError: API error occurred: Status 429\nBody: {\"object\":\"error\",\"message\":\"Rate limit exceeded\",\"type\":\"rate_limited\",\"param\":null,\"code\":\"1300\",\"raw_status_code\":429}"
+        },
+        {
+          "id": "ranking-joe-weakheart-fadeaway",
+          "ground_truth": {
+            "artist": "Ranking Joe",
+            "title": "Weakheart Fadeaway"
+          },
+          "raw_response": "",
+          "parsed": {
+            "artist": "",
+            "title": ""
+          },
+          "score": 0,
+          "match_type": "none",
+          "error": "SDKError: API error occurred: Status 429\nBody: {\"object\":\"error\",\"message\":\"Rate limit exceeded\",\"type\":\"rate_limited\",\"param\":null,\"code\":\"1300\",\"raw_status_code\":429}"
+        },
+        {
+          "id": "beth-carvalho-feliz",
+          "ground_truth": {
+            "artist": "Beth Carvalho",
+            "title": "Feliz"
+          },
+          "raw_response": "",
+          "parsed": {
+            "artist": "",
+            "title": ""
+          },
+          "score": 0,
+          "match_type": "none",
+          "error": "SDKError: API error occurred: Status 429\nBody: {\"object\":\"error\",\"message\":\"Rate limit exceeded\",\"type\":\"rate_limited\",\"param\":null,\"code\":\"1300\",\"raw_status_code\":429}"
+        },
+        {
+          "id": "billos-caracas-boys-la-rubia-y-la-triguena",
+          "ground_truth": {
+            "artist": "Billo's Caracas Boys",
+            "title": "La Rubia y la Trigueña"
+          },
+          "raw_response": "",
+          "parsed": {
+            "artist": "",
+            "title": ""
+          },
+          "score": 0,
+          "match_type": "none",
+          "error": "SDKError: API error occurred: Status 429\nBody: {\"object\":\"error\",\"message\":\"Rate limit exceeded\",\"type\":\"rate_limited\",\"param\":null,\"code\":\"1300\",\"raw_status_code\":429}"
+        },
+        {
+          "id": "crispin-licuado",
+          "ground_truth": {
+            "artist": "Crispin",
+            "title": "Licuado"
+          },
+          "raw_response": "",
+          "parsed": {
+            "artist": "",
+            "title": ""
+          },
+          "score": 0,
+          "match_type": "none",
+          "error": "SDKError: API error occurred: Status 429\nBody: {\"object\":\"error\",\"message\":\"Rate limit exceeded\",\"type\":\"rate_limited\",\"param\":null,\"code\":\"1300\",\"raw_status_code\":429}"
+        },
+        {
+          "id": "aurelio-reinoso-don-reinoso",
+          "ground_truth": {
+            "artist": "Aurelio Reinoso",
+            "title": "Don Reinoso"
+          },
+          "raw_response": "",
+          "parsed": {
+            "artist": "",
+            "title": ""
+          },
+          "score": 0,
+          "match_type": "none",
+          "error": "SDKError: API error occurred: Status 429\nBody: {\"object\":\"error\",\"message\":\"Rate limit exceeded\",\"type\":\"rate_limited\",\"param\":null,\"code\":\"1300\",\"raw_status_code\":429}"
+        },
+        {
+          "id": "grupo-guaco-guaco-76",
+          "ground_truth": {
+            "artist": "Grupo Guaco",
+            "title": "Guaco 76"
+          },
+          "raw_response": "",
+          "parsed": {
+            "artist": "",
+            "title": ""
+          },
+          "score": 0,
+          "match_type": "none",
+          "error": "SDKError: API error occurred: Status 429\nBody: {\"object\":\"error\",\"message\":\"Rate limit exceeded\",\"type\":\"rate_limited\",\"param\":null,\"code\":\"1300\",\"raw_status_code\":429}"
+        },
+        {
+          "id": "pacho-via-libre-llego",
+          "ground_truth": {
+            "artist": "Pacho",
+            "title": "Via Libre Llego"
+          },
+          "raw_response": "",
+          "parsed": {
+            "artist": "",
+            "title": ""
+          },
+          "score": 0,
+          "match_type": "none",
+          "error": "SDKError: API error occurred: Status 429\nBody: {\"object\":\"error\",\"message\":\"Rate limit exceeded\",\"type\":\"rate_limited\",\"param\":null,\"code\":\"1300\",\"raw_status_code\":429}"
+        }
+      ],
+      "summary": {
+        "exact": 11,
+        "partial": 14,
+        "none": 76,
+        "parse_errors": 51,
+        "total_score": 36,
+        "max_score": 202
+      }
+    }
+  }
+}

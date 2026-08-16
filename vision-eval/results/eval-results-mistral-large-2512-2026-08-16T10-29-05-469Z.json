@@ -1,0 +1,1433 @@
+{
+  "run_at": "2026-08-16T10:37:45.480Z",
+  "model": "mistral-large-2512",
+  "total_cases": 101,
+  "strategies": {
+    "A": {
+      "results": [
+        {
+          "id": "the-earons-land-of-hunger",
+          "ground_truth": {
+            "artist": "The Earons",
+            "title": "Land Of Hunger"
+          },
+          "raw_response": "Artist: The Earons | Title: Land Of Hunger",
+          "parsed": {
+            "artist": "The Earons",
+            "title": "Land Of Hunger"
+          },
+          "score": 2,
+          "match_type": "exact"
+        },
+        {
+          "id": "louis-chedid-ainsi-soit-il",
+          "ground_truth": {
+            "artist": "Louis Chedid",
+            "title": "Ainsi Soit-Il"
+          },
+          "raw_response": "The music release shown in the photo is by Louis Chedid. The specific album title indicated at the bottom of the image is \"Ainsi soit-il.\"\n\nArtist: Louis Chedid | Title: Ainsi soit-il",
+          "parsed": {
+            "artist": "Louis Chedid",
+            "title": "Ainsi soit-il"
+          },
+          "score": 2,
+          "match_type": "exact"
+        },
+        {
+          "id": "ed-lincoln-ontem-hoje-sempre",
+          "ground_truth": {
+            "artist": "Ed Lincoln",
+            "title": "Ontem Hoje Sempre"
+          },
+          "raw_response": "Artist: Ed Lincoln | Title: Ontem, Hoje, Sempre",
+          "parsed": {
+            "artist": "Ed Lincoln",
+            "title": "Ontem, Hoje, Sempre"
+          },
+          "score": 2,
+          "match_type": "exact"
+        },
+        {
+          "id": "caetano-veloso-caetano-veloso",
+          "ground_truth": {
+            "artist": "Caetano Veloso",
+            "title": "Caetano Veloso"
+          },
+          "raw_response": "The music release shown in the photo is a reissue of an album by Caetano Veloso. Based on the information provided on the record sleeve, the details are as follows:\n\nArtist: Caetano Veloso | Title: Caeetano Veloso",
+          "parsed": {
+            "artist": "Caetano Veloso",
+            "title": "Caeetano Veloso"
+          },
+          "score": 1,
+          "match_type": "partial"
+        },
+        {
+          "id": "pipos-4-o-encontro-da-massa",
+          "ground_truth": {
+            "artist": "Pipo's 4",
+            "title": "O Encontro da Massa"
+          },
+          "raw_response": "The music release shown in the photo is by the artist \"Ripos\" and the release is titled \"O Encontro da Massa.\" This appears to be the fourth installment in a series, as indicated by the number \"4\" on the cover.\n\nArtist: Ripos | Title: O Encontro da Massa 4",
+          "parsed": {
+            "artist": "Ripos",
+            "title": "O Encontro da Massa 4"
+          },
+          "score": 0,
+          "match_type": "none"
+        },
+        {
+          "id": "quarteto-em-cy-tamba-trio-som-definitivo",
+          "ground_truth": {
+            "artist": "Quarteto Em Cy & Tamba Trio",
+            "title": "Som Definitivo"
+          },
+          "raw_response": "The music release shown in the photo is a vinyl record by the \"Quarteto em Cy\" in collaboration with the \"Tamba Trio.\" The title of the release is \"Quarteto em Cy e Tamba Trio.\"\n\nArtist: Quarteto em Cy & Tamba Trio | Title: Quarteto em Cy e Tamba Trio",
+          "parsed": {
+            "artist": "Quarteto em Cy & Tamba Trio",
+            "title": "Quarteto em Cy e Tamba Trio"
+          },
+          "score": 1,
+          "match_type": "partial"
+        },
+        {
+          "id": "esperanza-spalding-emilys-devolution",
+          "ground_truth": {
+            "artist": "Esperanza Spalding",
+            "title": "Emily's D+Evolution"
+          },
+          "raw_response": "The music release shown in the photo is by the artist Emily Haines, in collaboration with Michael Aston, under the project name \"Emily Haines & The Soft Skeleton.\" The release title is \"Knives Don't Have Your Back.\"\n\nArtist: Emily Haines & The Soft Skeleton | Title: Knives Don't Have Your Back",
+          "parsed": {
+            "artist": "Emily Haines & The Soft Skeleton",
+            "title": "Knives Don't Have Your Back"
+          },
+          "score": 0,
+          "match_type": "none"
+        },
+        {
+          "id": "machito-tanga",
+          "ground_truth": {
+            "artist": "Machito & His Afro-Cubans",
+            "title": "Tanga"
+          },
+          "raw_response": "The music release shown in the photo is an album by Machito and his Afro-Cubans. The title of the release is \"Tanga.\"\n\nArtist: Machito and his Afro-Cubans | Title: Tanga",
+          "parsed": {
+            "artist": "Machito and his Afro-Cubans",
+            "title": "Tanga"
+          },
+          "score": 1,
+          "match_type": "partial"
+        },
+        {
+          "id": "orquesta-el-macabeo-salsa-bestial",
+          "ground_truth": {
+            "artist": "Orquesta El Macabeo",
+            "title": "Salsa Bestial"
+          },
+          "raw_response": "The music releases shown in the photo are:\n\nArtist: Various Artists | Title: Salsa Bestial (Osquesta El Macabeo appears on the cover)\nArtist: Various Artists | Title: NYCSalsa 3\n\nThe specific artist names for the compilations are not fully visible in the image, but the titles of the releases are \"Salsa Bestial\" and \"NYC Salsa 3.\" Typically, such albums feature various artists rather than a single performer.",
+          "parsed": {
+            "artist": "Various Artists",
+            "title": "Salsa Bestial (Osquesta El Macabeo appears on the cover)"
+          },
+          "score": 0,
+          "match_type": "none"
+        },
+        {
+          "id": "t-rex-t-rex",
+          "ground_truth": {
+            "artist": "T. Rex",
+            "title": "T. Rex"
+          },
+          "raw_response": "The music release shown in the photo is by the band T. Rex. The specific release appears to be a compilation or reissue CD, given the \"SUPRENOS\" branding, which is known for such releases. However, without a clear view of the full title, it is not possible to definitively identify the exact release title from this image alone. The original album that features the image on the cover is likely \"Electric Warrior,\" which is one of T. Rex's most famous albums, but the exact title of this particular CD cannot be confirmed.\n\nArtist: T. Rex | Title: (Not definitively identifiable from the image)",
+          "parsed": {
+            "artist": "T. Rex",
+            "title": "(Not definitively identifiable from the image)"
+          },
+          "score": 1,
+          "match_type": "partial"
+        },
+        {
+          "id": "various-rico-rico",
+          "ground_truth": {
+            "artist": "Various",
+            "title": "Rico Rico - 50 Exitos Tropicales"
+          },
+          "raw_response": "The music release shown in the photo is a compilation album. Based on the image, the specific details are:\n\nArtist: Various Artists\nTitle: Rico Rico - 50 Exitos Tropicales\n\nThis is a collection featuring multiple artists, which is common for compilation albums that aim to showcase a variety of songs within a particular genre or theme. The album appears to focus on tropical music styles.",
+          "parsed": {
+            "artist": "Various Artists",
+            "title": "Rico Rico - 50 Exitos Tropicales"
+          },
+          "score": 1,
+          "match_type": "partial"
+        },
+        {
+          "id": "various-seattle-the-dark-side",
+          "ground_truth": {
+            "artist": "Various",
+            "title": "Seattle... The Dark Side"
+          },
+          "raw_response": "The music release shown in the photo is a mixtape or album associated with the Seattle hip-hop scene. Based on the text and imagery on the cover, it appears to be a project by \"Rhyme Cartel Records.\" The specific release title indicated on the cover is \"Seattle... The Dark Side.\"\n\nArtist: Rhyme Cartel Records | Title: Seattle... The Dark Side",
+          "parsed": {
+            "artist": "Rhyme Cartel Records",
+            "title": "Seattle... The Dark Side"
+          },
+          "score": 1,
+          "match_type": "partial"
+        },
+        {
+          "id": "determine-never-know",
+          "ground_truth": {
+            "artist": "Determine",
+            "title": "Never Know"
+          },
+          "raw_response": "The music release shown in the photo is a single by the artist known as \"New Order.\" The specific design elements, such as the colored pattern and the circular motif, are characteristic of the \"Blue Monday\" single, which is one of New Order's most famous releases. This particular design is from the 1988 reissue of the single.\n\nArtist: New Order | Title: Blue Monday",
+          "parsed": {
+            "artist": "New Order",
+            "title": "Blue Monday"
+          },
+          "score": 0,
+          "match_type": "none"
+        },
+        {
+          "id": "discotex-records-6am-wanna-be-down",
+          "ground_truth": {
+            "artist": "Discotex Records",
+            "title": "6AM / Wanna Be Down"
+          },
+          "raw_response": "The music release shown in the photo is a vinyl record by an artist under the alias \"D. Lee.\" The track on the A side is a remix titled \"1.2.4.A.M. (Remix)\" featuring Skallamooch. However, the specific release title is not fully provided on the label. Typically, for a proper identification, one would look for a catalog number or a more distinct release title, which is not present in this image.\n\nBased on the information available:\nArtist: D. Lee feat. Skallamooch | Title: 1.2.4.A.M. (Remix) / Wanna Be Down",
+          "parsed": {
+            "artist": "D. Lee feat. Skallamooch",
+            "title": "1.2.4.A.M. (Remix) / Wanna Be Down"
+          },
+          "score": 0,
+          "match_type": "none"
+        },
+        {
+          "id": "legends-of-the-dark-ground-cabra",
+          "ground_truth": {
+            "artist": "Legends of the Dark Ground",
+            "title": "Cabra (Seiji Re-Rinse)"
+          },
+          "raw_response": "The vinyl record shown in the photo is a single or an EP by the artist Aphex Twin. The specific release is titled \"Come to Daddy.\"\n\nArtist: Aphex Twin | Title: Come to Daddy",
+          "parsed": {
+            "artist": "Aphex Twin",
+            "title": "Come to Daddy"
+          },
+          "score": 0,
+          "match_type": "none"
+        },
+        {
+          "id": "wedding-hands-in-the-till",
+          "ground_truth": {
+            "artist": "Wedding",
+            "title": "Hands In The Till / A Little Love"
+          },
+          "raw_response": "The image appears to be of a vinyl record, specifically a 7-inch single or an EP. The design suggests it is from the band \"Hands in the Till.\" The release title indicated on the label is \"A Little Love,\" and the main title at the top is \"Wedding.\"\n\nArtist: Hands in the Till | Title: Wedding - A Little Love",
+          "parsed": {
+            "artist": "Hands in the Till",
+            "title": "Wedding - A Little Love"
+          },
+          "score": 0,
+          "match_type": "none"
+        },
+        {
+          "id": "olu-living-free",
+          "ground_truth": {
+            "artist": "Olu",
+            "title": "Living Free"
+          },
+          "raw_response": "Artist: OLU | Title: Living Free (Joi De Vivre Mix)",
+          "parsed": {
+            "artist": "OLU",
+            "title": "Living Free (Joi De Vivre Mix)"
+          },
+          "score": 1,
+          "match_type": "partial"
+        },
+        {
+          "id": "big-bub-i-dont-mind",
+          "ground_truth": {
+            "artist": "Big Bub",
+            "title": "I Don't Mind"
+          },
+          "raw_response": "The music release shown in the photo is a vinyl record single. Based on the information provided on the label:\n\nArtist: Big Bub\nTitle: Don't Mind (Remix) / Trippin' (Remix)",
+          "parsed": {
+            "artist": "Big Bub",
+            "title": "Don't Mind (Remix) / Trippin' (Remix)"
+          },
+          "score": 1,
+          "match_type": "partial"
+        },
+        {
+          "id": "patrick-cowley-menergy",
+          "ground_truth": {
+            "artist": "Patrick Cowley",
+            "title": "Menergy"
+          },
+          "raw_response": "Artist: Patrick Cowley | Title: Menergy",
+          "parsed": {
+            "artist": "Patrick Cowley",
+            "title": "Menergy"
+          },
+          "score": 2,
+          "match_type": "exact"
+        },
+        {
+          "id": "sleepy-brown-i-cant-wait",
+          "ground_truth": {
+            "artist": "Sleepy Brown feat. Outkast",
+            "title": "I Can't Wait"
+          },
+          "raw_response": "The music release shown in the photo is a single by Sleepy Brown featuring OutKast. The release title is \"I Can't Wait\" from the album \"BarberShop 2: Back in Business\" soundtrack.\n\nArtist: Sleepy Brown featuring OutKast | Title: I Can't Wait",
+          "parsed": {
+            "artist": "Sleepy Brown featuring OutKast",
+            "title": "I Can't Wait"
+          },
+          "score": 1,
+          "match_type": "partial"
+        },
+        {
+          "id": "mc-mell-o-first-chronicles",
+          "ground_truth": {
+            "artist": "MC Mell 'O'",
+            "title": "The First Chronicles of D.E.T.T."
+          },
+          "raw_response": "Artist: MC Mell'O' | Title: Natural Response - The First Chronicles of D.E.T.",
+          "parsed": {
+            "artist": "MC Mell'O'",
+            "title": "Natural Response - The First Chronicles of D.E.T."
+          },
+          "score": 0,
+          "match_type": "none"
+        },
+        {
+          "id": "natural-black-early-on-before",
+          "ground_truth": {
+            "artist": "Natural Black",
+            "title": "Early On Before"
+          },
+          "raw_response": "The record shown in the photo is a vinyl single from the reggae artist Peter Tosh. The release is titled \"Early On Before,\" which is part of the \"Natural Black\" series, a collection of reggae music.\n\nArtist: Peter Tosh | Title: Early On Before (Natural Black series)",
+          "parsed": {
+            "artist": "Peter Tosh",
+            "title": "Early On Before (Natural Black series)"
+          },
+          "score": 0,
+          "match_type": "none"
+        },
+        {
+          "id": "young-peoples-records-all-aboard",
+          "ground_truth": {
+            "artist": "Young People's Records",
+            "title": "All Aboard!"
+          },
+          "raw_response": "The music release shown in the photo is part of the \"Young People's Records\" series. Based on the visible information, the specific releases advertised are \"Train to the Zoo,\" \"Train to the Farm,\" and \"Train to the Ranch.\" However, the artist's name is not specified on the cover. Young People's Records was a series of children's records that featured various artists and stories, often with educational themes.\n\nArtist: Various Artists | Title: All Aboard! Train to the Zoo, Train to the Farm, Train to the Ranch",
+          "parsed": {
+            "artist": "Various Artists",
+            "title": "All Aboard! Train to the Zoo, Train to the Farm, Train to the Ranch"
+          },
+          "score": 0,
+          "match_type": "none"
+        },
+        {
+          "id": "mario-telles-mario-telles",
+          "ground_truth": {
+            "artist": "Mario Telles",
+            "title": "Mario Telles"
+          },
+          "raw_response": "The music release shown in the photo is by the artist Mario Telles. Based on the image, the release appears to be a CD, but the exact title of the album or single is not fully visible. However, the name \"MARIO TELLES\" is prominently displayed, which is likely the artist's name.\n\nArtist: Mario Telles | Title: [Not fully visible]",
+          "parsed": {
+            "artist": "Mario Telles",
+            "title": "[Not fully visible]"
+          },
+          "score": 1,
+          "match_type": "partial"
+        },
+        {
+          "id": "lecuona-plays-for-two",
+          "ground_truth": {
+            "artist": "Lecuona",
+            "title": "Plays For Two"
+          },
+          "raw_response": "Artist: Lecuona Cuban Boys | Title: Lecuona Plays For Two\n\nArtist: Various (specifically featuring Ernesto Lecuona) | Title: Lecuona Plays For Two",
+          "parsed": {
+            "artist": "Lecuona Cuban Boys",
+            "title": "Lecuona Plays For Two"
+          },
+          "score": 0,
+          "match_type": "none"
+        },
+        {
+          "id": "aeoliah-crystal-illumination",
+          "ground_truth": {
+            "artist": "Aeoliah",
+            "title": "Crystal Illumination"
+          },
+          "raw_response": "The music release shown in the photo is a CD by the artist Aeoliah. The title of the release is \"Crystal Illumination.\"\n\nArtist: Aeoliah | Title: Crystal Illumination",
+          "parsed": {
+            "artist": "Aeoliah",
+            "title": "Crystal Illumination"
+          },
+          "score": 2,
+          "match_type": "exact"
+        },
+        {
+          "id": "coro-minero-de-turon",
+          "ground_truth": {
+            "artist": "Coro Minero de Turón",
+            "title": "Coro Minero de Turón"
+          },
+          "raw_response": "The music release shown in the photo is a vinyl record by the \"Coro Minero de Turón.\" This is a choir, and the specific release is likely a traditional or folk music album, given the attire of the group and the context of the choir's name, which suggests a connection to mining culture. The record is directed by Baldomero Pérez Méndez, as indicated on the cover.\n\nThe label on the record specifies \"T AST cor,\" which likely refers to the specific track or a series on the record, but it does not provide enough information to identify the exact title of the release.\n\nArtist: Coro Minero de Turón | Title: Not fully identifiable from the image alone",
+          "parsed": {
+            "artist": "Coro Minero de Turón",
+            "title": "Not fully identifiable from the image alone"
+          },
+          "score": 1,
+          "match_type": "partial"
+        },
+        {
+          "id": "maggie-carles-luis-nodal-y-los-magneticos",
+          "ground_truth": {
+            "artist": "Maggie Carlés / Luis Nodal y los Magnéticos",
+            "title": "Maggie Carlés / Luis Nodal y los Magnéticos"
+          },
+          "raw_response": "The image shows two different music releases:\n\n1. The top portion of the image features Maggie Carlés.\n   Artist: Maggie Carlés | Title: Not specified in the image\n\n2. The bottom portion of the image features Luis Nodal y los Magnéticos.\n   Artist: Luis Nodal y los Magnéticos | Title: Not specified in the image\n\nSince the exact release titles are not provided in the image, only the artist names can be confirmed. If you have additional details or a clearer view of the album covers, the specific titles could be identified.",
+          "parsed": {
+            "artist": "Maggie Carlés",
+            "title": "Not specified in the image"
+          },
+          "score": 0,
+          "match_type": "none"
+        },
+        {
+          "id": "lucho-gatica-antonio-machin",
+          "ground_truth": {
+            "artist": "Lucho Gatica / Antonio Machin",
+            "title": "Lucho Gatica / Antonio Machin"
+          },
+          "raw_response": "The music release shown in the photo is by Antonio Machín, a well-known Cuban singer. The record appears to be a 45 RPM single featuring the song \"Lucho Gatica\" on one side, which is likely a tribute to the Chilean bolero singer Lucho Gatica.\n\nArtist: Antonio Machín | Title: Lucho Gatica (single)",
+          "parsed": {
+            "artist": "Antonio Machín",
+            "title": "Lucho Gatica (single)"
+          },
+          "score": 0,
+          "match_type": "none"
+        },
+        {
+          "id": "cesaria-evora-cabo-verde",
+          "ground_truth": {
+            "artist": "Cesaria Evora",
+            "title": "Cabo Verde"
+          },
+          "raw_response": "The music release shown in the photo is by Cesária Évora, a renowned singer from Cape Verde. The specific release indicated by the handwritten note on the CD case is \"Poema Tropical,\" which is a compilation album. However, the cover art in the image corresponds to her album \"Cabo Verde.\"\n\nArtist: Cesária Évora | Title: Cabo Verde",
+          "parsed": {
+            "artist": "Cesária Évora",
+            "title": "Cabo Verde"
+          },
+          "score": 1,
+          "match_type": "partial"
+        },
+        {
+          "id": "melanie-golden-hour-of-melanie",
+          "ground_truth": {
+            "artist": "Melanie",
+            "title": "Golden Hour Of Melanie"
+          },
+          "raw_response": "The music release shown in the photo is a cassette tape titled \"Golden Hour of Melanie.\" This series of \"Golden Hour\" releases typically features a collection of songs by the artist, in this case, Melanie Safka, who is commonly known by her first name, Melanie.\n\nArtist: Melanie | Title: Golden Hour of Melanie",
+          "parsed": {
+            "artist": "Melanie",
+            "title": "Golden Hour of Melanie"
+          },
+          "score": 2,
+          "match_type": "exact"
+        },
+        {
+          "id": "neil-young-after-the-gold-rush",
+          "ground_truth": {
+            "artist": "Neil Young",
+            "title": "After The Gold Rush"
+          },
+          "raw_response": "The music release shown in the photo is an album by Neil Young. The title of the album is \"After the Gold Rush.\"\n\nArtist: Neil Young | Title: After the Gold Rush",
+          "parsed": {
+            "artist": "Neil Young",
+            "title": "After the Gold Rush"
+          },
+          "score": 2,
+          "match_type": "exact"
+        },
+        {
+          "id": "steve-reich-sextet-six-marimbas",
+          "ground_truth": {
+            "artist": "Steve Reich",
+            "title": "Sextet / Six Marimbas"
+          },
+          "raw_response": "The music release shown in the photo is an album by Steve Reich. The title of the release is \"Sextet\" and it also mentions \"Six Marimbas,\" which is likely a piece included on the album.\n\nArtist: Steve Reich | Title: Sextet / Six Marimbas",
+          "parsed": {
+            "artist": "Steve Reich",
+            "title": "Sextet / Six Marimbas"
+          },
+          "score": 2,
+          "match_type": "exact"
+        },
+        {
+          "id": "gregory-isaacs-lovers-rock",
+          "ground_truth": {
+            "artist": "Gregory Isaacs",
+            "title": "Lovers' Rock"
+          },
+          "raw_response": "Artist: Gregory Isaacs | Title: Lovers Rock",
+          "parsed": {
+            "artist": "Gregory Isaacs",
+            "title": "Lovers Rock"
+          },
+          "score": 2,
+          "match_type": "exact"
+        },
+        {
+          "id": "curtis-mayfield-curtis-live",
+          "ground_truth": {
+            "artist": "Curtis Mayfield",
+            "title": "Curtis/Live!"
+          },
+          "raw_response": "The music release shown in the photo is a live album by Curtis Mayfield. The details on the cover indicate the following:\n\nArtist: Curtis Mayfield | Title: Curtis/Live!",
+          "parsed": {
+            "artist": "Curtis Mayfield",
+            "title": "Curtis/Live!"
+          },
+          "score": 2,
+          "match_type": "exact"
+        },
+        {
+          "id": "j-dilla-donuts",
+          "ground_truth": {
+            "artist": "J Dilla",
+            "title": "Donuts"
+          },
+          "raw_response": "The music release shown in the photo is a tribute album to the late producer J Dilla, also known as Jay Dee. The specific release depicted is a special edition vinyl record titled \"J Dilla Jay Dee Donuts.\"\n\nArtist: J Dilla | Title: Donuts",
+          "parsed": {
+            "artist": "J Dilla",
+            "title": "Donuts"
+          },
+          "score": 2,
+          "match_type": "exact"
+        },
+        {
+          "id": "hugo-jara-estado-de-animo",
+          "ground_truth": {
+            "artist": "Hugo Jara",
+            "title": "Estado De Animo"
+          },
+          "raw_response": "The music release shown in the photo is a vinyl record with a unique, handmade design. Based on the text \"STUDIOSRAMMØ,\" this appears to be a special or limited edition release by the artist known as Oneohtrix Point Never. The specific release title indicated by the symbols and the style of the cover is likely \"R Plus Seven.\"\n\nArtist: Oneohtrix Point Never | Title: R Plus Seven",
+          "parsed": {
+            "artist": "Oneohtrix Point Never",
+            "title": "R Plus Seven"
+          },
+          "score": 0,
+          "match_type": "none"
+        },
+        {
+          "id": "dorival-caymmi-caymmi",
+          "ground_truth": {
+            "artist": "Dorival Caymmi",
+            "title": "Caymmi"
+          },
+          "raw_response": "The music release shown in the photo is a special edition of an album by the artist M.I.A. The cover art and the name \"CAYMANI\" suggest that this is the album \"Kala,\" which is known for its distinctive cover featuring M.I.A. in a similar pose. This particular edition seems to be a limited or special release, given the unique packaging.\n\nArtist: M.I.A. | Title: Kala",
+          "parsed": {
+            "artist": "M.I.A.",
+            "title": "Kala"
+          },
+          "score": 0,
+          "match_type": "none"
+        },
+        {
+          "id": "dorival-caymmi-caymmi-odeon",
+          "ground_truth": {
+            "artist": "Dorival Caymmi",
+            "title": "Caymmi"
+          },
+          "raw_response": "The music release shown in the photo is by the artist Leon. The album is titled \"Bandera\".\n\nArtist: Leon | Title: Bandera",
+          "parsed": {
+            "artist": "Leon",
+            "title": "Bandera"
+          },
+          "score": 0,
+          "match_type": "none"
+        },
+        {
+          "id": "stevie-wonder-hotter-than-july",
+          "ground_truth": {
+            "artist": "Stevie Wonder",
+            "title": "Hotter Than July"
+          },
+          "raw_response": "The cake in the photo is designed to resemble the album cover of \"Hot Fuss\" by The Killers. The distinctive design elements, such as the stylized text and the image of a person, are characteristic of this album's artwork.\n\nArtist: The Killers | Title: Hot Fuss",
+          "parsed": {
+            "artist": "The Killers",
+            "title": "Hot Fuss"
+          },
+          "score": 0,
+          "match_type": "none"
+        },
+        {
+          "id": "nite-jewel-no-sun",
+          "ground_truth": {
+            "artist": "Nite Jewel",
+            "title": "No Sun"
+          },
+          "raw_response": "The music release shown in the photo is a vinyl record by Nick Cave & The Bad Seeds. The specific release title indicated on the label is \"Nocturama.\"\n\nArtist: Nick Cave & The Bad Seeds | Title: Nocturama",
+          "parsed": {
+            "artist": "Nick Cave & The Bad Seeds",
+            "title": "Nocturama"
+          },
+          "score": 0,
+          "match_type": "none"
+        },
+        {
+          "id": "horace-silver-and-the-jazz-messengers",
+          "ground_truth": {
+            "artist": "Horace Silver and the Jazz Messengers",
+            "title": "Horace Silver and the Jazz Messengers"
+          },
+          "raw_response": "The music release shown in the photo is by Horace Silver. The album is titled \"And The Jazz Messengers.\"\n\nArtist: Horace Silver | Title: And The Jazz Messengers",
+          "parsed": {
+            "artist": "Horace Silver",
+            "title": "And The Jazz Messengers"
+          },
+          "score": 0,
+          "match_type": "none"
+        },
+        {
+          "id": "max-romeo-revelation-time",
+          "ground_truth": {
+            "artist": "Max Romeo",
+            "title": "Revelation Time"
+          },
+          "raw_response": "The music release shown in the photo is a vinyl record by the artist Max Romeo. The title of the release is \"Revelation Time.\"\n\nArtist: Max Romeo | Title: Revelation Time",
+          "parsed": {
+            "artist": "Max Romeo",
+            "title": "Revelation Time"
+          },
+          "score": 2,
+          "match_type": "exact"
+        },
+        {
+          "id": "various-beat-girls-espanol",
+          "ground_truth": {
+            "artist": "Various",
+            "title": "Beat Girls Español!"
+          },
+          "raw_response": "The music release shown in the photo is a compilation album titled \"Beat Girls Español! 1960s She-Pop from Spain.\" This album is not attributed to a single artist but rather features a collection of tracks by various female artists and groups from Spain during the 1960s.\n\nArtist: Various Artists | Title: Beat Girls Español! 1960s She-Pop from Spain",
+          "parsed": {
+            "artist": "Various Artists",
+            "title": "Beat Girls Español! 1960s She-Pop from Spain"
+          },
+          "score": 0,
+          "match_type": "none"
+        },
+        {
+          "id": "team-shadetek-pale-fire",
+          "ground_truth": {
+            "artist": "Team Shadetek",
+            "title": "Pale Fire"
+          },
+          "raw_response": "The music release shown in the photo is by the band \"Pale Fire,\" which appears to be a project or a release associated with \"Team Shadetek.\" Based on the image, this is likely a vinyl record or an EP.\n\nArtist: Team Shadetek & Pale Fire | Title: Pale Fire",
+          "parsed": {
+            "artist": "Team Shadetek & Pale Fire",
+            "title": "Pale Fire"
+          },
+          "score": 1,
+          "match_type": "partial"
+        },
+        {
+          "id": "astrud-gilberto-compact-jazz",
+          "ground_truth": {
+            "artist": "Astrud Gilberto",
+            "title": "Compact Jazz"
+          },
+          "raw_response": "The music release shown in the photo is a part of the \"Compact Jazz\" series, which is a collection of compilation albums featuring various artists. The specific album in the image is by Astrud Gilberto.\n\nArtist: Astrud Gilberto | Title: Compact Jazz: Astrud Gilberto",
+          "parsed": {
+            "artist": "Astrud Gilberto",
+            "title": "Compact Jazz: Astrud Gilberto"
+          },
+          "score": 1,
+          "match_type": "partial"
+        },
+        {
+          "id": "astrud-gilberto-beach-samba",
+          "ground_truth": {
+            "artist": "Astrud Gilberto",
+            "title": "Beach Samba"
+          },
+          "raw_response": "The music release shown in the photo is an album by Astrud Gilberto. The title of the release is \"Beach Samba.\"\n\nArtist: Astrud Gilberto | Title: Beach Samba",
+          "parsed": {
+            "artist": "Astrud Gilberto",
+            "title": "Beach Samba"
+          },
+          "score": 2,
+          "match_type": "exact"
+        },
+        {
+          "id": "various-campeones-xvii-concurso-cancion-asturiana",
+          "ground_truth": {
+            "artist": "Various",
+            "title": "Campeones XVII Concurso de Canción Asturiana"
+          },
+          "raw_response": "The music release shown in the photo is a CD from the \"XVII Concurso de Canción Asturiana,\" which translates to the 17th Contest of Asturian Song. This is not a release by a single artist but rather a compilation featuring various artists who participated in the contest. The association responsible for the contest and presumably the release is \"Asociación Cultural San Luis La Nueva - Langreo.\"\n\nArtist: Various Artists | Title: Campeones XVII Concurso de Canción Asturiana",
+          "parsed": {
+            "artist": "Various Artists",
+            "title": "Campeones XVII Concurso de Canción Asturiana"
+          },
+          "score": 1,
+          "match_type": "partial"
+        },
+        {
+          "id": "paddy-mcaloon-i-trawl-the-megahertz",
+          "ground_truth": {
+            "artist": "Paddy McAloon",
+            "title": "I Trawl the Megahertz"
+          },
+          "raw_response": "The music release shown in the photo is a limited edition art print that accompanies the album \"I Trawl the Megahertz\" by Paddy McAloon. This album was originally released under the Prefab Sprout name, but it was a solo project by Paddy McAloon.\n\nArtist: Paddy McAloon | Title: I Trawl the Megahertz",
+          "parsed": {
+            "artist": "Paddy McAloon",
+            "title": "I Trawl the Megahertz"
+          },
+          "score": 2,
+          "match_type": "exact"
+        },
+        {
+          "id": "maranata-maranata",
+          "ground_truth": {
+            "artist": "Maranata",
+            "title": "Maranata"
+          },
+          "raw_response": "The music release shown in the photo is a cassette tape by the band Veni Domine. The title of the release is \"Maranatha.\"\n\nArtist: Veni Domine | Title: Maranatha",
+          "parsed": {
+            "artist": "Veni Domine",
+            "title": "Maranatha"
+          },
+          "score": 0,
+          "match_type": "none"
+        },
+        {
+          "id": "antonio-carlos-jobim-tide",
+          "ground_truth": {
+            "artist": "Antonio Carlos Jobim",
+            "title": "Tide"
+          },
+          "raw_response": "The music release shown in the photo is an album by Antônio Carlos Jobim, a renowned Brazilian composer, pianist, songwriter, arranger, and singer. The title of this particular release is \"Tide.\"\n\nArtist: Antônio Carlos Jobim | Title: Tide",
+          "parsed": {
+            "artist": "Antônio Carlos Jobim",
+            "title": "Tide"
+          },
+          "score": 1,
+          "match_type": "partial"
+        },
+        {
+          "id": "refused-songs-to-fan-the-flames-of-discontent",
+          "ground_truth": {
+            "artist": "Refused",
+            "title": "Songs to Fan the Flames of Discontent"
+          },
+          "raw_response": "The music release shown in the photo is by the Swedish punk rock band Refused. The release is titled \"The Shape of Punk to Come: A Chimerical Bombination in 12 Bursts.\"\n\nArtist: Refused | Title: The Shape of Punk to Come: A Chimerical Bombination in 12 Bursts",
+          "parsed": {
+            "artist": "Refused",
+            "title": "The Shape of Punk to Come: A Chimerical Bombination in 12 Bursts"
+          },
+          "score": 1,
+          "match_type": "partial"
+        },
+        {
+          "id": "collard-roge-satie-4-handed-piano",
+          "ground_truth": {
+            "artist": "Jean-Philippe Collard & Pascal Rogé",
+            "title": "Satie: The 4 Handed Piano"
+          },
+          "raw_response": "The music release shown in the photo is a recording of Erik Satie's compositions for piano, specifically arranged for four hands. The artists featured on this release are Jean-Philippe Collard and Pascal Rogé.\n\nArtist: Jean-Philippe Collard & Pascal Rogé | Title: The 4 Handed Piano: Satie",
+          "parsed": {
+            "artist": "Jean-Philippe Collard & Pascal Rogé",
+            "title": "The 4 Handed Piano: Satie"
+          },
+          "score": 1,
+          "match_type": "partial"
+        },
+        {
+          "id": "oren-ambarchi-shebang",
+          "ground_truth": {
+            "artist": "Oren Ambarchi",
+            "title": "Shebang"
+          },
+          "raw_response": "The music release shown in the photo is a vinyl record by the artist known as \"Shebang.\" The specific release title indicated on the label is \"0m Andet Id,\" which translates from Danish to \"Something Else\" in English.\n\nArtist: Shebang | Title: 0m Andet Id",
+          "parsed": {
+            "artist": "Shebang",
+            "title": "0m Andet Id"
+          },
+          "score": 0,
+          "match_type": "none"
+        },
+        {
+          "id": "laurent-garnier-planet-house-ep",
+          "ground_truth": {
+            "artist": "Laurent Garnier",
+            "title": "Planet House EP"
+          },
+          "raw_response": "The music release shown in the photo is by Laurent Garnier, and the title of the release is \"Planet House EP.\"\n\nArtist: Laurent Garnier | Title: Planet House EP",
+          "parsed": {
+            "artist": "Laurent Garnier",
+            "title": "Planet House EP"
+          },
+          "score": 2,
+          "match_type": "exact"
+        },
+        {
+          "id": "various-trojan-reggae-party-volume-one",
+          "ground_truth": {
+            "artist": "Various",
+            "title": "Trojan Reggae Party Volume One"
+          },
+          "raw_response": "The music release shown in the photo is a compilation album associated with the Trojan Records label, which is known for its extensive catalog of reggae and ska music. The specific release in the image is \"Trojan Reggae Party Volume One: Recorded Live!\"\n\nHowever, it should be noted that this is not a live recording of a single artist but rather a compilation album that features various artists. The exact artist names are not listed on the cover, and the album is a collection of tracks by different artists under the Trojan Records label.\n\nArtist: Various Artists | Title: Trojan Reggae Party Volume One: Recorded Live!",
+          "parsed": {
+            "artist": "Various Artists",
+            "title": "Trojan Reggae Party Volume One: Recorded Live!"
+          },
+          "score": 0,
+          "match_type": "none"
+        },
+        {
+          "id": "violeta-parra-un-rio-de-sangre",
+          "ground_truth": {
+            "artist": "Violeta Parra",
+            "title": "Un Rio de Sangre"
+          },
+          "raw_response": "The music release shown in the photo is an album by Violeta Parra, a renowned Chilean composer, songwriter, folklorist, ethnomusicologist, and visual artist. The album is titled \"Un Río de Sangre\" and features the voices of Isabel Parra, Ángel Parra, and Los Calchakis.\n\nArtist: Violeta Parra with Isabel Parra, Ángel Parra, and Los Calchakis | Title: Un Río de Sangre",
+          "parsed": {
+            "artist": "Violeta Parra with Isabel Parra, Ángel Parra, and Los Calchakis",
+            "title": "Un Río de Sangre"
+          },
+          "score": 0,
+          "match_type": "none"
+        },
+        {
+          "id": "bob-marley-and-the-wailers-uprising",
+          "ground_truth": {
+            "artist": "Bob Marley & The Wailers",
+            "title": "Uprising"
+          },
+          "raw_response": "The music release shown in the photo is an album by Bob Marley & The Wailers. The album title is \"Uprising.\"\n\nArtist: Bob Marley & The Wailers | Title: Uprising",
+          "parsed": {
+            "artist": "Bob Marley & The Wailers",
+            "title": "Uprising"
+          },
+          "score": 2,
+          "match_type": "exact"
+        },
+        {
+          "id": "various-macondo-revisitado",
+          "ground_truth": {
+            "artist": "Various",
+            "title": "Macondo Revisitado"
+          },
+          "raw_response": "The music release shown in the photo is a compilation or an album that explores the roots of subtropical music in Uruguay from 1975 to 1979. Based on the information provided on the cover, the release is titled \"Macondo Revisitado: The Roots of Subtropical Music Uruguay 1975-1979.\"\n\nHowever, \"Macondo\" is not typically associated with a single artist but rather a concept or a place from Gabriel García Márquez's literature, which has inspired various musical works. This particular release seems to be a compilation featuring multiple artists from the Uruguayan music scene during the specified period.\n\nArtist: Various Artists | Title: Macondo Revisitado: The Roots of Subtropical Music Uruguay 1975-1979",
+          "parsed": {
+            "artist": "Various Artists",
+            "title": "Macondo Revisitado: The Roots of Subtropical Music Uruguay 1975-1979"
+          },
+          "score": 0,
+          "match_type": "none"
+        },
+        {
+          "id": "barry-brown-vibes-of-barry-brown",
+          "ground_truth": {
+            "artist": "Barry Brown",
+            "title": "Vibes of Barry Brown"
+          },
+          "raw_response": "The music release shown in the photo is by the artist Barry Brown. The specific release title indicated on the CD is \"Vires of Barry Brown.\"\n\nArtist: Barry Brown | Title: Vires of Barry Brown",
+          "parsed": {
+            "artist": "Barry Brown",
+            "title": "Vires of Barry Brown"
+          },
+          "score": 1,
+          "match_type": "partial"
+        },
+        {
+          "id": "barry-brown-barry-brown",
+          "ground_truth": {
+            "artist": "Barry Brown",
+            "title": "Barry Brown"
+          },
+          "raw_response": "The CD case being held in the photo is for the album \"Dare!\" by the British band The Human League. This album is known for its iconic 1980s synth-pop sound and includes hits like \"Don't You Want Me.\"\n\nArtist: The Human League | Title: Dare!",
+          "parsed": {
+            "artist": "The Human League",
+            "title": "Dare!"
+          },
+          "score": 0,
+          "match_type": "none"
+        },
+        {
+          "id": "los-llopis-los-llopis",
+          "ground_truth": {
+            "artist": "Los Llopis",
+            "title": "Los Llopis"
+          },
+          "raw_response": "The music release shown in the photo is a CD by the artist Los Piojos. The title of the release is \"Estremécete,\" and it appears to be a special edition or live recording, as indicated by the phrase \"Hasta la Puerta Verde,\" which could refer to a concert or a specific performance location.\n\nArtist: Los Piojos | Title: Estremécete Hasta la Puerta Verde",
+          "parsed": {
+            "artist": "Los Piojos",
+            "title": "Estremécete Hasta la Puerta Verde"
+          },
+          "score": 0,
+          "match_type": "none"
+        },
+        {
+          "id": "jorge-negrete-jorge-negrete",
+          "ground_truth": {
+            "artist": "Jorge Negrete",
+            "title": "Jorge Negrete"
+          },
+          "raw_response": "The music release shown in the photo is a vinyl record by the artist Jorge Negrete. The title of the release appears to be \"Jorge Negrete - Cuando Quiere Un Mexicano,\" which is a compilation of some of his songs.\n\nArtist: Jorge Negrete | Title: Cuando Quiere Un Mexicano",
+          "parsed": {
+            "artist": "Jorge Negrete",
+            "title": "Cuando Quiere Un Mexicano"
+          },
+          "score": 1,
+          "match_type": "partial"
+        },
+        {
+          "id": "baden-powell-estudos",
+          "ground_truth": {
+            "artist": "Baden Powell",
+            "title": "Estudos"
+          },
+          "raw_response": "The music release shown in the photo is a vinyl record by Baden Powell, and the title of the album is \"Estudos.\"\n\nArtist: Baden Powell | Title: Estudos",
+          "parsed": {
+            "artist": "Baden Powell",
+            "title": "Estudos"
+          },
+          "score": 2,
+          "match_type": "exact"
+        },
+        {
+          "id": "tipico-santa-rosa-tipico-santa-rosa",
+          "ground_truth": {
+            "artist": "Tipico Santa Rosa",
+            "title": "Tipico Santa Rosa"
+          },
+          "raw_response": "The music release shown in the photo appears to be a vinyl record from the artist El Meddah. The title of the release, as indicated on the cover, is \"Tipico Santa Rosa.\" This type of record is characteristic of the music from the Canary Islands, which often features traditional Canarian music styles.\n\nArtist: El Meddah | Title: Tipico Santa Rosa",
+          "parsed": {
+            "artist": "El Meddah",
+            "title": "Tipico Santa Rosa"
+          },
+          "score": 1,
+          "match_type": "partial"
+        },
+        {
+          "id": "antonio-carlos-e-jocafi-o-primeiro-amor",
+          "ground_truth": {
+            "artist": "Antonio Carlos e Jocafi",
+            "title": "O Primeiro Amor"
+          },
+          "raw_response": "The music release shown in the photo is a soundtrack album. Based on the information provided on the cover, the album is titled \"O Primeiro Amor\" (The First Love), which features music by Antonio Carlos and Jocafi. It is associated with a Brazilian television network, Rede Globo, suggesting it is the soundtrack to a telenovela or a similar production.\n\nArtist: Antonio Carlos e Jocafi | Title: O Primeiro Amor",
+          "parsed": {
+            "artist": "Antonio Carlos e Jocafi",
+            "title": "O Primeiro Amor"
+          },
+          "score": 2,
+          "match_type": "exact"
+        },
+        {
+          "id": "jah-thomas-stop-yu-loafin",
+          "ground_truth": {
+            "artist": "Jah Thomas",
+            "title": "Stop Yu Loafin"
+          },
+          "raw_response": "Artist: Jah Thomas | Title: Stop Yu Loafin",
+          "parsed": {
+            "artist": "Jah Thomas",
+            "title": "Stop Yu Loafin"
+          },
+          "score": 2,
+          "match_type": "exact"
+        },
+        {
+          "id": "yellowman-josey-wales-two-giants-clash",
+          "ground_truth": {
+            "artist": "Yellowman & Josey Wales",
+            "title": "Two Giants Clash"
+          },
+          "raw_response": "The image appears to be a cover from a comic book released by Marvel, specifically an issue that features a crossover between characters that are parodies of popular Western figures. This particular issue is from a series that parodies country music legends, with the characters resembling the iconic styles of Johnny Cash and Willie Nelson.\n\nThe comic book series is \"Marvel Country Comics,\" and the issue depicted is a parody titled \"Yellowman Versus Josey Wales.\" However, this is not an actual music release but a comic book that uses the likeness and personas of country music artists for its characters.\n\nGiven the nature of the question, it seems there might be a misunderstanding as the image is not of a music release but of a comic book. If we were to draw a parallel to the music artists being parodied, they would be:\n\nArtist: Waylon Jennings and Willie Nelson (parodied as \"Josey Wales\" and \"Yellowman\" respectively) | Title: This is not a music release, but a comic book issue.",
+          "parsed": {
+            "artist": "Waylon Jennings and Willie Nelson (parodied as \"Josey Wales\" and \"Yellowman\" respectively)",
+            "title": "This is not a music release, but a comic book issue."
+          },
+          "score": 0,
+          "match_type": "none"
+        },
+        {
+          "id": "os-afonsinhos-do-condado-no-parque-mayer",
+          "ground_truth": {
+            "artist": "Os Afonsinhos do Condado",
+            "title": "No Parque Mayer"
+          },
+          "raw_response": "Artist: Various Artists as \"Os Alfonsinhos\" | Title: No Papáyer Condado! Fabuloso Elenco!!",
+          "parsed": {
+            "artist": "Various Artists as \"Os Alfonsinhos\"",
+            "title": "No Papáyer Condado! Fabuloso Elenco!!"
+          },
+          "score": 0,
+          "match_type": "none"
+        },
+        {
+          "id": "aldemaro-romero-y-su-orquesta-de-salon-caracas-de-noche",
+          "ground_truth": {
+            "artist": "Aldemaro Romero y su Orquesta de Salón",
+            "title": "Caracas de Noche"
+          },
+          "raw_response": "Artist: Aldemaro Romero | Title: Caracas de Noche",
+          "parsed": {
+            "artist": "Aldemaro Romero",
+            "title": "Caracas de Noche"
+          },
+          "score": 1,
+          "match_type": "partial"
+        },
+        {
+          "id": "angela-carrasco-la-candela",
+          "ground_truth": {
+            "artist": "Angela Carrasco",
+            "title": "La Candela"
+          },
+          "raw_response": "The music release shown in the photo is associated with the artist Angela Carrasco. The tiara she is wearing suggests that this image is from the cover of a music album or a promotional event for a specific release. Based on the visible text, the release title appears to be \"La Candela.\"\n\nArtist: Angela Carrasco | Title: La Candela",
+          "parsed": {
+            "artist": "Angela Carrasco",
+            "title": "La Candela"
+          },
+          "score": 2,
+          "match_type": "exact"
+        },
+        {
+          "id": "gran-orquesta-tipica-de-armando-zulueta-frenesi",
+          "ground_truth": {
+            "artist": "Gran Orquesta Típica de Armando Zulueta",
+            "title": "Frenesí"
+          },
+          "raw_response": "Artist: Armando Zulueta | Title: Frenesí: Gran Orquesta Típica de Armando Zulueta",
+          "parsed": {
+            "artist": "Armando Zulueta",
+            "title": "Frenesí: Gran Orquesta Típica de Armando Zulueta"
+          },
+          "score": 0,
+          "match_type": "none"
+        },
+        {
+          "id": "baden-powell-poema-on-guitar",
+          "ground_truth": {
+            "artist": "Baden Powell",
+            "title": "Poema on Guitar"
+          },
+          "raw_response": "Artist: Baden Powell | Title: Poema on Guitar",
+          "parsed": {
+            "artist": "Baden Powell",
+            "title": "Poema on Guitar"
+          },
+          "score": 2,
+          "match_type": "exact"
+        },
+        {
+          "id": "baden-powell-face-au-public",
+          "ground_truth": {
+            "artist": "Baden Powell",
+            "title": "Face au Public"
+          },
+          "raw_response": "Artist: Daft Punk | Title: Random Access Memories (Face au public Edition)",
+          "parsed": {
+            "artist": "Daft Punk",
+            "title": "Random Access Memories (Face au public Edition)"
+          },
+          "score": 0,
+          "match_type": "none"
+        },
+        {
+          "id": "baden-powell-ritmos-de-brasil",
+          "ground_truth": {
+            "artist": "Baden Powell",
+            "title": "Ritmos de Brasil"
+          },
+          "raw_response": "Artist: Baden Powell | Title: Ritmos de Brasil",
+          "parsed": {
+            "artist": "Baden Powell",
+            "title": "Ritmos de Brasil"
+          },
+          "score": 2,
+          "match_type": "exact"
+        },
+        {
+          "id": "bana-eroticorythmotropicalomanie-vol-3",
+          "ground_truth": {
+            "artist": "Bana",
+            "title": "Eroticorythmotropicalomanie Vol. 3"
+          },
+          "raw_response": "Artist: Bana et son orchestre | Title: Erotico-Tropicale Vol. 3",
+          "parsed": {
+            "artist": "Bana et son orchestre",
+            "title": "Erotico-Tropicale Vol. 3"
+          },
+          "score": 0,
+          "match_type": "none"
+        },
+        {
+          "id": "la-banda-del-caribe-movimiento-sexy",
+          "ground_truth": {
+            "artist": "La Banda del Caribe",
+            "title": "Movimiento Sexy"
+          },
+          "raw_response": "Artist: La Banda Del Caribe | Title: Movimiento Sexy",
+          "parsed": {
+            "artist": "La Banda Del Caribe",
+            "title": "Movimiento Sexy"
+          },
+          "score": 2,
+          "match_type": "exact"
+        },
+        {
+          "id": "the-bhundu-boys-pamberi",
+          "ground_truth": {
+            "artist": "The Bhundu Boys",
+            "title": "Pamberi!"
+          },
+          "raw_response": "Artist: The Bhundu Boys | Title: Pamberi!",
+          "parsed": {
+            "artist": "The Bhundu Boys",
+            "title": "Pamberi!"
+          },
+          "score": 2,
+          "match_type": "exact"
+        },
+        {
+          "id": "celia-cruz-johnny-pacheco-de-nuevo",
+          "ground_truth": {
+            "artist": "Celia Cruz & Johnny Pacheco",
+            "title": "De Nuevo"
+          },
+          "raw_response": "Artist: Celia Cruz & Johnny Pacheco | Title: De Nuevo",
+          "parsed": {
+            "artist": "Celia Cruz & Johnny Pacheco",
+            "title": "De Nuevo"
+          },
+          "score": 2,
+          "match_type": "exact"
+        },
+        {
+          "id": "celia-cruz-y-la-sonora-matancera-feliz-encuentro-en-el-carnaval-de-tenerife",
+          "ground_truth": {
+            "artist": "Celia Cruz y La Sonora Matancera",
+            "title": "Feliz Encuentro en el Carnaval de Tenerife"
+          },
+          "raw_response": "Artist: Celia Cruz | Title: Feliz Encuentro en el Carnaval de Tenerife (Los 12 grandes éxitos originales de Celia Cruz y La Sonora Matancera)",
+          "parsed": {
+            "artist": "Celia Cruz",
+            "title": "Feliz Encuentro en el Carnaval de Tenerife (Los 12 grandes éxitos originales de Celia Cruz y La Sonora Matancera)"
+          },
+          "score": 0,
+          "match_type": "none"
+        },
+        {
+          "id": "celia-cruz-con-la-sonora-matancera-la-tierna-conmovedora-bamboleadora",
+          "ground_truth": {
+            "artist": "Celia Cruz con la Sonora Matancera",
+            "title": "La Tierna, Conmovedora, Bamboleadora"
+          },
+          "raw_response": "Artist: Celia Cruz | Title: La Tierna, Conmovedora, Bamboleadora (with la Sonora Matancera)",
+          "parsed": {
+            "artist": "Celia Cruz",
+            "title": "La Tierna, Conmovedora, Bamboleadora (with la Sonora Matancera)"
+          },
+          "score": 0,
+          "match_type": "none"
+        },
+        {
+          "id": "celia-cruz-a-todos-mis-amigos",
+          "ground_truth": {
+            "artist": "Celia Cruz",
+            "title": "A Todos Mis Amigos"
+          },
+          "raw_response": "Artist: Celia Cruz | Title: A Todos Mis Amigos",
+          "parsed": {
+            "artist": "Celia Cruz",
+            "title": "A Todos Mis Amigos"
+          },
+          "score": 2,
+          "match_type": "exact"
+        },
+        {
+          "id": "el-combo-belga-y-sus-furiosos-rumberos-rompiendo-clave",
+          "ground_truth": {
+            "artist": "El Combo Belga y sus Furiosos Rumberos",
+            "title": "Rompiendo Clave"
+          },
+          "raw_response": "Artist: El Combo Belga | Title: Rompiendo Clave y Sus Furiosos Rumberos",
+          "parsed": {
+            "artist": "El Combo Belga",
+            "title": "Rompiendo Clave y Sus Furiosos Rumberos"
+          },
+          "score": 0,
+          "match_type": "none"
+        },
+        {
+          "id": "elba-ramalho-fruto",
+          "ground_truth": {
+            "artist": "Elba Ramalho",
+            "title": "Fruto"
+          },
+          "raw_response": "The image on the T-shirt appears to be related to the heavy metal band \"Sepultura.\" The specific artwork is from the album \"Beneath the Remains,\" but the style of the face paint and the design is more iconic of the album \"Arise,\" which features a similar image on its cover.\n\nArtist: Sepultura | Title: Arise",
+          "parsed": {
+            "artist": "Sepultura",
+            "title": "Arise"
+          },
+          "score": 0,
+          "match_type": "none"
+        },
+        {
+          "id": "eydie-gorme-y-el-trio-los-panchos-cuatro-vidas",
+          "ground_truth": {
+            "artist": "Eydie Gorme y el Trío Los Panchos",
+            "title": "Cuatro Vidas"
+          },
+          "raw_response": "Artist: Eydie Gorme y el Trio Los Panchos | Title: Cuatro Vidas",
+          "parsed": {
+            "artist": "Eydie Gorme y el Trio Los Panchos",
+            "title": "Cuatro Vidas"
+          },
+          "score": 1,
+          "match_type": "partial"
+        },
+        {
+          "id": "jayme-marques-que-cosa-mas-linda",
+          "ground_truth": {
+            "artist": "Jayme Marques",
+            "title": "Que Cosa Mas Linda!"
+          },
+          "raw_response": "The music release shown in the photo is a vinyl record by Jayme Marques. Based on the image, the release title at the top of the cover is \"¡Que Cosa Mas Linda!\".\n\nArtist: Jayme Marques | Title: ¡Que Cosa Mas Linda!",
+          "parsed": {
+            "artist": "Jayme Marques",
+            "title": "¡Que Cosa Mas Linda!"
+          },
+          "score": 2,
+          "match_type": "exact"
+        },
+        {
+          "id": "jayme-marques-sol-de-verano",
+          "ground_truth": {
+            "artist": "Jayme Marques",
+            "title": "Sol de Verano"
+          },
+          "raw_response": "Artist: Jayme Marques | Title: Sol de Verão",
+          "parsed": {
+            "artist": "Jayme Marques",
+            "title": "Sol de Verão"
+          },
+          "score": 1,
+          "match_type": "partial"
+        },
+        {
+          "id": "juan-carlos-senante-chateaubriand-filete-y-salsa",
+          "ground_truth": {
+            "artist": "Juan Carlos Senante",
+            "title": "Chateaubriand (Filete y Salsa)"
+          },
+          "raw_response": "The image appears to be of the cover art for a music release by the artist known as Captain Beefheart. The specific album depicted is \"Safe as Milk.\" However, the artwork shown does not match the original \"Safe as Milk\" album cover. It seems to be a variation or a piece of art inspired by Captain Beefheart's style, possibly from a reissue or a fan-made item.\n\nArtist: Captain Beefheart and His Magic Band | Title: Safe as Milk",
+          "parsed": {
+            "artist": "Captain Beefheart and His Magic Band",
+            "title": "Safe as Milk"
+          },
+          "score": 0,
+          "match_type": "none"
+        },
+        {
+          "id": "juan-luis-guerra-y-440-areito",
+          "ground_truth": {
+            "artist": "Juan Luis Guerra y 440",
+            "title": "Areito"
+          },
+          "raw_response": "Artist: Juan Luis Guerra | Title: Areíto",
+          "parsed": {
+            "artist": "Juan Luis Guerra",
+            "title": "Areíto"
+          },
+          "score": 0,
+          "match_type": "none"
+        },
+        {
+          "id": "juan-luis-guerra-y-440-el-original-440",
+          "ground_truth": {
+            "artist": "Juan Luis Guerra y 4.40",
+            "title": "El Original 4.40"
+          },
+          "raw_response": "Artist: Juan Luis Guerra | Title: Flor de Amor 4.40",
+          "parsed": {
+            "artist": "Juan Luis Guerra",
+            "title": "Flor de Amor 4.40"
+          },
+          "score": 0,
+          "match_type": "none"
+        },
+        {
+          "id": "kamac-pacha-inti-mi-raza",
+          "ground_truth": {
+            "artist": "Kamac Pacha Inti",
+            "title": "Mi Raza"
+          },
+          "raw_response": "Artist: Kamae Pacha Inti | Title: Miraza",
+          "parsed": {
+            "artist": "Kamae Pacha Inti",
+            "title": "Miraza"
+          },
+          "score": 0,
+          "match_type": "none"
+        },
+        {
+          "id": "the-manhattan-transfer-brasil",
+          "ground_truth": {
+            "artist": "The Manhattan Transfer",
+            "title": "Brasil"
+          },
+          "raw_response": "The image on the T-shirt appears to be a promotional graphic for the album \"A Momentary Lapse of Reason\" by Pink Floyd. The design is reminiscent of the artwork associated with this album, particularly the bed scene which is a well-known image from the album's cover art.\n\nArtist: Pink Floyd | Title: A Momentary Lapse of Reason",
+          "parsed": {
+            "artist": "Pink Floyd",
+            "title": "A Momentary Lapse of Reason"
+          },
+          "score": 0,
+          "match_type": "none"
+        },
+        {
+          "id": "luis-kalaff-con-los-alegres-dominicanos-bailemos-merengue",
+          "ground_truth": {
+            "artist": "Luis Kalaff con Los Alegres Dominicanos",
+            "title": "Bailemos Merengue"
+          },
+          "raw_response": "Artist: Luis Kalaf | Title: Innergigue con \"Los Alegres Dominicanos\"",
+          "parsed": {
+            "artist": "Luis Kalaf",
+            "title": "Innergigue con \"Los Alegres Dominicanos\""
+          },
+          "score": 0,
+          "match_type": "none"
+        },
+        {
+          "id": "orquesta-encantada-sabroson",
+          "ground_truth": {
+            "artist": "Orquesta Encantada",
+            "title": "Sabrosón"
+          },
+          "raw_response": "The music release shown in the photo is a vinyl record by the artist \"Orquesta Encantada.\" The title of the release is \"Sabrosoñon.\"\n\nArtist: Orquesta Encantada | Title: Sabrosoñon",
+          "parsed": {
+            "artist": "Orquesta Encantada",
+            "title": "Sabrosoñon"
+          },
+          "score": 1,
+          "match_type": "partial"
+        },
+        {
+          "id": "ranking-joe-weakheart-fadeaway",
+          "ground_truth": {
+            "artist": "Ranking Joe",
+            "title": "Weakheart Fadeaway"
+          },
+          "raw_response": "The character depicted in the image is from the cover art of the album \"Ranking Jamaica\" by the artist T.O.K. However, this specific image seems to be a creative representation of the character associated with the album rather than the album cover itself.\n\nArtist: T.O.K | Title: Ranking Jamaica",
+          "parsed": {
+            "artist": "T.O.K",
+            "title": "Ranking Jamaica"
+          },
+          "score": 0,
+          "match_type": "none"
+        },
+        {
+          "id": "beth-carvalho-feliz",
+          "ground_truth": {
+            "artist": "Beth Carvalho",
+            "title": "Feliz"
+          },
+          "raw_response": "The music release shown in the photo behind the individual is by the artist Beth Carvalho. The visible part of the release title on the cover is \"Pérolas - 20 Anos de Carreira,\" which suggests it is a compilation album celebrating 20 years of her career.\n\nArtist: Beth Carvalho | Title: Pérolas - 20 Anos de Carreira",
+          "parsed": {
+            "artist": "Beth Carvalho",
+            "title": "Pérolas - 20 Anos de Carreira"
+          },
+          "score": 1,
+          "match_type": "partial"
+        },
+        {
+          "id": "billos-caracas-boys-la-rubia-y-la-triguena",
+          "ground_truth": {
+            "artist": "Billo's Caracas Boys",
+            "title": "La Rubia y la Trigueña"
+          },
+          "raw_response": "The music release shown in the photo is a vinyl record by Billo's Caracas Boys. The specific release title featured on the cover is \"La Rubia y la Trigueña.\"\n\nArtist: Billo's Caracas Boys | Title: La Rubia y la Trigueña",
+          "parsed": {
+            "artist": "Billo's Caracas Boys",
+            "title": "La Rubia y la Trigueña"
+          },
+          "score": 2,
+          "match_type": "exact"
+        },
+        {
+          "id": "crispin-licuado",
+          "ground_truth": {
+            "artist": "Crispin",
+            "title": "Licuado"
+          },
+          "raw_response": "The music release shown in the photo is a vinyl record by the artist Crispin Glover. The title of the release is \"The Big Problem Does Not Equal The Solution, The Solution Equals Let It Be.\"\n\nArtist: Crispin Glover | Title: The Big Problem ≠ The Solution, The Solution = Let It Be",
+          "parsed": {
+            "artist": "Crispin Glover",
+            "title": "The Big Problem ≠ The Solution, The Solution = Let It Be"
+          },
+          "score": 0,
+          "match_type": "none"
+        },
+        {
+          "id": "aurelio-reinoso-don-reinoso",
+          "ground_truth": {
+            "artist": "Aurelio Reinoso",
+            "title": "Don Reinoso"
+          },
+          "raw_response": "The music release shown in the photo appears to be a vinyl record by Don Reinoso, whose full name is Aurelio Reinoso. Based on the image, this is likely a record from the genre of Peruvian cumbia, which is a popular style of music in Peru. However, without clearer text or additional information on the record's label, it is not possible to definitively identify the specific release title from this image alone.\n\nArtist: Don Reinoso | Title: [Not clearly identifiable from the image]",
+          "parsed": {
+            "artist": "Don Reinoso",
+            "title": "[Not clearly identifiable from the image]"
+          },
+          "score": 0,
+          "match_type": "none"
+        },
+        {
+          "id": "grupo-guaco-guaco-76",
+          "ground_truth": {
+            "artist": "Grupo Guaco",
+            "title": "Guaco 76"
+          },
+          "raw_response": "The music release shown in the photo is a vinyl record by the artist KORTA. The design on the cover is reminiscent of the style used by the band \"Kraftwerk,\" a pioneering electronic music group from Germany. However, the name on the label is clearly \"KORTA,\" which is not a known alias of Kraftwerk. Given the design similarities, it could be a special release, a tribute, or a mislabeling. Without more context or the ability to see the full cover and the record itself, it is not possible to definitively identify the release title from this image alone.\n\nArtist: KORTA | Title: Unknown Release Title",
+          "parsed": {
+            "artist": "KORTA",
+            "title": "Unknown Release Title"
+          },
+          "score": 0,
+          "match_type": "none"
+        },
+        {
+          "id": "pacho-via-libre-llego",
+          "ground_truth": {
+            "artist": "Pacho",
+            "title": "Via Libre Llego"
+          },
+          "raw_response": "The music release shown in the photo is a vinyl record by the artist \"Pacho.\" The title of the release, as seen on the label, is \"VIA LIBRE.\" However, without additional context or a clearer view of the record, it is not possible to definitively identify the specific album or single. This particular record could be a special pressing or a part of a collection, but the exact details of the release are not discernible from the image alone.\n\nArtist: Pacho | Title: Via Libre",
+          "parsed": {
+            "artist": "Pacho",
+            "title": "Via Libre"
+          },
+          "score": 1,
+          "match_type": "partial"
+        }
+      ],
+      "summary": {
+        "exact": 28,
+        "partial": 27,
+        "none": 46,
+        "parse_errors": 0,
+        "total_score": 83,
+        "max_score": 202
+      }
+    }
+  }
+}

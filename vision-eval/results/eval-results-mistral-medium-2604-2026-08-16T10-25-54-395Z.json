@@ -1,0 +1,1433 @@
+{
+  "run_at": "2026-08-16T10:28:43.200Z",
+  "model": "mistral-medium-2604",
+  "total_cases": 101,
+  "strategies": {
+    "A": {
+      "results": [
+        {
+          "id": "the-earons-land-of-hunger",
+          "ground_truth": {
+            "artist": "The Earons",
+            "title": "Land Of Hunger"
+          },
+          "raw_response": "Artist: The Earons | Title: Land Of Hunger",
+          "parsed": {
+            "artist": "The Earons",
+            "title": "Land Of Hunger"
+          },
+          "score": 2,
+          "match_type": "exact"
+        },
+        {
+          "id": "louis-chedid-ainsi-soit-il",
+          "ground_truth": {
+            "artist": "Louis Chedid",
+            "title": "Ainsi Soit-Il"
+          },
+          "raw_response": "Artist: Louis Chédid | Title: Ainsí Soit-Il",
+          "parsed": {
+            "artist": "Louis Chédid",
+            "title": "Ainsí Soit-Il"
+          },
+          "score": 0,
+          "match_type": "none"
+        },
+        {
+          "id": "ed-lincoln-ontem-hoje-sempre",
+          "ground_truth": {
+            "artist": "Ed Lincoln",
+            "title": "Ontem Hoje Sempre"
+          },
+          "raw_response": "Artist: Ed Lincoln | Title: Ontem, Hoje, Sempre",
+          "parsed": {
+            "artist": "Ed Lincoln",
+            "title": "Ontem, Hoje, Sempre"
+          },
+          "score": 2,
+          "match_type": "exact"
+        },
+        {
+          "id": "caetano-veloso-caetano-veloso",
+          "ground_truth": {
+            "artist": "Caetano Veloso",
+            "title": "Caetano Veloso"
+          },
+          "raw_response": "Artist: Caetano Veloso | Title: Caetano Veloso",
+          "parsed": {
+            "artist": "Caetano Veloso",
+            "title": "Caetano Veloso"
+          },
+          "score": 2,
+          "match_type": "exact"
+        },
+        {
+          "id": "pipos-4-o-encontro-da-massa",
+          "ground_truth": {
+            "artist": "Pipo's 4",
+            "title": "O Encontro da Massa"
+          },
+          "raw_response": "Artist: Pipo's 4 | Title: O Encontro da Massa",
+          "parsed": {
+            "artist": "Pipo's 4",
+            "title": "O Encontro da Massa"
+          },
+          "score": 2,
+          "match_type": "exact"
+        },
+        {
+          "id": "quarteto-em-cy-tamba-trio-som-definitivo",
+          "ground_truth": {
+            "artist": "Quarteto Em Cy & Tamba Trio",
+            "title": "Som Definitivo"
+          },
+          "raw_response": "Artist: Quarteto em Cy | Title: Som Definitivo",
+          "parsed": {
+            "artist": "Quarteto em Cy",
+            "title": "Som Definitivo"
+          },
+          "score": 1,
+          "match_type": "partial"
+        },
+        {
+          "id": "esperanza-spalding-emilys-devolution",
+          "ground_truth": {
+            "artist": "Esperanza Spalding",
+            "title": "Emily's D+Evolution"
+          },
+          "raw_response": "Artist: Emily's D+Evolution | Title: Emily's D+Evolution",
+          "parsed": {
+            "artist": "Emily's D+Evolution",
+            "title": "Emily's D+Evolution"
+          },
+          "score": 1,
+          "match_type": "partial"
+        },
+        {
+          "id": "machito-tanga",
+          "ground_truth": {
+            "artist": "Machito & His Afro-Cubans",
+            "title": "Tanga"
+          },
+          "raw_response": "Artist: Machito | Title: Tanga",
+          "parsed": {
+            "artist": "Machito",
+            "title": "Tanga"
+          },
+          "score": 1,
+          "match_type": "partial"
+        },
+        {
+          "id": "orquesta-el-macabeo-salsa-bestial",
+          "ground_truth": {
+            "artist": "Orquesta El Macabeo",
+            "title": "Salsa Bestial"
+          },
+          "raw_response": "The image shows a section of a CD storage rack with various music genres labeled, such as Techno, House, Dance, Ambient, Electronic, Country, Rock 'n' Roll, Reggae, and Latin Jazz. Among these, two CDs are prominently displayed. The CD on the left is titled \"Salsa Bestial\" by the artist \"Orquesta El Macabeo.\" The CD on the right is titled \"NYC Salsa 2.\"\n\nBased on the visible information, the music release shown in the photo is:\n\nArtist: Orquesta El Macabeo | Title: Salsa Bestial",
+          "parsed": {
+            "artist": "Orquesta El Macabeo",
+            "title": "Salsa Bestial"
+          },
+          "score": 2,
+          "match_type": "exact"
+        },
+        {
+          "id": "t-rex-t-rex",
+          "ground_truth": {
+            "artist": "T. Rex",
+            "title": "T. Rex"
+          },
+          "raw_response": "The image shows a vinyl record with the band name \"T-REX\" prominently displayed. The cover features a photograph of the band members, which is characteristic of their album covers. Based on the visual clues, the music release shown is by the artist T. Rex, and the album title is likely one of their well-known releases.\n\nArtist: T. Rex | Title: T. Rex",
+          "parsed": {
+            "artist": "T. Rex",
+            "title": "T. Rex"
+          },
+          "score": 2,
+          "match_type": "exact"
+        },
+        {
+          "id": "various-rico-rico",
+          "ground_truth": {
+            "artist": "Various",
+            "title": "Rico Rico - 50 Exitos Tropicales"
+          },
+          "raw_response": "Artist: Various Artists | Title: Rico Rico - 50 Exitos Tropicales",
+          "parsed": {
+            "artist": "Various Artists",
+            "title": "Rico Rico - 50 Exitos Tropicales"
+          },
+          "score": 1,
+          "match_type": "partial"
+        },
+        {
+          "id": "various-seattle-the-dark-side",
+          "ground_truth": {
+            "artist": "Various",
+            "title": "Seattle... The Dark Side"
+          },
+          "raw_response": "Artist: Various Artists | Title: Seattle... The Dark Side",
+          "parsed": {
+            "artist": "Various Artists",
+            "title": "Seattle... The Dark Side"
+          },
+          "score": 1,
+          "match_type": "partial"
+        },
+        {
+          "id": "determine-never-know",
+          "ground_truth": {
+            "artist": "Determine",
+            "title": "Never Know"
+          },
+          "raw_response": "Artist: IC Determines | Title: Never Know",
+          "parsed": {
+            "artist": "IC Determines",
+            "title": "Never Know"
+          },
+          "score": 1,
+          "match_type": "partial"
+        },
+        {
+          "id": "discotex-records-6am-wanna-be-down",
+          "ground_truth": {
+            "artist": "Discotex Records",
+            "title": "6AM / Wanna Be Down"
+          },
+          "raw_response": "Artist: D'Lee | Title: Wanna Be Down",
+          "parsed": {
+            "artist": "D'Lee",
+            "title": "Wanna Be Down"
+          },
+          "score": 0,
+          "match_type": "none"
+        },
+        {
+          "id": "legends-of-the-dark-ground-cabra",
+          "ground_truth": {
+            "artist": "Legends of the Dark Ground",
+            "title": "Cabra (Seiji Re-Rinse)"
+          },
+          "raw_response": "Artist: Capira | Title: Selji Re-Rinse",
+          "parsed": {
+            "artist": "Capira",
+            "title": "Selji Re-Rinse"
+          },
+          "score": 0,
+          "match_type": "none"
+        },
+        {
+          "id": "wedding-hands-in-the-till",
+          "ground_truth": {
+            "artist": "Wedding",
+            "title": "Hands In The Till / A Little Love"
+          },
+          "raw_response": "Artist: A Little Love | Title: Wedding",
+          "parsed": {
+            "artist": "A Little Love",
+            "title": "Wedding"
+          },
+          "score": 0,
+          "match_type": "none"
+        },
+        {
+          "id": "olu-living-free",
+          "ground_truth": {
+            "artist": "Olu",
+            "title": "Living Free"
+          },
+          "raw_response": "Artist: Olu | Title: Living Free",
+          "parsed": {
+            "artist": "Olu",
+            "title": "Living Free"
+          },
+          "score": 2,
+          "match_type": "exact"
+        },
+        {
+          "id": "big-bub-i-dont-mind",
+          "ground_truth": {
+            "artist": "Big Bub",
+            "title": "I Don't Mind"
+          },
+          "raw_response": "Artist: Big Bub | Title: I Don't Mind",
+          "parsed": {
+            "artist": "Big Bub",
+            "title": "I Don't Mind"
+          },
+          "score": 2,
+          "match_type": "exact"
+        },
+        {
+          "id": "patrick-cowley-menergy",
+          "ground_truth": {
+            "artist": "Patrick Cowley",
+            "title": "Menergy"
+          },
+          "raw_response": "Artist: Patrick Cowley | Title: Menergy",
+          "parsed": {
+            "artist": "Patrick Cowley",
+            "title": "Menergy"
+          },
+          "score": 2,
+          "match_type": "exact"
+        },
+        {
+          "id": "sleepy-brown-i-cant-wait",
+          "ground_truth": {
+            "artist": "Sleepy Brown feat. Outkast",
+            "title": "I Can't Wait"
+          },
+          "raw_response": "Artist: Sleepy Brown | Title: I Can't Wait featuring Outkast",
+          "parsed": {
+            "artist": "Sleepy Brown",
+            "title": "I Can't Wait featuring Outkast"
+          },
+          "score": 0,
+          "match_type": "none"
+        },
+        {
+          "id": "mc-mell-o-first-chronicles",
+          "ground_truth": {
+            "artist": "MC Mell 'O'",
+            "title": "The First Chronicles of D.E.T.T."
+          },
+          "raw_response": "The image shows a vinyl record with the title \"natural response\" prominently displayed at the top. Below the title, the artist name is listed as \"MC MELL'O\". The subtitle or additional information on the record is \"THE FIRST CHRONICLES OF D. E. P. T.\".\n\nBased on the visual information provided in the image:\n\nArtist: MC MELL'O | Title: THE FIRST CHRONICLES OF D. E. P. T.",
+          "parsed": {
+            "artist": "MC MELL'O",
+            "title": "THE FIRST CHRONICLES OF D. E. P. T."
+          },
+          "score": 0,
+          "match_type": "none"
+        },
+        {
+          "id": "natural-black-early-on-before",
+          "ground_truth": {
+            "artist": "Natural Black",
+            "title": "Early On Before"
+          },
+          "raw_response": "The music release shown in the photo is by the artist Natural Black. The title of the release is \"Early On Before.\" This information is derived from the visible text on the vinyl record's label.\n\nArtist: Natural Black | Title: Early On Before",
+          "parsed": {
+            "artist": "Natural Black",
+            "title": "Early On Before"
+          },
+          "score": 2,
+          "match_type": "exact"
+        },
+        {
+          "id": "young-peoples-records-all-aboard",
+          "ground_truth": {
+            "artist": "Young People's Records",
+            "title": "All Aboard!"
+          },
+          "raw_response": "Artist: Various Artists | Title: All Aboard! Train to the Zoo, Train to the Farm, Train to the Ranch",
+          "parsed": {
+            "artist": "Various Artists",
+            "title": "All Aboard! Train to the Zoo, Train to the Farm, Train to the Ranch"
+          },
+          "score": 0,
+          "match_type": "none"
+        },
+        {
+          "id": "mario-telles-mario-telles",
+          "ground_truth": {
+            "artist": "Mario Telles",
+            "title": "Mario Telles"
+          },
+          "raw_response": "Artist: Mario Telles | Title: <release title>",
+          "parsed": {
+            "artist": "Mario Telles",
+            "title": "<release title>"
+          },
+          "score": 1,
+          "match_type": "partial"
+        },
+        {
+          "id": "lecuona-plays-for-two",
+          "ground_truth": {
+            "artist": "Lecuona",
+            "title": "Plays For Two"
+          },
+          "raw_response": "Artist: Lecuona Cuban Boys | Title: Plays For Two",
+          "parsed": {
+            "artist": "Lecuona Cuban Boys",
+            "title": "Plays For Two"
+          },
+          "score": 1,
+          "match_type": "partial"
+        },
+        {
+          "id": "aeoliah-crystal-illumination",
+          "ground_truth": {
+            "artist": "Aeoliah",
+            "title": "Crystal Illumination"
+          },
+          "raw_response": "Artist: Aeoliah | Title: Crystal Illumination",
+          "parsed": {
+            "artist": "Aeoliah",
+            "title": "Crystal Illumination"
+          },
+          "score": 2,
+          "match_type": "exact"
+        },
+        {
+          "id": "coro-minero-de-turon",
+          "ground_truth": {
+            "artist": "Coro Minero de Turón",
+            "title": "Coro Minero de Turón"
+          },
+          "raw_response": "Artist: Coro Minero de Turón | Title: Tast Cor",
+          "parsed": {
+            "artist": "Coro Minero de Turón",
+            "title": "Tast Cor"
+          },
+          "score": 1,
+          "match_type": "partial"
+        },
+        {
+          "id": "maggie-carles-luis-nodal-y-los-magneticos",
+          "ground_truth": {
+            "artist": "Maggie Carlés / Luis Nodal y los Magnéticos",
+            "title": "Maggie Carlés / Luis Nodal y los Magnéticos"
+          },
+          "raw_response": "Artist: Luis Nodal y los Magnéticos, Maggie Carlés | Title: <release title>",
+          "parsed": {
+            "artist": "Luis Nodal y los Magnéticos, Maggie Carlés",
+            "title": "<release title>"
+          },
+          "score": 0,
+          "match_type": "none"
+        },
+        {
+          "id": "lucho-gatica-antonio-machin",
+          "ground_truth": {
+            "artist": "Lucho Gatica / Antonio Machin",
+            "title": "Lucho Gatica / Antonio Machin"
+          },
+          "raw_response": "Artist: Antonio Machín | Title: Lucho Gatica",
+          "parsed": {
+            "artist": "Antonio Machín",
+            "title": "Lucho Gatica"
+          },
+          "score": 0,
+          "match_type": "none"
+        },
+        {
+          "id": "cesaria-evora-cabo-verde",
+          "ground_truth": {
+            "artist": "Cesaria Evora",
+            "title": "Cabo Verde"
+          },
+          "raw_response": "Artist: Cesária Évora | Title: Cabo Verde",
+          "parsed": {
+            "artist": "Cesária Évora",
+            "title": "Cabo Verde"
+          },
+          "score": 1,
+          "match_type": "partial"
+        },
+        {
+          "id": "melanie-golden-hour-of-melanie",
+          "ground_truth": {
+            "artist": "Melanie",
+            "title": "Golden Hour Of Melanie"
+          },
+          "raw_response": "Artist: Melanie | Title: Golden Hour Of Melanie",
+          "parsed": {
+            "artist": "Melanie",
+            "title": "Golden Hour Of Melanie"
+          },
+          "score": 2,
+          "match_type": "exact"
+        },
+        {
+          "id": "neil-young-after-the-gold-rush",
+          "ground_truth": {
+            "artist": "Neil Young",
+            "title": "After The Gold Rush"
+          },
+          "raw_response": "Artist: Neil Young | Title: After the Gold Rush",
+          "parsed": {
+            "artist": "Neil Young",
+            "title": "After the Gold Rush"
+          },
+          "score": 2,
+          "match_type": "exact"
+        },
+        {
+          "id": "steve-reich-sextet-six-marimbas",
+          "ground_truth": {
+            "artist": "Steve Reich",
+            "title": "Sextet / Six Marimbas"
+          },
+          "raw_response": "Artist: Steve Reich | Title: Sextet / Six Marimbas",
+          "parsed": {
+            "artist": "Steve Reich",
+            "title": "Sextet / Six Marimbas"
+          },
+          "score": 2,
+          "match_type": "exact"
+        },
+        {
+          "id": "gregory-isaacs-lovers-rock",
+          "ground_truth": {
+            "artist": "Gregory Isaacs",
+            "title": "Lovers' Rock"
+          },
+          "raw_response": "Artist: Gregory Isaacs | Title: Lovers' Rock",
+          "parsed": {
+            "artist": "Gregory Isaacs",
+            "title": "Lovers' Rock"
+          },
+          "score": 2,
+          "match_type": "exact"
+        },
+        {
+          "id": "curtis-mayfield-curtis-live",
+          "ground_truth": {
+            "artist": "Curtis Mayfield",
+            "title": "Curtis/Live!"
+          },
+          "raw_response": "Artist: Curtis Mayfield | Title: Curtis/Live!",
+          "parsed": {
+            "artist": "Curtis Mayfield",
+            "title": "Curtis/Live!"
+          },
+          "score": 2,
+          "match_type": "exact"
+        },
+        {
+          "id": "j-dilla-donuts",
+          "ground_truth": {
+            "artist": "J Dilla",
+            "title": "Donuts"
+          },
+          "raw_response": "Artist: J Dilla | Title: Donuts",
+          "parsed": {
+            "artist": "J Dilla",
+            "title": "Donuts"
+          },
+          "score": 2,
+          "match_type": "exact"
+        },
+        {
+          "id": "hugo-jara-estado-de-animo",
+          "ground_truth": {
+            "artist": "Hugo Jara",
+            "title": "Estado De Animo"
+          },
+          "raw_response": "The image shows a vinyl record cover with the title \"Estados De Ánimo\" prominently displayed. This is a release by the band Zap Mama.\n\nArtist: Zap Mama | Title: Estados De Ánimo",
+          "parsed": {
+            "artist": "Zap Mama",
+            "title": "Estados De Ánimo"
+          },
+          "score": 0,
+          "match_type": "none"
+        },
+        {
+          "id": "dorival-caymmi-caymmi",
+          "ground_truth": {
+            "artist": "Dorival Caymmi",
+            "title": "Caymmi"
+          },
+          "raw_response": "The image shows a vinyl record with a distinctive cover art featuring a surreal landscape with geometric shapes and a fish. The title \"CAYMMI\" is prominently displayed at the bottom of the cover. This indicates that the music release is associated with the artist Caymmi.\n\nArtist: Caymmi | Title: Caymmi",
+          "parsed": {
+            "artist": "Caymmi",
+            "title": "Caymmi"
+          },
+          "score": 1,
+          "match_type": "partial"
+        },
+        {
+          "id": "dorival-caymmi-caymmi-odeon",
+          "ground_truth": {
+            "artist": "Dorival Caymmi",
+            "title": "Caymmi"
+          },
+          "raw_response": "Artist: Caetano Veloso | Title: Caetano Veloso",
+          "parsed": {
+            "artist": "Caetano Veloso",
+            "title": "Caetano Veloso"
+          },
+          "score": 0,
+          "match_type": "none"
+        },
+        {
+          "id": "stevie-wonder-hotter-than-july",
+          "ground_truth": {
+            "artist": "Stevie Wonder",
+            "title": "Hotter Than July"
+          },
+          "raw_response": "Artist: Stevie Wonder | Title: Hotter Than July",
+          "parsed": {
+            "artist": "Stevie Wonder",
+            "title": "Hotter Than July"
+          },
+          "score": 2,
+          "match_type": "exact"
+        },
+        {
+          "id": "nite-jewel-no-sun",
+          "ground_truth": {
+            "artist": "Nite Jewel",
+            "title": "No Sun"
+          },
+          "raw_response": "Artist: Nine Inch Nails | Title: No Sun",
+          "parsed": {
+            "artist": "Nine Inch Nails",
+            "title": "No Sun"
+          },
+          "score": 1,
+          "match_type": "partial"
+        },
+        {
+          "id": "horace-silver-and-the-jazz-messengers",
+          "ground_truth": {
+            "artist": "Horace Silver and the Jazz Messengers",
+            "title": "Horace Silver and the Jazz Messengers"
+          },
+          "raw_response": "Artist: Horace Silver and the Jazz Messengers | Title: Horace Silver and the Jazz Messengers",
+          "parsed": {
+            "artist": "Horace Silver and the Jazz Messengers",
+            "title": "Horace Silver and the Jazz Messengers"
+          },
+          "score": 2,
+          "match_type": "exact"
+        },
+        {
+          "id": "max-romeo-revelation-time",
+          "ground_truth": {
+            "artist": "Max Romeo",
+            "title": "Revelation Time"
+          },
+          "raw_response": "Artist: Max Romeo | Title: Revelation Time",
+          "parsed": {
+            "artist": "Max Romeo",
+            "title": "Revelation Time"
+          },
+          "score": 2,
+          "match_type": "exact"
+        },
+        {
+          "id": "various-beat-girls-espanol",
+          "ground_truth": {
+            "artist": "Various",
+            "title": "Beat Girls Español!"
+          },
+          "raw_response": "Artist: Various Artists | Title: Beat Girls Español!",
+          "parsed": {
+            "artist": "Various Artists",
+            "title": "Beat Girls Español!"
+          },
+          "score": 1,
+          "match_type": "partial"
+        },
+        {
+          "id": "team-shadetek-pale-fire",
+          "ground_truth": {
+            "artist": "Team Shadetek",
+            "title": "Pale Fire"
+          },
+          "raw_response": "Artist: Team Shadetek | Title: Pale Fire",
+          "parsed": {
+            "artist": "Team Shadetek",
+            "title": "Pale Fire"
+          },
+          "score": 2,
+          "match_type": "exact"
+        },
+        {
+          "id": "astrud-gilberto-compact-jazz",
+          "ground_truth": {
+            "artist": "Astrud Gilberto",
+            "title": "Compact Jazz"
+          },
+          "raw_response": "Artist: Astrud Gilberto | Title: Compact Jazz",
+          "parsed": {
+            "artist": "Astrud Gilberto",
+            "title": "Compact Jazz"
+          },
+          "score": 2,
+          "match_type": "exact"
+        },
+        {
+          "id": "astrud-gilberto-beach-samba",
+          "ground_truth": {
+            "artist": "Astrud Gilberto",
+            "title": "Beach Samba"
+          },
+          "raw_response": "Artist: Astrud Gilberto | Title: Beach Samba",
+          "parsed": {
+            "artist": "Astrud Gilberto",
+            "title": "Beach Samba"
+          },
+          "score": 2,
+          "match_type": "exact"
+        },
+        {
+          "id": "various-campeones-xvii-concurso-cancion-asturiana",
+          "ground_truth": {
+            "artist": "Various",
+            "title": "Campeones XVII Concurso de Canción Asturiana"
+          },
+          "raw_response": "Artist: Various Artists | Title: Campeones XVII Concurso de Canción Asturiana",
+          "parsed": {
+            "artist": "Various Artists",
+            "title": "Campeones XVII Concurso de Canción Asturiana"
+          },
+          "score": 1,
+          "match_type": "partial"
+        },
+        {
+          "id": "paddy-mcaloon-i-trawl-the-megahertz",
+          "ground_truth": {
+            "artist": "Paddy McAloon",
+            "title": "I Trawl the Megahertz"
+          },
+          "raw_response": "Artist: Paddy McAloon | Title: I Trawl The Megahertz",
+          "parsed": {
+            "artist": "Paddy McAloon",
+            "title": "I Trawl The Megahertz"
+          },
+          "score": 2,
+          "match_type": "exact"
+        },
+        {
+          "id": "maranata-maranata",
+          "ground_truth": {
+            "artist": "Maranata",
+            "title": "Maranata"
+          },
+          "raw_response": "The image shows a CD cover with the title \"MARANATA.\" The artwork features a dove, which is often associated with Christian music or themes. The CD appears to be a release by the artist Vinedresser, as indicated by the visible text on the spine of the case.\n\nArtist: Vinedresser | Title: Maranata",
+          "parsed": {
+            "artist": "Vinedresser",
+            "title": "Maranata"
+          },
+          "score": 1,
+          "match_type": "partial"
+        },
+        {
+          "id": "antonio-carlos-jobim-tide",
+          "ground_truth": {
+            "artist": "Antonio Carlos Jobim",
+            "title": "Tide"
+          },
+          "raw_response": "Artist: Antonio Carlos Jobim | Title: Tide",
+          "parsed": {
+            "artist": "Antonio Carlos Jobim",
+            "title": "Tide"
+          },
+          "score": 2,
+          "match_type": "exact"
+        },
+        {
+          "id": "refused-songs-to-fan-the-flames-of-discontent",
+          "ground_truth": {
+            "artist": "Refused",
+            "title": "Songs to Fan the Flames of Discontent"
+          },
+          "raw_response": "Artist: Refused | Title: The Shape of Punk to Come",
+          "parsed": {
+            "artist": "Refused",
+            "title": "The Shape of Punk to Come"
+          },
+          "score": 1,
+          "match_type": "partial"
+        },
+        {
+          "id": "collard-roge-satie-4-handed-piano",
+          "ground_truth": {
+            "artist": "Jean-Philippe Collard & Pascal Rogé",
+            "title": "Satie: The 4 Handed Piano"
+          },
+          "raw_response": "Artist: Pascal Rogé, Jean-Philippe Collard | Title: The 4 Handed Piano [Piano à 4 mains]",
+          "parsed": {
+            "artist": "Pascal Rogé, Jean-Philippe Collard",
+            "title": "The 4 Handed Piano [Piano à 4 mains]"
+          },
+          "score": 0,
+          "match_type": "none"
+        },
+        {
+          "id": "oren-ambarchi-shebang",
+          "ground_truth": {
+            "artist": "Oren Ambarchi",
+            "title": "Shebang"
+          },
+          "raw_response": "Artist: Shebang | Title: Shebang",
+          "parsed": {
+            "artist": "Shebang",
+            "title": "Shebang"
+          },
+          "score": 1,
+          "match_type": "partial"
+        },
+        {
+          "id": "laurent-garnier-planet-house-ep",
+          "ground_truth": {
+            "artist": "Laurent Garnier",
+            "title": "Planet House EP"
+          },
+          "raw_response": "Artist: Laurent Garnier | Title: Planet House EP",
+          "parsed": {
+            "artist": "Laurent Garnier",
+            "title": "Planet House EP"
+          },
+          "score": 2,
+          "match_type": "exact"
+        },
+        {
+          "id": "various-trojan-reggae-party-volume-one",
+          "ground_truth": {
+            "artist": "Various",
+            "title": "Trojan Reggae Party Volume One"
+          },
+          "raw_response": "Artist: Trojan Reggae Party | Title: Volume One - Recorded Live!",
+          "parsed": {
+            "artist": "Trojan Reggae Party",
+            "title": "Volume One - Recorded Live!"
+          },
+          "score": 0,
+          "match_type": "none"
+        },
+        {
+          "id": "violeta-parra-un-rio-de-sangre",
+          "ground_truth": {
+            "artist": "Violeta Parra",
+            "title": "Un Rio de Sangre"
+          },
+          "raw_response": "Artist: Violeta Parra | Title: Un río de sangre",
+          "parsed": {
+            "artist": "Violeta Parra",
+            "title": "Un río de sangre"
+          },
+          "score": 1,
+          "match_type": "partial"
+        },
+        {
+          "id": "bob-marley-and-the-wailers-uprising",
+          "ground_truth": {
+            "artist": "Bob Marley & The Wailers",
+            "title": "Uprising"
+          },
+          "raw_response": "Artist: Bob Marley & The Wailers | Title: Uprising",
+          "parsed": {
+            "artist": "Bob Marley & The Wailers",
+            "title": "Uprising"
+          },
+          "score": 2,
+          "match_type": "exact"
+        },
+        {
+          "id": "various-macondo-revisitado",
+          "ground_truth": {
+            "artist": "Various",
+            "title": "Macondo Revisitado"
+          },
+          "raw_response": "Artist: Various Artists | Title: Macondo Revisitado - The Roots of Subtropical Music Uruguay 1975-1979",
+          "parsed": {
+            "artist": "Various Artists",
+            "title": "Macondo Revisitado - The Roots of Subtropical Music Uruguay 1975-1979"
+          },
+          "score": 0,
+          "match_type": "none"
+        },
+        {
+          "id": "barry-brown-vibes-of-barry-brown",
+          "ground_truth": {
+            "artist": "Barry Brown",
+            "title": "Vibes of Barry Brown"
+          },
+          "raw_response": "Artist: Barry Brown | Title: Vibes of Barry Brown",
+          "parsed": {
+            "artist": "Barry Brown",
+            "title": "Vibes of Barry Brown"
+          },
+          "score": 2,
+          "match_type": "exact"
+        },
+        {
+          "id": "barry-brown-barry-brown",
+          "ground_truth": {
+            "artist": "Barry Brown",
+            "title": "Barry Brown"
+          },
+          "raw_response": "The image shows a stack of CDs, with one of the visible covers displaying the text \"BARRY WHITE\" prominently. This indicates that the music release in question is by the artist Barry White. The specific title of the release is not entirely clear from the image, but given the context and the visible text, it is likely one of his well-known albums.\n\nArtist: Barry White | Title: Barry White",
+          "parsed": {
+            "artist": "Barry White",
+            "title": "Barry White"
+          },
+          "score": 0,
+          "match_type": "none"
+        },
+        {
+          "id": "los-llopis-los-llopis",
+          "ground_truth": {
+            "artist": "Los Llopis",
+            "title": "Los Llopis"
+          },
+          "raw_response": "Artist: Los Llopis | Title: Estremécete / La Puerta Verde / Hasta la vista, cocodrilo",
+          "parsed": {
+            "artist": "Los Llopis",
+            "title": "Estremécete / La Puerta Verde / Hasta la vista, cocodrilo"
+          },
+          "score": 1,
+          "match_type": "partial"
+        },
+        {
+          "id": "jorge-negrete-jorge-negrete",
+          "ground_truth": {
+            "artist": "Jorge Negrete",
+            "title": "Jorge Negrete"
+          },
+          "raw_response": "Artist: Various Artists | Title: Jorge Negrete - Cuando Quiere Un Mexicano",
+          "parsed": {
+            "artist": "Various Artists",
+            "title": "Jorge Negrete - Cuando Quiere Un Mexicano"
+          },
+          "score": 0,
+          "match_type": "none"
+        },
+        {
+          "id": "baden-powell-estudos",
+          "ground_truth": {
+            "artist": "Baden Powell",
+            "title": "Estudos"
+          },
+          "raw_response": "Artist: Baden Powell | Title: Estudos",
+          "parsed": {
+            "artist": "Baden Powell",
+            "title": "Estudos"
+          },
+          "score": 2,
+          "match_type": "exact"
+        },
+        {
+          "id": "tipico-santa-rosa-tipico-santa-rosa",
+          "ground_truth": {
+            "artist": "Tipico Santa Rosa",
+            "title": "Tipico Santa Rosa"
+          },
+          "raw_response": "Artist: Tipico Santa Rosa | Title: Tipico Santa Rosa",
+          "parsed": {
+            "artist": "Tipico Santa Rosa",
+            "title": "Tipico Santa Rosa"
+          },
+          "score": 2,
+          "match_type": "exact"
+        },
+        {
+          "id": "antonio-carlos-e-jocafi-o-primeiro-amor",
+          "ground_truth": {
+            "artist": "Antonio Carlos e Jocafi",
+            "title": "O Primeiro Amor"
+          },
+          "raw_response": "The music release shown in the photo is a soundtrack album. The cover indicates that it is the original soundtrack for a work by Antonio Carlos Jobim, commonly known as Jobim, and it features music from \"O Primeiro Amor.\" The album is released by the label Som Livre, which is part of the Rede Globo network.\n\nArtist: Antonio Carlos Jobim | Title: O Primeiro Amor",
+          "parsed": {
+            "artist": "Antonio Carlos Jobim",
+            "title": "O Primeiro Amor"
+          },
+          "score": 1,
+          "match_type": "partial"
+        },
+        {
+          "id": "jah-thomas-stop-yu-loafin",
+          "ground_truth": {
+            "artist": "Jah Thomas",
+            "title": "Stop Yu Loafin"
+          },
+          "raw_response": "Artist: Jah Thomas | Title: Stop Yu Loafin",
+          "parsed": {
+            "artist": "Jah Thomas",
+            "title": "Stop Yu Loafin"
+          },
+          "score": 2,
+          "match_type": "exact"
+        },
+        {
+          "id": "yellowman-josey-wales-two-giants-clash",
+          "ground_truth": {
+            "artist": "Yellowman & Josey Wales",
+            "title": "Two Giants Clash"
+          },
+          "raw_response": "Artist: Yellowman vs. Josey Wales | Title: Two Giants Clash",
+          "parsed": {
+            "artist": "Yellowman vs. Josey Wales",
+            "title": "Two Giants Clash"
+          },
+          "score": 1,
+          "match_type": "partial"
+        },
+        {
+          "id": "os-afonsinhos-do-condado-no-parque-mayer",
+          "ground_truth": {
+            "artist": "Os Afonsinhos do Condado",
+            "title": "No Parque Mayer"
+          },
+          "raw_response": "Artist: Os Afonsinhos do Condado | Title: No Parque Mayer",
+          "parsed": {
+            "artist": "Os Afonsinhos do Condado",
+            "title": "No Parque Mayer"
+          },
+          "score": 2,
+          "match_type": "exact"
+        },
+        {
+          "id": "aldemaro-romero-y-su-orquesta-de-salon-caracas-de-noche",
+          "ground_truth": {
+            "artist": "Aldemaro Romero y su Orquesta de Salón",
+            "title": "Caracas de Noche"
+          },
+          "raw_response": "Artist: Aldemaro Romero y su Orquesta de Salon | Title: Caracas de Noche",
+          "parsed": {
+            "artist": "Aldemaro Romero y su Orquesta de Salon",
+            "title": "Caracas de Noche"
+          },
+          "score": 1,
+          "match_type": "partial"
+        },
+        {
+          "id": "angela-carrasco-la-candela",
+          "ground_truth": {
+            "artist": "Angela Carrasco",
+            "title": "La Candela"
+          },
+          "raw_response": "Artist: Angela Carrasco | Title: La Candela",
+          "parsed": {
+            "artist": "Angela Carrasco",
+            "title": "La Candela"
+          },
+          "score": 2,
+          "match_type": "exact"
+        },
+        {
+          "id": "gran-orquesta-tipica-de-armando-zulueta-frenesi",
+          "ground_truth": {
+            "artist": "Gran Orquesta Típica de Armando Zulueta",
+            "title": "Frenesí"
+          },
+          "raw_response": "Artist: Gran Orquesta Típica de Armando Zulueta | Title: Frenesí...",
+          "parsed": {
+            "artist": "Gran Orquesta Típica de Armando Zulueta",
+            "title": "Frenesí..."
+          },
+          "score": 2,
+          "match_type": "exact"
+        },
+        {
+          "id": "baden-powell-poema-on-guitar",
+          "ground_truth": {
+            "artist": "Baden Powell",
+            "title": "Poema on Guitar"
+          },
+          "raw_response": "The image shows a vinyl record cover with the text \"POEMA ON GUITAR BADEN POWELL\" prominently displayed at the top. The artwork features a guitar with flames and clouds, which is characteristic of some album covers from the artist Baden Powell.\n\nArtist: Baden Powell | Title: Poema on Guitar",
+          "parsed": {
+            "artist": "Baden Powell",
+            "title": "Poema on Guitar"
+          },
+          "score": 2,
+          "match_type": "exact"
+        },
+        {
+          "id": "baden-powell-face-au-public",
+          "ground_truth": {
+            "artist": "Baden Powell",
+            "title": "Face au Public"
+          },
+          "raw_response": "The image shows a vinyl record cover with the text \"BADEN POWELL face au public\" prominently displayed. Baden Powell is a well-known Brazilian guitarist and composer. The phrase \"face au public\" translates from French to \"facing the public,\" which suggests this is a live album or a public performance recording.\n\nArtist: Baden Powell | Title: face au public",
+          "parsed": {
+            "artist": "Baden Powell",
+            "title": "face au public"
+          },
+          "score": 2,
+          "match_type": "exact"
+        },
+        {
+          "id": "baden-powell-ritmos-de-brasil",
+          "ground_truth": {
+            "artist": "Baden Powell",
+            "title": "Ritmos de Brasil"
+          },
+          "raw_response": "Artist: Baden Powell | Title: Ritmos de Brasil",
+          "parsed": {
+            "artist": "Baden Powell",
+            "title": "Ritmos de Brasil"
+          },
+          "score": 2,
+          "match_type": "exact"
+        },
+        {
+          "id": "bana-eroticorythmotropicalomanie-vol-3",
+          "ground_truth": {
+            "artist": "Bana",
+            "title": "Eroticorythmotropicalomanie Vol. 3"
+          },
+          "raw_response": "Artist: Bana et son orchestre | Title: Eroticorythmotropicalia Vol. 3",
+          "parsed": {
+            "artist": "Bana et son orchestre",
+            "title": "Eroticorythmotropicalia Vol. 3"
+          },
+          "score": 0,
+          "match_type": "none"
+        },
+        {
+          "id": "la-banda-del-caribe-movimiento-sexy",
+          "ground_truth": {
+            "artist": "La Banda del Caribe",
+            "title": "Movimiento Sexy"
+          },
+          "raw_response": "Artist: La Banda del Caribe | Title: Movimiento Sexy",
+          "parsed": {
+            "artist": "La Banda del Caribe",
+            "title": "Movimiento Sexy"
+          },
+          "score": 2,
+          "match_type": "exact"
+        },
+        {
+          "id": "the-bhundu-boys-pamberi",
+          "ground_truth": {
+            "artist": "The Bhundu Boys",
+            "title": "Pamberi!"
+          },
+          "raw_response": "Artist: The Bhundu Boys | Title: Pamberi!",
+          "parsed": {
+            "artist": "The Bhundu Boys",
+            "title": "Pamberi!"
+          },
+          "score": 2,
+          "match_type": "exact"
+        },
+        {
+          "id": "celia-cruz-johnny-pacheco-de-nuevo",
+          "ground_truth": {
+            "artist": "Celia Cruz & Johnny Pacheco",
+            "title": "De Nuevo"
+          },
+          "raw_response": "Artist: Celia Cruz & Johnny Pacheco | Title: De Nuevo",
+          "parsed": {
+            "artist": "Celia Cruz & Johnny Pacheco",
+            "title": "De Nuevo"
+          },
+          "score": 2,
+          "match_type": "exact"
+        },
+        {
+          "id": "celia-cruz-y-la-sonora-matancera-feliz-encuentro-en-el-carnaval-de-tenerife",
+          "ground_truth": {
+            "artist": "Celia Cruz y La Sonora Matancera",
+            "title": "Feliz Encuentro en el Carnaval de Tenerife"
+          },
+          "raw_response": "Artist: Celia Cruz | Title: Los 12 grandes éxitos originales de Celia Cruz y La Sonora Matancera: Feliz Encuentro en el Carnaval de Tenerife",
+          "parsed": {
+            "artist": "Celia Cruz",
+            "title": "Los 12 grandes éxitos originales de Celia Cruz y La Sonora Matancera: Feliz Encuentro en el Carnaval de Tenerife"
+          },
+          "score": 0,
+          "match_type": "none"
+        },
+        {
+          "id": "celia-cruz-con-la-sonora-matancera-la-tierna-conmovedora-bamboleadora",
+          "ground_truth": {
+            "artist": "Celia Cruz con la Sonora Matancera",
+            "title": "La Tierna, Conmovedora, Bamboleadora"
+          },
+          "raw_response": "Artist: Celia Cruz | Title: La tierna, conmovedora, bamboleadora con la Sonora Matancera",
+          "parsed": {
+            "artist": "Celia Cruz",
+            "title": "La tierna, conmovedora, bamboleadora con la Sonora Matancera"
+          },
+          "score": 0,
+          "match_type": "none"
+        },
+        {
+          "id": "celia-cruz-a-todos-mis-amigos",
+          "ground_truth": {
+            "artist": "Celia Cruz",
+            "title": "A Todos Mis Amigos"
+          },
+          "raw_response": "Artist: Celia Cruz | Title: A Todos Mis Amigos",
+          "parsed": {
+            "artist": "Celia Cruz",
+            "title": "A Todos Mis Amigos"
+          },
+          "score": 2,
+          "match_type": "exact"
+        },
+        {
+          "id": "el-combo-belga-y-sus-furiosos-rumberos-rompiendo-clave",
+          "ground_truth": {
+            "artist": "El Combo Belga y sus Furiosos Rumberos",
+            "title": "Rompiendo Clave"
+          },
+          "raw_response": "Artist: El Combo Belca y sus Furiosos Rumberos | Title: Rompiendo Clave",
+          "parsed": {
+            "artist": "El Combo Belca y sus Furiosos Rumberos",
+            "title": "Rompiendo Clave"
+          },
+          "score": 1,
+          "match_type": "partial"
+        },
+        {
+          "id": "elba-ramalho-fruto",
+          "ground_truth": {
+            "artist": "Elba Ramalho",
+            "title": "Fruto"
+          },
+          "raw_response": "Artist: Elba Ramalho | Title: Fruto",
+          "parsed": {
+            "artist": "Elba Ramalho",
+            "title": "Fruto"
+          },
+          "score": 2,
+          "match_type": "exact"
+        },
+        {
+          "id": "eydie-gorme-y-el-trio-los-panchos-cuatro-vidas",
+          "ground_truth": {
+            "artist": "Eydie Gorme y el Trío Los Panchos",
+            "title": "Cuatro Vidas"
+          },
+          "raw_response": "Artist: Eydie Gormé y El Trío Los Panchos | Title: Cuatro Vidas",
+          "parsed": {
+            "artist": "Eydie Gormé y El Trío Los Panchos",
+            "title": "Cuatro Vidas"
+          },
+          "score": 1,
+          "match_type": "partial"
+        },
+        {
+          "id": "jayme-marques-que-cosa-mas-linda",
+          "ground_truth": {
+            "artist": "Jayme Marques",
+            "title": "Que Cosa Mas Linda!"
+          },
+          "raw_response": "Artist: Jayme Marques | Title: Que Cosa Mas Linda!",
+          "parsed": {
+            "artist": "Jayme Marques",
+            "title": "Que Cosa Mas Linda!"
+          },
+          "score": 2,
+          "match_type": "exact"
+        },
+        {
+          "id": "jayme-marques-sol-de-verano",
+          "ground_truth": {
+            "artist": "Jayme Marques",
+            "title": "Sol de Verano"
+          },
+          "raw_response": "Artist: Jayme Marques | Title: Sol de Verão",
+          "parsed": {
+            "artist": "Jayme Marques",
+            "title": "Sol de Verão"
+          },
+          "score": 1,
+          "match_type": "partial"
+        },
+        {
+          "id": "juan-carlos-senante-chateaubriand-filete-y-salsa",
+          "ground_truth": {
+            "artist": "Juan Carlos Senante",
+            "title": "Chateaubriand (Filete y Salsa)"
+          },
+          "raw_response": "Artist: Chateau Flight | Title: Serenade",
+          "parsed": {
+            "artist": "Chateau Flight",
+            "title": "Serenade"
+          },
+          "score": 0,
+          "match_type": "none"
+        },
+        {
+          "id": "juan-luis-guerra-y-440-areito",
+          "ground_truth": {
+            "artist": "Juan Luis Guerra y 440",
+            "title": "Areito"
+          },
+          "raw_response": "Artist: Juan Luis Guerra | Title: Areito",
+          "parsed": {
+            "artist": "Juan Luis Guerra",
+            "title": "Areito"
+          },
+          "score": 1,
+          "match_type": "partial"
+        },
+        {
+          "id": "juan-luis-guerra-y-440-el-original-440",
+          "ground_truth": {
+            "artist": "Juan Luis Guerra y 4.40",
+            "title": "El Original 4.40"
+          },
+          "raw_response": "Artist: Juan Luis Guerra y 440 | Title: El Original 4.40",
+          "parsed": {
+            "artist": "Juan Luis Guerra y 440",
+            "title": "El Original 4.40"
+          },
+          "score": 2,
+          "match_type": "exact"
+        },
+        {
+          "id": "kamac-pacha-inti-mi-raza",
+          "ground_truth": {
+            "artist": "Kamac Pacha Inti",
+            "title": "Mi Raza"
+          },
+          "raw_response": "Artist: Kamac Pacha Inti | Title: Mi Raza",
+          "parsed": {
+            "artist": "Kamac Pacha Inti",
+            "title": "Mi Raza"
+          },
+          "score": 2,
+          "match_type": "exact"
+        },
+        {
+          "id": "the-manhattan-transfer-brasil",
+          "ground_truth": {
+            "artist": "The Manhattan Transfer",
+            "title": "Brasil"
+          },
+          "raw_response": "Artist: The Manhattan Transfer | Title: The Manhattan Transfer",
+          "parsed": {
+            "artist": "The Manhattan Transfer",
+            "title": "The Manhattan Transfer"
+          },
+          "score": 1,
+          "match_type": "partial"
+        },
+        {
+          "id": "luis-kalaff-con-los-alegres-dominicanos-bailemos-merengue",
+          "ground_truth": {
+            "artist": "Luis Kalaff con Los Alegres Dominicanos",
+            "title": "Bailemos Merengue"
+          },
+          "raw_response": "Artist: Luis Kalaff | Title: Merengues bailables con \"Los Alegres Dominicanos\"",
+          "parsed": {
+            "artist": "Luis Kalaff",
+            "title": "Merengues bailables con \"Los Alegres Dominicanos\""
+          },
+          "score": 0,
+          "match_type": "none"
+        },
+        {
+          "id": "orquesta-encantada-sabroson",
+          "ground_truth": {
+            "artist": "Orquesta Encantada",
+            "title": "Sabrosón"
+          },
+          "raw_response": "Artist: Sabroson | Title: Orquesta Encantada",
+          "parsed": {
+            "artist": "Sabroson",
+            "title": "Orquesta Encantada"
+          },
+          "score": 0,
+          "match_type": "none"
+        },
+        {
+          "id": "ranking-joe-weakheart-fadeaway",
+          "ground_truth": {
+            "artist": "Ranking Joe",
+            "title": "Weakheart Fadeaway"
+          },
+          "raw_response": "The image depicts a person riding a motorcycle with a bright light or halo effect in the background. The text on the motorcycle's headlight reads \"Ranking Jacob.\" This suggests that the image is related to a music release by an artist named Ranking Jacob. The visual elements, such as the motorcycle and the vibrant colors, are often associated with reggae or dancehall music album covers.\n\nBased on the visual clues and the text on the motorcycle, the music release shown in this photo is likely by the artist Ranking Jacob.\n\nArtist: Ranking Jacob | Title: Ranking Jacob",
+          "parsed": {
+            "artist": "Ranking Jacob",
+            "title": "Ranking Jacob"
+          },
+          "score": 0,
+          "match_type": "none"
+        },
+        {
+          "id": "beth-carvalho-feliz",
+          "ground_truth": {
+            "artist": "Beth Carvalho",
+            "title": "Feliz"
+          },
+          "raw_response": "Artist: Beth Carvalho | Title: Folia",
+          "parsed": {
+            "artist": "Beth Carvalho",
+            "title": "Folia"
+          },
+          "score": 1,
+          "match_type": "partial"
+        },
+        {
+          "id": "billos-caracas-boys-la-rubia-y-la-triguena",
+          "ground_truth": {
+            "artist": "Billo's Caracas Boys",
+            "title": "La Rubia y la Trigueña"
+          },
+          "raw_response": "Artist: La Rubia y la Trigueña | Title: Billo's",
+          "parsed": {
+            "artist": "La Rubia y la Trigueña",
+            "title": "Billo's"
+          },
+          "score": 0,
+          "match_type": "none"
+        },
+        {
+          "id": "crispin-licuado",
+          "ground_truth": {
+            "artist": "Crispin",
+            "title": "Licuado"
+          },
+          "raw_response": "Artist: Crispin | Title: Licuado",
+          "parsed": {
+            "artist": "Crispin",
+            "title": "Licuado"
+          },
+          "score": 2,
+          "match_type": "exact"
+        },
+        {
+          "id": "aurelio-reinoso-don-reinoso",
+          "ground_truth": {
+            "artist": "Aurelio Reinoso",
+            "title": "Don Reinoso"
+          },
+          "raw_response": "Artist: Don Reinoso, Aurelio Reinoso | Title: <release title not visible in the image>",
+          "parsed": {
+            "artist": "Don Reinoso, Aurelio Reinoso",
+            "title": "<release title not visible in the image>"
+          },
+          "score": 0,
+          "match_type": "none"
+        },
+        {
+          "id": "grupo-guaco-guaco-76",
+          "ground_truth": {
+            "artist": "Grupo Guaco",
+            "title": "Guaco 76"
+          },
+          "raw_response": "Artist: Korta | Title: Korta",
+          "parsed": {
+            "artist": "Korta",
+            "title": "Korta"
+          },
+          "score": 0,
+          "match_type": "none"
+        },
+        {
+          "id": "pacho-via-libre-llego",
+          "ground_truth": {
+            "artist": "Pacho",
+            "title": "Via Libre Llego"
+          },
+          "raw_response": "Artist: Pacho | Title: Via Libre Llego Pacho",
+          "parsed": {
+            "artist": "Pacho",
+            "title": "Via Libre Llego Pacho"
+          },
+          "score": 1,
+          "match_type": "partial"
+        }
+      ],
+      "summary": {
+        "exact": 46,
+        "partial": 29,
+        "none": 26,
+        "parse_errors": 0,
+        "total_score": 121,
+        "max_score": 202
+      }
+    }
+  }
+}
