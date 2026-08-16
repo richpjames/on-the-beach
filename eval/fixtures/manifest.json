@@ -389,6 +389,222 @@
       "image": "images/IMG_5345.jpeg",
       "artist": "Tipico Santa Rosa",
       "title": "Tipico Santa Rosa"
+    },
+    {
+      "id": "antonio-carlos-e-jocafi-o-primeiro-amor",
+      "image": "images/IMG_0494.jpeg",
+      "artist": "Antonio Carlos e Jocafi",
+      "title": "O Primeiro Amor"
+    },
+    {
+      "id": "jah-thomas-stop-yu-loafin",
+      "image": "images/IMG_0522.jpeg",
+      "artist": "Jah Thomas",
+      "title": "Stop Yu Loafin"
+    },
+    {
+      "id": "yellowman-josey-wales-two-giants-clash",
+      "image": "images/IMG_0524.jpeg",
+      "artist": "Yellowman & Josey Wales",
+      "title": "Two Giants Clash"
+    },
+    {
+      "id": "os-afonsinhos-do-condado-no-parque-mayer",
+      "image": "images/IMG_0564.jpeg",
+      "artist": "Os Afonsinhos do Condado",
+      "title": "No Parque Mayer"
+    },
+    {
+      "id": "aldemaro-romero-y-su-orquesta-de-salon-caracas-de-noche",
+      "image": "images/IMG_0565.jpeg",
+      "artist": "Aldemaro Romero y su Orquesta de Salón",
+      "title": "Caracas de Noche"
+    },
+    {
+      "id": "angela-carrasco-la-candela",
+      "image": "images/IMG_0566.jpeg",
+      "artist": "Angela Carrasco",
+      "title": "La Candela"
+    },
+    {
+      "id": "gran-orquesta-tipica-de-armando-zulueta-frenesi",
+      "image": "images/IMG_0567.jpeg",
+      "artist": "Gran Orquesta Típica de Armando Zulueta",
+      "title": "Frenesí"
+    },
+    {
+      "id": "baden-powell-poema-on-guitar",
+      "image": "images/IMG_0568.jpeg",
+      "artist": "Baden Powell",
+      "title": "Poema on Guitar"
+    },
+    {
+      "id": "baden-powell-face-au-public",
+      "image": "images/IMG_0569.jpeg",
+      "artist": "Baden Powell",
+      "title": "Face au Public"
+    },
+    {
+      "id": "baden-powell-ritmos-de-brasil",
+      "image": "images/IMG_0570.jpeg",
+      "artist": "Baden Powell",
+      "title": "Ritmos de Brasil"
+    },
+    {
+      "id": "bana-eroticorythmotropicalomanie-vol-3",
+      "image": "images/IMG_0571.jpeg",
+      "artist": "Bana",
+      "title": "Eroticorythmotropicalomanie Vol. 3"
+    },
+    {
+      "id": "la-banda-del-caribe-movimiento-sexy",
+      "image": "images/IMG_0572.jpeg",
+      "artist": "La Banda del Caribe",
+      "title": "Movimiento Sexy"
+    },
+    {
+      "id": "the-bhundu-boys-pamberi",
+      "image": "images/IMG_0574.jpeg",
+      "artist": "The Bhundu Boys",
+      "title": "Pamberi!"
+    },
+    {
+      "id": "celia-cruz-johnny-pacheco-de-nuevo",
+      "image": "images/IMG_0576.jpeg",
+      "artist": "Celia Cruz & Johnny Pacheco",
+      "title": "De Nuevo"
+    },
+    {
+      "id": "celia-cruz-y-la-sonora-matancera-feliz-encuentro-en-el-carnaval-de-tenerife",
+      "image": "images/IMG_0577.jpeg",
+      "artist": "Celia Cruz y La Sonora Matancera",
+      "title": "Feliz Encuentro en el Carnaval de Tenerife"
+    },
+    {
+      "id": "celia-cruz-con-la-sonora-matancera-la-tierna-conmovedora-bamboleadora",
+      "image": "images/IMG_0578.jpeg",
+      "artist": "Celia Cruz con la Sonora Matancera",
+      "title": "La Tierna, Conmovedora, Bamboleadora"
+    },
+    {
+      "id": "celia-cruz-a-todos-mis-amigos",
+      "image": "images/IMG_0579.jpeg",
+      "artist": "Celia Cruz",
+      "title": "A Todos Mis Amigos"
+    },
+    {
+      "id": "el-combo-belga-y-sus-furiosos-rumberos-rompiendo-clave",
+      "image": "images/IMG_0580.jpeg",
+      "artist": "El Combo Belga y sus Furiosos Rumberos",
+      "title": "Rompiendo Clave"
+    },
+    {
+      "id": "elba-ramalho-fruto",
+      "image": "images/IMG_0583.jpeg",
+      "artist": "Elba Ramalho",
+      "title": "Fruto"
+    },
+    {
+      "id": "eydie-gorme-y-el-trio-los-panchos-cuatro-vidas",
+      "image": "images/IMG_0584.jpeg",
+      "artist": "Eydie Gorme y el Trío Los Panchos",
+      "title": "Cuatro Vidas"
+    },
+    {
+      "id": "jayme-marques-que-cosa-mas-linda",
+      "image": "images/IMG_0642.jpeg",
+      "artist": "Jayme Marques",
+      "title": "Que Cosa Mas Linda!"
+    },
+    {
+      "id": "jayme-marques-sol-de-verano",
+      "image": "images/IMG_0643.jpeg",
+      "artist": "Jayme Marques",
+      "title": "Sol de Verano"
+    },
+    {
+      "id": "juan-carlos-senante-chateaubriand-filete-y-salsa",
+      "image": "images/IMG_0644.jpeg",
+      "artist": "Juan Carlos Senante",
+      "title": "Chateaubriand (Filete y Salsa)"
+    },
+    {
+      "id": "juan-luis-guerra-y-440-areito",
+      "image": "images/IMG_0645.jpeg",
+      "artist": "Juan Luis Guerra y 440",
+      "title": "Areito"
+    },
+    {
+      "id": "juan-luis-guerra-y-440-el-original-440",
+      "image": "images/IMG_0646.jpeg",
+      "artist": "Juan Luis Guerra y 4.40",
+      "title": "El Original 4.40"
+    },
+    {
+      "id": "kamac-pacha-inti-mi-raza",
+      "image": "images/IMG_0647.jpeg",
+      "artist": "Kamac Pacha Inti",
+      "title": "Mi Raza"
+    },
+    {
+      "id": "the-manhattan-transfer-brasil",
+      "image": "images/IMG_0651.jpeg",
+      "artist": "The Manhattan Transfer",
+      "title": "Brasil"
+    },
+    {
+      "id": "luis-kalaff-con-los-alegres-dominicanos-bailemos-merengue",
+      "image": "images/IMG_0652.jpeg",
+      "artist": "Luis Kalaff con Los Alegres Dominicanos",
+      "title": "Bailemos Merengue"
+    },
+    {
+      "id": "orquesta-encantada-sabroson",
+      "image": "images/IMG_0656.jpeg",
+      "artist": "Orquesta Encantada",
+      "title": "Sabrosón"
+    },
+    {
+      "id": "ranking-joe-weakheart-fadeaway",
+      "image": "images/IMG_0525.jpeg",
+      "artist": "Ranking Joe",
+      "title": "Weakheart Fadeaway"
+    },
+    {
+      "id": "beth-carvalho-feliz",
+      "image": "images/IMG_0573.jpeg",
+      "artist": "Beth Carvalho",
+      "title": "Feliz"
+    },
+    {
+      "id": "billos-caracas-boys-la-rubia-y-la-triguena",
+      "image": "images/IMG_0575.jpeg",
+      "artist": "Billo's Caracas Boys",
+      "title": "La Rubia y la Trigueña"
+    },
+    {
+      "id": "crispin-licuado",
+      "image": "images/IMG_0581.jpeg",
+      "artist": "Crispin",
+      "title": "Licuado"
+    },
+    {
+      "id": "aurelio-reinoso-don-reinoso",
+      "image": "images/IMG_0582.jpeg",
+      "artist": "Aurelio Reinoso",
+      "title": "Don Reinoso"
+    },
+    {
+      "id": "grupo-guaco-guaco-76",
+      "image": "images/IMG_0641.jpeg",
+      "artist": "Grupo Guaco",
+      "title": "Guaco 76"
+    },
+    {
+      "id": "pacho-via-libre-llego",
+      "image": "images/IMG_0659.jpeg",
+      "artist": "Pacho",
+      "title": "Via Libre Llego"
     }
   ]
 }
