@@ -1,7 +1,7 @@
 import { Mistral } from "@mistralai/mistralai";
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from "node:fs";
 import { resolve, dirname, extname } from "node:path";
-import { callMistral } from "./api";
+import { callMistral, callOpenAICompatible } from "./api";
 import { strategies } from "./strategies";
 import { scoreResult } from "./score";
 import type { EvalManifest } from "../eval/types";
@@ -19,19 +19,43 @@ const strategyFilter = getFlag("--strategy")
   .map((s) => s.trim().toUpperCase());
 const limit = getFlag("--limit") ? parseInt(getFlag("--limit")!, 10) : undefined;
 const delay = getFlag("--delay") ? parseInt(getFlag("--delay")!, 10) : 500;
-const model = getFlag("--model") ?? "pixtral-large-latest";
+const model = getFlag("--model") ?? "mistral-medium-2604";
+const provider = (getFlag("--provider") ?? "mistral").toLowerCase();
+
+// Known OpenAI-compatible endpoints, so common providers need only --provider.
+// Any other base URL can be passed with --base-url.
+const PRESET_BASE_URLS: Record<string, string> = {
+  qwen: "https://dashscope-intl.aliyuncs.com/compatible-mode/v1",
+  "qwen-cn": "https://dashscope.aliyuncs.com/compatible-mode/v1",
+  openrouter: "https://openrouter.ai/api/v1",
+};
 
 // --- Setup ---
-const API_KEY = process.env.MISTRAL_API_KEY;
-if (!API_KEY) {
-  console.error("MISTRAL_API_KEY is not set");
+if (provider !== "mistral" && !PRESET_BASE_URLS[provider] && !getFlag("--base-url")) {
+  console.error(
+    `Unknown --provider "${provider}". Use "mistral", one of ` +
+      `${Object.keys(PRESET_BASE_URLS).join(", ")}, or pass --base-url explicitly.`,
+  );
   process.exit(1);
 }
 
-const PIXTRAL_DIR = dirname(import.meta.path);
-const FIXTURES_DIR = resolve(PIXTRAL_DIR, "../eval/fixtures");
-const RESULTS_DIR = resolve(PIXTRAL_DIR, "results");
-const OUTPUT_PATH = resolve(RESULTS_DIR, `eval-results-${model}.json`);
+// Mistral reads MISTRAL_API_KEY; every other provider reads EVAL_API_KEY so a
+// single variable covers Qwen, OpenRouter and anything else OpenAI-compatible.
+const API_KEY = provider === "mistral" ? process.env.MISTRAL_API_KEY : process.env.EVAL_API_KEY;
+if (!API_KEY) {
+  console.error(provider === "mistral" ? "MISTRAL_API_KEY is not set" : "EVAL_API_KEY is not set");
+  process.exit(1);
+}
+
+const BASE_URL = getFlag("--base-url") ?? PRESET_BASE_URLS[provider];
+
+const VISION_EVAL_DIR = dirname(import.meta.path);
+const FIXTURES_DIR = resolve(VISION_EVAL_DIR, "../eval/fixtures");
+const RESULTS_DIR = resolve(VISION_EVAL_DIR, "results");
+// Timestamped so repeat runs of the same model accumulate instead of overwriting
+// each other. Matches the naming used by eval/results.ts and eval/reverse-image-search.ts.
+const RUN_TIMESTAMP = new Date().toISOString().replace(/[:.]/g, "-");
+const OUTPUT_PATH = resolve(RESULTS_DIR, `eval-results-${model}-${RUN_TIMESTAMP}.json`);
 
 const manifest: EvalManifest = JSON.parse(
   readFileSync(resolve(FIXTURES_DIR, "manifest.json"), "utf-8"),
@@ -87,6 +111,24 @@ for (const c of cases) {
   imageCache.set(c.id, imageToDataUri(c.image));
 }
 
+// Pre-flight: one real call before the loop. A retired model or bad key fails
+// identically on every case, so without this the run burns the whole fixture
+// set producing a score table made entirely of errors.
+{
+  const probe = imageCache.get(cases[0]!.id)!;
+  console.log(`Pre-flight: ${model} via ${provider}${BASE_URL ? ` (${BASE_URL})` : ""} ...`);
+  const { error } = await (provider === "mistral"
+    ? callMistral(client, "Reply with the word: ok", probe, model)
+    : callOpenAICompatible(BASE_URL!, API_KEY, "Reply with the word: ok", probe, model));
+  if (error) {
+    console.error(
+      `\nPre-flight failed — aborting before spending ${cases.length} calls.\n${error}`,
+    );
+    process.exit(1);
+  }
+  console.log("Pre-flight OK\n");
+}
+
 for (const strategy of selectedStrategies) {
   console.log(`\nRunning strategy ${strategy.id} — ${strategy.name}`);
   const results: ImageResult[] = [];
@@ -96,7 +138,10 @@ for (const strategy of selectedStrategies) {
 
     process.stdout.write(`  ${testCase.id} ... `);
 
-    const { content, error } = await callMistral(client, strategy.prompt, dataUri, model);
+    const { content, error } =
+      provider === "mistral"
+        ? await callMistral(client, strategy.prompt, dataUri, model)
+        : await callOpenAICompatible(BASE_URL!, API_KEY, strategy.prompt, dataUri, model);
 
     let result: ImageResult;
 
@@ -185,3 +230,20 @@ for (const strategy of selectedStrategies) {
 }
 
 console.log(`\nResults written to ${OUTPUT_PATH}`);
+
+// A run that mostly errored (rate limits, transport failures) still produces a
+// full score table, because failed cases score 0 and look like wrong answers.
+// Call that out rather than letting a throttled run be read as a bad model.
+for (const strategy of selectedStrategies) {
+  const s = output[strategy.id];
+  if (!s) continue;
+  const errored = s.results.filter((r) => r.error).length;
+  if (errored > 0) {
+    const pct = Math.round((errored / s.results.length) * 100);
+    console.warn(
+      `\n⚠️  Strategy ${strategy.id}: ${errored}/${s.results.length} cases (${pct}%) failed with ` +
+        `API errors and scored 0. This score measures the failures, not the model. ` +
+        `Re-run with a longer --delay before comparing.`,
+    );
+  }
+}

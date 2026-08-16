@@ -48,7 +48,7 @@ Open http://localhost:3000.
 | `BODY_SIZE_LIMIT`         | No       | `512K` (adapter-node)  | Max request body. The default is smaller than a shared record sleeve, so photo uploads 413 before the route runs — the Docker image sets `4M`.   |
 | `MISTRAL_API_KEY`         | No       | —                      | Enables AI cover scanning and unsupported music-link extraction                                                                                  |
 | `MISTRAL_LINK_MODEL`      | No       | `mistral-small-latest` | Model for unsupported music-link extraction via chat completions.                                                                                |
-| `MISTRAL_SCAN_MODEL`      | No       | `mistral-ocr-latest`   | Model for cover scanning. Non-OCR models use chat-completions mode.                                                                              |
+| `MISTRAL_SCAN_MODEL`      | No       | `mistral-small-2506`   | Model for cover scanning. Models whose name contains `-ocr-` are sent to the OCR endpoint; any other model uses chat completions.                |
 | `INGEST_API_KEY`          | No       | —                      | Secret token for the HTTP email ingest webhook. Required to enable it.                                                                           |
 | `INGEST_ENABLED`          | No       | `true`                 | Set to `false` to disable the HTTP ingest endpoint without removing the key                                                                      |
 | `ORIGIN`                  | Prod     | —                      | Public origin of the deployment (e.g. `https://otb.example.com`). Used to derive request URLs, the CSRF origin check, and cookie security flags. |
