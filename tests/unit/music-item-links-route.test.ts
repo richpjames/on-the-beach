@@ -15,6 +15,7 @@ const BANDCAMP_URL = "https://seekersinternational.bandcamp.com/album/where-betw
 
 const BANDCAMP_HTML = `<html><head>
 <meta property="og:title" content="Where Between You &amp; Me, by Seekersinternational">
+<meta property="og:image" content="https://f4.bcbits.com/img/a998877_10.jpg">
 <meta name="bc-page-properties" content='{"item_type":"album","item_id":998877}'>
 </head><body></body></html>`;
 
@@ -28,18 +29,28 @@ function makeApp(): Hono {
   return app;
 }
 
-async function insertItem(): Promise<number> {
+async function insertItem(artworkUrl: string | null = null): Promise<number> {
   const [inserted] = await db
     .insert(musicItems)
     .values({
       title: "Where Between You & Me",
       normalizedTitle: "where between you & me",
       listenStatus: "to-listen",
+      artworkUrl,
     })
     .returning({ id: musicItems.id });
 
   insertedItemIds.push(inserted.id);
   return inserted.id;
+}
+
+async function readArtwork(id: number): Promise<string | null> {
+  const [item] = await db
+    .select({ artworkUrl: musicItems.artworkUrl })
+    .from(musicItems)
+    .where(eq(musicItems.id, id));
+
+  return item?.artworkUrl ?? null;
 }
 
 function addLink(id: number, body: Record<string, unknown>) {
@@ -99,8 +110,8 @@ describe("POST /api/music-items/:id/links", () => {
     expect(link.isPrimary).toBe(true);
   });
 
-  test("stores no metadata, and scrapes nothing, for a source with no player ids", async () => {
-    const id = await insertItem();
+  test("stores no metadata for a source with no player ids", async () => {
+    const id = await insertItem("/uploads/scanned-sleeve.jpg");
 
     const res = await addLink(id, {
       sourceName: "Spotify",
@@ -110,7 +121,34 @@ describe("POST /api/music-items/:id/links", () => {
     expect(res.status).toBe(201);
     const [link] = await readLinks(id);
     expect(link.metadata).toBeNull();
+  });
+
+  test("scrapes nothing when the release needs neither player ids nor a picture", async () => {
+    const id = await insertItem("/uploads/scanned-sleeve.jpg");
+
+    await addLink(id, { sourceName: "Spotify", url: "https://open.spotify.com/album/1A2B3C4D5E" });
+
     expect(fetchCalls).toBe(0);
+  });
+
+  test("gives a release with no picture the one from the page just linked to it", async () => {
+    const id = await insertItem();
+
+    const res = await addLink(id, { sourceName: "Bandcamp", url: BANDCAMP_URL });
+
+    expect(res.status).toBe(201);
+    expect(await res.json()).toMatchObject({
+      artwork_url: "https://f4.bcbits.com/img/a998877_10.jpg",
+    });
+    expect(await readArtwork(id)).toBe("https://f4.bcbits.com/img/a998877_10.jpg");
+  });
+
+  test("leaves the picture a release already has alone", async () => {
+    const id = await insertItem("/uploads/scanned-sleeve.jpg");
+
+    await addLink(id, { sourceName: "Bandcamp", url: BANDCAMP_URL });
+
+    expect(await readArtwork(id)).toBe("/uploads/scanned-sleeve.jpg");
   });
 
   test("rejects a second copy of a link the release already has", async () => {

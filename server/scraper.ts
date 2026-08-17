@@ -1135,6 +1135,53 @@ export async function scrapeUrl(
   }
 }
 
+/**
+ * Read just the `og:image` off a page, without asking what release the page is
+ * about.
+ *
+ * The full scrape of an unsupported link runs an LLM extraction to work that
+ * out, and throws when the page isn't recognisably about music — far more than
+ * is needed when the release already exists and all that's wanted is the
+ * picture the page advertises. Returns null on anything that isn't reachable
+ * HTML carrying an image.
+ */
+export async function scrapeOgImage(url: string, timeoutMs = 5000): Promise<string | null> {
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+
+    const response = await fetch(url, {
+      signal: controller.signal,
+      headers: {
+        "User-Agent": "Mozilla/5.0 (compatible; MusicBot/1.0)",
+        Accept: "text/html",
+      },
+    });
+
+    clearTimeout(timer);
+
+    if (!response.headers.get("content-type")?.includes("text/html")) return null;
+
+    const reader = response.body?.getReader();
+    if (!reader) return null;
+
+    let html = "";
+    const decoder = new TextDecoder();
+    while (html.length < MAX_HEAD_BYTES) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      html += decoder.decode(value, { stream: true });
+      if (html.includes("</head>")) break;
+    }
+
+    reader.cancel();
+
+    return parseOgTags(html).ogImage ?? null;
+  } catch {
+    return null;
+  }
+}
+
 function normalizeForMatch(s: string): string {
   return s
     .toLowerCase()

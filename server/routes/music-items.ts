@@ -23,7 +23,8 @@ import {
   createMusicItemDirect,
 } from "../music-item-creator";
 import { hydrateItemStacks } from "../hydrate-item-stacks";
-import { scrapeLinkEmbedMetadata } from "../link-embed-metadata";
+import { scrapeAddedLink } from "../added-link-scrape";
+import { saveArtwork } from "../secondary-link-enrichment";
 import { UnsupportedMusicLinkError } from "../scraper";
 import { ensureSuggestionForItemNow, findPendingSuggestionForItem } from "../suggestions";
 import { scheduleAppleMusicBackfill } from "../apple-music-backfill";
@@ -687,19 +688,32 @@ musicItemRoutes.post("/:id/links", async (c) => {
 
   const isPrimary = existing.length === 0;
 
+  const [item] = await db
+    .select({ artworkUrl: musicItems.artworkUrl })
+    .from(musicItems)
+    .where(eq(musicItems.id, id))
+    .limit(1);
+
   // Scraped here rather than at creation time, because this link never went
   // through the creation path — without it a hand-added Bandcamp link can't
-  // produce a player. Null for every other source, and on any scrape failure.
-  const metadata = await scrapeLinkEmbedMetadata(url);
+  // produce a player, and a release with no picture of its own never gets one
+  // from the page just linked to it.
+  const scraped = await scrapeAddedLink(url, !item?.artworkUrl);
 
   const [link] = await db
     .insert(musicLinks)
-    .values({ musicItemId: id, sourceId: source.id, url, isPrimary, metadata })
+    .values({ musicItemId: id, sourceId: source.id, url, isPrimary, metadata: scraped.metadata })
     .onConflictDoNothing()
     .returning({ id: musicLinks.id, url: musicLinks.url, isPrimary: musicLinks.isPrimary });
 
   if (!link) {
     return c.json({ error: "Link already exists for this release" }, 409);
+  }
+
+  // Only fills the gap: the `IS NULL` guard inside means an artwork set while
+  // the scrape was in flight is never clobbered.
+  if (scraped.imageUrl) {
+    await saveArtwork(id, scraped.imageUrl);
   }
 
   return c.json(
@@ -709,6 +723,7 @@ musicItemRoutes.post("/:id/links", async (c) => {
       source_name: source.name,
       display_name: source.displayName,
       is_primary: link.isPrimary,
+      artwork_url: item?.artworkUrl ?? scraped.imageUrl,
     },
     201,
   );
