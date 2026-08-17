@@ -77,6 +77,20 @@ export const musicItems = sqliteTable(
     catalogueNumber: text("catalogue_number"),
     musicbrainzReleaseId: text("musicbrainz_release_id"),
     musicbrainzArtistId: text("musicbrainz_artist_id"),
+    musicbrainzReleaseGroupId: text("musicbrainz_release_group_id"),
+    discogsReleaseId: integer("discogs_release_id"),
+    discogsMasterId: integer("discogs_master_id"),
+    // 'matched' | 'partial' | 'absent' | 'failed', or null when resolution has
+    // never been attempted. Without this an absent identifier is ambiguous — it
+    // could mean "we looked and the record is in neither database" or "we never
+    // looked". Roughly 7% of the catalogue we ingest exists in neither
+    // MusicBrainz nor Discogs, so a background sweep that reads only the id
+    // columns would re-query those records forever. 'absent' is terminal;
+    // 'failed' (a timeout, a 503) is retryable.
+    resolutionStatus: text("resolution_status"),
+    // Last resolution attempt, set on both a hit and a miss, for the same
+    // reason as `lookupAttemptedAt` below.
+    resolutionAttemptedAt: integer("resolution_attempted_at", { mode: "timestamp" }),
     // Timestamp of the last secondary-link lookup attempt against the active
     // streaming service. Set on both a hit and a miss so we don't re-query on
     // every page view for items with no match. Cleared for all items when the
