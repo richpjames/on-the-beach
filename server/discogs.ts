@@ -155,7 +155,11 @@ export async function fetchDiscogsRelease(
     Accept: "application/json",
   };
 
-  const token = process.env.DISCOGS_TOKEN;
+  // A Discogs personal access token. `DISCOGS_PAT` names what it actually is
+  // and is the preferred variable; `DISCOGS_TOKEN` is still read so existing
+  // deployments keep working. Without either, requests go out unauthenticated
+  // — they succeed, but the rate limit drops from 60 requests/minute to 25.
+  const token = process.env.DISCOGS_PAT ?? process.env.DISCOGS_TOKEN;
   if (token) {
     headers["Authorization"] = `Discogs token=${token}`;
   }
