@@ -323,7 +323,12 @@
       body: JSON.stringify({ sourceName, url }),
     });
     if (res.ok) {
-      const link = await res.json();
+      // A release with no picture of its own takes one from the page it was
+      // just linked to. The edit field was filled in before that happened, so
+      // without this saving the form afterwards would write its emptiness back
+      // over the cover the link supplied.
+      const { artwork_url: artworkUrl, ...link } = await res.json();
+      if (artworkUrl && !editArtworkUrl.trim()) editArtworkUrl = artworkUrl;
       itemLinks = [...itemLinks, link];
       sourceQuery = "";
       linkUrl = "";
