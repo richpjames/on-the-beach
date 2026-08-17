@@ -20,3 +20,11 @@ if (!process.env.DATABASE_PATH) {
 if (process.env.OTB_MB_MIN_REQUEST_GAP_MS === undefined) {
   process.env.OTB_MB_MIN_REQUEST_GAP_MS = "0";
 }
+
+// server/discogs.ts has the same gate for Discogs' 60 req/min, and the same
+// reasoning applies. Note the default gap is non-zero whenever a token is
+// present, and `.env` is loaded automatically — so without this a developer
+// with DISCOGS_PAT set sees a slow suite and one without does not.
+if (process.env.OTB_DISCOGS_MIN_REQUEST_GAP_MS === undefined) {
+  process.env.OTB_DISCOGS_MIN_REQUEST_GAP_MS = "0";
+}

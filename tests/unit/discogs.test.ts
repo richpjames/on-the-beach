@@ -1,5 +1,10 @@
 import { afterEach, describe, expect, mock, spyOn, test } from "bun:test";
-import { fetchDiscogsRelease, parseDiscogsRelease } from "../../server/discogs";
+import {
+  DiscogsHttpError,
+  fetchDiscogsRelease,
+  parseDiscogsRelease,
+  searchReleases,
+} from "../../server/discogs";
 
 function makeDiscogsResponse(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
@@ -250,5 +255,124 @@ describe("fetchDiscogsRelease", () => {
 
     const result = await fetchDiscogsRelease("https://www.discogs.com/sell/item/9999999", 5000);
     expect(result).toBeNull();
+  });
+});
+
+describe("searchReleases", () => {
+  // The request gate is zeroed for the whole suite in tests/unit/preload.ts.
+  afterEach(() => {
+    mock.restore();
+  });
+
+  function searchResponse(results: unknown[]): Response {
+    return makeDiscogsResponse({ results });
+  }
+
+  test("splits the packed 'Artist - Title' field", async () => {
+    spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      searchResponse([{ id: 1, master_id: 10, title: "The Earons - Land of Hunger" }]),
+    );
+
+    const [candidate] = await searchReleases({ artist: "The Earons" });
+
+    expect(candidate?.artist).toBe("The Earons");
+    expect(candidate?.title).toBe("Land of Hunger");
+  });
+
+  test("strips the disambiguation suffix from the artist half", async () => {
+    spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      searchResponse([{ id: 2, title: "Bana (2) - Eroticorythmotropicalomanie Vol. 3" }]),
+    );
+
+    const [candidate] = await searchReleases({ artist: "Bana" });
+
+    expect(candidate?.artist).toBe("Bana");
+  });
+
+  test("coerces master_id 0 to null so 'no master' is unambiguous", async () => {
+    spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      searchResponse([{ id: 3, master_id: 0, title: "Determine - Never Know" }]),
+    );
+
+    const [candidate] = await searchReleases({ artist: "Determine" });
+
+    // 0 is Discogs' way of saying the release has no master. Left as 0 it looks
+    // like a valid id; the release id is the work-level key in that case.
+    expect(candidate?.masterId).toBeNull();
+    expect(candidate?.releaseId).toBe(3);
+  });
+
+  test("keeps a real master id", async () => {
+    spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      searchResponse([{ id: 4, master_id: 608159, title: "Dorival Caymmi - Caymmi" }]),
+    );
+
+    const [candidate] = await searchReleases({ artist: "Dorival Caymmi" });
+
+    expect(candidate?.masterId).toBe(608159);
+  });
+
+  test("parses label, catalogue number, year and country", async () => {
+    spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      searchResponse([
+        {
+          id: 5,
+          title: "Ernesto Lecuona - Lecuona Plays For Two",
+          year: "1955",
+          country: "US",
+          label: ["RCA Victor", "RCA"],
+          catno: "LPM-1058",
+        },
+      ]),
+    );
+
+    const [candidate] = await searchReleases({ catno: "LPM-1058" });
+
+    expect(candidate?.year).toBe(1955);
+    expect(candidate?.country).toBe("US");
+    expect(candidate?.label).toBe("RCA Victor");
+    expect(candidate?.catalogueNumber).toBe("LPM-1058");
+  });
+
+  test("passes structured query fields through to the API", async () => {
+    const fetchSpy = spyOn(globalThis, "fetch").mockResolvedValueOnce(searchResponse([]));
+
+    await searchReleases(
+      { artist: "Barry Brown", releaseTitle: "Vibes", track: "Dub", catno: "SP 01" },
+      3,
+    );
+
+    const url = String(fetchSpy.mock.calls[0]?.[0]);
+    expect(url).toContain("artist=Barry+Brown");
+    expect(url).toContain("release_title=Vibes");
+    expect(url).toContain("track=Dub");
+    expect(url).toContain("catno=SP+01");
+    expect(url).toContain("per_page=3");
+    expect(url).toContain("type=release");
+  });
+
+  test("throws DiscogsHttpError on a non-2xx so a miss is not confused with a failure", async () => {
+    spyOn(globalThis, "fetch").mockResolvedValueOnce(makeDiscogsResponse({}, 429));
+
+    // Returning [] here would record a throttled request as "record absent",
+    // which is exactly how an earlier fixture pass invented three false misses.
+    await expect(searchReleases({ artist: "x" })).rejects.toThrow(DiscogsHttpError);
+  });
+
+  test("skips malformed results rather than failing the whole search", async () => {
+    spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      searchResponse([null, { title: "no id here" }, { id: 9, title: "Olu - Living Free" }]),
+    );
+
+    const candidates = await searchReleases({ artist: "Olu" });
+
+    expect(candidates).toHaveLength(1);
+    expect(candidates[0]?.releaseId).toBe(9);
+  });
+
+  test("returns an empty list when Discogs has no results", async () => {
+    spyOn(globalThis, "fetch").mockResolvedValueOnce(searchResponse([]));
+
+    expect(await searchReleases({ q: "nothing" })).toEqual([]);
   });
 });
