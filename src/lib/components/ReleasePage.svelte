@@ -68,7 +68,7 @@
   }
 
   // ── Suggestion picker ──────────────────────────────────────────────────────
-  let suggestion = $state<ItemSuggestion | null>(null);
+  let suggestions = $state<ItemSuggestion[]>([]);
   let suggestionSourceId = $state<number | null>(null);
 
   async function onStatusChange(event: Event): Promise<void> {
@@ -86,8 +86,8 @@
     if (wasScheduled) {
       await clearReminder();
     }
-    if (newStatus === "listened" && result?.suggestion) {
-      suggestion = result.suggestion;
+    if (newStatus === "listened" && result?.suggestions.length) {
+      suggestions = result.suggestions;
       suggestionSourceId = item.id;
     }
   }
@@ -794,11 +794,11 @@
 </main>
 
 <SuggestionPickerModal
-  {suggestion}
+  {suggestions}
   sourceItemId={suggestionSourceId}
   onAccepted={() => {}}
   onClosed={() => {
-    suggestion = null;
+    suggestions = [];
     suggestionSourceId = null;
   }}
 />

@@ -224,31 +224,41 @@ async function fetchArtistReleases(mbid: string): Promise<MbArtistRelease[]> {
 }
 
 /**
- * Find another release by the artist whose title neither matches nor is close
- * to anything in `trackedTitles`. Candidates are ranked by release length
+ * Find up to `limit` releases by the artist whose titles neither match nor are
+ * close to anything in `trackedTitles`. Candidates are ranked by release length
  * under `lengthPreference` (albums before EPs before singles by default,
  * reversed for "shorter"), then by year: closest to `sourceYear`, or most
- * recent when null.
+ * recent when null. The picks are distinct records, not editions of one — see
+ * the dedupe below.
  *
- * Returns null when the artist can't be found or has no untracked releases.
- * Network failures and non-2xx MusicBrainz responses THROW so callers can
- * tell "nothing to suggest" apart from "the lookup failed" — swallowing them
- * here made production failures (rate limiting, blocked UAs) invisible.
+ * Returns an empty array when the artist can't be found or has no untracked
+ * releases. Network failures and non-2xx MusicBrainz responses THROW so callers
+ * can tell "nothing to suggest" apart from "the lookup failed" — swallowing
+ * them here made production failures (rate limiting, blocked UAs) invisible.
  */
-export async function findSuggestedRelease(opts: {
+export async function findSuggestedReleases(opts: {
   mbArtistId: string | null;
   artistName: string;
   trackedTitles: Set<string>;
   sourceYear: number | null;
   lengthPreference?: ReleaseLengthPreference;
-}): Promise<SuggestedRelease | null> {
-  const { mbArtistId, artistName, trackedTitles, sourceYear, lengthPreference = "longer" } = opts;
-  const searchLog = { artistName, mbArtistId, sourceYear, lengthPreference };
+  /** How many distinct releases to return. */
+  limit?: number;
+}): Promise<SuggestedRelease[]> {
+  const {
+    mbArtistId,
+    artistName,
+    trackedTitles,
+    sourceYear,
+    lengthPreference = "longer",
+    limit = 1,
+  } = opts;
+  const searchLog = { artistName, mbArtistId, sourceYear, lengthPreference, limit };
 
   const mbid = mbArtistId ?? (await fetchArtistMbid(artistName));
   if (!mbid) {
     console.info("[musicbrainz] No artist match for suggestion lookup", searchLog);
-    return null;
+    return [];
   }
 
   const releases = await fetchArtistReleases(mbid);
@@ -267,7 +277,7 @@ export async function findSuggestedRelease(opts: {
       releaseCount: releases.length,
       trackedCount: trackedTitles.size,
     });
-    return null;
+    return [];
   }
 
   const ranked = candidates.map((r) => {
@@ -303,13 +313,34 @@ export async function findSuggestedRelease(opts: {
       byYear(a, b),
   );
 
-  const picked = ranked[0] ?? null;
+  // MB lists every pressing of a record separately — a reissue, a Japanese
+  // edition and the original are three entries with the same title. Taking the
+  // top `limit` rows straight off the ranking would offer the same album three
+  // times, so a pick is skipped when its release-group, or a title close to it,
+  // is already on the list.
+  const picked: typeof ranked = [];
+  const pickedGroups = new Set<string>();
+  const pickedTitles: string[] = [];
+  for (const candidate of ranked) {
+    if (picked.length >= limit) break;
+    if (
+      candidate.musicbrainzReleaseGroupId &&
+      pickedGroups.has(candidate.musicbrainzReleaseGroupId)
+    )
+      continue;
+    if (titleMatchesAny(candidate.title, pickedTitles)) continue;
+
+    picked.push(candidate);
+    if (candidate.musicbrainzReleaseGroupId) pickedGroups.add(candidate.musicbrainzReleaseGroupId);
+    pickedTitles.push(candidate.title);
+  }
+
   console.info("[musicbrainz] Suggestion lookup result", {
     ...searchLog,
     mbid,
     releaseCount: releases.length,
     candidateCount: candidates.length,
-    picked: picked ? { title: picked.title, year: picked.year, tracks: picked.trackCount } : null,
+    picked: picked.map((p) => ({ title: p.title, year: p.year, tracks: p.trackCount })),
   });
 
   return picked;

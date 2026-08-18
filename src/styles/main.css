@@ -3628,6 +3628,34 @@ a:hover {
   gap: var(--space-5);
 }
 
+/* The prompt has no list-header row, so the shared four-row template would put
+   the list in an `auto` row and hand the flexible one to the buttons. With one
+   suggestion that was invisible; with three it clips the list and leaves the
+   spare space under the buttons. Three rows, list flexible. */
+#suggestion-picker-modal .link-picker__dialog {
+  grid-template-rows: auto minmax(0, 1fr) auto;
+}
+
+/* The list scrolls when three releases won't fit — on a short landscape window
+   — rather than pushing the buttons off the bottom of the dialog. The link
+   picker hides its scrollbar because it draws its own; this list has no such
+   chrome, so it keeps the real one as its scroll affordance. */
+#suggestion-picker-list {
+  scrollbar-width: thin;
+}
+
+#suggestion-picker-list::-webkit-scrollbar {
+  width: 12px;
+}
+
+/* Smaller covers where vertical space is scarce, so all three stay in view. */
+@media (max-width: 520px), (orientation: landscape) and (max-height: 500px) {
+  .suggestion-picker__artwork {
+    width: 56px;
+    height: 56px;
+  }
+}
+
 /* Folder rows */
 .folder-row {
   display: flex;

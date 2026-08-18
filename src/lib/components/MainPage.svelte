@@ -73,7 +73,7 @@
   let items = $state(data.items);
   let childStacks = $state<Array<{ id: number; name: string; item_count: number }>>([]);
 
-  let suggestion = $state<ItemSuggestion | null>(null);
+  let suggestions = $state<ItemSuggestion[]>([]);
   let suggestionSourceId = $state<number | null>(null);
 
   let addFormComponent: AddForm | undefined = $state();
@@ -269,8 +269,8 @@
     const result = await api.updateListenStatus(itemId, status);
     app.send({ type: "LIST_REFRESH" });
 
-    if (status === "listened" && result?.suggestion) {
-      suggestion = result.suggestion;
+    if (status === "listened" && result?.suggestions.length) {
+      suggestions = result.suggestions;
       suggestionSourceId = itemId;
     }
   }
@@ -438,11 +438,11 @@
 />
 
 <SuggestionPickerModal
-  {suggestion}
+  {suggestions}
   sourceItemId={suggestionSourceId}
   onAccepted={() => app.send({ type: "LIST_REFRESH" })}
   onClosed={() => {
-    suggestion = null;
+    suggestions = [];
     suggestionSourceId = null;
   }}
 />

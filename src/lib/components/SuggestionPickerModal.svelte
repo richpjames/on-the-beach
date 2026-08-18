@@ -1,82 +1,48 @@
 <script lang="ts">
   import type { ItemSuggestion } from "../../types";
   import { api } from "../api";
+  import SuggestionArtwork from "./SuggestionArtwork.svelte";
 
   let {
-    suggestion,
+    suggestions,
     sourceItemId,
     onAccepted,
     onClosed,
   }: {
-    suggestion: ItemSuggestion | null;
+    suggestions: ItemSuggestion[];
     sourceItemId: number | null;
     onAccepted: () => void;
     onClosed: () => void;
   } = $props();
 
-  // Cover Art Archive is keyed by both release-group and release MBID, but the
-  // two are nowhere near equally covered: a suggestion is one specific pressing
-  // out of dozens, and most pressings have no scan uploaded, while the
-  // release-group nearly always does. Ask the group first and only fall back to
-  // the exact release — asking the release alone is why these prompts came up
-  // blank most of the time.
-  const artworkCandidates = $derived.by(() => {
-    if (!suggestion) return [];
-    const urls: string[] = [];
-    if (suggestion.musicbrainzReleaseGroupId) {
-      urls.push(
-        `https://coverartarchive.org/release-group/${encodeURIComponent(suggestion.musicbrainzReleaseGroupId)}/front-250`,
-      );
-    }
-    if (suggestion.musicbrainzReleaseId) {
-      urls.push(
-        `https://coverartarchive.org/release/${encodeURIComponent(suggestion.musicbrainzReleaseId)}/front-250`,
-      );
-    }
-    return urls;
-  });
+  const isOpen = $derived(suggestions.length > 0);
 
-  // Index into artworkCandidates; past the end means "give up, show no image".
-  let candidateIndex = $state(0);
-  let retried = false;
-  let retryTimer: ReturnType<typeof setTimeout> | null = null;
-  const artworkUrl = $derived(artworkCandidates[candidateIndex] ?? null);
+  // The suggestion the "Add to list" button will take. Reset whenever the
+  // prompt opens with a different set, so a stale id can't carry over.
+  let selectedId = $state<number | null>(null);
+  const suggestionsKey = $derived(suggestions.map((s) => s.id).join(","));
 
   $effect.pre(() => {
-    void suggestion;
-    if (retryTimer !== null) clearTimeout(retryTimer);
-    retryTimer = null;
-    candidateIndex = 0;
-    retried = false;
+    void suggestionsKey;
+    selectedId = suggestions[0]?.id ?? null;
   });
 
-  // CAA also serves the odd transient 5xx from its archive.org backend, which
-  // reaches an <img> as the same bare `error` event as a genuine 404. One retry
-  // pass over the whole list costs nothing and rescues those.
-  function onArtworkError(): void {
-    if (candidateIndex + 1 < artworkCandidates.length) {
-      candidateIndex += 1;
-      return;
-    }
-    // Dropping the <img> and re-adding it is what forces a fresh request; the
-    // browser won't reload a src it has already failed on.
-    candidateIndex = artworkCandidates.length;
-    if (retried) return;
-    retried = true;
-    retryTimer = setTimeout(() => {
-      retryTimer = null;
-      candidateIndex = 0;
-    }, 800);
-  }
+  const artistNames = $derived([...new Set(suggestions.map((s) => s.artistName))]);
+  const message = $derived.by(() => {
+    if (suggestions.length === 0) return "";
+    const by = artistNames.length === 1 ? `Also by ${artistNames[0]}` : "Also by artists you like";
+    return suggestions.length === 1 ? by : `${by} — pick one`;
+  });
 
   async function accept(): Promise<void> {
-    if (sourceItemId === null) return;
-    // Snapshot the id: destructured $props() reads are live, and onClosed()
-    // nulls the parent state this prop is bound to.
+    if (sourceItemId === null || selectedId === null) return;
+    // Snapshot the ids: destructured $props() reads are live, and onClosed()
+    // nulls the parent state these props are bound to.
     const itemId = sourceItemId;
+    const suggestionId = selectedId;
     onClosed();
     try {
-      await api.acceptSuggestion(itemId);
+      await api.acceptSuggestion(itemId, suggestionId);
     } catch {
       alert("Failed to add release.");
       return;
@@ -87,16 +53,18 @@
   async function dismiss(): Promise<void> {
     if (sourceItemId === null) return;
     const itemId = sourceItemId;
+    // Turning down the prompt turns down every release it offered.
+    const suggestionIds = suggestions.map((s) => s.id);
     onClosed();
     try {
-      await api.dismissSuggestion(itemId);
+      await api.dismissSuggestion(itemId, suggestionIds);
     } catch {
       alert("Failed to dismiss suggestion.");
     }
   }
 
   $effect(() => {
-    if (!suggestion) return;
+    if (!isOpen) return;
     const onEscape = (event: KeyboardEvent): void => {
       if (event.key === "Escape") void dismiss();
     };
@@ -105,7 +73,7 @@
   });
 </script>
 
-<div id="suggestion-picker-modal" class="link-picker" hidden={!suggestion}>
+<div id="suggestion-picker-modal" class="link-picker" hidden={!isOpen}>
   <div
     class="link-picker__backdrop"
     data-suggestion-picker-close="true"
@@ -120,21 +88,20 @@
   >
     <div class="link-picker__header">
       <h2 id="suggestion-picker-title">You might also like</h2>
-      <p id="suggestion-picker-message">
-        {suggestion ? `Also by ${suggestion.artistName}` : ""}
-      </p>
+      <p id="suggestion-picker-message">{message}</p>
     </div>
-    <div id="suggestion-picker-list" class="link-picker__list" style="overflow-y: visible">
-      {#if suggestion}
-        <button type="button" class="link-picker__candidate is-selected" aria-pressed="true">
-          {#if artworkUrl}
-            <img
-              src={artworkUrl}
-              alt={suggestion.title}
-              class="suggestion-picker__artwork"
-              onerror={onArtworkError}
-            />
-          {/if}
+    <div id="suggestion-picker-list" class="link-picker__list">
+      {#each suggestions as suggestion (suggestion.id)}
+        {@const isSelected = suggestion.id === selectedId}
+        <button
+          type="button"
+          class="link-picker__candidate"
+          class:is-selected={isSelected}
+          data-suggestion-id={suggestion.id}
+          aria-pressed={isSelected ? "true" : "false"}
+          onclick={() => (selectedId = suggestion.id)}
+        >
+          <SuggestionArtwork {suggestion} />
           <span class="link-picker__candidate-main">
             <span class="link-picker__candidate-title"
               >{suggestion.title}{suggestion.year ? ` (${suggestion.year})` : ""}</span
@@ -145,13 +112,19 @@
             <span class="badge badge--source">{suggestion.itemType}</span>
           </span>
         </button>
-      {/if}
+      {/each}
     </div>
     <div class="link-picker__actions">
       <button type="button" id="suggestion-picker-dismiss" class="btn btn--ghost" onclick={dismiss}
         >Dismiss</button
       >
-      <button type="button" id="suggestion-picker-accept" class="btn btn--primary" onclick={accept}>
+      <button
+        type="button"
+        id="suggestion-picker-accept"
+        class="btn btn--primary"
+        disabled={selectedId === null}
+        onclick={accept}
+      >
         Add to list
       </button>
     </div>

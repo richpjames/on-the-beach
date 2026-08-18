@@ -30,17 +30,19 @@ test("suggestion modal appears when a release is marked listened on the release 
       contentType: "application/json",
       body: JSON.stringify({
         item: { ...item, listen_status: "listened" },
-        suggestion: {
-          id: 999,
-          sourceItemId: item.id,
-          title: "Tri Repetae",
-          artistName: "Autechre",
-          itemType: "album",
-          year: 1995,
-          musicbrainzReleaseId: null,
-          status: "pending",
-          createdAt: new Date().toISOString(),
-        },
+        suggestions: [
+          {
+            id: 999,
+            sourceItemId: item.id,
+            title: "Tri Repetae",
+            artistName: "Autechre",
+            itemType: "album",
+            year: 1995,
+            musicbrainzReleaseId: null,
+            status: "pending",
+            createdAt: new Date().toISOString(),
+          },
+        ],
       }),
     });
   });
@@ -85,17 +87,19 @@ async function openSuggestionWithIds(
       contentType: "application/json",
       body: JSON.stringify({
         item: { ...item, listen_status: "listened" },
-        suggestion: {
-          id: 999,
-          sourceItemId: item.id,
-          title: "Tri Repetae",
-          artistName: "Autechre",
-          itemType: "album",
-          year: 1995,
-          status: "pending",
-          createdAt: new Date().toISOString(),
-          ...ids,
-        },
+        suggestions: [
+          {
+            id: 999,
+            sourceItemId: item.id,
+            title: "Tri Repetae",
+            artistName: "Autechre",
+            itemType: "album",
+            year: 1995,
+            status: "pending",
+            createdAt: new Date().toISOString(),
+            ...ids,
+          },
+        ],
       }),
     });
   });
@@ -173,6 +177,93 @@ test("suggestion artwork falls back to the release when the group has none", asy
   await expect
     .poll(() => artwork.evaluate((img: HTMLImageElement) => img.naturalWidth > 0))
     .toBe(true);
+});
+
+test("the prompt offers every stored suggestion, and adds the one picked", async ({
+  page,
+  request,
+}) => {
+  const res = await request.post("/api/music-items", {
+    data: { title: "Amber", artistName: "Autechre", listenStatus: "to-listen", year: 1994 },
+  });
+  const item = await res.json();
+
+  // Three prefetched suggestions, standing in for the MusicBrainz lookup.
+  for (const [title, year] of [
+    ["Tri Repetae", 1995],
+    ["Chiastic Slide", 1997],
+    ["Confield", 2001],
+  ] as const) {
+    await request.post("/api/__test__/suggestions", {
+      data: { sourceItemId: item.id, title, artistName: "Autechre", itemType: "album", year },
+    });
+  }
+
+  await page.goto(`/r/${item.id}`);
+  await page.locator("#status-select").selectOption("listened");
+
+  const modal = page.locator("#suggestion-picker-modal");
+  await expect(modal).toBeVisible({ timeout: 5_000 });
+  const candidates = modal.locator(".link-picker__candidate");
+  await expect(candidates).toHaveCount(3);
+
+  // The first is selected by default; picking another moves the selection.
+  await expect(candidates.first()).toHaveAttribute("aria-pressed", "true");
+  await candidates.nth(2).click();
+  await expect(candidates.nth(2)).toHaveAttribute("aria-pressed", "true");
+  await expect(candidates.first()).toHaveAttribute("aria-pressed", "false");
+
+  const acceptResponse = page.waitForResponse(
+    (response) =>
+      response.url().includes(`/api/music-items/${item.id}/suggestion/accept`) &&
+      response.request().method() === "POST",
+    { timeout: 5_000 },
+  );
+  await page.locator("#suggestion-picker-accept").click();
+  expect((await acceptResponse).status()).toBe(201);
+
+  const list = await (await request.get("/api/music-items?listenStatus=to-listen")).json();
+  const items = Array.isArray(list) ? list : list.items;
+  const titles = items.map((entry: { title: string }) => entry.title);
+  expect(titles).toContain("Confield");
+  expect(titles).not.toContain("Tri Repetae");
+});
+
+test("dismissing the prompt turns down every release it offered", async ({ page, request }) => {
+  const res = await request.post("/api/music-items", {
+    data: { title: "Amber", artistName: "Autechre", listenStatus: "to-listen", year: 1994 },
+  });
+  const item = await res.json();
+
+  for (const title of ["Tri Repetae", "Chiastic Slide"]) {
+    await request.post("/api/__test__/suggestions", {
+      data: { sourceItemId: item.id, title, artistName: "Autechre", itemType: "album" },
+    });
+  }
+
+  await page.goto(`/r/${item.id}`);
+  await page.locator("#status-select").selectOption("listened");
+
+  const modal = page.locator("#suggestion-picker-modal");
+  await expect(modal).toBeVisible({ timeout: 5_000 });
+
+  const dismissResponse = page.waitForResponse(
+    (response) =>
+      response.url().includes(`/api/music-items/${item.id}/suggestion/dismiss`) &&
+      response.request().method() === "POST",
+    { timeout: 5_000 },
+  );
+  await page.locator("#suggestion-picker-dismiss").click();
+  expect((await dismissResponse).status()).toBe(200);
+  await expect(modal).toBeHidden();
+
+  // Nothing was added, and marking another item listened must not re-offer the
+  // releases the user just turned down.
+  const list = await (await request.get("/api/music-items?listenStatus=to-listen")).json();
+  const items = Array.isArray(list) ? list : list.items;
+  const titles = items.map((entry: { title: string }) => entry.title);
+  expect(titles).not.toContain("Tri Repetae");
+  expect(titles).not.toContain("Chiastic Slide");
 });
 
 test("accepting a suggestion adds the release to the to-listen list", async ({ page, request }) => {

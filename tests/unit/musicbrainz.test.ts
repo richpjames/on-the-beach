@@ -1,12 +1,21 @@
 import { afterEach, beforeEach, describe, expect, mock, spyOn, test } from "bun:test";
 import {
   lookupRelease,
-  findSuggestedRelease,
+  findSuggestedReleases,
   fetchReleaseGroupIdForRelease,
   fetchArtistReleaseGroups,
   searchArtistCandidates,
   MusicBrainzHttpError,
 } from "../../server/musicbrainz";
+import type { SuggestedRelease } from "../../server/musicbrainz";
+
+/** The single top pick, which is what most of these cases are about. */
+async function findSuggestedRelease(
+  opts: Parameters<typeof findSuggestedReleases>[0],
+): Promise<SuggestedRelease | null> {
+  const [first] = await findSuggestedReleases(opts);
+  return first ?? null;
+}
 
 function makeMbArtistSearchResponse(artists: unknown[]): Response {
   return new Response(JSON.stringify({ artists }), {
@@ -32,7 +41,7 @@ beforeEach(() => {
   mock.restore();
 });
 
-describe("findSuggestedRelease", () => {
+describe("findSuggestedReleases", () => {
   afterEach(() => {
     mock.restore();
   });
@@ -335,6 +344,91 @@ describe("findSuggestedRelease", () => {
 
     expect(result?.musicbrainzReleaseGroupId).toBeNull();
     expect(result?.itemType).toBe("album");
+  });
+
+  test("returns up to `limit` releases, best first", async () => {
+    spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      makeMbArtistReleasesResponse([
+        { id: "r1", title: "Amber", date: "1994" },
+        { id: "r2", title: "Tri Repetae", date: "1995" },
+        { id: "r3", title: "Chiastic Slide", date: "1997" },
+        { id: "r4", title: "Confield", date: "2001" },
+      ]),
+    );
+
+    const results = await findSuggestedReleases({
+      mbArtistId: "artist-uuid",
+      artistName: "Autechre",
+      trackedTitles: new Set(),
+      sourceYear: 1996,
+      limit: 3,
+    });
+
+    expect(results.map((r) => r.title)).toEqual(["Tri Repetae", "Chiastic Slide", "Amber"]);
+  });
+
+  test("returns fewer than `limit` when the artist has fewer untracked releases", async () => {
+    spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      makeMbArtistReleasesResponse([
+        { id: "r1", title: "Amber", date: "1994" },
+        { id: "r2", title: "Tri Repetae", date: "1995" },
+      ]),
+    );
+
+    const results = await findSuggestedReleases({
+      mbArtistId: "artist-uuid",
+      artistName: "Autechre",
+      trackedTitles: new Set(["amber"]),
+      sourceYear: 1996,
+      limit: 3,
+    });
+
+    expect(results.map((r) => r.title)).toEqual(["Tri Repetae"]);
+  });
+
+  test("offers distinct records, not several pressings of one", async () => {
+    // MB lists each pressing separately — same release group, different ids.
+    spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      makeMbArtistReleasesResponse([
+        { id: "r1", title: "Tri Repetae", date: "1995", "release-group": { id: "rg-tri" } },
+        {
+          id: "r2",
+          title: "Tri Repetae (Japanese Edition)",
+          date: "1995",
+          "release-group": { id: "rg-tri" },
+        },
+        { id: "r3", title: "Chiastic Slide", date: "1997", "release-group": { id: "rg-chi" } },
+      ]),
+    );
+
+    const results = await findSuggestedReleases({
+      mbArtistId: "artist-uuid",
+      artistName: "Autechre",
+      trackedTitles: new Set(),
+      sourceYear: 1996,
+      limit: 3,
+    });
+
+    expect(results.map((r) => r.title)).toEqual(["Tri Repetae", "Chiastic Slide"]);
+  });
+
+  test("treats near-identical titles as the same record when there are no group ids", async () => {
+    spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      makeMbArtistReleasesResponse([
+        { id: "r1", title: "Tri Repetae", date: "1995" },
+        { id: "r2", title: "Tri Repetae [2009 Remaster]", date: "2009" },
+      ]),
+    );
+
+    const results = await findSuggestedReleases({
+      mbArtistId: "artist-uuid",
+      artistName: "Autechre",
+      trackedTitles: new Set(),
+      sourceYear: 1996,
+      limit: 3,
+    });
+
+    expect(results.map((r) => r.title)).toEqual(["Tri Repetae"]);
   });
 
   test("throws on fetch error so callers can distinguish failure from no-candidates", async () => {
