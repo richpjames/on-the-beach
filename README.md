@@ -18,7 +18,7 @@ A full-stack music tracker for collecting links and keeping tabs on listening st
 - Ingest music links automatically via HTTP webhook
 - Filter the list by status, stack, or source
 - Full-text search
-- "You may also like" suggestions (via Cover Art Archive) when marking items as listened
+- "You may also like" suggestions — up to three releases to pick from (via Cover Art Archive) when marking items as listened
 
 ## Tech Stack
 

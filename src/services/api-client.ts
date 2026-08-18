@@ -203,26 +203,41 @@ export class ApiClient {
   async updateListenStatus(
     id: number,
     status: ListenStatus,
-  ): Promise<{ item: MusicItemFull; suggestion: ItemSuggestion | null } | null> {
-    return this.requestJsonOrNull<{ item: MusicItemFull; suggestion: ItemSuggestion | null }>(
+  ): Promise<{ item: MusicItemFull; suggestions: ItemSuggestion[] } | null> {
+    const result = await this.requestJsonOrNull<{
+      item: MusicItemFull;
+      suggestion?: ItemSuggestion | null;
+      suggestions?: ItemSuggestion[];
+    }>(
       `/api/music-items/${id}`,
       "updateListenStatus",
-      this.jsonRequest("PATCH", { listenStatus: status }),
+      this.jsonRequest("PATCH", {
+        listenStatus: status,
+      }),
     );
+    if (!result) return null;
+
+    // `suggestions` is what the server sends now; `suggestion` is the single
+    // one older builds returned.
+    const suggestions =
+      result.suggestions ?? (result.suggestion ? [result.suggestion] : ([] as ItemSuggestion[]));
+    return { item: result.item, suggestions };
   }
 
-  async acceptSuggestion(sourceItemId: number): Promise<MusicItemFull> {
+  async acceptSuggestion(sourceItemId: number, suggestionId: number): Promise<MusicItemFull> {
     return this.requestJson<MusicItemFull>(
       `/api/music-items/${sourceItemId}/suggestion/accept`,
       "acceptSuggestion",
-      { method: "POST" },
+      this.jsonRequest("POST", { suggestionId }),
     );
   }
 
-  async dismissSuggestion(sourceItemId: number): Promise<void> {
-    await this.request(`/api/music-items/${sourceItemId}/suggestion/dismiss`, "dismissSuggestion", {
-      method: "POST",
-    });
+  async dismissSuggestion(sourceItemId: number, suggestionIds: number[]): Promise<void> {
+    await this.request(
+      `/api/music-items/${sourceItemId}/suggestion/dismiss`,
+      "dismissSuggestion",
+      this.jsonRequest("POST", { suggestionIds }),
+    );
   }
 
   async saveOrder(contextKey: string, itemIds: number[]): Promise<void> {

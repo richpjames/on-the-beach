@@ -26,7 +26,7 @@ import { hydrateItemStacks } from "../hydrate-item-stacks";
 import { scrapeAddedLink } from "../added-link-scrape";
 import { saveArtwork } from "../secondary-link-enrichment";
 import { UnsupportedMusicLinkError } from "../scraper";
-import { ensureSuggestionForItemNow, findPendingSuggestionForItem } from "../suggestions";
+import { ensureSuggestionsForItemNow, findPendingSuggestionsForItem } from "../suggestions";
 import { scheduleAppleMusicBackfill } from "../apple-music-backfill";
 import type {
   CreateMusicItemInput,
@@ -531,20 +531,22 @@ musicItemRoutes.patch("/:id", async (c) => {
     return c.json({ error: "Not found" }, 404);
   }
 
-  let suggestion = null;
+  let suggestions: Awaited<ReturnType<typeof ensureSuggestionsForItemNow>> = [];
   if (input.listenStatus === "listened") {
     try {
-      // Prefetched suggestion if one is ready, else a bounded on-demand
+      // Prefetched suggestions if any are ready, else a bounded on-demand
       // lookup — covers items marked listened before the background prefetch
       // finished (or whose prefetch failed).
-      suggestion = await ensureSuggestionForItemNow(id);
+      suggestions = await ensureSuggestionsForItemNow(id);
     } catch (err) {
       // Non-critical — suggestion lookup must not block the status update
       console.error("[api] suggestion lookup failed during PATCH", id, err);
     }
   }
 
-  return c.json({ item, suggestion });
+  // `suggestion` is the first of `suggestions`, kept for clients built before
+  // the prompt offered a choice (a bundled native build can lag the server).
+  return c.json({ item, suggestion: suggestions[0] ?? null, suggestions });
 });
 
 // ---------------------------------------------------------------------------
@@ -573,7 +575,14 @@ musicItemRoutes.post("/:id/suggestion/accept", async (c) => {
   const id = Number(c.req.param("id"));
   if (Number.isNaN(id)) return c.json({ error: "Invalid ID" }, 400);
 
-  const suggestion = await findPendingSuggestionForItem(id);
+  // Which of the offered suggestions the user picked. Absent (older clients,
+  // which only ever saw one) means the first.
+  const body = (await c.req.json().catch(() => null)) as { suggestionId?: unknown } | null;
+  const suggestionId = typeof body?.suggestionId === "number" ? body.suggestionId : null;
+
+  const pending = await findPendingSuggestionsForItem(id);
+  const suggestion =
+    suggestionId === null ? pending[0] : pending.find((row) => row.id === suggestionId);
 
   if (!suggestion) return c.json({ error: "No pending suggestion" }, 404);
 
@@ -614,12 +623,30 @@ musicItemRoutes.post("/:id/suggestion/dismiss", async (c) => {
   const id = Number(c.req.param("id"));
   if (Number.isNaN(id)) return c.json({ error: "Invalid ID" }, 400);
 
-  const suggestion = await findPendingSuggestionForItem(id);
-  if (suggestion) {
+  // Dismissing the prompt turns down everything it offered, so the client
+  // sends back the ids it showed. Without a list, only the first is dismissed
+  // — an older client can't have shown more than that.
+  const body = (await c.req.json().catch(() => null)) as { suggestionIds?: unknown } | null;
+  const requestedIds = Array.isArray(body?.suggestionIds)
+    ? body.suggestionIds.filter((value: unknown): value is number => typeof value === "number")
+    : null;
+
+  const pending = await findPendingSuggestionsForItem(id);
+  const toDismiss =
+    requestedIds === null
+      ? pending.slice(0, 1)
+      : pending.filter((row) => requestedIds.includes(row.id));
+
+  if (toDismiss.length > 0) {
     await db
       .update(itemSuggestions)
       .set({ status: "dismissed" })
-      .where(eq(itemSuggestions.id, suggestion.id));
+      .where(
+        inArray(
+          itemSuggestions.id,
+          toDismiss.map((row) => row.id),
+        ),
+      );
   }
 
   return c.json({ success: true });
