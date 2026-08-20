@@ -28,6 +28,37 @@ export type MbidConfidence = "confirmed" | "probable" | "unresolved";
 /** MusicBrainz's Various Artists placeholder — never a real artist to track. */
 export const VARIOUS_ARTISTS_MBID = "89ad4ac3-39f7-470e-963a-56509c546377";
 
+/**
+ * The names a compilation's "artist" goes by. Not a person or a band, so
+ * anything that reasons about an artist's discography — the watch, the
+ * "you might also like" suggestions — has to leave them alone: there is no
+ * such discography to walk.
+ */
+const VARIOUS_ARTISTS_NAMES = new Set([
+  "various",
+  "various artist",
+  "various artists",
+  "va",
+  "v/a",
+  "v.a.",
+  "compilation",
+]);
+
+/**
+ * Is this a compilation placeholder rather than a real artist? Matched on the
+ * MusicBrainz id when we have one, and on the name otherwise — most items get
+ * their artist name from a scrape or the user typing it, long before any MBID
+ * is resolved.
+ */
+export function isVariousArtists(
+  artistName: string | null | undefined,
+  mbid?: string | null,
+): boolean {
+  if (mbid === VARIOUS_ARTISTS_MBID) return true;
+  if (!artistName) return false;
+  return VARIOUS_ARTISTS_NAMES.has(artistName.toLowerCase().trim().replace(/\s+/g, " "));
+}
+
 /** A name-search hit is only accepted at or above this score. */
 const MIN_ACCEPTED_SCORE = 95;
 /** …and only when it beats the runner-up by at least this much. */
