@@ -1,3 +1,14 @@
+<script lang="ts" module>
+  /**
+   * How far the bar was scrolled, kept outside the component instance.
+   *
+   * Picking a stack is a real navigation between routes, so the bar is torn
+   * down and rebuilt; without this the tabs snap back to the left every time
+   * one is clicked, dragging the tab out from under the pointer.
+   */
+  let lastScrollLeft = 0;
+</script>
+
 <script lang="ts">
   import { tick } from "svelte";
   import type { StackWithCount } from "../../types";
@@ -40,18 +51,28 @@
   // alphabetical order along the top row before wrapping onto the second one.
   // Row-wise flow needs an explicit column count: the first column is pinned to
   // "All" (row 1) and the manage cog (row 2), and the remaining tabs — the
-  // stacks plus the delete tab while it is showing — split across both rows.
-  const flowingTabCount = $derived(visibleStacks.length + (selectedStack ? 1 : 0));
+  // stacks plus the delete tab — split across both rows. The delete tab counts
+  // even while it is hidden: letting the count change when a stack is selected
+  // re-wraps every tab and lurches the bar sideways. Its reserved column is
+  // `max-content`, so it takes no width until the tab actually shows.
+  const flowingTabCount = $derived(visibleStacks.length + 1);
   const columnCount = $derived(1 + Math.ceil(flowingTabCount / 2));
 
-  // Keep the active tab visible when the selection changes.
+  // Keep the active tab visible when the selection changes. Only when it
+  // changes: re-running this on every stack refresh would yank the bar back to
+  // the active tab under a user who had scrolled somewhere else.
+  let revealedStack: number | null | undefined = undefined;
   $effect(() => {
-    void currentStack;
+    const stack = currentStack;
     void visibleStacks;
+    if (stack === revealedStack) return;
     tick().then(() => {
       if (!barEl) return;
       const activeBtn = barEl.querySelector(".stack-tab.active");
+      // The tab for a deep-linked stack only exists once the stacks load; keep
+      // trying until it does, then remember we've revealed this selection.
       if (!(activeBtn instanceof HTMLElement)) return;
+      revealedStack = stack;
       const tabLeft = activeBtn.offsetLeft;
       const tabRight = tabLeft + activeBtn.offsetWidth;
       if (tabLeft < barEl.scrollLeft) {
@@ -61,6 +82,32 @@
       }
     });
   });
+
+  // Put the bar back where it was after the navigation that rebuilt it, once
+  // enough tabs have rendered for the offset to survive being set.
+  let restoredScroll = false;
+  $effect(() => {
+    void visibleStacks;
+    if (restoredScroll || !barEl) return;
+    if (lastScrollLeft === 0 || barEl.scrollWidth <= barEl.clientWidth) return;
+    barEl.scrollLeft = lastScrollLeft;
+    restoredScroll = true;
+  });
+
+  function rememberScroll(): void {
+    if (barEl) lastScrollLeft = barEl.scrollLeft;
+  }
+
+  /**
+   * Take focus by hand so the browser doesn't scroll the pressed tab into
+   * view: clicking a half-visible tab (or the cog, pinned to the far left)
+   * would otherwise yank the whole bar sideways mid-click. Keyboard focus
+   * still scrolls, which is how a tabbing user finds the tab they landed on.
+   */
+  function focusWithoutScrolling(event: MouseEvent): void {
+    event.preventDefault();
+    (event.currentTarget as HTMLElement).focus({ preventScroll: true });
+  }
 </script>
 
 <div class="stack-bar-shell">
@@ -69,16 +116,19 @@
     class="stack-bar"
     style="--stack-bar-columns: {columnCount}"
     bind:this={barEl}
+    onscroll={rememberScroll}
   >
     <button
       class="stack-tab{currentStack === null ? ' active' : ''}"
       data-stack="all"
+      onmousedown={focusWithoutScrolling}
       onclick={onSelectAll}>All</button
     >
     {#each visibleStacks as stack (stack.id)}
       <button
         class="stack-tab{currentStack === stack.id ? ' active' : ''}"
         data-stack-id={stack.id}
+        onmousedown={focusWithoutScrolling}
         onclick={() => onSelectStack(stack.id)}>{stack.name}</button
       >
     {/each}
@@ -86,6 +136,7 @@
       class="stack-tab stack-tab--manage"
       id="manage-stacks-btn"
       title="Manage stacks"
+      onmousedown={focusWithoutScrolling}
       onclick={onToggleManage}
     >
       <svg
@@ -109,6 +160,7 @@
       hidden={!selectedStack}
       disabled={!selectedStack}
       aria-label="Delete selected stack"
+      onmousedown={focusWithoutScrolling}
       onclick={() => {
         if (currentStack !== null) void onDeleteStack(currentStack);
       }}
