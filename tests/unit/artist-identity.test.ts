@@ -6,6 +6,7 @@ import { artists, musicItems } from "../../server/db/schema";
 import { normalize } from "../../server/utils";
 import {
   backfillArtistMbidsFromItems,
+  isVariousArtists,
   mbidFromItems,
   pickArtistFromSearch,
   resolveArtistMbid,
@@ -277,5 +278,35 @@ describe("setArtistMbid", () => {
     expect(row?.mbidConfidence).toBe("confirmed");
     expect(row?.pollFailureCount).toBe(0);
     expect(row!.nextPollAt!.getTime()).toBeLessThanOrEqual(Date.now() + 1000);
+  });
+});
+
+describe("isVariousArtists", () => {
+  test("recognises the names a compilation credit goes by", () => {
+    for (const name of [
+      "Various Artists",
+      "various artists",
+      "  Various   Artists  ",
+      "Various Artist",
+      "Various",
+      "VA",
+      "V/A",
+      "V.A.",
+      "Compilation",
+    ]) {
+      expect(isVariousArtists(name)).toBe(true);
+    }
+  });
+
+  test("recognises the MusicBrainz placeholder whatever the name says", () => {
+    expect(isVariousArtists("Diverse Interpreten", VARIOUS_ARTISTS_MBID)).toBe(true);
+  });
+
+  test("leaves real artists alone", () => {
+    for (const name of ["Autechre", "Various Production", "Va Va Voom", "The Compilations"]) {
+      expect(isVariousArtists(name)).toBe(false);
+    }
+    expect(isVariousArtists(null)).toBe(false);
+    expect(isVariousArtists("Autechre", "some-other-mbid")).toBe(false);
   });
 });

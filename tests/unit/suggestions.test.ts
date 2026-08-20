@@ -3,6 +3,7 @@ import { eq } from "drizzle-orm";
 import * as musicbrainz from "../../server/musicbrainz";
 import { db } from "../../server/db/index";
 import { artists, itemSuggestions, musicItems } from "../../server/db/schema";
+import { VARIOUS_ARTISTS_MBID } from "../../server/artist-identity";
 import { normalize } from "../../server/utils";
 import {
   backfillSuggestionReleaseGroups,
@@ -107,6 +108,33 @@ describe("fetchAndStoreSuggestion", () => {
     });
 
     expect(outcome).toBe("skipped");
+    expect(mbSpy).not.toHaveBeenCalled();
+  });
+
+  test("skips compilations, by name and by MusicBrainz id", async () => {
+    const mbSpy = spyOn(musicbrainz, "findSuggestedReleases");
+
+    for (const artistName of ["Various Artists", "various artists", "VA", "V/A", "Various"]) {
+      expect(
+        await fetchAndStoreSuggestion({
+          id: 1,
+          artist_name: artistName,
+          year: null,
+          musicbrainz_artist_id: null,
+        }),
+      ).toBe("skipped");
+    }
+
+    // A compilation credited to something else entirely, caught by its MBID.
+    expect(
+      await fetchAndStoreSuggestion({
+        id: 1,
+        artist_name: "Diverse Interpreten",
+        year: null,
+        musicbrainz_artist_id: VARIOUS_ARTISTS_MBID,
+      }),
+    ).toBe("skipped");
+
     expect(mbSpy).not.toHaveBeenCalled();
   });
 
@@ -511,6 +539,18 @@ describe("ensureSuggestionsForItemNow", () => {
     expect(later?.title).toBe("Tri Repetae");
   });
 
+  test("never looks up or surfaces suggestions for a compilation", async () => {
+    const mbSpy = spyOn(musicbrainz, "findSuggestedReleases").mockResolvedValue([testSuggestion]);
+    const { itemId } = await createArtistWithItem("Various Artists", "Now That's What I Call 42");
+    // …even if a row was stored back when compilations were looked up.
+    await seedSuggestion(itemId, "Various Artists", { releaseId: "legacy-release" });
+
+    const found = await ensureSuggestionsForItemNow(itemId);
+
+    expect(found).toEqual([]);
+    expect(mbSpy).not.toHaveBeenCalled();
+  });
+
   test("does not perform a live lookup under OTB_DISABLE_EXTERNAL_LOOKUPS", async () => {
     process.env.OTB_DISABLE_EXTERNAL_LOOKUPS = "1";
     const mbSpy = spyOn(musicbrainz, "findSuggestedReleases");
@@ -593,6 +633,16 @@ describe("ensureSuggestionsForToListenArtists", () => {
 
     const calls = mbSpy.mock.calls.filter((c) => c[0].artistName === flakyName).length;
     expect(calls).toBe(2);
+  });
+
+  test("skips compilations", async () => {
+    const mbSpy = spyOn(musicbrainz, "findSuggestedReleases").mockResolvedValue([testSuggestion]);
+    await createArtistWithItem("Various Artists", `Sweep Compilation ${Date.now()}`);
+
+    await ensureSuggestionsForToListenArtists();
+
+    const call = mbSpy.mock.calls.find((c) => c[0].artistName === "Various Artists");
+    expect(call).toBeUndefined();
   });
 
   test("no-ops under OTB_DISABLE_EXTERNAL_LOOKUPS", async () => {

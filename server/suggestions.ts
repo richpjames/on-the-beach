@@ -1,4 +1,5 @@
 import { and, desc, eq, isNotNull, isNull } from "drizzle-orm";
+import { isVariousArtists } from "./artist-identity";
 import { db } from "./db/index";
 import { musicItems, artists, itemSuggestions } from "./db/schema";
 import { fetchReleaseGroupIdForRelease, findSuggestedReleases } from "./musicbrainz";
@@ -98,6 +99,8 @@ export async function findPendingSuggestionsForItem(
   const combined: StoredSuggestion[] = [];
   for (const row of [...own, ...forArtist]) {
     if (seen.has(row.id)) continue;
+    // Rows stored before compilations were excluded from the lookup.
+    if (isVariousArtists(row.artistName)) continue;
     seen.add(row.id);
     combined.push(row);
   }
@@ -114,7 +117,8 @@ export type SuggestionFetchOutcome =
   // The lookup failed (network, rate limit, blocked UA); retried on the
   // next sweep or creation — transient failures must not back off for 24h.
   | "error"
-  // No artist name, or the artist is inside its no-candidates backoff window.
+  // No artist name, a compilation rather than a real artist, or the artist is
+  // inside its no-candidates backoff window.
   | "skipped";
 
 // Artists whose last lookup found nothing suggestible — don't hammer
@@ -138,6 +142,9 @@ const inFlightByArtist = new Map<string, Promise<SuggestionFetchOutcome>>();
 export async function fetchAndStoreSuggestion(item: ItemSummary): Promise<SuggestionFetchOutcome> {
   const artistName = item.artist_name;
   if (!artistName) return "skipped";
+  // "Various Artists" is a placeholder, not an artist: its "discography" is
+  // every compilation ever pressed, so suggesting from it is noise.
+  if (isVariousArtists(artistName, item.musicbrainz_artist_id)) return "skipped";
 
   const artistKey = normalize(artistName);
   const inFlight = inFlightByArtist.get(artistKey);
@@ -281,6 +288,7 @@ export async function ensureSuggestionsForItemNow(
     .where(eq(musicItems.id, itemId))
     .get();
   if (!itemRow?.artistName) return [];
+  if (isVariousArtists(itemRow.artistName, itemRow.mbArtistId)) return [];
 
   console.info("[suggestions] no prefetched suggestion — looking up on demand", {
     itemId,
@@ -409,6 +417,7 @@ export async function ensureSuggestionsForToListenArtists(): Promise<void> {
   // Most recent to-listen item per artist represents that artist in the lookup.
   const perArtist = new Map<string, (typeof candidates)[number]>();
   for (const candidate of candidates) {
+    if (isVariousArtists(candidate.artistName, candidate.mbArtistId)) continue;
     const key = normalize(candidate.artistName);
     if (!perArtist.has(key)) perArtist.set(key, candidate);
   }
