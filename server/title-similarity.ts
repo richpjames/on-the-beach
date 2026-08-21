@@ -38,7 +38,13 @@ export function normalizeTitleForMatch(title: string): string {
     .trim();
 }
 
-function levenshtein(a: string, b: string): number {
+/**
+ * Edit distance between two strings. Exported so the release resolver can
+ * build a 0–1 similarity ratio from it rather than carry a second copy; the
+ * two modules want different answers from the same measurement, so the
+ * comparison rules stay separate but the arithmetic is shared.
+ */
+export function editDistance(a: string, b: string): number {
   if (a === b) return 0;
   if (a.length === 0) return b.length;
   if (b.length === 0) return a.length;
@@ -75,7 +81,7 @@ export function titlesMatchClosely(a: string, b: string): boolean {
   const threshold = Math.max(1, Math.floor(longer.length * 0.2));
   // Levenshtein is O(len²); titles this different can't be within threshold.
   if (longer.length - shorter.length > threshold) return false;
-  return levenshtein(na, nb) <= threshold;
+  return editDistance(na, nb) <= threshold;
 }
 
 /** Whether `title` matches, or is close to, any title in `existing`. */
