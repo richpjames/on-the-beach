@@ -5,6 +5,8 @@ import {
   fetchReleaseGroupIdForRelease,
   fetchArtistReleaseGroups,
   searchArtistCandidates,
+  searchReleaseCandidates,
+  escapeLucene,
   MusicBrainzHttpError,
 } from "../../server/musicbrainz";
 
@@ -706,5 +708,149 @@ describe("searchArtistCandidates", () => {
     const candidates = await searchArtistCandidates("Whoever");
 
     expect(candidates.map((candidate) => candidate.id)).toEqual(["ok"]);
+  });
+});
+
+describe("escapeLucene", () => {
+  test("escapes reserved characters that would otherwise change the query", () => {
+    // "Curtis/Live!" and "Cabra (Seiji Re-Rinse)" are both real fixture titles;
+    // unescaped, the slash opens a regex and the parens open a group.
+    expect(escapeLucene("Curtis/Live!")).toBe("Curtis\\/Live\\!");
+    expect(escapeLucene("Cabra (Seiji Re-Rinse)")).toBe("Cabra \\(Seiji Re\\-Rinse\\)");
+  });
+
+  test("leaves ordinary text alone", () => {
+    expect(escapeLucene("Land Of Hunger")).toBe("Land Of Hunger");
+  });
+});
+
+describe("searchReleaseCandidates", () => {
+  afterEach(() => {
+    mock.restore();
+  });
+
+  /**
+   * The `query` param as MusicBrainz receives it. URLSearchParams encodes
+   * spaces as "+", which decodeURIComponent does not undo — asserting on the
+   * raw string silently compares against "artist:Pipo's+4".
+   */
+  function queryOf(call: unknown): string {
+    return new URL(String(call)).searchParams.get("query") ?? "";
+  }
+
+  function makeSearchResponse(releases: unknown[]): Response {
+    return new Response(JSON.stringify({ releases }), {
+      headers: { "content-type": "application/json" },
+    });
+  }
+
+  const CANDIDATE = {
+    id: "release-uuid",
+    title: "Un río de sangre",
+    score: 100,
+    date: "1978",
+    country: "ES",
+    "artist-credit": [{ name: "Violeta Parra", artist: { id: "artist-uuid" } }],
+    "release-group": { id: "group-uuid" },
+    "label-info": [{ label: { name: "Movieplay" }, "catalog-number": "17.1282" }],
+  };
+
+  test("quotes phrases by default", async () => {
+    const fetchSpy = spyOn(globalThis, "fetch").mockResolvedValueOnce(makeSearchResponse([]));
+
+    await searchReleaseCandidates({ artist: "Violeta Parra", title: "Un Rio de Sangre" });
+
+    const query = queryOf(fetchSpy.mock.calls[0]?.[0]);
+    expect(query).toContain('artist:"Violeta Parra"');
+    expect(query).toContain('release:"Un Rio de Sangre"');
+  });
+
+  test("omits the quotes when asked, for the loose pass of a cascade", async () => {
+    const fetchSpy = spyOn(globalThis, "fetch").mockResolvedValueOnce(makeSearchResponse([]));
+
+    await searchReleaseCandidates({ artist: "Pipo's 4", title: "O Encontro", quoted: false });
+
+    const query = queryOf(fetchSpy.mock.calls[0]?.[0]);
+    expect(query).toContain("artist:Pipo's 4");
+    expect(query).not.toContain('artist:"');
+  });
+
+  test("escapes reserved characters inside a quoted phrase", async () => {
+    const fetchSpy = spyOn(globalThis, "fetch").mockResolvedValueOnce(makeSearchResponse([]));
+
+    await searchReleaseCandidates({ artist: "Curtis Mayfield", title: "Curtis/Live!" });
+
+    const query = queryOf(fetchSpy.mock.calls[0]?.[0]);
+    expect(query).toContain('release:"Curtis\\/Live\\!"');
+  });
+
+  test("adds a date term only when a year is given", async () => {
+    const fetchSpy = spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(makeSearchResponse([]))
+      .mockResolvedValueOnce(makeSearchResponse([]));
+
+    await searchReleaseCandidates({ artist: "a", title: "b" });
+    expect(queryOf(fetchSpy.mock.calls[0]?.[0])).not.toContain("date:");
+
+    await searchReleaseCandidates({ artist: "a", title: "b", year: 1978 });
+    expect(queryOf(fetchSpy.mock.calls[1]?.[0])).toContain("AND date:1978");
+  });
+
+  test("requests five candidates, not one", async () => {
+    const fetchSpy = spyOn(globalThis, "fetch").mockResolvedValueOnce(makeSearchResponse([]));
+
+    await searchReleaseCandidates({ artist: "a", title: "b" });
+
+    // Taking the top hit on faith is how the old lookup returned J Balvin for
+    // "Mi Raza"; verification needs alternatives to choose between.
+    expect(String(fetchSpy.mock.calls[0]?.[0])).toContain("limit=5");
+  });
+
+  test("extracts the release-group, artist id and label info", async () => {
+    spyOn(globalThis, "fetch").mockResolvedValueOnce(makeSearchResponse([CANDIDATE]));
+
+    const [candidate] = await searchReleaseCandidates({ artist: "Violeta Parra", title: "x" });
+
+    expect(candidate?.releaseGroupId).toBe("group-uuid");
+    expect(candidate?.artistId).toBe("artist-uuid");
+    expect(candidate?.artistCredit).toBe("Violeta Parra");
+    expect(candidate?.label).toBe("Movieplay");
+    expect(candidate?.catalogueNumber).toBe("17.1282");
+    expect(candidate?.score).toBe(100);
+  });
+
+  test("joins a multi-artist credit with its join phrases", async () => {
+    spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      makeSearchResponse([
+        {
+          id: "r",
+          title: "Two Giants Clash",
+          "artist-credit": [{ name: "Yellowman", joinphrase: " & " }, { name: "Josey Wales" }],
+        },
+      ]),
+    );
+
+    const [candidate] = await searchReleaseCandidates({ artist: "Yellowman", title: "x" });
+
+    expect(candidate?.artistCredit).toBe("Yellowman & Josey Wales");
+  });
+
+  test("throws on a non-2xx so throttling is not mistaken for absence", async () => {
+    spyOn(globalThis, "fetch").mockResolvedValueOnce(new Response("", { status: 503 }));
+
+    await expect(searchReleaseCandidates({ artist: "a", title: "b" })).rejects.toBeInstanceOf(
+      MusicBrainzHttpError,
+    );
+  });
+
+  test("skips malformed entries rather than failing the search", async () => {
+    spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      makeSearchResponse([null, { title: "no id" }, CANDIDATE]),
+    );
+
+    const candidates = await searchReleaseCandidates({ artist: "a", title: "b" });
+
+    expect(candidates).toHaveLength(1);
+    expect(candidates[0]?.id).toBe("release-uuid");
   });
 });

@@ -558,3 +558,163 @@ export async function lookupRelease(
     return null;
   }
 }
+
+// ---------------------------------------------------------------------------
+// Release search (identifier resolution)
+//
+// `lookupRelease` above answers "give me the fields for this record" and takes
+// MusicBrainz's top hit on faith. This answers "which records might this be?"
+// and leaves the judgement to the caller, because the provider's ranking cannot
+// be trusted — see the note on `score` below.
+// ---------------------------------------------------------------------------
+
+/** A candidate from a release search. Callers MUST verify before accepting. */
+export interface MbReleaseCandidate {
+  id: string;
+  title: string;
+  /** The joined artist credit, e.g. "Yellowman & Josey Wales". */
+  artistCredit: string;
+  /**
+   * The work-level identity, and what resolution should be scored on. A
+   * specific pressing is not the answer: MusicBrainz files regional retitlings
+   * under the original work, so "Un río de sangre" and "Canciones
+   * reencontradas en París" are one release-group and comparing release ids
+   * would call a correct answer a miss.
+   */
+  releaseGroupId: string | null;
+  artistId: string | null;
+  /** Verbatim: "1974", "1974-05" and "1974-05-01" are all possible. */
+  date: string | null;
+  country: string | null;
+  label: string | null;
+  catalogueNumber: string | null;
+  /**
+   * MusicBrainz's own relevance score, 0–100.
+   *
+   * NOT a confidence signal. It measures how well the document matched the
+   * query, not whether the query described a real record — every false positive
+   * observed while resolving the eval fixtures scored 100, including J Balvin's
+   * "Mi gente" for "Kamac Pacha Inti — Mi Raza" and John Powell's "Face/Off"
+   * for "Baden Powell — Face au Public". Use it to order candidates, never to
+   * accept one.
+   */
+  score: number;
+}
+
+// Lucene reserves these; unescaped, a stray bracket or colon in a record title
+// turns a search into a syntax error or, worse, a silently different query.
+const LUCENE_SPECIAL = /([+\-!(){}[\]^"~*?:\\/]|&&|\|\|)/g;
+
+export function escapeLucene(value: string): string {
+  return value.replace(LUCENE_SPECIAL, "\\$&");
+}
+
+export interface MbReleaseSearchQuery {
+  artist: string;
+  title: string;
+  year?: number | null;
+  /**
+   * Quoted (default) searches the phrase; unquoted lets Lucene tokenise.
+   *
+   * The two fail in OPPOSITE directions and a resolver needs both in a
+   * cascade. Quoted misses records catalogued under a variant spelling and
+   * returns nothing — a visible failure. Unquoted ORs the loose terms together
+   * until something matches, which is how `artist:Kamac Pacha Inti AND
+   * release:Mi Raza` returned J Balvin. Its recall is real but every hit needs
+   * verifying.
+   */
+  quoted?: boolean;
+  limit?: number;
+}
+
+function buildReleaseQuery({ artist, title, year, quoted = true }: MbReleaseSearchQuery): string {
+  const artistTerm = quoted ? `"${escapeLucene(artist)}"` : escapeLucene(artist);
+  const titleTerm = quoted ? `"${escapeLucene(title)}"` : escapeLucene(title);
+  const parts = [`artist:${artistTerm}`, `AND release:${titleTerm}`];
+  if (year) parts.push(`AND date:${year}`);
+  return parts.join(" ");
+}
+
+interface MbSearchRelease {
+  id?: unknown;
+  title?: unknown;
+  date?: unknown;
+  country?: unknown;
+  score?: unknown;
+  "artist-credit"?: unknown;
+  "release-group"?: unknown;
+  "label-info"?: unknown;
+}
+
+function parseArtistCredit(credit: unknown): { name: string; id: string | null } {
+  if (!Array.isArray(credit)) return { name: "", id: null };
+  const names: string[] = [];
+  let id: string | null = null;
+  for (const entry of credit) {
+    const part = entry as { name?: unknown; joinphrase?: unknown; artist?: { id?: unknown } };
+    if (typeof part.name === "string") names.push(part.name);
+    if (typeof part.joinphrase === "string" && part.joinphrase) names.push(part.joinphrase);
+    if (id === null && typeof part.artist?.id === "string") id = part.artist.id;
+  }
+  return { name: names.join("").trim(), id };
+}
+
+function parseSearchCandidate(raw: unknown): MbReleaseCandidate | null {
+  if (!raw || typeof raw !== "object") return null;
+  const release = raw as MbSearchRelease;
+  if (typeof release.id !== "string") return null;
+
+  const { name, id: artistId } = parseArtistCredit(release["artist-credit"]);
+  const group = release["release-group"] as { id?: unknown } | undefined;
+  const { label, catalogueNumber } = parseLabelInfo(release["label-info"]);
+
+  return {
+    id: release.id,
+    title: typeof release.title === "string" ? release.title : "",
+    artistCredit: name,
+    releaseGroupId: typeof group?.id === "string" ? group.id : null,
+    artistId,
+    date: typeof release.date === "string" ? release.date : null,
+    country: typeof release.country === "string" ? release.country : null,
+    label,
+    catalogueNumber,
+    score: typeof release.score === "number" ? release.score : 0,
+  };
+}
+
+/**
+ * Search releases, returning ranked candidates for the caller to verify.
+ *
+ * Release search documents already embed their `release-group`, so no `inc` is
+ * needed — and none is possible, search takes a fixed document shape.
+ *
+ * Throws `MusicBrainzHttpError` on a non-2xx response and the underlying error
+ * on a network failure, matching `fetchArtistReleaseGroups`. Callers have to
+ * tell "no such record" apart from "the lookup failed": treating a 503 as an
+ * empty result is how three fixtures were recorded as absent from MusicBrainz
+ * when the requests had merely been throttled.
+ */
+export async function searchReleaseCandidates(
+  query: MbReleaseSearchQuery,
+): Promise<MbReleaseCandidate[]> {
+  const params = new URLSearchParams({
+    query: buildReleaseQuery(query),
+    limit: String(query.limit ?? 5),
+    fmt: "json",
+  });
+  const response = await mbFetch(`${MB_API_BASE}/release?${params}`);
+
+  if (!response.ok) {
+    throw new MusicBrainzHttpError(
+      response.status,
+      `MusicBrainz release search returned ${response.status} for "${query.artist} — ${query.title}"`,
+    );
+  }
+
+  const data = (await response.json()) as { releases?: unknown[] };
+  const raw = Array.isArray(data.releases) ? data.releases : [];
+  return raw.flatMap((entry) => {
+    const parsed = parseSearchCandidate(entry);
+    return parsed ? [parsed] : [];
+  });
+}
