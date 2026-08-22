@@ -62,3 +62,4 @@ ios/
 native/ShareExtension/Secrets.xcconfig
 *.ipa
 Pods/
+eval/resolution/results/search-cache.json

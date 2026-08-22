@@ -16,6 +16,7 @@
     "test:visual": "bunx playwright test --project=visual-desktop --project=visual-mobile --workers=1",
     "test:visual:update": "bunx playwright test --project=visual-desktop --project=visual-mobile --workers=1 --update-snapshots=all",
     "test:visual:update-baselines": "bash scripts/update-visual-baselines.sh",
+    "eval:resolution": "bun run eval/resolution/run.ts",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:studio": "drizzle-kit studio",
