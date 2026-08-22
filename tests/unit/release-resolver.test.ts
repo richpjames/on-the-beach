@@ -312,3 +312,34 @@ describe("recoverMusicBrainzArtistId", () => {
     expect(await recoverMusicBrainzArtistId("Pacho Alonso")).toBe("right-mbid");
   });
 });
+
+describe("containment is anchored", () => {
+  test("refuses a title that merely appears inside a longer one", () => {
+    // "Vibes of Barry Brown" sits mid-string inside "More Vibes of Barry Brown
+    // Along With Stama Rank", which is a different record. Unanchored
+    // containment matched them and cost a false id on the fixture set.
+    const score = scoreCandidate(
+      { artist: "Barry Brown", title: "Vibes of Barry Brown" },
+      { artist: "Barry Brown", title: "More Vibes Of Barry Brown Along With Stama Rank" },
+    );
+    expect(score.accepted).toBe(false);
+  });
+
+  test("accepts a suffix match, which is how the two databases' titles differ", () => {
+    // Discogs files "Compact Jazz: Astrud Gilberto" as the self-titled
+    // "Astrud Gilberto". Dropping the suffix rule cost this fixture its hit.
+    const score = scoreCandidate(
+      { artist: "Astrud Gilberto", title: "Compact Jazz: Astrud Gilberto" },
+      { artist: "Astrud Gilberto", title: "Astrud Gilberto" },
+    );
+    expect(score.accepted).toBe(true);
+  });
+
+  test("still accepts a missing subtitle, which is a prefix", () => {
+    const score = scoreCandidate(
+      { artist: "Astrud Gilberto", title: "Compact Jazz" },
+      { artist: "Astrud Gilberto", title: "Compact Jazz: Astrud Gilberto" },
+    );
+    expect(score.accepted).toBe(true);
+  });
+});

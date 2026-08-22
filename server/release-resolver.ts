@@ -122,12 +122,20 @@ export function similarity(a: string, b: string, allowContainment = true): numbe
   if (na === nb) return 1;
 
   const [shorter, longer] = na.length <= nb.length ? [na, nb] : [nb, na];
+  // Anchored containment only — a prefix or a suffix, never the middle.
+  //
+  // Both anchors earn their place on the fixture set. Prefix covers a dropped
+  // subtitle. Suffix covers the two databases naming one record differently:
+  // Discogs files "Compact Jazz: Astrud Gilberto" as the self-titled "Astrud
+  // Gilberto", and only the suffix rule bridges them.
+  //
+  // Mid-string containment covers nothing and costs: "Vibes of Barry Brown"
+  // sits in the middle of "More Vibes of Barry Brown Along With Stama Rank",
+  // which is a different record, and matching them was a false id.
   const raw =
     allowContainment &&
     shorter.length >= MIN_CONTAINMENT_LENGTH &&
-    (longer.startsWith(`${shorter} `) ||
-      longer.endsWith(` ${shorter}`) ||
-      longer.includes(` ${shorter} `))
+    (longer.startsWith(`${shorter} `) || longer.endsWith(` ${shorter}`))
       ? CONTAINMENT_SIMILARITY
       : 1 - editDistance(na, nb) / longer.length;
 
@@ -172,15 +180,30 @@ export interface CandidateScore {
   accepted: boolean;
 }
 
+export interface MatchThresholds {
+  /**
+   * Neither field may be weak on its own. A right artist with a wrong title is
+   * a different record by the same act; a right title with a wrong artist is
+   * one of the hundreds of unrelated records sharing a common title.
+   */
+  artist: number;
+  title: number;
+  /** …and their mean must clear this, so two barely-passing halves still fail. */
+  confidence: number;
+}
+
 /**
- * Neither field may be weak on its own. A right artist with a wrong title is a
- * different record by the same act; a right title with a wrong artist is one
- * of the hundreds of unrelated records sharing a common title.
+ * Argued for, not yet measured. These are the numbers the resolution eval
+ * exists to set: raising them trades resolution rate for a lower false-ID
+ * rate, and the two are not equally costly — a wrong id is written into
+ * music_items and silently poisons artwork and release alerts downstream,
+ * while a miss leaves a row that can be retried.
  */
-const MIN_ARTIST_SIMILARITY = 0.72;
-const MIN_TITLE_SIMILARITY = 0.72;
-/** …and their mean must clear this, so two barely-passing halves still fail. */
-const MIN_CONFIDENCE = 0.82;
+export const DEFAULT_THRESHOLDS: MatchThresholds = {
+  artist: 0.72,
+  title: 0.72,
+  confidence: 0.82,
+};
 
 /**
  * Score one candidate against what was asked for.
@@ -196,6 +219,7 @@ const MIN_CONFIDENCE = 0.82;
 export function scoreCandidate(
   query: ReleaseQuery,
   candidate: { artist: string; title: string },
+  thresholds: MatchThresholds = DEFAULT_THRESHOLDS,
 ): CandidateScore {
   const artist = artistSimilarity(query.artist, candidate.artist);
   const title = similarity(query.title, candidate.title);
@@ -205,9 +229,9 @@ export function scoreCandidate(
     title,
     confidence,
     accepted:
-      artist >= MIN_ARTIST_SIMILARITY &&
-      title >= MIN_TITLE_SIMILARITY &&
-      confidence >= MIN_CONFIDENCE,
+      artist >= thresholds.artist &&
+      title >= thresholds.title &&
+      confidence >= thresholds.confidence,
   };
 }
 
@@ -219,9 +243,10 @@ export function scoreCandidate(
 export function pickBest<T extends { artist: string; title: string; year?: number | null }>(
   query: ReleaseQuery,
   candidates: T[],
+  thresholds: MatchThresholds = DEFAULT_THRESHOLDS,
 ): { candidate: T; score: CandidateScore } | null {
   const accepted = candidates
-    .map((candidate) => ({ candidate, score: scoreCandidate(query, candidate) }))
+    .map((candidate) => ({ candidate, score: scoreCandidate(query, candidate, thresholds) }))
     .filter((entry) => entry.score.accepted);
   if (accepted.length === 0) return null;
 
@@ -273,10 +298,15 @@ export interface ResolutionOutcome {
   errors: Array<{ provider: "musicbrainz" | "discogs"; message: string }>;
 }
 
-type ProviderResult<T> =
+export type ProviderResult<T> =
   | { kind: "found"; value: T; confidence: number }
   | { kind: "absent" }
-  | { kind: "failed"; message: string };
+  | { kind: "failed"; message: string }
+  // Distinct from "absent": a database that was never asked has said nothing
+  // about whether it holds the record. Only the eval's single-provider
+  // strategies produce this, but conflating it with absence would credit a
+  // Discogs-only run with correctly abstaining on MusicBrainz.
+  | { kind: "skipped" };
 
 /** Wraps a provider candidate in the shape `pickBest` compares on. */
 interface Scorable<T> {
@@ -313,6 +343,7 @@ async function runCascade<Query, Candidate>(
   variants: Query[],
   search: (variant: Query) => Promise<Candidate[]>,
   toScorable: (candidate: Candidate) => Scorable<Candidate>,
+  thresholds: MatchThresholds,
 ): Promise<ProviderResult<Candidate>> {
   for (const variant of variants) {
     let candidates: Candidate[];
@@ -322,7 +353,7 @@ async function runCascade<Query, Candidate>(
       return { kind: "failed", message: messageOf(error) };
     }
 
-    const best = pickBest(query, candidates.map(toScorable));
+    const best = pickBest(query, candidates.map(toScorable), thresholds);
     if (best) {
       return { kind: "found", value: best.candidate.value, confidence: best.score.confidence };
     }
@@ -330,7 +361,7 @@ async function runCascade<Query, Candidate>(
   return { kind: "absent" };
 }
 
-function discogsVariants(query: ReleaseQuery): DiscogsSearchQuery[] {
+function discogsVariants(query: ReleaseQuery, maxVariants: number): DiscogsSearchQuery[] {
   const stripped = stripCreditClause(query.artist);
   const variants: DiscogsSearchQuery[] = [{ artist: query.artist, releaseTitle: query.title }];
   if (stripped && stripped !== query.artist) {
@@ -339,10 +370,10 @@ function discogsVariants(query: ReleaseQuery): DiscogsSearchQuery[] {
   // Free text last: it is the loosest and so the likeliest to return something
   // plausible and wrong, which only local verification then has to reject.
   variants.push({ q: `${query.artist} ${query.title}` });
-  return variants;
+  return variants.slice(0, maxVariants);
 }
 
-function musicbrainzVariants(query: ReleaseQuery): MbReleaseSearchQuery[] {
+function musicbrainzVariants(query: ReleaseQuery, maxVariants: number): MbReleaseSearchQuery[] {
   const stripped = stripCreditClause(query.artist);
   const variants: MbReleaseSearchQuery[] = [
     { artist: query.artist, title: query.title, quoted: true },
@@ -351,33 +382,79 @@ function musicbrainzVariants(query: ReleaseQuery): MbReleaseSearchQuery[] {
     variants.push({ artist: stripped, title: query.title, quoted: true });
   }
   variants.push({ artist: query.artist, title: query.title, quoted: false });
-  return variants;
+  return variants.slice(0, maxVariants);
+}
+
+export interface ResolverOptions {
+  /** Query MusicBrainz. Default true. */
+  musicbrainz?: boolean;
+  /** Query Discogs. Default true. */
+  discogs?: boolean;
+  /**
+   * Cap the query cascade. 1 keeps only the strictest variant — the structured
+   * artist/title search — and so measures precision without the recall the
+   * looser variants buy.
+   */
+  maxVariants?: number;
+  thresholds?: MatchThresholds;
+  /** Candidates requested per query. Five is enough that the right record is
+   * present when it exists at all; taking one on faith is what produced every
+   * false id in the fixture set. */
+  candidateLimit?: number;
+  /** Recover a MusicBrainz artist id from a Discogs-only hit. Default true. */
+  recoverArtist?: boolean;
+}
+
+interface ResolvedOptions {
+  musicbrainz: boolean;
+  discogs: boolean;
+  maxVariants: number;
+  thresholds: MatchThresholds;
+  candidateLimit: number;
+  recoverArtist: boolean;
+}
+
+function withDefaults(options: ResolverOptions = {}): ResolvedOptions {
+  return {
+    musicbrainz: options.musicbrainz ?? true,
+    discogs: options.discogs ?? true,
+    maxVariants: options.maxVariants ?? Number.MAX_SAFE_INTEGER,
+    thresholds: options.thresholds ?? DEFAULT_THRESHOLDS,
+    candidateLimit: options.candidateLimit ?? 5,
+    recoverArtist: options.recoverArtist ?? true,
+  };
 }
 
 export function resolveDiscogs(
   query: ReleaseQuery,
+  options: ResolverOptions = {},
 ): Promise<ProviderResult<DiscogsReleaseCandidate>> {
+  const resolved = withDefaults(options);
   return runCascade(
     query,
-    discogsVariants(query),
-    (variant) => searchReleases(variant),
+    discogsVariants(query, resolved.maxVariants),
+    (variant) => searchReleases(variant, resolved.candidateLimit),
     (c) => ({
       artist: c.artist,
       title: c.title,
       year: c.year,
       value: c,
     }),
+    resolved.thresholds,
   );
 }
 
 export function resolveMusicBrainz(
   query: ReleaseQuery,
+  options: ResolverOptions = {},
 ): Promise<ProviderResult<MbReleaseCandidate>> {
+  const resolved = withDefaults(options);
   return runCascade(
     query,
-    musicbrainzVariants(query),
-    (variant) => searchReleaseCandidates(variant),
+    musicbrainzVariants(query, resolved.maxVariants),
+    (variant) => searchReleaseCandidates({ ...variant, limit: resolved.candidateLimit }),
     (c) => ({ artist: c.artistCredit, title: c.title, year: yearFromDate(c.date), value: c }),
+    resolved.thresholds,
   );
 }
 
@@ -420,11 +497,26 @@ export async function recoverMusicBrainzArtistId(artistName: string): Promise<st
 /**
  * Resolve a hand-written artist and title to catalogue identifiers.
  *
- * Queries both databases every time — see the note at the top of the file for
- * why recall is not the reason MusicBrainz is asked.
+ * Queries both databases by default — see the note at the top of the file for
+ * why recall is not the reason MusicBrainz is asked. `options` exists so the
+ * resolution eval can run one database at a time and vary the thresholds; the
+ * app should take the defaults.
  */
-export async function resolveRelease(query: ReleaseQuery): Promise<ResolutionOutcome> {
-  const [discogs, musicbrainz] = [await resolveDiscogs(query), await resolveMusicBrainz(query)];
+export async function resolveRelease(
+  query: ReleaseQuery,
+  options: ResolverOptions = {},
+): Promise<ResolutionOutcome> {
+  const resolved = withDefaults(options);
+
+  // Sequential, not concurrent. Each provider has its own single-slot request
+  // gate, so overlapping them wins nothing, and running them in order keeps a
+  // failure attributable to one provider.
+  const discogs: ProviderResult<DiscogsReleaseCandidate> = resolved.discogs
+    ? await resolveDiscogs(query, options)
+    : { kind: "skipped" };
+  const musicbrainz: ProviderResult<MbReleaseCandidate> = resolved.musicbrainz
+    ? await resolveMusicBrainz(query, options)
+    : { kind: "skipped" };
 
   const errors: ResolutionOutcome["errors"] = [];
   if (discogs.kind === "failed") errors.push({ provider: "discogs", message: discogs.message });
@@ -432,18 +524,18 @@ export async function resolveRelease(query: ReleaseQuery): Promise<ResolutionOut
     errors.push({ provider: "musicbrainz", message: musicbrainz.message });
   }
 
-  const found = discogs.kind === "found" || musicbrainz.kind === "found";
-  if (!found) {
-    return { status: errors.length > 0 ? "failed" : "absent", ids: null, errors };
-  }
-
   const dc = discogs.kind === "found" ? discogs.value : null;
   const mb = musicbrainz.kind === "found" ? musicbrainz.value : null;
+
+  if (!dc && !mb) {
+    return { status: errors.length > 0 ? "failed" : "absent", ids: null, errors };
+  }
 
   // Only worth a request when Discogs supplied a name MusicBrainz has not
   // already given us an artist id for.
   const musicbrainzArtistId =
-    mb?.artistId ?? (dc ? await recoverMusicBrainzArtistId(dc.artist) : null);
+    mb?.artistId ??
+    (dc && resolved.recoverArtist ? await recoverMusicBrainzArtistId(dc.artist) : null);
 
   const ids: ResolvedIds = {
     musicbrainzReleaseId: mb?.id ?? null,
@@ -467,5 +559,10 @@ export async function resolveRelease(query: ReleaseQuery): Promise<ResolutionOut
   // A provider that errored has not told us the record is missing, so the row
   // stays retryable even though the other provider answered.
   if (errors.length > 0) return { status: "failed", ids, errors };
-  return { status: dc && mb ? "matched" : "partial", ids, errors };
+
+  // A skipped provider is not a shortfall — a Discogs-only configuration that
+  // found the record has done everything it was asked to.
+  const asked = [discogs, musicbrainz].filter((result) => result.kind !== "skipped");
+  const allFound = asked.every((result) => result.kind === "found");
+  return { status: allFound ? "matched" : "partial", ids, errors };
 }
