@@ -5,6 +5,7 @@ import {
   type DiscogsSearchQuery,
 } from "./discogs";
 import {
+  fetchReleaseTrackArtists,
   MusicBrainzHttpError,
   searchArtistCandidates,
   searchReleaseCandidates,
@@ -481,6 +482,59 @@ function musicbrainzVariants(query: ReleaseQuery, maxVariants: number): MbReleas
   return variants.slice(0, maxVariants);
 }
 
+/**
+ * Last resort for a record MusicBrainz files under Various Artists: search the
+ * title against the Various Artists entity, then confirm the compilation
+ * actually contains the act asked for.
+ *
+ * The confirmation is not optional. Compilation titles collide constantly, and
+ * on title alone this returned an unrelated compilation called "Tanga" for
+ * Machito's album and "The Plan: You Never Know" for a Determine single — both
+ * scored as confident matches, neither containing the artist. Checking the
+ * track credits is the only thing that separates a compilation that holds the
+ * record from one that merely shares its name.
+ *
+ * Costs one extra request per surviving candidate, which is why the title has
+ * to clear the bar first and why this only runs once the ordinary cascade has
+ * come back empty.
+ */
+async function resolveMusicBrainzCompilation(
+  query: ReleaseQuery,
+  candidateLimit: number,
+): Promise<ProviderResult<MbReleaseCandidate>> {
+  let candidates: MbReleaseCandidate[];
+  try {
+    candidates = await searchReleaseCandidates({
+      artist: query.artist,
+      title: query.title,
+      variousArtists: true,
+      limit: candidateLimit,
+    });
+  } catch (error) {
+    return { kind: "failed", message: messageOf(error) };
+  }
+
+  const byTitle = candidates
+    .map((candidate) => ({ candidate, title: similarity(query.title, candidate.title) }))
+    .filter((entry) => entry.title >= VARIOUS_TITLE_MIN)
+    .sort((a, b) => b.title - a.title);
+
+  for (const { candidate, title } of byTitle) {
+    let contributors: string[];
+    try {
+      contributors = await fetchReleaseTrackArtists(candidate.id);
+    } catch (error) {
+      return { kind: "failed", message: messageOf(error) };
+    }
+    const credited = contributors.some(
+      (name) => artistSimilarity(query.artist, name) >= DEFAULT_THRESHOLDS.artist,
+    );
+    if (credited) return { kind: "found", value: candidate, confidence: title };
+  }
+
+  return { kind: "absent" };
+}
+
 export interface ResolverOptions {
   /** Query MusicBrainz. Default true. */
   musicbrainz?: boolean;
@@ -540,18 +594,20 @@ export function resolveDiscogs(
   );
 }
 
-export function resolveMusicBrainz(
+export async function resolveMusicBrainz(
   query: ReleaseQuery,
   options: ResolverOptions = {},
 ): Promise<ProviderResult<MbReleaseCandidate>> {
   const resolved = withDefaults(options);
-  return runCascade(
+  const main = await runCascade(
     query,
     musicbrainzVariants(query, resolved.maxVariants),
     (variant) => searchReleaseCandidates({ ...variant, limit: resolved.candidateLimit }),
     (c) => ({ artist: c.artistCredit, title: c.title, year: yearFromDate(c.date), value: c }),
     resolved.thresholds,
   );
+  if (main.kind !== "absent" || resolved.maxVariants < Number.MAX_SAFE_INTEGER) return main;
+  return resolveMusicBrainzCompilation(query, resolved.candidateLimit);
 }
 
 /** A recovered artist must clear the same bar as an artist read off a release. */

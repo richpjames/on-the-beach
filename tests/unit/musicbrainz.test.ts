@@ -8,6 +8,7 @@ import {
   searchReleaseCandidates,
   escapeLucene,
   MusicBrainzHttpError,
+  VARIOUS_ARTISTS_MBID,
 } from "../../server/musicbrainz";
 import type { SuggestedRelease } from "../../server/musicbrainz";
 
@@ -29,6 +30,17 @@ function makeMbArtistReleasesResponse(releases: unknown[]): Response {
   return new Response(JSON.stringify({ releases, "release-count": releases.length }), {
     headers: { "content-type": "application/json" },
   });
+}
+
+/**
+ * The `query` parameter of a captured fetch call.
+ *
+ * URLSearchParams encodes a space as "+", which decodeURIComponent does not
+ * undo — comparing against a decodeURIComponent'd URL fails on any query
+ * containing a space.
+ */
+function queryOf(call: unknown): string {
+  return new URL(String(call)).searchParams.get("query") ?? "";
 }
 
 // `bun test` runs every file in one process, so `globalThis.fetch` can arrive
@@ -840,10 +852,6 @@ describe("searchReleaseCandidates", () => {
    * spaces as "+", which decodeURIComponent does not undo — asserting on the
    * raw string silently compares against "artist:Pipo's+4".
    */
-  function queryOf(call: unknown): string {
-    return new URL(String(call)).searchParams.get("query") ?? "";
-  }
-
   function makeSearchResponse(releases: unknown[]): Response {
     return new Response(JSON.stringify({ releases }), {
       headers: { "content-type": "application/json" },
@@ -958,5 +966,33 @@ describe("searchReleaseCandidates", () => {
 
     expect(candidates).toHaveLength(1);
     expect(candidates[0]?.id).toBe("release-uuid");
+  });
+});
+
+describe("searchReleaseCandidates — compilations", () => {
+  afterEach(() => {
+    mock.restore();
+  });
+
+  test("pins a compilation search to the Various Artists entity", async () => {
+    const fetchSpy = spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      new Response(JSON.stringify({ releases: [] }), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      }),
+    );
+
+    await searchReleaseCandidates({
+      artist: "Antonio Carlos e Jocafi",
+      title: "O Primeiro Amor",
+      variousArtists: true,
+    });
+
+    const query = queryOf(fetchSpy.mock.calls[0]?.[0]);
+    // The act on the sleeve must not be in the query — the record is filed
+    // under Various Artists and searching for the duo returns nothing.
+    expect(query).not.toContain("Antonio Carlos");
+    expect(query).toContain(`arid:${VARIOUS_ARTISTS_MBID}`);
+    expect(query).toContain('release:"O Primeiro Amor"');
   });
 });

@@ -600,6 +600,9 @@ export async function lookupRelease(
 // ---------------------------------------------------------------------------
 
 /** A candidate from a release search. Callers MUST verify before accepting. */
+/** MusicBrainz's Various Artists placeholder — never a real artist to track. */
+export const VARIOUS_ARTISTS_MBID = "89ad4ac3-39f7-470e-963a-56509c546377";
+
 export interface MbReleaseCandidate {
   id: string;
   title: string;
@@ -655,13 +658,34 @@ export interface MbReleaseSearchQuery {
    * verifying.
    */
   quoted?: boolean;
+  /**
+   * Search the title against MusicBrainz's Various Artists placeholder instead
+   * of against `artist`.
+   *
+   * A compilation is filed under Various Artists, so a search for the act
+   * printed on the sleeve returns nothing at all — the "O Primeiro Amor"
+   * soundtrack is credited to the duo on its cover and to Various by both
+   * databases. `artist` is still used by the caller to verify whatever comes
+   * back; it is only kept out of the query.
+   */
+  variousArtists?: boolean;
   limit?: number;
 }
 
-function buildReleaseQuery({ artist, title, year, quoted = true }: MbReleaseSearchQuery): string {
-  const artistTerm = quoted ? `"${escapeLucene(artist)}"` : escapeLucene(artist);
+function buildReleaseQuery({
+  artist,
+  title,
+  year,
+  quoted = true,
+  variousArtists = false,
+}: MbReleaseSearchQuery): string {
   const titleTerm = quoted ? `"${escapeLucene(title)}"` : escapeLucene(title);
-  const parts = [`artist:${artistTerm}`, `AND release:${titleTerm}`];
+  // arid, not a name search: it pins the query to the one placeholder entity
+  // rather than to anything MusicBrainz happens to call "Various".
+  const artistTerm = variousArtists
+    ? `arid:${VARIOUS_ARTISTS_MBID}`
+    : `artist:${quoted ? `"${escapeLucene(artist)}"` : escapeLucene(artist)}`;
+  const parts = [artistTerm, `AND release:${titleTerm}`];
   if (year) parts.push(`AND date:${year}`);
   return parts.join(" ");
 }
@@ -748,4 +772,40 @@ export async function searchReleaseCandidates(
     const parsed = parseSearchCandidate(entry);
     return parsed ? [parsed] : [];
   });
+}
+
+/**
+ * The distinct artist credits across a release's tracks.
+ *
+ * Needed to tell whether a compilation actually contains the act you were
+ * looking for. A search pinned to Various Artists matches on title alone, and
+ * compilation titles collide constantly — "Tanga" and "You Never Know" both
+ * matched unrelated compilations while looking for a Machito album and a
+ * Determine single. The release-level credit is just "Various Artists" and
+ * says nothing; the track credits are the actual evidence.
+ */
+export async function fetchReleaseTrackArtists(releaseId: string): Promise<string[]> {
+  const response = await mbFetch(
+    `${MB_API_BASE}/release/${releaseId}?inc=recordings+artist-credits&fmt=json`,
+  );
+  if (!response.ok) {
+    throw new MusicBrainzHttpError(
+      response.status,
+      `MusicBrainz release lookup returned ${response.status} for ${releaseId}`,
+    );
+  }
+
+  const data = (await response.json()) as { media?: unknown[] };
+  const names = new Set<string>();
+  for (const medium of Array.isArray(data.media) ? data.media : []) {
+    const tracks = (medium as { tracks?: unknown[] }).tracks;
+    for (const track of Array.isArray(tracks) ? tracks : []) {
+      const credit = (track as { "artist-credit"?: unknown })["artist-credit"];
+      for (const part of Array.isArray(credit) ? credit : []) {
+        const name = (part as { name?: unknown }).name;
+        if (typeof name === "string" && name) names.add(name);
+      }
+    }
+  }
+  return [...names];
 }

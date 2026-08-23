@@ -1,7 +1,12 @@
 import { and, desc, eq, isNotNull, isNull, or, lt } from "drizzle-orm";
 import { db } from "./db/index";
 import { artists, musicItems } from "./db/schema";
-import { lookupRelease, searchArtistCandidates, type MbArtistCandidate } from "./musicbrainz";
+import {
+  lookupRelease,
+  searchArtistCandidates,
+  VARIOUS_ARTISTS_MBID,
+  type MbArtistCandidate,
+} from "./musicbrainz";
 
 // ---------------------------------------------------------------------------
 // Artist MBID resolution
@@ -25,8 +30,9 @@ import { lookupRelease, searchArtistCandidates, type MbArtistCandidate } from ".
 
 export type MbidConfidence = "confirmed" | "probable" | "unresolved";
 
-/** MusicBrainz's Various Artists placeholder — never a real artist to track. */
-export const VARIOUS_ARTISTS_MBID = "89ad4ac3-39f7-470e-963a-56509c546377";
+// Defined in musicbrainz.ts so the release query builder can pin a compilation
+// search to it; re-exported here because this is where callers expect it.
+export { VARIOUS_ARTISTS_MBID } from "./musicbrainz";
 
 /**
  * The names a compilation's "artist" goes by. Not a person or a band, so
