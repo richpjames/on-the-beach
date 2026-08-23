@@ -343,3 +343,100 @@ describe("containment is anchored", () => {
     expect(score.accepted).toBe(true);
   });
 });
+
+describe("credits the sleeve abbreviates", () => {
+  // The sleeve names the act; the catalogue names the act plus its band, its
+  // collaborator, or the composer first. Every one of these cost a fixture
+  // its hit before token-subset matching.
+  test.each([
+    ["Pacho", "Pacho Alonso"],
+    ["Bana", "Bana Et Son Orchestre"],
+    ["Natural Black", "Natural Black / Sydney Mills All Stars"],
+    ["Jean-Philippe Collard & Pascal Rogé", "Satie / Pascal Rogé, Jean-Philippe Collard"],
+  ])("matches %s against %s", (asked, candidate) => {
+    expect(artistSimilarity(asked, candidate)).toBeGreaterThanOrEqual(0.85);
+  });
+
+  test("refuses a credit shorter than the one asked for", () => {
+    // The direction is the safeguard: MusicBrainz's "Pacho" is a German rapper,
+    // not the Pacho Alonso we asked about.
+    expect(artistSimilarity("Pacho Alonso", "Pacho")).toBeLessThan(0.85);
+  });
+});
+
+describe("compilations credited to Various", () => {
+  test("accepts a compilation whose title matches, ignoring the Various credit", () => {
+    const score = scoreCandidate(
+      { artist: "Antonio Carlos e Jocafi", title: "O Primeiro Amor" },
+      { artist: "Various", title: "O Primeiro Amor (Trilha Sonora Original Da Novela)" },
+    );
+    expect(score.accepted).toBe(true);
+  });
+
+  test("accepts when Discogs folds the act into the title", () => {
+    const score = scoreCandidate(
+      { artist: "Pipo's 4", title: "O Encontro da Massa" },
+      { artist: "Various", title: "PIPO'S O Encontro Da Massa Vol. 4" },
+    );
+    expect(score.accepted).toBe(true);
+  });
+
+  test("still refuses a compilation whose title does not match", () => {
+    const score = scoreCandidate(
+      { artist: "Antonio Carlos e Jocafi", title: "O Primeiro Amor" },
+      { artist: "Various", title: "Beat Girls Español!" },
+    );
+    expect(score.accepted).toBe(false);
+  });
+
+  test("does not waive the artist test for a non-compilation", () => {
+    // Title-token matching under the waiver must not leak out to ordinary
+    // records, or "Vibes of Barry Brown" is readmitted as "More Vibes of...".
+    const score = scoreCandidate(
+      { artist: "Barry Brown", title: "Vibes of Barry Brown" },
+      { artist: "Barry Brown", title: "More Vibes Of Barry Brown Along With Stama Rank" },
+    );
+    expect(score.accepted).toBe(false);
+  });
+});
+
+describe("digits in a subtitle", () => {
+  test("accepts a subtitle that carries a year the sleeve does not", () => {
+    const score = scoreCandidate(
+      { artist: "Various", title: "Beat Girls Español!" },
+      { artist: "Various", title: "Beat Girls Español! (1960s She-Pop From Spain)" },
+    );
+    expect(score.accepted).toBe(true);
+  });
+
+  test("still refuses two records whose numbers disagree", () => {
+    const score = scoreCandidate(
+      { artist: "Guaco", title: "Guaco 76" },
+      { artist: "Guaco", title: "Guaco 77" },
+    );
+    expect(score.accepted).toBe(false);
+  });
+});
+
+describe("compilation volumes", () => {
+  const asked = { artist: "Pipo's 4", title: "O Encontro da Massa" };
+
+  test("accepts the volume asked for", () => {
+    const score = scoreCandidate(asked, {
+      artist: "Various",
+      title: "PIPO'S O Encontro Da Massa Vol. 4",
+    });
+    expect(score.accepted).toBe(true);
+  });
+
+  test("refuses a different volume whose title matches just as well", () => {
+    // Both are titled "O Encontro Da Massa" and both are credited to Various;
+    // the only thing separating them is a number that lives in the artist
+    // field. Ranking picked the wrong one until the number had to be matched.
+    const score = scoreCandidate(asked, {
+      artist: "Various",
+      title: "PIPO'S 2 - O Encontro Da Massa",
+    });
+    expect(score.accepted).toBe(false);
+  });
+});
