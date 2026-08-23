@@ -12,7 +12,7 @@ import { strategies, type ResolutionStrategy } from "./strategies";
 //
 //   photo ──[A: vision]──> {artist, title} ──[B: resolver]──> ids | abstain
 //
-// Run with `--config oracle` the resolver is fed the manifest's verified
+// Run with `--config ground-truth` the resolver is fed the manifest's verified
 // artist/title, which removes vision error and shows the resolver's ceiling.
 // Run with `--config e2e` it is fed a vision model's output, replayed from a
 // vision-eval results file so a resolver change is measurable without
@@ -32,12 +32,12 @@ const strategyFilter = flag("--strategy")
   ?.split(",")
   .map((s) => s.trim().toUpperCase());
 const limit = flag("--limit") ? Number.parseInt(flag("--limit")!, 10) : undefined;
-const config = (flag("--config") ?? "oracle").toLowerCase();
+const config = (flag("--config") ?? "ground-truth").toLowerCase();
 const visionResultsPath = flag("--vision-results");
 const visionStrategyId = flag("--vision-strategy");
 
-if (config !== "oracle" && config !== "e2e") {
-  console.error(`--config must be "oracle" or "e2e", got "${config}"`);
+if (config !== "ground-truth" && config !== "e2e") {
+  console.error(`--config must be "ground-truth" or "e2e", got "${config}"`);
   process.exit(1);
 }
 if (config === "e2e" && !visionResultsPath) {
@@ -175,7 +175,7 @@ interface VisionResults {
 /** What the resolver is fed for a fixture: verified truth, or a model's guess. */
 function buildInputs(): Map<string, { artist: string; title: string }> {
   const inputs = new Map<string, { artist: string; title: string }>();
-  if (config === "oracle") {
+  if (config === "ground-truth") {
     for (const fixture of fixtures) {
       inputs.set(fixture.id, { artist: fixture.artist, title: fixture.title });
     }
