@@ -1314,10 +1314,10 @@ private extension UITableViewController {
     /// Resize `tableHeaderView` to the height its own Auto Layout asks for.
     ///
     /// Table header views are laid out by frame, not by constraints, so a header
-    /// built with Auto Layout (the list picker's search field, the release
-    /// picker's message banner) keeps whatever height it was given until it's
-    /// measured and re-set. Call from `viewDidLayoutSubviews`; the height check
-    /// stops the re-assignment from looping.
+    /// built with Auto Layout (the release picker's message banner) keeps
+    /// whatever height it was given until it's measured and re-set. Call from
+    /// `viewDidLayoutSubviews`; the height check stops the re-assignment from
+    /// looping.
     func sizeTableHeaderToFit() {
         guard let header = tableView.tableHeaderView else { return }
         let height = header.systemLayoutSizeFitting(
@@ -1340,16 +1340,18 @@ private extension UITableViewController {
 /// reported via `onSelectionChanged` after every change — the server resolves the
 /// names (creating any new), so no id round-trip is needed.
 ///
-/// A **search field** sits above the rows — the native twin of the web app's
+/// A **search field** is pinned above the rows — the native twin of the web app's
 /// `StackDropdown` box, down to the "Search or add a list…" placeholder. Typing
 /// filters the existing lists, and Return files the item into whatever was typed
 /// (matching an existing list by name, or creating one) so a long collection
-/// doesn't have to be scrolled through on a phone-sized sheet.
+/// doesn't have to be scrolled through on a phone-sized sheet. It stays put while
+/// the rows scroll, so it's still there once you're deep in the list.
 ///
 /// There's also an **Add** button in the top right, mirroring the compose form's:
 /// choosing a list is normally the last decision, so the user can post from here
 /// and close the sheet without first navigating back.
-private final class ListPickerViewController: UITableViewController, UITextFieldDelegate {
+private final class ListPickerViewController: UIViewController,
+    UITableViewDataSource, UITableViewDelegate, UITextFieldDelegate {
     var onSelectionChanged: (([String]) -> Void)?
     var onAdd: (() -> Void)?
 
@@ -1363,6 +1365,10 @@ private final class ListPickerViewController: UITableViewController, UITextField
     // Selection order is preserved so the compose row and payload stay stable.
     private var selected: [String]
 
+    /// The rows. Owned rather than inherited from `UITableViewController`,
+    /// whose view *is* its table — there'd be nowhere to hang a field that
+    /// doesn't scroll with the rows.
+    private let tableView = UITableView(frame: .zero, style: .plain)
     private let searchField = UITextField()
     /// The trimmed search text. Empty means "show every list".
     private var query = ""
@@ -1391,7 +1397,7 @@ private final class ListPickerViewController: UITableViewController, UITextField
     init(stacks: [String], selected: [String]) {
         self.names = stacks
         self.selected = selected
-        super.init(style: .plain)
+        super.init(nibName: nil, bundle: nil)
     }
 
     @available(*, unavailable)
@@ -1403,20 +1409,36 @@ private final class ListPickerViewController: UITableViewController, UITextField
         super.viewDidLoad()
         title = "Lists"
         // The Winamp black playlist: black well, light-blue text, navy separators.
+        view.backgroundColor = OTBTheme.playlistBg
         tableView.backgroundColor = OTBTheme.playlistBg
         tableView.separatorColor = OTBTheme.navyBorder
         tableView.tintColor = OTBTheme.accent // checkmark colour
-
-        let searchHeader = makeSearchHeader()
-        searchHeader.frame = CGRect(
-            x: 0,
-            y: 0,
-            width: tableView.bounds.width,
-            height: 1 // resized to its content in viewDidLayoutSubviews
-        )
-        tableView.tableHeaderView = searchHeader
+        tableView.dataSource = self
+        tableView.delegate = self
         // Flicking through the results puts the keyboard away.
         tableView.keyboardDismissMode = .onDrag
+
+        // The search band is a sibling of the table pinned under the title bar,
+        // not the table's own `tableHeaderView`: a header scrolls off with the
+        // rows, so on the collection this screen exists for — dozens of lists —
+        // the field is gone by the time you've scrolled far enough to want it.
+        // Pinned, it's on screen whatever the rows are doing, and its height
+        // comes from Auto Layout rather than from measuring a frame-laid-out
+        // header.
+        let searchBand = makeSearchHeader()
+        searchBand.translatesAutoresizingMaskIntoConstraints = false
+        tableView.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(searchBand)
+        view.addSubview(tableView)
+        NSLayoutConstraint.activate([
+            searchBand.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
+            searchBand.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            searchBand.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            tableView.topAnchor.constraint(equalTo: searchBand.bottomAnchor),
+            tableView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            tableView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            tableView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+        ])
         NotificationCenter.default.addObserver(
             self,
             selector: #selector(keyboardFrameChanged),
@@ -1434,14 +1456,9 @@ private final class ListPickerViewController: UITableViewController, UITextField
         addButton.isEnabled = canAdd
     }
 
-    override func viewDidLayoutSubviews() {
-        super.viewDidLayoutSubviews()
-        sizeTableHeaderToFit()
-    }
-
-    /// The search row: a sunken white field (the app's `--bevel-field` input)
-    /// on a chrome band, so it reads as window furniture above the black
-    /// playlist rather than as another list row.
+    /// The search band: a sunken white field (the app's `--bevel-field` input)
+    /// on a chrome band, so it reads as window furniture below the title bar
+    /// rather than as another list row.
     private func makeSearchHeader() -> UIView {
         let container = UIView()
         container.backgroundColor = OTBTheme.chrome
@@ -1519,6 +1536,7 @@ private final class ListPickerViewController: UITableViewController, UITextField
     func setPosting(_ posting: Bool, progress: String? = nil) {
         isPosting = posting
         tableView.isUserInteractionEnabled = !posting
+        searchField.isEnabled = !posting
         navigationItem.hidesBackButton = posting
         if posting {
             // Get the keyboard out of the way of the spinner and the toast.
@@ -1563,13 +1581,13 @@ private final class ListPickerViewController: UITableViewController, UITextField
     }
 
     // Section 0: existing lists (checkmark = selected). Section 1: "New list…".
-    override func numberOfSections(in tableView: UITableView) -> Int { 2 }
+    func numberOfSections(in tableView: UITableView) -> Int { 2 }
 
-    override func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
+    func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
         section == 0 ? visibleNames.count : 1
     }
 
-    override func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
+    func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
         let cell = tableView.dequeueReusableCell(withIdentifier: "cell")
             ?? UITableViewCell(style: .default, reuseIdentifier: "cell")
 
@@ -1599,7 +1617,7 @@ private final class ListPickerViewController: UITableViewController, UITextField
 
     /// Zebra-stripe the existing-list rows, matching the playlist's alternating
     /// row backgrounds (--playlist-bg / --playlist-bg-alt).
-    override func tableView(_ tableView: UITableView, willDisplay cell: UITableViewCell, forRowAt indexPath: IndexPath) {
+    func tableView(_ tableView: UITableView, willDisplay cell: UITableViewCell, forRowAt indexPath: IndexPath) {
         guard indexPath.section == 0 else {
             cell.backgroundColor = OTBTheme.playlistBg
             return
@@ -1607,7 +1625,7 @@ private final class ListPickerViewController: UITableViewController, UITextField
         cell.backgroundColor = indexPath.row.isMultiple(of: 2) ? OTBTheme.playlistBg : OTBTheme.playlistBgAlt
     }
 
-    override func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
+    func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
         tableView.deselectRow(at: indexPath, animated: true)
 
         if indexPath.section == 1 {

@@ -34,12 +34,14 @@ for free by building the same targets with **Mac Catalyst** (see [Enable macOS
   name. On **Add** it `POST`s the URL — plus `notes` and `listName` when set — to
   `POST /api/ingest/link` with a `Bearer` token. The extension talks to the server
   directly, so a share works even when the app isn't running.
-- The list picker has a **search field** above the rows, the native counterpart of the
-  web app's `StackDropdown` (same "Search or add a list…" placeholder). Typing filters
-  your lists case- and accent-insensitively; pressing Return files the item into the
-  typed name — an existing list if one matches, a new one if not — so a big collection
-  doesn't have to be scrolled. When the search matches nothing, the "New list…" row
-  reads `New list “<what you typed>”` and creates it in one tap.
+- The list picker has a **search field pinned above the rows**, the native counterpart
+  of the web app's `StackDropdown` (same "Search or add a list…" placeholder). Typing
+  filters your lists case- and accent-insensitively; pressing Return files the item into
+  the typed name — an existing list if one matches, a new one if not — so a big
+  collection doesn't have to be scrolled. When the search matches nothing, the "New
+  list…" row reads `New list “<what you typed>”` and creates it in one tap. The field sits
+  between the title bar and the rows rather than scrolling with them, so it's reachable
+  from anywhere in a long list.
 - The list picker carries **its own Add button** in the top right, doing exactly what
   the compose form's does. Picking a list is usually the last decision, so this saves
   a trip back to the first screen just to post. Whichever Add you tap, the same note,
