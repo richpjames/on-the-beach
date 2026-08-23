@@ -101,9 +101,9 @@ The eval must run **three configurations**, because the end-to-end number alone 
 
 | Config | Input to stage B | Measures |
 | --- | --- | --- |
-| **B-oracle** | ground-truth `artist`/`title` | The resolver's ceiling, with vision error removed |
+| **B-ground-truth** | ground-truth `artist`/`title` | The resolver's ceiling, with vision error removed |
 | **End-to-end** | vision model output | The number that matters in production |
-| **Delta** | — | End-to-end minus B-oracle = loss attributable to vision |
+| **Delta** | — | End-to-end minus B-ground-truth = loss attributable to vision |
 
 This split is the single most important part of the design. Exploratory work showed that with *perfect* input strings, MusicBrainz alone resolved only 54/101, and reaching 94/101 required a second database plus hand-verification. **The resolver, not the vision model, is likely the dominant loss** — and the current eval structure cannot show that.
 
@@ -179,7 +179,7 @@ Resolving a returned release id to its group/master costs one extra API call. Ca
 
 ### Task 2.3 — `eval/resolution/run.ts`
 
-Harness mirroring `vision-eval/index.ts`: CLI flags for `--strategy`, `--limit`, `--config oracle|e2e`, timestamped JSON output under `eval/resolution/results/`.
+Harness mirroring `vision-eval/index.ts`: CLI flags for `--strategy`, `--limit`, `--config ground-truth|e2e`, timestamped JSON output under `eval/resolution/results/`.
 
 Reuses the vision model output already captured in `vision-eval/results/*.json` for the end-to-end config, so a resolver change is measurable **without re-spending vision API calls**.
 
