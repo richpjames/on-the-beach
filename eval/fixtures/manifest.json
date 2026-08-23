@@ -315,8 +315,8 @@
     {
       "id": "discotex-records-6am-wanna-be-down",
       "image": "images/IMG_4284.jpeg",
-      "artist": "Discotex Records",
-      "title": "6AM / Wanna Be Down",
+      "artist": "Dawna Lee",
+      "title": "Wanna Be Down",
       "expected": {
         "mb": {
           "resolvable": false,
@@ -339,9 +339,13 @@
       "title": "Cafira (Seiji Re-Rinse)",
       "expected": {
         "mb": {
-          "resolvable": false,
-          "releaseGroupIds": [],
-          "releaseIds": []
+          "resolvable": true,
+          "releaseGroupIds": [
+            "f960df62-56eb-4cfa-9339-56ee5212bf62"
+          ],
+          "releaseIds": [
+            "c0926dcf-d47f-443e-8c42-288e94ad85a6"
+          ]
         },
         "discogs": {
           "resolvable": true,
@@ -464,7 +468,9 @@
         },
         "discogs": {
           "resolvable": true,
-          "masterIds": [],
+          "masterIds": [
+            828491
+          ],
           "releaseIds": [
             640255
           ]
@@ -1065,9 +1071,13 @@
       "title": "Compact Jazz: Astrud Gilberto",
       "expected": {
         "mb": {
-          "resolvable": false,
-          "releaseGroupIds": [],
-          "releaseIds": []
+          "resolvable": true,
+          "releaseGroupIds": [
+            "d1b55d44-dc6e-327a-974c-49fb82d41cc1"
+          ],
+          "releaseIds": [
+            "b86bd910-ef90-4e59-b217-50a02e31e9ac"
+          ]
         },
         "discogs": {
           "resolvable": true,
@@ -1393,7 +1403,9 @@
         },
         "discogs": {
           "resolvable": true,
-          "masterIds": [],
+          "masterIds": [
+            1852503
+          ],
           "releaseIds": [
             9875626
           ]
@@ -1775,7 +1787,9 @@
         },
         "discogs": {
           "resolvable": true,
-          "masterIds": [],
+          "masterIds": [
+            1891431
+          ],
           "releaseIds": [
             5042293
           ]
@@ -2371,7 +2385,9 @@
         },
         "discogs": {
           "resolvable": true,
-          "masterIds": [],
+          "masterIds": [
+            786503
+          ],
           "releaseIds": [
             2733412
           ]
