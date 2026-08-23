@@ -76,9 +76,10 @@ export function normalizeForMatch(value: string): string {
  * own terms.
  */
 export function stripCreditClause(artist: string): string {
-  const match = /\s+(?:y|e|con|and|with|feat\.?|featuring|presents|pres\.?|vs\.?|&|\+)\s+/i.exec(
-    artist,
-  );
+  const match =
+    /\s*(?:\/|\s(?:y|e|et|con|and|with|feat\.?|featuring|presents|pres\.?|vs\.?|&|\+)\s)\s*/i.exec(
+      artist,
+    );
   return match ? artist.slice(0, match.index).trim() : artist.trim();
 }
 
@@ -132,15 +133,48 @@ export function similarity(a: string, b: string, allowContainment = true): numbe
   // Mid-string containment covers nothing and costs: "Vibes of Barry Brown"
   // sits in the middle of "More Vibes of Barry Brown Along With Stama Rank",
   // which is a different record, and matching them was a false id.
-  const raw =
+  const contained =
     allowContainment &&
     shorter.length >= MIN_CONTAINMENT_LENGTH &&
-    (longer.startsWith(`${shorter} `) || longer.endsWith(` ${shorter}`))
-      ? CONTAINMENT_SIMILARITY
-      : 1 - editDistance(na, nb) / longer.length;
+    (longer.startsWith(`${shorter} `) || longer.endsWith(` ${shorter}`));
 
+  // Containment outranks the digit rule. The digits that break a containment
+  // match are in the part one side does not have at all — a year inside a
+  // subtitle, as in "Beat Girls Español!" against "Beat Girls Español! (1960s
+  // She-Pop From Spain)". Capping those cost two fixtures their hit. The pair
+  // the rule exists for, "Guaco 76" against "Guaco 77", is not a containment
+  // match in the first place, so it still gets capped below.
+  if (contained) return CONTAINMENT_SIMILARITY;
+
+  const raw = 1 - editDistance(na, nb) / longer.length;
   if (digitSignature(na) !== digitSignature(nb)) return Math.min(raw, DIGIT_MISMATCH_CEILING);
   return raw;
+}
+
+function tokensOf(value: string): string[] {
+  const normalized = normalizeForMatch(value);
+  return normalized ? normalized.split(" ") : [];
+}
+
+/**
+ * Whether every word asked for appears in the candidate.
+ *
+ * Directional on purpose, and that direction is the whole safeguard. A
+ * database credit that is LONGER than the sleeve is the normal case — the
+ * sleeve says "Pacho", "Bana" or "Natural Black" and the catalogue says "Pacho
+ * Alonso", "Bana Et Son Orchestre", "Natural Black / Sydney Mills All Stars".
+ * A credit that is SHORTER than what was asked for is a different, less
+ * specific entity, which is how MusicBrainz's "Pacho" (a German rapper) came
+ * back for Pacho Alonso. Subset one way, never the other.
+ *
+ * Order-insensitive, which also handles a reordered multi-artist credit:
+ * "Jean-Philippe Collard & Pascal Rogé" against "Satie / Pascal Rogé,
+ * Jean-Philippe Collard".
+ */
+function tokenSubset(asked: string[], candidate: string[]): boolean {
+  if (asked.length === 0) return false;
+  const available = new Set(candidate);
+  return asked.every((token) => available.has(token));
 }
 
 /**
@@ -157,14 +191,34 @@ export function similarity(a: string, b: string, allowContainment = true): numbe
 export function artistSimilarity(asked: string, candidate: string): number {
   const askedVariants = new Set([asked, stripCreditClause(asked)]);
   const candidateVariants = new Set([candidate, stripCreditClause(candidate)]);
+  const candidateTokens = tokensOf(candidate);
+
   let best = 0;
   for (const left of askedVariants) {
+    if (
+      normalizeForMatch(left).length >= MIN_CONTAINMENT_LENGTH &&
+      tokenSubset(tokensOf(left), candidateTokens)
+    ) {
+      best = Math.max(best, CONTAINMENT_SIMILARITY);
+    }
     for (const right of candidateVariants) {
       best = Math.max(best, similarity(left, right, false));
     }
   }
   return best;
 }
+
+/** Discogs' and MusicBrainz's placeholder for a compilation with no single act. */
+function isVariousArtists(name: string): boolean {
+  return /^(?:various|various artists|v ?a)$/.test(normalizeForMatch(name));
+}
+
+/**
+ * Under the compilation waiver the title carries the whole burden, so it has to
+ * clear more than the ordinary bar — a containment match qualifies, an
+ * edit-distance near-miss does not.
+ */
+const VARIOUS_TITLE_MIN = 0.85;
 
 export interface ReleaseQuery {
   artist: string;
@@ -221,8 +275,50 @@ export function scoreCandidate(
   candidate: { artist: string; title: string },
   thresholds: MatchThresholds = DEFAULT_THRESHOLDS,
 ): CandidateScore {
-  const artist = artistSimilarity(query.artist, candidate.artist);
   const title = similarity(query.title, candidate.title);
+
+  // Compilations. Discogs credits a compilation to "Various" where the sleeve
+  // names the act that fronts it, so artist similarity is ~0 against a record
+  // that is genuinely the right one — three fixtures were lost this way.
+  //
+  // "Various" is not a wrong artist; it is the absence of an artist claim. So
+  // the artist test is waived and the title must carry the decision alone, at
+  // a higher bar. The second clause covers Discogs folding the act into the
+  // title, as in "PIPO'S O Encontro Da Massa Vol. 4" for "Pipo's 4 — O
+  // Encontro da Massa": every word asked for is there, just not where the
+  // field boundary says it should be.
+  //
+  // Deliberately NOT generalised to non-compilations. Matching on title tokens
+  // alone would readmit "Vibes of Barry Brown" as "More Vibes of Barry Brown
+  // Along With Stama Rank", which is exactly the false id anchored containment
+  // was narrowed to prevent.
+  if (isVariousArtists(candidate.artist) && !isVariousArtists(query.artist)) {
+    const askedTokens = [...tokensOf(query.artist), ...tokensOf(query.title)];
+    const candidateTokens = tokensOf(candidate.title);
+    const wordsAccountedFor = tokenSubset(askedTokens, candidateTokens);
+
+    // Every number asked for must appear somewhere in the candidate title.
+    // Extra numbers on the candidate side are fine — they are years in a
+    // subtitle. A number we asked for and did not get back is a different
+    // volume: searching "Pipo's 4 — O Encontro da Massa" returns both Vol. 4
+    // and the Vol. 2 record, whose titles are equally good matches, and only
+    // the missing 4 separates them. The digit lives in the artist field here,
+    // which is why this checks the whole asked string and not just the title.
+    const digitsAsked = new Set(askedTokens.filter((token) => /^\d+$/.test(token)));
+    const candidateDigits = new Set(candidateTokens.filter((token) => /^\d+$/.test(token)));
+    const numbersAccountedFor = [...digitsAsked].every((digit) => candidateDigits.has(digit));
+
+    const accepted = numbersAccountedFor && (title >= VARIOUS_TITLE_MIN || wordsAccountedFor);
+    return {
+      artist: 0,
+      title,
+      // The title is the only evidence, so it is the whole confidence.
+      confidence: accepted ? Math.max(title, VARIOUS_TITLE_MIN) : title,
+      accepted,
+    };
+  }
+
+  const artist = artistSimilarity(query.artist, candidate.artist);
   const confidence = (artist + title) / 2;
   return {
     artist,
