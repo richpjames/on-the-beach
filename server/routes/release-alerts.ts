@@ -53,16 +53,44 @@ export function createReleaseAlertRoutes(): Hono {
   });
 
   // POST /:id/add — create the item, file it in New Releases, schedule it if
-  // the record is still announced-only.
+  // the record is still announced-only. Refuses a release nobody carries: the
+  // alert is left pending so it can be tried again later.
   routes.post("/:id/add", async (c) => {
     const id = parseId(c.req.param("id"));
     if (id === null) return c.json({ error: "Invalid ID" }, 400);
 
     const result = await acceptAlert(id);
-    if (!result) return c.json({ error: "Alert not found or already added" }, 404);
+
+    if (result.status === "not-found") {
+      return c.json({ error: "Alert not found or already added" }, 404);
+    }
+    if (result.status === "no-link") {
+      // 422: the request was well-formed and the alert exists — the record
+      // just has nothing behind it yet.
+      return c.json(
+        {
+          error: `No ${result.serviceName} or MusicBrainz link for this release yet.`,
+          reason: "no_link",
+        },
+        422,
+      );
+    }
+    if (result.status === "check-failed") {
+      return c.json(
+        { error: "Couldn't check for a link — try again shortly.", reason: "link_check_failed" },
+        503,
+      );
+    }
 
     const item = await fetchFullItem(result.itemId);
-    return c.json({ item, remindAt: result.remindAt?.toISOString() ?? null }, 201);
+    return c.json(
+      {
+        item,
+        remindAt: result.remindAt?.toISOString() ?? null,
+        link: result.link,
+      },
+      201,
+    );
   });
 
   // POST /:id/dismiss — never re-fires (unique index on the release).
