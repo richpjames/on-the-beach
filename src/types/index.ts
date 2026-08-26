@@ -196,6 +196,8 @@ export interface LinkReleaseCandidate {
   confidence?: number;
   evidence?: string;
   isPrimary?: boolean;
+  /** The release's own page, when the link that was added merely listed it. */
+  url?: string;
 }
 
 export interface RecognizeResult {

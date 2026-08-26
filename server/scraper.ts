@@ -1,6 +1,8 @@
 import type { ItemType, SourceName } from "../src/types";
 import {
+  extractPageLinks,
   extractReleaseCandidatesFromWebText,
+  matchReleaseUrls,
   type ExtractedReleaseCandidate,
 } from "./link-extractor";
 import { fetchDiscogsRelease } from "./discogs";
@@ -224,14 +226,20 @@ async function scrapeUnknownUrl(url: string, html: string, og: OgData): Promise<
     throw new UnsupportedMusicLinkError("Couldn't extract a release from this link");
   }
 
-  const primary = releases[0];
+  // A page naming one release is that release's page — its own URL is the right
+  // link. A page naming several is a listing, and links to each of them: give
+  // every release the page that is actually about it where the page said so.
+  const withLinks =
+    releases.length > 1 ? matchReleaseUrls(releases, extractPageLinks(html, url)) : releases;
+
+  const primary = withLinks[0];
   return {
     potentialArtist: primary?.artist,
     potentialTitle: primary?.title,
     itemType: primary?.itemType,
     imageUrl: og.ogImage,
     pageTitle: og.ogTitle || og.title,
-    releases,
+    releases: withLinks,
   };
 }
 

@@ -21,6 +21,7 @@ import type {
   ItemType,
   LinkReleaseCandidate,
   MusicItemFull,
+  SourceName,
 } from "../src/types";
 
 // ---------------------------------------------------------------------------
@@ -80,6 +81,10 @@ interface ReleaseCandidateInput {
   title: string;
   artistName?: string;
   itemType: ItemType;
+  /** The release's own page, when the added link merely listed it. */
+  url?: string;
+  /** Source of `url`, when the release has one of its own. */
+  source?: SourceName;
   artworkUrl?: string | null;
   confidence?: number;
   evidence?: string;
@@ -143,6 +148,7 @@ function toReleaseCandidate(input: ReleaseCandidateInput): LinkReleaseCandidate 
     confidence: input.confidence,
     evidence: input.evidence,
     isPrimary: input.isPrimary,
+    url: input.url,
   };
 }
 
@@ -179,6 +185,26 @@ async function fetchItemsByUrl(url: string): Promise<MusicItemFull[]> {
   return items.filter((item): item is MusicItemFull => item !== null);
 }
 
+/**
+ * Everything already filed under any of these URLs, de-duplicated by item.
+ *
+ * Releases picked off a listing page are stored under their own links, so
+ * re-adding the listing has to look those up too — checking the listing URL
+ * alone would find nothing and add the whole page over again.
+ */
+async function fetchItemsByUrls(urls: string[]): Promise<MusicItemFull[]> {
+  const seen = new Set<string>();
+  const unique = urls.filter((url) => url && !seen.has(url) && (seen.add(url), true));
+
+  const found = await Promise.all(unique.map((url) => fetchItemsByUrl(url)));
+  const byId = new Map<number, MusicItemFull>();
+  for (const item of found.flat()) {
+    byId.set(item.id, item);
+  }
+
+  return [...byId.values()];
+}
+
 async function insertMusicItemWithLink(
   normalizedUrl: string,
   sourceName: string,
@@ -190,7 +216,12 @@ async function insertMusicItemWithLink(
     artistId = await getOrCreateArtist(candidate.artistName);
   }
 
-  const sourceId = await getSourceId(sourceName);
+  // A release lifted off a listing page links to its own page, and is filed
+  // under that page's source — a Mixcloud show picked off a profile is a
+  // Mixcloud link, not an unknown one.
+  const linkUrl = candidate.url ?? normalizedUrl;
+  const linkSource = candidate.url ? (candidate.source ?? "unknown") : sourceName;
+  const sourceId = await getSourceId(linkSource);
 
   const [inserted] = await db
     .insert(musicItems)
@@ -216,7 +247,7 @@ async function insertMusicItemWithLink(
   await db.insert(musicLinks).values({
     musicItemId: inserted.id,
     sourceId,
-    url: normalizedUrl,
+    url: linkUrl,
     isPrimary: true,
     metadata: candidate.embedMetadata ? JSON.stringify(candidate.embedMetadata) : null,
   });
@@ -303,17 +334,22 @@ async function resolveReleaseCandidates(
       ? formatPageSourceNote(parsed.normalizedUrl, scraped?.pageTitle)
       : undefined;
 
-  const extractedCandidates = releases.map((release) => ({
-    candidateId: release.candidateId,
-    title: release.title || "Untitled",
-    artistName: release.artist,
-    itemType: release.itemType ?? "album",
-    artworkUrl: overrides?.artworkUrl ?? scraped?.imageUrl ?? null,
-    confidence: release.confidence,
-    evidence: release.evidence,
-    isPrimary: release.isPrimary,
-    sourceNote,
-  }));
+  const extractedCandidates = releases.map((release) => {
+    const releaseLink = release.url ? parseUrl(release.url) : null;
+
+    return {
+      candidateId: release.candidateId,
+      title: release.title || "Untitled",
+      artistName: release.artist,
+      itemType: release.itemType ?? "album",
+      artworkUrl: overrides?.artworkUrl ?? scraped?.imageUrl ?? null,
+      confidence: release.confidence,
+      evidence: release.evidence,
+      isPrimary: release.isPrimary,
+      ...(releaseLink ? { url: releaseLink.normalizedUrl, source: releaseLink.source } : {}),
+      sourceNote,
+    };
+  });
 
   if (extractedCandidates.length === 0) {
     throw new UnsupportedMusicLinkError("Couldn't extract a release from this link");
@@ -378,9 +414,9 @@ async function resolveReleaseCandidates(
         normalizedUrl: parsed.normalizedUrl,
         source: parsed.source,
         // The page mentioned others but is mainly about this release — it *is*
-        // the release's page, so its link already says where the item came
-        // from and a provenance note would only repeat it.
-        candidates: [{ ...chosen, sourceNote: undefined }],
+        // the release's page, so its own URL is the link to keep, and a
+        // provenance note would only repeat what that link already says.
+        candidates: [{ ...chosen, url: undefined, source: undefined, sourceNote: undefined }],
       };
     }
   }
@@ -424,8 +460,8 @@ const scrapingMachine = setup({
     resolve: fromPromise<ResolveOutput, { url: string; overrides?: Partial<CreateMusicItemInput> }>(
       async ({ input }) => resolveReleaseCandidates(input.url, input.overrides),
     ),
-    checkDuplicates: fromPromise<MusicItemFull[], { normalizedUrl: string }>(async ({ input }) =>
-      fetchItemsByUrl(input.normalizedUrl),
+    checkDuplicates: fromPromise<MusicItemFull[], { urls: string[] }>(async ({ input }) =>
+      fetchItemsByUrls(input.urls),
     ),
     insert: fromPromise<
       CreateResult[],
@@ -502,7 +538,14 @@ const scrapingMachine = setup({
     checkingDuplicates: {
       invoke: {
         src: "checkDuplicates",
-        input: ({ context }) => ({ normalizedUrl: context.resolvedUrl }),
+        input: ({ context }) => ({
+          urls: [
+            context.resolvedUrl,
+            ...context.candidates
+              .map((candidate) => candidate.url)
+              .filter((url): url is string => Boolean(url)),
+          ],
+        }),
         onDone: [
           {
             // Known source with an existing item — return it without inserting.

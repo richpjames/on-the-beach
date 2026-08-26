@@ -5,6 +5,7 @@
 - `server/scraper.ts` parses OG tags, detects whether unknown pages are music-related, and extracts source-specific metadata.
 - Known sources such as Bandcamp can expose extra embed metadata.
 - Unsupported pages can still be processed through text extraction when Mistral-backed release extraction is available.
+- A page naming several releases is a listing (a Mixcloud profile, a label catalogue, a round-up), and links to each of them. `matchReleaseUrls` (`server/link-extractor.ts`) pairs each extracted release with the page's own link to it, matching on the anchor's text and the link's slug, so an item picked off the listing links to its own release page and is filed under that page's source. A release the page links no page for keeps the listing URL.
 
 ## Cover scanning
 
