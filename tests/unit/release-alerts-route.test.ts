@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { afterEach, beforeEach, describe, expect, mock, spyOn, test } from "bun:test";
 import { and, eq } from "drizzle-orm";
 import { Hono } from "hono";
 import { db } from "../../server/db/index";
@@ -7,17 +7,21 @@ import {
   artists,
   musicItemStacks,
   musicItems,
+  musicLinks,
   releaseAlerts,
+  sources,
   stacks,
 } from "../../server/db/schema";
 import { normalize } from "../../server/utils";
 import { createReleaseAlertRoutes } from "../../server/routes/release-alerts";
 import { createArtistRoutes } from "../../server/routes/artists";
 import {
+  acceptAlert,
   ensureNewReleasesStack,
   itemTypeForReleaseGroup,
   NEW_RELEASES_STACK_NAME,
 } from "../../server/release-alerts";
+import type { ReleaseLinkOutcome } from "../../server/release-link-check";
 import { DEFAULT_ARTIST_WATCH_SETTINGS, setArtistWatchSettings } from "../../server/settings";
 
 function makeApp(): Hono {
@@ -252,6 +256,245 @@ describe("POST /api/release-alerts/:id/add", () => {
       method: "POST",
     });
     expect(res.status).toBe(404);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// The link gate
+//
+// Every test above runs with OTB_DISABLE_EXTERNAL_LOOKUPS set, which switches
+// the gate off — that is the point of these: they drive `acceptAlert` with the
+// check stubbed, and the last two let the real one run against a mocked fetch
+// to prove the route reports a refusal rather than a failure.
+// ---------------------------------------------------------------------------
+
+const NO_LINK: ReleaseLinkOutcome = {
+  kind: "none",
+  service: "apple_music",
+  providerSearched: true,
+};
+
+function providerLink(url: string): ReleaseLinkOutcome {
+  return {
+    kind: "found",
+    link: {
+      url,
+      sourceName: "apple_music",
+      via: "provider",
+      foundBy: "Apple Music",
+      artworkUrl: "https://example.test/cover.jpg",
+      service: "apple_music",
+      providerSearched: true,
+    },
+  };
+}
+
+function musicbrainzLink(url: string): ReleaseLinkOutcome {
+  return {
+    kind: "found",
+    link: {
+      url,
+      sourceName: "bandcamp",
+      via: "musicbrainz",
+      foundBy: "MusicBrainz",
+      artworkUrl: null,
+      service: "apple_music",
+      providerSearched: true,
+    },
+  };
+}
+
+async function linksFor(itemId: number): Promise<Array<{ url: string; source: string | null }>> {
+  const rows = await db
+    .select({ url: musicLinks.url, source: sources.name })
+    .from(musicLinks)
+    .leftJoin(sources, eq(musicLinks.sourceId, sources.id))
+    .where(eq(musicLinks.musicItemId, itemId));
+  return rows.map((row) => ({ url: row.url, source: row.source ?? null }));
+}
+
+describe("acceptAlert link gate", () => {
+  test("a release with no link anywhere is refused, and the alert survives it", async () => {
+    const { alertId } = await makeAlert({ title: "Unlinked Record" });
+
+    const outcome = await acceptAlert(alertId, new Date(), async () => NO_LINK);
+    expect(outcome).toEqual({ status: "no-link", serviceName: "Apple Music" });
+
+    // Untouched: the record may well turn up on the service next week.
+    const alert = await db.select().from(releaseAlerts).where(eq(releaseAlerts.id, alertId)).get();
+    expect(alert?.status).toBe("pending");
+    expect(alert?.musicItemId).toBeNull();
+
+    const created = await db
+      .select({ id: musicItems.id })
+      .from(musicItems)
+      .where(eq(musicItems.normalizedTitle, normalize("Unlinked Record")));
+    expect(created).toHaveLength(0);
+  });
+
+  test("a check that didn't complete is reported as retryable, not as a refusal", async () => {
+    const { alertId } = await makeAlert();
+
+    const outcome = await acceptAlert(alertId, new Date(), async () => ({
+      kind: "failed",
+      message: "MusicBrainz returned 503",
+    }));
+
+    expect(outcome.status).toBe("check-failed");
+    const alert = await db.select().from(releaseAlerts).where(eq(releaseAlerts.id, alertId)).get();
+    expect(alert?.status).toBe("pending");
+  });
+
+  test("the provider link the gate found is filed with the item, artwork and all", async () => {
+    const url = "https://music.apple.com/gb/album/linked-record/1";
+    const { alertId } = await makeAlert({ title: "Linked Record" });
+
+    const outcome = await acceptAlert(alertId, new Date(), async () => providerLink(url));
+    expect(outcome.status).toBe("added");
+    if (outcome.status !== "added") return;
+    expect(outcome.link).toEqual({ url, foundBy: "Apple Music", via: "provider" });
+
+    expect(await linksFor(outcome.itemId)).toEqual([{ url, source: "apple_music" }]);
+
+    const item = await db.select().from(musicItems).where(eq(musicItems.id, outcome.itemId)).get();
+    expect(item?.artworkUrl).toBe("https://example.test/cover.jpg");
+    // The provider answered, so there is no missed lookup to remember.
+    expect(item?.lookupAttemptedAt).toBeNull();
+  });
+
+  test("a MusicBrainz external link is filed, and the provider's miss is remembered", async () => {
+    const url = "https://ordinary.bandcamp.com/album/external-record";
+    const { alertId } = await makeAlert({ title: "External Record" });
+
+    const outcome = await acceptAlert(alertId, new Date(), async () => musicbrainzLink(url));
+    expect(outcome.status).toBe("added");
+    if (outcome.status !== "added") return;
+
+    expect(await linksFor(outcome.itemId)).toEqual([{ url, source: "bandcamp" }]);
+
+    const item = await db.select().from(musicItems).where(eq(musicItems.id, outcome.itemId)).get();
+    expect(item?.lookupAttemptedAt).toBeInstanceOf(Date);
+  });
+
+  test("an announced release keeps its provider lookup for the day it comes out", async () => {
+    const url = "https://ordinary.bandcamp.com/album/announced-record";
+    const { alertId } = await makeAlert({
+      title: "Announced Record",
+      firstReleaseDate: "2099-09-18",
+      reason: "announced",
+    });
+
+    const outcome = await acceptAlert(alertId, new Date(), async () => musicbrainzLink(url));
+    expect(outcome.status).toBe("added");
+    if (outcome.status !== "added") return;
+
+    const item = await db.select().from(musicItems).where(eq(musicItems.id, outcome.itemId)).get();
+    // Stamping the miss now would keep the item out of the backfill for good.
+    expect(item?.lookupAttemptedAt).toBeNull();
+  });
+
+  test("…and still keeps it when scheduling is off and the item goes straight in", async () => {
+    await setArtistWatchSettings({ scheduleAnnouncedReleases: false });
+    const { alertId } = await makeAlert({
+      title: "Unscheduled Record",
+      firstReleaseDate: "2099-09-18",
+      reason: "announced",
+    });
+
+    const outcome = await acceptAlert(alertId, new Date(), async () =>
+      musicbrainzLink("https://ordinary.bandcamp.com/album/unscheduled-record"),
+    );
+    expect(outcome.status).toBe("added");
+    if (outcome.status !== "added") return;
+
+    // `remind_at` is null here, but the record still isn't out — the provider's
+    // "no" says nothing about the day it is.
+    const item = await db.select().from(musicItems).where(eq(musicItems.id, outcome.itemId)).get();
+    expect(item?.remindAt).toBeNull();
+    expect(item?.lookupAttemptedAt).toBeNull();
+  });
+});
+
+describe("POST /api/release-alerts/:id/add — gate responses", () => {
+  // These let the real check run, so the environment switch has to come off.
+  afterEach(() => {
+    mock.restore();
+    process.env.OTB_DISABLE_EXTERNAL_LOOKUPS = "1";
+  });
+
+  function mockLookups(musicbrainz: () => Response): void {
+    delete process.env.OTB_DISABLE_EXTERNAL_LOOKUPS;
+    spyOn(globalThis, "fetch").mockImplementation(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes("itunes.apple.com") || url.includes("api.music.apple.com")) {
+        return Response.json({ results: {}, resultCount: 0 });
+      }
+      if (url.includes("/ws/2/release-group/")) return musicbrainz();
+      // Accepting an alert also fires the background suggestion prefetch, which
+      // asks MusicBrainz about the artist. Answer it emptily rather than
+      // letting a real request escape the suite.
+      if (url.includes("musicbrainz.org")) return Response.json({});
+      throw new Error(`unexpected fetch in test: ${url}`);
+    });
+  }
+
+  test("422s a release neither the provider nor MusicBrainz has a link for", async () => {
+    const { alertId } = await makeAlert({ title: "Nowhere Record" });
+    const app = makeApp();
+    mockLookups(() => Response.json({ relations: [] }));
+
+    const res = await app.request(`http://localhost/api/release-alerts/${alertId}/add`, {
+      method: "POST",
+    });
+
+    expect(res.status).toBe(422);
+    const body = await res.json();
+    expect(body.reason).toBe("no_link");
+    expect(body.error).toContain("Apple Music");
+
+    const alert = await db.select().from(releaseAlerts).where(eq(releaseAlerts.id, alertId)).get();
+    expect(alert?.status).toBe("pending");
+  });
+
+  test("503s when the check itself couldn't complete", async () => {
+    const { alertId } = await makeAlert({ title: "Unknowable Record" });
+    const app = makeApp();
+    mockLookups(() => new Response("", { status: 503 }));
+
+    const res = await app.request(`http://localhost/api/release-alerts/${alertId}/add`, {
+      method: "POST",
+    });
+
+    expect(res.status).toBe(503);
+    expect((await res.json()).reason).toBe("link_check_failed");
+
+    const alert = await db.select().from(releaseAlerts).where(eq(releaseAlerts.id, alertId)).get();
+    expect(alert?.status).toBe("pending");
+  });
+
+  test("201s once MusicBrainz has an external link for it", async () => {
+    const { alertId } = await makeAlert({ title: "Findable Record" });
+    const app = makeApp();
+    mockLookups(() =>
+      Response.json({
+        relations: [{ type: "streaming", url: { resource: "https://open.spotify.com/album/abc" } }],
+      }),
+    );
+
+    const res = await app.request(`http://localhost/api/release-alerts/${alertId}/add`, {
+      method: "POST",
+    });
+
+    expect(res.status).toBe(201);
+    const body = await res.json();
+    expect(body.link).toEqual({
+      url: "https://open.spotify.com/album/abc",
+      foundBy: "MusicBrainz",
+      via: "musicbrainz",
+    });
+    expect(await linksFor(body.item.id)).toEqual([
+      { url: "https://open.spotify.com/album/abc", source: "spotify" },
+    ]);
   });
 });
 

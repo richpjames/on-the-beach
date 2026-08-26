@@ -14,7 +14,9 @@ import type {
   RecognizeResult,
   ItemSuggestion,
   ReleaseAlert,
+  ReleaseAlertLink,
   ReleaseAlertStatus,
+  AddReleaseAlertResult,
   TrackedArtist,
   ArtistFollowState,
   MbArtistCandidateView,
@@ -398,14 +400,40 @@ export class ApiClient {
     );
   }
 
-  async addReleaseAlert(
-    alertId: number,
-  ): Promise<{ item: MusicItemFull; remindAt: string | null }> {
-    return this.requestJson<{ item: MusicItemFull; remindAt: string | null }>(
-      `/api/release-alerts/${alertId}/add`,
-      "addReleaseAlert",
-      { method: "POST" },
+  /**
+   * Accept an alert. A release with no link on the provider of choice and none
+   * among MusicBrainz's external links is refused rather than filed, so the two
+   * refusals are returned as results — they're expected answers, not failures,
+   * and the card stays in the queue either way.
+   */
+  async addReleaseAlert(alertId: number): Promise<AddReleaseAlertResult> {
+    const response = await fetch(
+      this.buildUrl(`/api/release-alerts/${alertId}/add`),
+      withCsrf({ method: "POST" }),
     );
+
+    if (response.status === 422 || response.status === 503) {
+      const body = (await response.json().catch(() => ({}))) as {
+        error?: string;
+        reason?: string;
+      };
+      return {
+        added: false,
+        reason: body.reason === "link_check_failed" ? "link_check_failed" : "no_link",
+        message: body.error ?? "Couldn't add that release.",
+      };
+    }
+
+    if (!response.ok) {
+      throw new Error(`addReleaseAlert failed: ${response.status}`);
+    }
+
+    const body = (await response.json()) as {
+      item: MusicItemFull;
+      remindAt: string | null;
+      link: ReleaseAlertLink | null;
+    };
+    return { added: true, item: body.item, remindAt: body.remindAt, link: body.link ?? null };
   }
 
   async dismissReleaseAlert(alertId: number): Promise<void> {

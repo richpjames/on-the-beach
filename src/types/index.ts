@@ -266,6 +266,24 @@ export interface ReleaseAlert {
   first_release_year: number | null;
 }
 
+/** The link that vouched for an accepted release. */
+export interface ReleaseAlertLink {
+  url: string;
+  /** "Apple Music", "Spotify" or "MusicBrainz". */
+  foundBy: string;
+  via: "provider" | "musicbrainz";
+}
+
+/**
+ * Accepting an alert can be refused: a release is only filed once there is a
+ * link to it, either on the provider of choice or among MusicBrainz's external
+ * links. `no_link` is a decision about the record; `link_check_failed` means
+ * the lookup itself didn't complete and the alert is worth retrying.
+ */
+export type AddReleaseAlertResult =
+  | { added: true; item: MusicItemFull; remindAt: string | null; link: ReleaseAlertLink | null }
+  | { added: false; reason: "no_link" | "link_check_failed"; message: string };
+
 export interface TrackedArtist {
   id: number;
   name: string;

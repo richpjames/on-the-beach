@@ -3,6 +3,7 @@ import {
   lookupRelease,
   findSuggestedReleases,
   fetchReleaseGroupIdForRelease,
+  fetchReleaseGroupUrlRelations,
   fetchArtistReleaseGroups,
   searchArtistCandidates,
   searchReleaseCandidates,
@@ -506,6 +507,53 @@ describe("fetchReleaseGroupIdForRelease", () => {
     spyOn(globalThis, "fetch").mockResolvedValueOnce(new Response("rate limited", { status: 503 }));
 
     expect(fetchReleaseGroupIdForRelease("r1")).rejects.toThrow("503");
+  });
+});
+
+describe("fetchReleaseGroupUrlRelations", () => {
+  afterEach(() => {
+    mock.restore();
+  });
+
+  test("reads the external links off a release group", async () => {
+    const fetchSpy = spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          id: "rg1",
+          relations: [
+            { type: "streaming", url: { resource: "https://open.spotify.com/album/1" } },
+            { type: "discogs", url: { resource: "https://www.discogs.com/master/1" } },
+          ],
+        }),
+        { headers: { "content-type": "application/json" } },
+      ),
+    );
+
+    const relations = await fetchReleaseGroupUrlRelations("rg1");
+
+    const [url] = fetchSpy.mock.calls[0] as [string, RequestInit];
+    expect(url).toContain("/release-group/rg1?");
+    expect(url).toContain("inc=url-rels");
+    expect(relations).toEqual([
+      { type: "streaming", url: "https://open.spotify.com/album/1" },
+      { type: "discogs", url: "https://www.discogs.com/master/1" },
+    ]);
+  });
+
+  test("skips relations with no url, and a group with none at all is empty", async () => {
+    spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      new Response(JSON.stringify({ id: "rg1", relations: [{ type: "part of", target: "rg2" }] }), {
+        headers: { "content-type": "application/json" },
+      }),
+    );
+
+    expect(await fetchReleaseGroupUrlRelations("rg1")).toEqual([]);
+  });
+
+  test("throws on a non-2xx response — a throttled request is not an absence of links", async () => {
+    spyOn(globalThis, "fetch").mockResolvedValueOnce(new Response("rate limited", { status: 503 }));
+
+    expect(fetchReleaseGroupUrlRelations("rg1")).rejects.toThrow("503");
   });
 });
 

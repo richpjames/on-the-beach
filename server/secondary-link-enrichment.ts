@@ -125,12 +125,19 @@ export async function getExistingLink(itemId: number, sourceName: string): Promi
   return rows[0]?.url ?? null;
 }
 
-export async function saveLink(itemId: number, url: string, sourceName: string): Promise<void> {
-  const sourceRows = await db
-    .select({ id: sources.id })
-    .from(sources)
-    .where(eq(sources.name, sourceName))
-    .limit(1);
+/**
+ * `sourceName` is nullable because a link can arrive from somewhere we don't
+ * model — a MusicBrainz external link may point at an artist's own site. The
+ * row is still worth keeping; it just carries no source.
+ */
+export async function saveLink(
+  itemId: number,
+  url: string,
+  sourceName: string | null,
+): Promise<void> {
+  const sourceRows = sourceName
+    ? await db.select({ id: sources.id }).from(sources).where(eq(sources.name, sourceName)).limit(1)
+    : [];
 
   const sourceId = sourceRows[0]?.id ?? null;
 

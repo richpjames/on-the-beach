@@ -809,3 +809,55 @@ export async function fetchReleaseTrackArtists(releaseId: string): Promise<strin
   }
   return [...names];
 }
+
+// ---------------------------------------------------------------------------
+// External links (release group url-rels)
+//
+// The "External links" block on a MusicBrainz release-group page: the url
+// relationships editors have attached to the work — a Bandcamp page, an Apple
+// Music or Spotify album, a Discogs master, a Wikidata item. It is the second
+// of the two pieces of evidence the New Releases gate accepts that a record
+// exists somewhere you could actually go and hear it.
+// ---------------------------------------------------------------------------
+
+export interface MbUrlRelation {
+  /** MB's relationship type — "streaming", "free streaming", "discogs"… */
+  type: string | null;
+  url: string;
+}
+
+/**
+ * The url relationships attached to a release group.
+ *
+ * Throws `MusicBrainzHttpError` on a non-2xx response and the underlying error
+ * on a network failure: a caller gating on "are there any links" must not read
+ * a failed request as a confident "none".
+ */
+export async function fetchReleaseGroupUrlRelations(
+  releaseGroupId: string,
+): Promise<MbUrlRelation[]> {
+  const params = new URLSearchParams({ inc: "url-rels", fmt: "json" });
+  const response = await mbFetch(`${MB_API_BASE}/release-group/${releaseGroupId}?${params}`);
+  if (!response.ok) {
+    throw new MusicBrainzHttpError(
+      response.status,
+      `MusicBrainz release-group lookup returned ${response.status} for ${releaseGroupId}`,
+    );
+  }
+
+  const data = (await response.json()) as { relations?: unknown[] };
+  const relations: MbUrlRelation[] = [];
+  for (const entry of Array.isArray(data.relations) ? data.relations : []) {
+    if (!entry || typeof entry !== "object") continue;
+    const relation = entry as Record<string, unknown>;
+    const target = relation.url;
+    const resource =
+      target && typeof target === "object" ? (target as Record<string, unknown>).resource : null;
+    if (typeof resource !== "string" || resource.length === 0) continue;
+    relations.push({
+      type: typeof relation.type === "string" ? relation.type : null,
+      url: resource,
+    });
+  }
+  return relations;
+}

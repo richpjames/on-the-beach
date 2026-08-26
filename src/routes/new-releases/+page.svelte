@@ -78,10 +78,19 @@
     busyId = alert.id;
     try {
       const result = await api.addReleaseAlert(alert.id);
+
+      // A release with nowhere to listen to it isn't filed. The card stays in
+      // the queue: the streaming services routinely catch up days later.
+      if (!result.added) {
+        statusMessage = `Not added — ${result.message}`;
+        return;
+      }
+
       removeAlert(alert.id);
+      const found = result.link ? ` Link from ${result.link.foundBy}.` : "";
       statusMessage = result.remindAt
-        ? `Added “${alert.title}” — scheduled for ${releaseDateLabel(alert)}.`
-        : `Added “${alert.title}” to To Listen.`;
+        ? `Added “${alert.title}” — scheduled for ${releaseDateLabel(alert)}.${found}`
+        : `Added “${alert.title}” to To Listen.${found}`;
     } catch {
       statusMessage = "Couldn't add that release.";
     } finally {
