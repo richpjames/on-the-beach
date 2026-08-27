@@ -262,21 +262,6 @@ export async function authorize(): Promise<boolean> {
   }
 }
 
-/**
- * Drop the cached user token and sign in again from scratch.
- *
- * MusicKit keeps the listener's user token in local storage, so one that Apple
- * has expired or revoked still reports as authorised while every play fails.
- * Signing out first is what forces Apple's sign-in sheet back up to mint a
- * fresh token.
- */
-export async function reauthorize(): Promise<boolean> {
-  const mk = await ensureConfigured();
-  if (!mk) return false;
-  await unauthorize();
-  return authorize();
-}
-
 /** Sign the listener out of Apple Music for this app. */
 export async function unauthorize(): Promise<void> {
   if (!instance) return;

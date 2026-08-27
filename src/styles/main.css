@@ -3874,14 +3874,6 @@ a:hover {
   cursor: pointer;
 }
 
-/* Actions sit in a row that wraps to a stack once the panel narrows. */
-.settings__buttons {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--space-2);
-}
-
 .settings__status {
   margin: 0;
   min-height: 1.2em;

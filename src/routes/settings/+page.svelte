@@ -1,13 +1,7 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import { apiFetch } from "$lib/api";
-  import {
-    musickit,
-    authorize,
-    unauthorize,
-    reauthorize,
-    ensureConfigured,
-  } from "$lib/musickit.svelte";
+  import { musickit, authorize, unauthorize, ensureConfigured } from "$lib/musickit.svelte";
   import { api } from "$lib/api";
   import StarRating from "$lib/components/StarRating.svelte";
   import type { LookupService, ReleaseLengthPreference } from "../../../server/settings";
@@ -84,29 +78,17 @@
     }
   }
 
+  /**
+   * Signing out is the whole fix for a stale sign-in: dropping the cached user
+   * token is what makes the next sign-in mint a fresh one. Doing both halves on
+   * one click would have to reopen Apple's sheet without a click of its own,
+   * which WebKit blocks — so the second half is left to the button below.
+   */
   async function signOutAppleMusic(): Promise<void> {
     appleMusicBusy = true;
     try {
       await unauthorize();
-      appleMusicStatusMessage = "Signed out of Apple Music.";
-    } finally {
-      appleMusicBusy = false;
-    }
-  }
-
-  /**
-   * Sign out and straight back in. A user token Apple has expired or revoked
-   * still reads as signed in, so playback fails with nothing here to fix it
-   * short of starting the sign-in over.
-   */
-  async function reauthoriseAppleMusic(): Promise<void> {
-    appleMusicBusy = true;
-    appleMusicStatusMessage = "Reauthorising…";
-    try {
-      const ok = await reauthorize();
-      appleMusicStatusMessage = ok
-        ? "Reauthorised with Apple Music."
-        : "Signed out, but the new sign-in didn't finish — use Sign in to Apple Music below.";
+      appleMusicStatusMessage = "Signed out. Sign in again to refresh your Apple Music access.";
     } finally {
       appleMusicBusy = false;
     }
@@ -548,36 +530,25 @@
         <div class="settings__options">
           {#if musickit.authorized}
             <p class="settings__hint">
-              Signed in to Apple Music. If playback has started failing, reauthorise to replace an
-              expired sign-in.
+              Signed in to Apple Music. If playback has started failing, your sign-in has probably
+              expired — sign out here, then sign in again to refresh it.
             </p>
-            <div class="settings__buttons">
-              <button
-                type="button"
-                class="btn"
-                id="apple-music-reauthorise"
-                disabled={appleMusicBusy}
-                onclick={reauthoriseAppleMusic}>Reauthorise</button
-              >
-              <button
-                type="button"
-                class="btn"
-                id="apple-music-signout"
-                disabled={appleMusicBusy}
-                onclick={signOutAppleMusic}>Sign out</button
-              >
-            </div>
+            <button
+              type="button"
+              class="btn"
+              id="apple-music-signout"
+              disabled={appleMusicBusy}
+              onclick={signOutAppleMusic}>Sign out</button
+            >
           {:else}
-            <div class="settings__buttons">
-              <button
-                type="button"
-                class="btn btn--primary"
-                id="apple-music-connect"
-                disabled={appleMusicBusy}
-                onclick={signInAppleMusic}
-                onmouseenter={connectAppleMusic}>Sign in to Apple Music</button
-              >
-            </div>
+            <button
+              type="button"
+              class="btn btn--primary"
+              id="apple-music-connect"
+              disabled={appleMusicBusy}
+              onclick={signInAppleMusic}
+              onmouseenter={connectAppleMusic}>Sign in to Apple Music</button
+            >
             {#if musickit.error}
               <p class="settings__status" role="status">{musickit.error}</p>
             {/if}
