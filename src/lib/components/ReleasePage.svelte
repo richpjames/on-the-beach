@@ -8,8 +8,10 @@
   import { api, apiFetch } from "../api";
   import { encodeImageFile } from "../encode-image";
   import { player } from "../player.svelte";
+  import ServiceIcon from "./ServiceIcon.svelte";
   import StarRating from "./StarRating.svelte";
   import SuggestionPickerModal from "./SuggestionPickerModal.svelte";
+  import { linkService } from "../../ui/domain/link-service";
 
   // The page wraps this component in {#key item.id}, so all state below is
   // (re)initialised per release — the same lifecycle as the old full-page SSR.
@@ -533,8 +535,10 @@
                 target="_blank"
                 rel="noopener noreferrer"
                 title={data.sourceLink!.label}
-                aria-label={data.sourceLink!.label}>🔗</a
+                aria-label={data.sourceLink!.label}
               >
+                <ServiceIcon service={data.sourceLink!.source} />
+              </a>
             {/if}
             {#if lookupLink && !lookupIsPlayableAppleMusic}
               <a
@@ -543,8 +547,10 @@
                 target="_blank"
                 rel="noopener noreferrer"
                 title={lookupLink.label}
-                aria-label={lookupLink.label}>🔗</a
+                aria-label={lookupLink.label}
               >
+                <ServiceIcon service={linkService(lookupLink.url)} />
+              </a>
             {/if}
             {#each secondaryLinks as link (link.id)}
               {@const label = link.display_name ?? link.source_name ?? "Link"}
@@ -554,8 +560,10 @@
                 target="_blank"
                 rel="noopener noreferrer"
                 title={label}
-                aria-label={label}>🔗</a
+                aria-label={label}
               >
+                <ServiceIcon service={linkService(link.url, link.source_name)} />
+              </a>
             {/each}
           </div>
           {#if data.mixcloudWidgetSrc}

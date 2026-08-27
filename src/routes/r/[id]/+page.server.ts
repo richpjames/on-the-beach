@@ -177,12 +177,17 @@ export const load: PageServerLoad = async ({ params, url }) => {
   // reach its own URL at all. The page hides this link whenever a play button
   // already points at the same href, which covers the case the exclusion was
   // there for.
-  const sourceLink = item.primary_url
-    ? {
-        href: item.primary_url,
-        label: sourceDisplayName(item.primary_source ?? parseUrl(item.primary_url).source),
-      }
+  const primarySource = item.primary_url
+    ? (item.primary_source ?? parseUrl(item.primary_url).source)
     : null;
+  const sourceLink =
+    item.primary_url && primarySource
+      ? {
+          href: item.primary_url,
+          source: primarySource,
+          label: sourceDisplayName(primarySource),
+        }
+      : null;
 
   const appleMusicConfigured = isAppleMusicConfigured();
 

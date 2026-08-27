@@ -3227,7 +3227,8 @@ a:hover {
 }
 
 /* An external link (e.g. "Apple Music") sits in the same horizontal row as
-   the play buttons, but as a compact icon-only button — just a link glyph. */
+   the play buttons, but as a compact icon-only button — the service's own
+   mark, named for screen readers by the button's aria-label. */
 .release-page__link-btn {
   display: inline-flex;
   align-items: center;
@@ -3252,6 +3253,18 @@ a:hover {
   border-color: var(--bevel-sunken);
 }
 
+/* Block, so the icon carries no text baseline gap under it. Sized to sit at
+   the same height as the ▶ buttons' 11px label rather than to the 16px the
+   component defaults to. */
+.service-icon {
+  display: block;
+}
+
+.release-page__link-btn .service-icon {
+  width: 13px;
+  height: 13px;
+}
+
 .release-page__footer {
   display: flex;
   justify-content: flex-end;
@@ -3271,6 +3284,16 @@ a:hover {
     flex: 1 1 calc(50% - var(--space-2));
     justify-content: center;
     min-height: var(--control-h);
+  }
+
+  /* Touch targets grow on phones, and the marks grow with them. */
+  .release-page__link-btn {
+    min-height: var(--control-h);
+  }
+
+  .release-page__link-btn .service-icon {
+    width: 18px;
+    height: 18px;
   }
 }
 
