@@ -87,6 +87,7 @@ interface ReleaseCandidateInput {
   embedMetadata?: Record<string, string>;
   year?: number;
   genre?: string;
+  label?: string;
   /** Provenance line for a release lifted off a page that named several — see `formatPageSourceNote`. */
   sourceNote?: string;
 }
@@ -202,7 +203,7 @@ async function insertMusicItemWithLink(
       purchaseIntent: overrides?.purchaseIntent ?? "no",
       notes: composeNotes(overrides?.notes, candidate.sourceNote),
       artworkUrl: overrides?.artworkUrl ?? candidate.artworkUrl ?? null,
-      label: overrides?.label ?? null,
+      label: overrides?.label ?? candidate.label ?? null,
       year: overrides?.year ?? candidate.year ?? null,
       country: overrides?.country ?? null,
       genre: overrides?.genre ?? candidate.genre ?? null,
@@ -285,6 +286,7 @@ async function resolveReleaseCandidates(
           embedMetadata: scraped?.embedMetadata,
           year: overrides?.year ?? scraped?.year,
           genre: overrides?.genre ?? scraped?.genre,
+          label: overrides?.label ?? scraped?.label,
         },
       ],
     };
