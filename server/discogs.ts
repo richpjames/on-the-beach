@@ -158,7 +158,8 @@ function parseItemType(formats: unknown): ItemType {
 function extractDiscogsTypeAndId(
   url: string,
 ): { type: "release" | "master" | "listing"; id: string } | null {
-  const listingMatch = url.match(/discogs\.com\/sell\/item\/(\d+)/);
+  // /sell/item/<id> is the legacy spelling of /shop/item/<id>; same listing id.
+  const listingMatch = url.match(/discogs\.com\/(?:sell|shop)\/item\/(\d+)/);
   if (listingMatch) return { type: "listing", id: listingMatch[1] };
   const match = url.match(/discogs\.com\/(release|master)\/(\d+)/);
   if (!match) return null;

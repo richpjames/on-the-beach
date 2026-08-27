@@ -54,8 +54,16 @@ const URL_PATTERNS: Array<{
     },
   },
   {
+    // Discogs renamed marketplace listing pages from /sell/item/<id> to
+    // /shop/item/<id>. Both paths serve the same listing id — the API's own
+    // `uri` field still answers with the /sell/ form — so accept either and
+    // normalise to /sell/, keeping a listing shared under both spellings one
+    // item rather than two.
     source: "discogs",
-    pattern: /^https?:\/\/(?:www\.)?discogs\.com\/(?:(?:release|master)\/\d+|sell\/item\/\d+)/,
+    pattern:
+      /^https?:\/\/(?:www\.)?discogs\.com\/(?:(?:release|master)\/\d+|(?:sell|shop)\/item\/\d+)/,
+    normalizer: (match) =>
+      (match.input ?? match[0]).split("?")[0].replace("/shop/item/", "/sell/item/"),
   },
   {
     source: "tidal",
