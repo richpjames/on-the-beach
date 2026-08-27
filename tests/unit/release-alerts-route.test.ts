@@ -376,24 +376,43 @@ describe("acceptAlert link gate", () => {
     expect(item?.lookupAttemptedAt).toBeInstanceOf(Date);
   });
 
-  test("an announced release keeps its provider lookup for the day it comes out", async () => {
-    const url = "https://ordinary.bandcamp.com/album/announced-record";
+  test("an announced release is filed unchecked — its check is release day's job", async () => {
+    const checkLink = mock(async () => NO_LINK);
     const { alertId } = await makeAlert({
       title: "Announced Record",
       firstReleaseDate: "2099-09-18",
       reason: "announced",
     });
 
-    const outcome = await acceptAlert(alertId, new Date(), async () => musicbrainzLink(url));
+    const outcome = await acceptAlert(alertId, new Date(), checkLink);
+
+    // Nobody carries an album that isn't out, so nobody is asked: the item is
+    // scheduled, and processReminders() runs the check on the day.
+    expect(checkLink).not.toHaveBeenCalled();
     expect(outcome.status).toBe("added");
     if (outcome.status !== "added") return;
-
-    const item = await db.select().from(musicItems).where(eq(musicItems.id, outcome.itemId)).get();
-    // Stamping the miss now would keep the item out of the backfill for good.
-    expect(item?.lookupAttemptedAt).toBeNull();
+    expect(outcome.link).toBeNull();
+    expect(outcome.remindAt?.toISOString()).toBe("2099-09-18T00:00:00.000Z");
   });
 
-  test("…and still keeps it when scheduling is off and the item goes straight in", async () => {
+  test("…and with scheduling off it is an ordinary add, gate and all", async () => {
+    await setArtistWatchSettings({ scheduleAnnouncedReleases: false });
+    const checkLink = mock(async () => NO_LINK);
+    const { alertId } = await makeAlert({
+      title: "Unscheduled Announced Record",
+      firstReleaseDate: "2099-09-18",
+      reason: "announced",
+    });
+
+    const outcome = await acceptAlert(alertId, new Date(), checkLink);
+
+    expect(checkLink).toHaveBeenCalled();
+    expect(outcome.status).toBe("no-link");
+  });
+
+  test("a link found for a record that isn't out keeps its provider lookup alive", async () => {
+    // Scheduling off, so an announced record is filed straight into To Listen
+    // and the gate applies — but the provider's "no" is still about today.
     await setArtistWatchSettings({ scheduleAnnouncedReleases: false });
     const { alertId } = await makeAlert({
       title: "Unscheduled Record",
@@ -407,8 +426,6 @@ describe("acceptAlert link gate", () => {
     expect(outcome.status).toBe("added");
     if (outcome.status !== "added") return;
 
-    // `remind_at` is null here, but the record still isn't out — the provider's
-    // "no" says nothing about the day it is.
     const item = await db.select().from(musicItems).where(eq(musicItems.id, outcome.itemId)).get();
     expect(item?.remindAt).toBeNull();
     expect(item?.lookupAttemptedAt).toBeNull();

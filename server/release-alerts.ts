@@ -13,16 +13,12 @@ import {
 import { createMusicItemDirect } from "./music-item-store";
 import {
   checkReleaseLink,
+  persistReleaseLink,
   type ReleaseLink,
   type ReleaseLinkOutcome,
   type ReleaseLinkQuery,
 } from "./release-link-check";
-import {
-  LOOKUP_SERVICE_CONFIG,
-  saveArtwork,
-  saveLink,
-  stampLookup,
-} from "./secondary-link-enrichment";
+import { LOOKUP_SERVICE_CONFIG } from "./secondary-link-enrichment";
 import {
   isAnnouncedRelease,
   remindAtForReleaseDate,
@@ -216,27 +212,6 @@ export function itemTypeForReleaseGroup(primaryType: string | null): ItemType {
   return candidate && ITEM_TYPES.has(candidate as ItemType) ? (candidate as ItemType) : "album";
 }
 
-/**
- * Keep what the gate already found: the link itself, the cover art that came
- * with it, and — when the provider was asked and had nothing — the attempt
- * marker, so the release page doesn't re-ask on every view.
- *
- * The marker is withheld for a record that isn't out yet (`released` false):
- * the provider's "no" is about today, and stamping it would keep the item out
- * of the backfill for good once the record actually appeared.
- */
-async function persistAcceptedLink(
-  itemId: number,
-  link: ReleaseLink,
-  released: boolean,
-): Promise<void> {
-  await saveLink(itemId, link.url, link.sourceName);
-  if (link.artworkUrl) await saveArtwork(itemId, link.artworkUrl);
-  if (link.via === "musicbrainz" && link.providerSearched && released) {
-    await stampLookup(itemId);
-  }
-}
-
 /** The link that vouched for the release, as shown back to the user. */
 export interface AcceptedLink {
   url: string;
@@ -268,6 +243,13 @@ export type AcceptOutcome =
  * same answer as a record nobody carries. The gate runs *before* the claim
  * below, so a refused alert is left exactly as it was and can be tried again
  * once the streaming services catch up.
+ *
+ * A record that is going to be *scheduled* is exempt: nobody carries a link to
+ * an album that isn't out, and refusing it would make the announced case — the
+ * one the watcher is most useful for — unaddable. Its check moves to release
+ * day instead, where `processReminders()` runs it before letting the item into
+ * To Listen. That is also why the gate isn't run here at all for those: the
+ * answer today says nothing about the answer on the day.
  */
 export async function acceptAlert(
   alertId: number,
@@ -293,22 +275,30 @@ export async function acceptAlert(
 
   if (!alert || alert.status === "added") return { status: "not-found" };
 
-  const linkCheck = await checkLink({
-    title: alert.title,
-    artistName: alert.artistName,
-    mbReleaseGroupId: alert.mbReleaseGroupId,
-  });
+  const settings = await getArtistWatchSettings();
+  const remindAt = settings.scheduleAnnouncedReleases
+    ? remindAtForReleaseDate(alert.firstReleaseDate, now)
+    : null;
 
-  if (linkCheck.kind === "failed") {
-    return { status: "check-failed", message: linkCheck.message };
+  let found: ReleaseLink | null = null;
+  if (remindAt === null) {
+    const linkCheck = await checkLink({
+      title: alert.title,
+      artistName: alert.artistName,
+      mbReleaseGroupId: alert.mbReleaseGroupId,
+    });
+
+    if (linkCheck.kind === "failed") {
+      return { status: "check-failed", message: linkCheck.message };
+    }
+    if (linkCheck.kind === "none") {
+      return {
+        status: "no-link",
+        serviceName: LOOKUP_SERVICE_CONFIG[linkCheck.service].displayName,
+      };
+    }
+    if (linkCheck.kind === "found") found = linkCheck.link;
   }
-  if (linkCheck.kind === "none") {
-    return {
-      status: "no-link",
-      serviceName: LOOKUP_SERVICE_CONFIG[linkCheck.service].displayName,
-    };
-  }
-  const found = linkCheck.kind === "found" ? linkCheck.link : null;
 
   // Claim the alert before creating anything. Reading the status and acting on
   // it are two steps, so without a claim two concurrent accepts of the same
@@ -323,11 +313,6 @@ export async function acceptAlert(
   if (claimed.length === 0) return { status: "not-found" };
 
   try {
-    const settings = await getArtistWatchSettings();
-    const remindAt = settings.scheduleAnnouncedReleases
-      ? remindAtForReleaseDate(alert.firstReleaseDate, now)
-      : null;
-
     const { item } = await createMusicItemDirect(
       {
         title: alert.title,
@@ -336,19 +321,21 @@ export async function acceptAlert(
         listenStatus: "to-listen",
         year: alert.firstReleaseYear ?? undefined,
       },
-      // The gate has already asked the provider, so the eager background
-      // lookup would only ask it again for an answer we hold; its result is
-      // written below instead. With the gate switched off, the old rule
-      // stands: a record that isn't out yet has nothing to find on the
-      // streaming services, and the lookup stamps an attempt marker that would
-      // stop the item being re-queried once it actually is released.
+      // Nothing to gain from the eager background lookup in either case: the
+      // gate has just asked the provider and its answer is written below, or
+      // the record isn't out, where a lookup would find nothing and stamp an
+      // attempt marker that would stop the item being re-queried once it
+      // actually is released. Release day re-checks it either way.
       { skipLinkEnrichment: found !== null || remindAt !== null },
     );
 
-    // Out already, as far as MusicBrainz knows — asked of the release date
-    // rather than of `remindAt`, which is also null when scheduling is off.
+    // Asked of the release date, not of `remindAt`: with scheduling switched
+    // off an announced record is filed straight into To Listen, and the
+    // provider's "no" about a record that isn't out must not be remembered.
     if (found) {
-      await persistAcceptedLink(item.id, found, !isAnnouncedRelease(alert.firstReleaseDate, now));
+      await persistReleaseLink(item.id, found, {
+        released: !isAnnouncedRelease(alert.firstReleaseDate, now),
+      });
     }
 
     if (remindAt) {

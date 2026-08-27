@@ -1,5 +1,10 @@
 import { fetchReleaseGroupUrlRelations, type MbUrlRelation } from "./musicbrainz";
-import { LOOKUP_SERVICE_CONFIG } from "./secondary-link-enrichment";
+import {
+  LOOKUP_SERVICE_CONFIG,
+  saveArtwork,
+  saveLink,
+  stampLookup,
+} from "./secondary-link-enrichment";
 import { getLookupService, type LookupService } from "./settings";
 import type { ServiceSearchResult } from "./scraper";
 import { parseUrl } from "./utils";
@@ -177,4 +182,25 @@ export async function checkReleaseLink(
 
   if (providerError !== null) return { kind: "failed", message: providerError };
   return { kind: "none", service, providerSearched };
+}
+
+/**
+ * Keep what a check found: the link itself, the cover art that came with it,
+ * and — when the provider was asked and had nothing — the attempt marker, so
+ * the release page doesn't re-ask on every view.
+ *
+ * The marker is withheld for a record that isn't out yet (`released` false):
+ * the provider's "no" is about today, and stamping it would keep the item out
+ * of the backfill for good once the record actually appeared.
+ */
+export async function persistReleaseLink(
+  itemId: number,
+  link: ReleaseLink,
+  { released }: { released: boolean },
+): Promise<void> {
+  await saveLink(itemId, link.url, link.sourceName);
+  if (link.artworkUrl) await saveArtwork(itemId, link.artworkUrl);
+  if (link.via === "musicbrainz" && link.providerSearched && released) {
+    await stampLookup(itemId);
+  }
 }
