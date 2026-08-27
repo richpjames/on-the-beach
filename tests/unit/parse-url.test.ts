@@ -75,6 +75,38 @@ describe("parseUrl - soundcloud", () => {
   });
 });
 
+describe("parseUrl - discogs", () => {
+  test("identifies a marketplace listing on the legacy /sell/item path", () => {
+    const result = parseUrl("https://www.discogs.com/sell/item/4334240712");
+
+    expect(result.source).toBe("discogs");
+    expect(result.normalizedUrl).toBe("https://www.discogs.com/sell/item/4334240712");
+  });
+
+  test("identifies a marketplace listing on the current /shop/item path", () => {
+    const result = parseUrl("https://www.discogs.com/shop/item/4334240712");
+
+    expect(result.source).toBe("discogs");
+  });
+
+  test("normalises /shop/item to /sell/item so both spellings dedupe together", () => {
+    const shop = parseUrl("https://www.discogs.com/shop/item/4334240712?ev=item_sug");
+    const sell = parseUrl("https://www.discogs.com/sell/item/4334240712");
+
+    expect(shop.normalizedUrl).toBe(sell.normalizedUrl);
+    expect(shop.normalizedUrl).toBe("https://www.discogs.com/sell/item/4334240712");
+  });
+
+  test("leaves a release URL and its slug untouched", () => {
+    const result = parseUrl("https://www.discogs.com/release/123456-Neil-Young-On-The-Beach?ev=x");
+
+    expect(result.source).toBe("discogs");
+    expect(result.normalizedUrl).toBe(
+      "https://www.discogs.com/release/123456-Neil-Young-On-The-Beach",
+    );
+  });
+});
+
 describe("parseUrl - generic mobile subdomain handling", () => {
   test("strips m. from mixcloud links", () => {
     const result = parseUrl("https://m.mixcloud.com/somebody/some-show/");

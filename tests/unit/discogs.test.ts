@@ -248,6 +248,22 @@ describe("fetchDiscogsRelease", () => {
     });
   });
 
+  test("resolves shop/item URL via marketplace listing", async () => {
+    const fetchSpy = spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(makeDiscogsResponse({ release: { id: 5678 } }))
+      .mockResolvedValueOnce(makeDiscogsResponse(RELEASE_FIXTURE));
+
+    const result = await fetchDiscogsRelease("https://www.discogs.com/shop/item/4334240712", 5000);
+
+    const [listingUrl] = fetchSpy.mock.calls[0] as [string, RequestInit];
+    expect(listingUrl).toBe("https://api.discogs.com/marketplace/listings/4334240712");
+
+    const [releaseUrl] = fetchSpy.mock.calls[1] as [string, RequestInit];
+    expect(releaseUrl).toBe("https://api.discogs.com/releases/5678");
+
+    expect(result?.potentialTitle).toBe("Some EP");
+  });
+
   test("returns null when sell/item listing cannot be resolved", async () => {
     spyOn(globalThis, "fetch").mockResolvedValueOnce(
       makeDiscogsResponse({ message: "Not Found" }, 404),
