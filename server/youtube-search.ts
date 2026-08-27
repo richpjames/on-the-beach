@@ -1,5 +1,5 @@
 import type { ServiceSearchResult } from "./apple-music-catalog";
-import { decodeHtmlEntities } from "./scraper";
+import { decodeHtmlEntities } from "./html-metadata";
 
 // ---------------------------------------------------------------------------
 // YouTube fallback search
