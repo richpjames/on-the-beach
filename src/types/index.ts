@@ -279,6 +279,9 @@ export interface ReleaseAlertLink {
  * link to it, either on the provider of choice or among MusicBrainz's external
  * links. `no_link` is a decision about the record; `link_check_failed` means
  * the lookup itself didn't complete and the alert is worth retrying.
+ *
+ * A record that isn't out yet is exempt — it is scheduled unchecked, and the
+ * server runs the check on release day before letting it into To Listen.
  */
 export type AddReleaseAlertResult =
   | { added: true; item: MusicItemFull; remindAt: string | null; link: ReleaseAlertLink | null }

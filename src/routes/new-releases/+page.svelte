@@ -89,7 +89,11 @@
       removeAlert(alert.id);
       const found = result.link ? ` Link from ${result.link.foundBy}.` : "";
       statusMessage = result.remindAt
-        ? `Added “${alert.title}” — scheduled for ${releaseDateLabel(alert)}.${found}`
+        ? // Nothing carries a record that isn't out, so a scheduled release is
+          // filed unchecked and asked about again on the day.
+          `Added “${alert.title}” — scheduled for ${releaseDateLabel(alert)}.${
+            found || " Links are checked on release day."
+          }`
         : `Added “${alert.title}” to To Listen.${found}`;
     } catch {
       statusMessage = "Couldn't add that release.";
@@ -139,8 +143,8 @@
       <h2 class="alerts__heading">📻 New Releases</h2>
       <p class="alerts__hint">
         Records by artists you've listened to that we haven't seen before. Adding one files it in
-        the New Releases stack; anything not out yet is scheduled to arrive in To Listen on release
-        day.
+        the New Releases stack, as long as there's a link to it; anything not out yet is scheduled
+        and checked again on release day.
       </p>
       <a class="alerts__feed-link" href="/feed/new-releases.rss">📡 Subscribe by RSS</a>
     </section>
