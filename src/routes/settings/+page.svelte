@@ -1,7 +1,13 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import { apiFetch } from "$lib/api";
-  import { musickit, authorize, unauthorize, ensureConfigured } from "$lib/musickit.svelte";
+  import {
+    musickit,
+    authorize,
+    unauthorize,
+    reauthorize,
+    ensureConfigured,
+  } from "$lib/musickit.svelte";
   import { api } from "$lib/api";
   import StarRating from "$lib/components/StarRating.svelte";
   import type { LookupService, ReleaseLengthPreference } from "../../../server/settings";
@@ -64,12 +70,46 @@
     if (amReady) void ensureConfigured();
   }
 
+  let appleMusicStatusMessage = $state("");
+  let appleMusicBusy = $state(false);
+
   async function signInAppleMusic(): Promise<void> {
-    await authorize();
+    appleMusicBusy = true;
+    appleMusicStatusMessage = "Opening Apple Music sign-in…";
+    try {
+      const ok = await authorize();
+      appleMusicStatusMessage = ok ? "Signed in to Apple Music." : "Sign-in didn't complete.";
+    } finally {
+      appleMusicBusy = false;
+    }
   }
 
   async function signOutAppleMusic(): Promise<void> {
-    await unauthorize();
+    appleMusicBusy = true;
+    try {
+      await unauthorize();
+      appleMusicStatusMessage = "Signed out of Apple Music.";
+    } finally {
+      appleMusicBusy = false;
+    }
+  }
+
+  /**
+   * Sign out and straight back in. A user token Apple has expired or revoked
+   * still reads as signed in, so playback fails with nothing here to fix it
+   * short of starting the sign-in over.
+   */
+  async function reauthoriseAppleMusic(): Promise<void> {
+    appleMusicBusy = true;
+    appleMusicStatusMessage = "Reauthorising…";
+    try {
+      const ok = await reauthorize();
+      appleMusicStatusMessage = ok
+        ? "Reauthorised with Apple Music."
+        : "Reauthorisation didn't complete — you're signed out.";
+    } finally {
+      appleMusicBusy = false;
+    }
   }
 
   async function onServiceChange(service: LookupService): Promise<void> {
@@ -507,22 +547,44 @@
         </p>
         <div class="settings__options">
           {#if musickit.authorized}
-            <p class="settings__status" role="status">Signed in to Apple Music.</p>
-            <button type="button" class="btn" id="apple-music-signout" onclick={signOutAppleMusic}
-              >Sign out</button
-            >
+            <p class="settings__hint">
+              Signed in to Apple Music. If playback has started failing, reauthorise to replace an
+              expired sign-in.
+            </p>
+            <div class="settings__buttons">
+              <button
+                type="button"
+                class="btn"
+                id="apple-music-reauthorise"
+                disabled={appleMusicBusy}
+                onclick={reauthoriseAppleMusic}>Reauthorise</button
+              >
+              <button
+                type="button"
+                class="btn"
+                id="apple-music-signout"
+                disabled={appleMusicBusy}
+                onclick={signOutAppleMusic}>Sign out</button
+              >
+            </div>
           {:else}
-            <button
-              type="button"
-              class="btn btn--primary"
-              id="apple-music-connect"
-              onclick={signInAppleMusic}
-              onmouseenter={connectAppleMusic}>Sign in to Apple Music</button
-            >
+            <div class="settings__buttons">
+              <button
+                type="button"
+                class="btn btn--primary"
+                id="apple-music-connect"
+                disabled={appleMusicBusy}
+                onclick={signInAppleMusic}
+                onmouseenter={connectAppleMusic}>Sign in to Apple Music</button
+              >
+            </div>
             {#if musickit.error}
               <p class="settings__status" role="status">{musickit.error}</p>
             {/if}
           {/if}
+          <p id="apple-music-status" class="settings__status" role="status" aria-live="polite">
+            {appleMusicStatusMessage}
+          </p>
         </div>
       {:else if amState === "checking"}
         <p class="settings__hint">Checking Apple Music configuration…</p>
