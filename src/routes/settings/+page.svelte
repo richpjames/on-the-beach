@@ -106,7 +106,7 @@
       const ok = await reauthorize();
       appleMusicStatusMessage = ok
         ? "Reauthorised with Apple Music."
-        : "Reauthorisation didn't complete — you're signed out.";
+        : "Signed out, but the new sign-in didn't finish — use Sign in to Apple Music below.";
     } finally {
       appleMusicBusy = false;
     }
