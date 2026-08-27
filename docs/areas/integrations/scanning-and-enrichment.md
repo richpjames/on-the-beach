@@ -2,7 +2,9 @@
 
 ## Link metadata
 
-- `server/scraper.ts` parses OG tags, detects whether unknown pages are music-related, and extracts source-specific metadata.
+- `server/scraper.ts` fetches the page, detects whether unknown pages are music-related, and dispatches to the parser for the link's source.
+- `server/html-metadata.ts` holds the source-agnostic reading of a page — OG tags, JSON-LD, HTML entities — so a per-source module never has to import the scraper that calls it.
+- `server/mixcloud.ts` holds everything Mixcloud: oEmbed, JSON-LD and OG parsing, thumbnail squaring, the widget URL the release page embeds, and the show URL lifted from an embedded widget on someone else's page. Other sources with more than a parser have their own modules too (`server/discogs.ts`, `server/apple-music-catalog.ts`, `server/youtube-search.ts`).
 - Known sources such as Bandcamp can expose extra embed metadata.
 - Unsupported pages can still be processed through text extraction when Mistral-backed release extraction is available.
 - A page naming several releases is a listing (a Mixcloud profile, a label catalogue, a round-up), and links to each of them. `matchReleaseUrls` (`server/link-extractor.ts`) pairs each extracted release with the page's own link to it, matching on the anchor's text and the link's slug, so an item picked off the listing links to its own release page and is filed under that page's source. A release the page links no page for keeps the listing URL.

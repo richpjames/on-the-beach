@@ -8,6 +8,7 @@ import {
   extractYouTubeVideoId,
   extractYouTubePlaylistId,
 } from "../../../../server/utils";
+import { mixcloudWidgetSrc } from "../../../../server/mixcloud";
 import { parseAppleMusicCatalogUrl, type AppleMusicResource } from "../../../../shared/apple-music";
 import { sanitizeListHref } from "../../../ui/domain/list-url";
 import type { MusicItemFull } from "../../../types";
@@ -142,23 +143,6 @@ function appleMusicListen(item: MusicItemFull, configured: boolean): AppleMusicL
   return null;
 }
 
-function mixcloudWidgetSrc(item: MusicItemFull): string | null {
-  const meta = parseLinkMetadata(item.primary_link_metadata);
-  const mixcloudUrl = meta?.mixcloud_url;
-  if (!mixcloudUrl) return null;
-
-  let pathname: string;
-  try {
-    const parsed = new URL(mixcloudUrl);
-    if (!parsed.hostname.toLowerCase().endsWith("mixcloud.com")) return null;
-    pathname = parsed.pathname;
-  } catch {
-    return null;
-  }
-
-  return `https://www.mixcloud.com/widget/iframe/?hide_cover=1&feed=${encodeURIComponent(pathname)}`;
-}
-
 export const load: PageServerLoad = async ({ params, url }) => {
   const id = Number(params.id);
   if (!Number.isInteger(id) || id <= 0) {
@@ -204,7 +188,9 @@ export const load: PageServerLoad = async ({ params, url }) => {
     bandcampEmbed: bandcampEmbed(item),
     appleMusicListen: appleMusicListen(item, appleMusicConfigured),
     appleMusicConfigured,
-    mixcloudWidgetSrc: mixcloudWidgetSrc(item),
+    mixcloudWidgetSrc: mixcloudWidgetSrc(
+      parseLinkMetadata(item.primary_link_metadata)?.mixcloud_url,
+    ),
     lookupService: await getLookupService(),
   };
 };

@@ -1,6 +1,6 @@
 import { Mistral } from "@mistralai/mistralai";
 import type { ItemType, LinkReleaseCandidate } from "../src/types";
-import { decodeHtmlEntities } from "./scraper";
+import { decodeHtmlEntities } from "./html-metadata";
 
 const DEFAULT_LINK_MODEL = "mistral-small-latest";
 const MAX_AI_TEXT_CHARS = 20_000;
