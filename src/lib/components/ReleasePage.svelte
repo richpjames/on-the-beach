@@ -385,10 +385,15 @@
   });
 
   const metaFields = $derived(
-    [item.year ? String(item.year) : null, item.label, item.country, item.genre]
-      .filter(Boolean)
-      .join(" · "),
+    [item.year ? String(item.year) : null, item.country, item.genre].filter(Boolean).join(" · "),
   );
+
+  // The record label belongs with the catalogue number, not folded into the
+  // run-on above: "Bronze" sandwiched between a year and a country reads as
+  // neither, whereas "Bronze · BRON 511" reads as the imprint and the number
+  // printed on the sleeve. The RSS feed (server/routes/rss.ts) already emits
+  // the pair as one line for the same reason.
+  const labelLine = $derived([item.label, item.catalogue_number].filter(Boolean).join(" · "));
 
   // The primary-source link (e.g. "Spotify", "Discogs") is a plain external
   // link. Hide it when a play button already targets the same URL — otherwise
@@ -443,8 +448,8 @@
           {#if metaFields}
             <p class="release-page__meta">{metaFields}</p>
           {/if}
-          {#if item.catalogue_number}
-            <p class="release-page__catalogue">{item.catalogue_number}</p>
+          {#if labelLine}
+            <p class="release-page__label">{labelLine}</p>
           {/if}
           <div class="release-page__notes-section">
             {#if notesState === "editing" || notesState === "saving"}

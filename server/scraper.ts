@@ -28,6 +28,8 @@ export interface ScrapedMetadata {
   embedMetadata?: Record<string, string>;
   year?: number;
   genre?: string;
+  /** The releasing label, where the source names one (Discogs does). */
+  label?: string;
   canonicalUrl?: string;
 }
 

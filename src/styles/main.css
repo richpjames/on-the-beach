@@ -3009,7 +3009,7 @@ a:hover {
   margin-top: var(--space-2);
 }
 
-.release-page__catalogue {
+.release-page__label {
   color: var(--chrome-darker);
   font-size: var(--text-base);
 }

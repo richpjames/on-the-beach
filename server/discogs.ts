@@ -88,6 +88,10 @@ interface DiscogsFormat {
   descriptions?: unknown;
 }
 
+interface DiscogsLabel {
+  name?: unknown;
+}
+
 interface DiscogsRelease {
   title?: unknown;
   year?: unknown;
@@ -96,6 +100,7 @@ interface DiscogsRelease {
   styles?: unknown;
   images?: unknown;
   formats?: unknown;
+  labels?: unknown;
 }
 
 export interface DiscogsScrapedData {
@@ -105,6 +110,7 @@ export interface DiscogsScrapedData {
   itemType: ItemType;
   year?: number;
   genre?: string;
+  label?: string;
 }
 
 function parseArtistName(artists: unknown): string | undefined {
@@ -112,6 +118,20 @@ function parseArtistName(artists: unknown): string | undefined {
   const first = artists[0] as DiscogsArtist;
   if (typeof first?.name !== "string") return undefined;
   // Remove Discogs disambiguation suffix like " (2)"
+  return first.name.replace(/\s+\(\d+\)$/, "").trim() || undefined;
+}
+
+/**
+ * The releasing label. Discogs lists every label credited on the pressing —
+ * reissue imprints, sub-labels, the odd "Not On Label" placeholder — and the
+ * first is the one printed on the sleeve, so it is the one worth keeping. The
+ * disambiguation suffix (`Ariola (2)`) is stripped for the same reason it is
+ * on artists: it is a Discogs bookkeeping artefact, not part of the name.
+ */
+function parseLabelName(labels: unknown): string | undefined {
+  if (!Array.isArray(labels) || labels.length === 0) return undefined;
+  const first = labels[0] as DiscogsLabel;
+  if (typeof first?.name !== "string") return undefined;
   return first.name.replace(/\s+\(\d+\)$/, "").trim() || undefined;
 }
 
@@ -178,6 +198,7 @@ export function parseDiscogsRelease(data: unknown): DiscogsScrapedData | null {
   const genre = parsePrimaryGenre(release.genres, release.styles);
   const imageUrl = parsePrimaryImageUri(release.images);
   const itemType = parseItemType(release.formats);
+  const label = parseLabelName(release.labels);
 
   if (!potentialTitle && !potentialArtist && !imageUrl) return null;
 
@@ -188,6 +209,7 @@ export function parseDiscogsRelease(data: unknown): DiscogsScrapedData | null {
     itemType,
     ...(year !== undefined ? { year } : {}),
     ...(genre !== undefined ? { genre } : {}),
+    ...(label !== undefined ? { label } : {}),
   };
 }
 

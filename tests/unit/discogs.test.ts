@@ -70,6 +70,32 @@ describe("parseDiscogsRelease", () => {
     expect(result?.imageUrl).toBe("https://img.discogs.com/primary.jpg");
   });
 
+  test("keeps the releasing label", () => {
+    const result = parseDiscogsRelease(RELEASE_FIXTURE);
+    expect(result?.label).toBe("Test Label");
+  });
+
+  test("takes the first label when the pressing credits several", () => {
+    const data = {
+      title: "Test",
+      labels: [{ name: "Bronze" }, { name: "Reissue Imprint" }],
+    };
+    const result = parseDiscogsRelease(data);
+    expect(result?.label).toBe("Bronze");
+  });
+
+  test("strips the disambiguation suffix from a label name", () => {
+    const data = { title: "Test", labels: [{ name: "Ariola (2)" }] };
+    const result = parseDiscogsRelease(data);
+    expect(result?.label).toBe("Ariola");
+  });
+
+  test("omits label when the release names none", () => {
+    // Masters carry no label — the imprint belongs to a pressing, not the work.
+    const result = parseDiscogsRelease(MASTER_FIXTURE);
+    expect(result?.label).toBeUndefined();
+  });
+
   test("falls back to first image when no primary image", () => {
     const data = {
       title: "Test",
@@ -245,6 +271,7 @@ describe("fetchDiscogsRelease", () => {
       itemType: "ep",
       year: 2016,
       genre: "Techno",
+      label: "Test Label",
     });
   });
 
