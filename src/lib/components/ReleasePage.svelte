@@ -3,8 +3,8 @@
   import { onMount } from "svelte";
   import type { PageData } from "../../routes/r/[id]/$types";
   import type { AppleMusicListen, ListenEmbed } from "../../routes/r/[id]/+page.server";
-  import type { ItemSuggestion, ListenStatus } from "../../types";
-  import { parseAppleMusicCatalogUrl } from "../../../shared/apple-music";
+  import type { ItemSuggestion, ListenStatus } from "../../../domain/types";
+  import { parseAppleMusicCatalogUrl } from "../../../domain/apple-music";
   import { api, apiFetch } from "../api";
   import { encodeImageFile } from "../encode-image";
   import { player } from "../player.svelte";

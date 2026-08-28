@@ -1,7 +1,7 @@
 <script lang="ts">
   import Sortable from "sortablejs";
   import { onMount } from "svelte";
-  import type { ListenStatus, MusicItemFull, StackWithCount } from "../../types";
+  import type { ListenStatus, MusicItemFull, StackWithCount } from "../../../domain/types";
   import type { FilterSelection } from "../../ui/domain/music-list";
   import { getEmptyStateHint, getEmptyStateMessage } from "../../ui/domain/music-list";
   import { api } from "../api";

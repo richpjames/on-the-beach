@@ -5,7 +5,7 @@ import { normalize, capitalize } from "./utils";
 import { enrichSecondaryLinkInBackground } from "./secondary-link-enrichment";
 import { fetchSuggestionInBackground } from "./suggestions";
 import { fullItemSelect } from "./queries/full-item-select";
-import type { CreateMusicItemInput, MusicItemFull } from "../src/types";
+import type { CreateMusicItemInput, MusicItemFull } from "../domain/types";
 
 // ---------------------------------------------------------------------------
 // Item reads and URL-less writes.

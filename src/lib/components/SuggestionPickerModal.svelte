@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { ItemSuggestion } from "../../types";
+  import type { ItemSuggestion } from "../../../domain/types";
   import { api } from "../api";
   import SuggestionArtwork from "./SuggestionArtwork.svelte";
 

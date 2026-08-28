@@ -4,7 +4,7 @@ import type {
   MusicItemSort,
   MusicItemSortDirection,
   StackWithCount,
-} from "../../types";
+} from "../../../domain/types";
 
 export interface AppContext {
   currentFilter: ListenStatus | "all" | "scheduled";

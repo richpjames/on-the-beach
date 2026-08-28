@@ -4,9 +4,9 @@ import { musicItems, musicItemStacks, stacks, musicItemOrder, stackParents } fro
 import { fullItemSelect } from "./full-item-select";
 import { hydrateItemStacks } from "../hydrate-item-stacks";
 import { collectDescendantStackIds } from "../routes/music-items";
-import { applyOrder, buildContextKey } from "../../shared/music-list-context";
+import { applyOrder, buildContextKey } from "../../domain/music-list-context";
 import type { FilterSelection } from "../../src/ui/domain/music-list";
-import type { MusicItemFull, StackWithCount } from "../../src/types";
+import type { MusicItemFull, StackWithCount } from "../../domain/types";
 
 export const DEFAULT_FILTER = "to-listen" as const;
 export const STACK_DEFAULT_FILTER: FilterSelection = "all";

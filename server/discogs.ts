@@ -1,4 +1,4 @@
-import type { ItemType } from "../src/types";
+import type { ItemType } from "../domain/types";
 
 const DISCOGS_API_BASE = "https://api.discogs.com";
 const USER_AGENT = "on-the-beach/1.0 (https://github.com/richpjames/on-the-beach)";

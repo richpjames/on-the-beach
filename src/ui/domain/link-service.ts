@@ -1,4 +1,4 @@
-import type { SourceName } from "../../types";
+import type { SourceName } from "../../../domain/types";
 
 /**
  * Which service a link points at, for choosing the mark that stands in for it.

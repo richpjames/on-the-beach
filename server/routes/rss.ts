@@ -2,8 +2,8 @@ import { Hono } from "hono";
 import { db } from "../db/index";
 import { musicItems, artists, musicLinks, sources, stacks, musicItemStacks } from "../db/schema";
 import { eq, and, inArray, isNull } from "drizzle-orm";
-import type { MusicItemFull } from "../../src/types";
-import type { PrimaryFeedKey } from "../../shared/rss";
+import type { MusicItemFull } from "../../domain/types";
+import type { PrimaryFeedKey } from "../../domain/rss";
 import type { ReleaseAlertView } from "../release-alerts";
 import { listReleaseAlerts } from "../release-alerts";
 

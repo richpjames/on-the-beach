@@ -1,7 +1,7 @@
 <script lang="ts">
   import Case from "case";
   import { tick } from "svelte";
-  import type { ListenStatus, MusicItemFull, StackWithCount } from "../../types";
+  import type { ListenStatus, MusicItemFull, StackWithCount } from "../../../domain/types";
   import { buildReleaseHref } from "../../ui/domain/list-url";
   import { STATUS_LABELS } from "../../ui/domain/status";
   import { api } from "../api";

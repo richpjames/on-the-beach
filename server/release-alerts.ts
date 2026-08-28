@@ -26,7 +26,7 @@ import {
   type AlertReason,
 } from "./artist-watch";
 import { getArtistWatchSettings, getNewReleasesStackId, setNewReleasesStackId } from "./settings";
-import type { ItemType } from "../src/types";
+import type { ItemType } from "../domain/types";
 
 // ---------------------------------------------------------------------------
 // The alert queue: reading it, and the three things you can do with a card.

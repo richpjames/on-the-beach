@@ -1,4 +1,4 @@
-import type { MusicItemSort, MusicItemSortDirection } from "../../types";
+import type { MusicItemSort, MusicItemSortDirection } from "../../../domain/types";
 import type { FilterSelection } from "./music-list";
 
 /**

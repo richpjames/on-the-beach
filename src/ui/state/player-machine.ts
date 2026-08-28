@@ -1,5 +1,5 @@
 import { assign, setup } from "xstate";
-import type { AppleMusicKind } from "../../../shared/apple-music";
+import type { AppleMusicKind } from "../../../domain/apple-music";
 
 export type PlayerType = "audio" | "video";
 

@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import { afterNavigate } from "$app/navigation";
-  import type { MusicItemFull } from "../../types";
+  import type { MusicItemFull } from "../../../domain/types";
   import { api } from "../api";
   import { player } from "../player.svelte";
 

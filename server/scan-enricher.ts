@@ -1,4 +1,4 @@
-import type { ScanResult } from "../src/types";
+import type { ScanResult } from "../domain/types";
 import type { MusicBrainzFields } from "./musicbrainz";
 
 const CONFIDENCE_THRESHOLD = 0.8;

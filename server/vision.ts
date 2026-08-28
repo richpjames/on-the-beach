@@ -1,5 +1,5 @@
 import { Mistral } from "@mistralai/mistralai";
-import type { ScanResult } from "../src/types";
+import type { ScanResult } from "../domain/types";
 import { parseScanJson } from "./scan-parser";
 
 const DEFAULT_SCAN_MODEL = "mistral-small-2506";

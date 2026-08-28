@@ -4,7 +4,7 @@ import { getWebContext } from "../google-vision";
 import { lookupRelease } from "../musicbrainz";
 import { fetchAndSaveCoverArt } from "../cover-art-archive";
 import { createScanEnricher } from "../scan-enricher";
-import type { ScanResult } from "../../src/types";
+import type { ScanResult } from "../../domain/types";
 import type { MusicBrainzFields } from "../musicbrainz";
 import { saveImageFromBase64, validateImageBase64 } from "../uploads";
 import { db } from "../db/index";

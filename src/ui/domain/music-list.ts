@@ -3,8 +3,8 @@ import type {
   MusicItemFilters,
   MusicItemSort,
   MusicItemSortDirection,
-} from "../../types";
-import { applyOrder, buildContextKey } from "../../../shared/music-list-context";
+} from "../../../domain/types";
+import { applyOrder, buildContextKey } from "../../../domain/music-list-context";
 import { STATUS_LABELS } from "./status";
 
 export type FilterSelection = ListenStatus | "all" | "scheduled";

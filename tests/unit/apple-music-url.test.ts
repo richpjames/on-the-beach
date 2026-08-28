@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { parseAppleMusicCatalogUrl, isPlayableAppleMusicUrl } from "../../shared/apple-music";
+import { parseAppleMusicCatalogUrl, isPlayableAppleMusicUrl } from "../../domain/apple-music";
 
 describe("parseAppleMusicCatalogUrl", () => {
   test("parses an album URL with a storefront", () => {
