@@ -10,6 +10,8 @@ export type MusicItemSort =
   | "release-name"
   | "star-rating";
 export type MusicItemSortDirection = "asc" | "desc";
+/** What a browse list is filtered down to — the statuses plus the two pseudo-filters. */
+export type FilterSelection = ListenStatus | "all" | "scheduled";
 
 export type SourceName =
   | "bandcamp"

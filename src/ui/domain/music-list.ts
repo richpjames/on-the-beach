@@ -1,4 +1,5 @@
 import type {
+  FilterSelection,
   ListenStatus,
   MusicItemFilters,
   MusicItemSort,
@@ -6,8 +7,6 @@ import type {
 } from "../../../domain/types";
 import { applyOrder, buildContextKey } from "../../../domain/music-list-context";
 import { STATUS_LABELS } from "./status";
-
-export type FilterSelection = ListenStatus | "all" | "scheduled";
 
 export function buildMusicItemFilters(
   currentFilter: FilterSelection,

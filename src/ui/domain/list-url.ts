@@ -1,5 +1,5 @@
 import type { MusicItemSort, MusicItemSortDirection } from "../../../domain/types";
-import type { FilterSelection } from "./music-list";
+import type { FilterSelection } from "../../../domain/types";
 
 /**
  * How a list page (`/` or `/s/:id/:name`) is being browsed.
