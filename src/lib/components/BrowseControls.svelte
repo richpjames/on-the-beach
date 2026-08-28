@@ -1,7 +1,7 @@
 <script lang="ts">
   import { tick } from "svelte";
   import type { MusicItemSort, MusicItemSortDirection } from "../../../domain/types";
-  import type { FilterSelection } from "../../ui/domain/music-list";
+  import type { FilterSelection } from "../../../domain/types";
   import type { appMachine } from "../../ui/state/app-machine";
   import type { MachineHandle } from "../use-machine.svelte";
 
