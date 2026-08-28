@@ -18,4 +18,4 @@
 
 - Titles and artist names are normalized for searching and deduping.
 - Link metadata is stored as JSON text when a source needs extra embed fields.
-- Ordering is persisted by browse context, not globally, via keys from `shared/music-list-context.ts`.
+- Ordering is persisted by browse context, not globally, via keys from `domain/music-list-context.ts`.

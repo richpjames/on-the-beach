@@ -5,7 +5,7 @@
   import { api } from "$lib/api";
   import StarRating from "$lib/components/StarRating.svelte";
   import type { LookupService, ReleaseLengthPreference } from "../../../server/settings";
-  import type { ArtistFollowState, MbArtistCandidateView, TrackedArtist } from "../../types";
+  import type { ArtistFollowState, MbArtistCandidateView, TrackedArtist } from "../../../domain/types";
 
   let { data } = $props();
 

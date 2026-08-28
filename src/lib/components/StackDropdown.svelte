@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount } from "svelte";
-  import type { StackWithCount } from "../../types";
+  import type { StackWithCount } from "../../../domain/types";
 
   let {
     stacks,

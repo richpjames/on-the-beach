@@ -9,9 +9,9 @@ import {
   extractYouTubePlaylistId,
 } from "../../../../server/utils";
 import { mixcloudWidgetSrc } from "../../../../server/mixcloud";
-import { parseAppleMusicCatalogUrl, type AppleMusicResource } from "../../../../shared/apple-music";
+import { parseAppleMusicCatalogUrl, type AppleMusicResource } from "../../../../domain/apple-music";
 import { sanitizeListHref } from "../../../ui/domain/list-url";
-import type { MusicItemFull } from "../../../types";
+import type { MusicItemFull } from "../../../../domain/types";
 
 const SOURCE_DISPLAY_NAMES: Record<string, string> = {
   bandcamp: "Bandcamp",

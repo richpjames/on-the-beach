@@ -17,7 +17,7 @@
  */
 import { browser } from "$app/environment";
 import { createActor } from "xstate";
-import type { AppleMusicKind } from "../../shared/apple-music";
+import type { AppleMusicKind } from "../../domain/apple-music";
 import { playResource, stop as stopMusicKit } from "./musickit.svelte";
 import { playerMachine, type PlayerType } from "../ui/state/player-machine";
 

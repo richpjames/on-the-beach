@@ -6,7 +6,7 @@
  * live here rather than in `scraper.ts` — that keeps a per-source module (see
  * `mixcloud.ts`) from having to import the scraper it is called by.
  */
-import type { ItemType } from "../src/types";
+import type { ItemType } from "../domain/types";
 import type { ExtractedReleaseCandidate } from "./link-extractor";
 
 export interface OgData {

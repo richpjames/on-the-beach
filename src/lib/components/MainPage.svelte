@@ -2,7 +2,7 @@
   import { goto } from "$app/navigation";
   import { page } from "$app/state";
   import { onMount } from "svelte";
-  import type { ItemSuggestion, ListenStatus, MusicItemFull, StackWithCount } from "../../types";
+  import type { ItemSuggestion, ListenStatus, MusicItemFull, StackWithCount } from "../../../domain/types";
   import { buildContextKey, buildMusicItemFilters } from "../../ui/domain/music-list";
   import {
     buildListHref,
@@ -22,7 +22,7 @@
     buildStackFeedHref,
     buildStackFeedTitle,
     PRIMARY_FEEDS,
-  } from "../../../shared/rss";
+  } from "../../../domain/rss";
   import { api } from "../api";
   import { useMachine } from "../use-machine.svelte";
   import AddForm from "./AddForm.svelte";

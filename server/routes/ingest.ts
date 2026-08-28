@@ -15,7 +15,7 @@ import { getWebContext } from "../google-vision";
 import { lookupRelease } from "../musicbrainz";
 import { db } from "../db";
 import { stacks, musicItemStacks, musicItems } from "../db/schema";
-import type { CreateMusicItemInput, ScanResult } from "../../src/types";
+import type { CreateMusicItemInput, ScanResult } from "../../domain/types";
 
 interface EmailEnvelope {
   from: string;

@@ -1,5 +1,5 @@
 import { describe, test, expect } from "bun:test";
-import { parseUrl, extractYouTubePlaylistId } from "../../src/repository/utils";
+import { parseUrl, extractYouTubePlaylistId } from "../../server/utils";
 
 describe("parseUrl - youtube", () => {
   test("identifies youtube watch link and preserves video ID in normalizedUrl", () => {

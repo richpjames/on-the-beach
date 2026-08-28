@@ -11,7 +11,7 @@
 
 <script lang="ts">
   import { tick } from "svelte";
-  import type { StackWithCount } from "../../types";
+  import type { StackWithCount } from "../../../domain/types";
   import HorizontalScrollbar from "./HorizontalScrollbar.svelte";
 
   let {

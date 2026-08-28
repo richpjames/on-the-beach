@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { ItemSuggestion } from "../../types";
+  import type { ItemSuggestion } from "../../../domain/types";
 
   let { suggestion }: { suggestion: ItemSuggestion } = $props();
 

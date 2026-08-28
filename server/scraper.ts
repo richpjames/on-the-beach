@@ -1,4 +1,4 @@
-import type { SourceName } from "../src/types";
+import type { SourceName } from "../domain/types";
 import {
   extractPageLinks,
   extractReleaseCandidatesFromWebText,

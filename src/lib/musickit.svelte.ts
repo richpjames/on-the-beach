@@ -10,7 +10,7 @@
  * All playback state lives at module scope so it survives SvelteKit client-side
  * navigation, mirroring `player.svelte.ts`.
  */
-import type { AppleMusicKind } from "../../shared/apple-music";
+import type { AppleMusicKind } from "../../domain/apple-music";
 
 const MUSICKIT_SRC = "https://js-cdn.music.apple.com/musickit/v3/musickit.js";
 

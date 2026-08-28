@@ -1,4 +1,4 @@
-import type { ListenStatus } from "../../types";
+import type { ListenStatus } from "../../../domain/types";
 
 export type DisplayListenStatus = ListenStatus;
 

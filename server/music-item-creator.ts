@@ -22,7 +22,7 @@ import type {
   LinkReleaseCandidate,
   MusicItemFull,
   SourceName,
-} from "../src/types";
+} from "../domain/types";
 
 // ---------------------------------------------------------------------------
 // Helpers (moved from routes/music-items.ts for shared use)

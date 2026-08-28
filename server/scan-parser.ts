@@ -1,4 +1,4 @@
-import type { ScanResult } from "../src/types";
+import type { ScanResult } from "../domain/types";
 
 function normalizeNullableString(value: unknown): string | null {
   if (typeof value !== "string") {

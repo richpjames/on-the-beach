@@ -1,8 +1,8 @@
 import { describe, expect, mock, test } from "bun:test";
 import { Hono } from "hono";
 import { createRssRoutes } from "../../server/routes/rss";
-import type { MusicItemFull } from "../../src/types";
-import type { PrimaryFeedKey } from "../../shared/rss";
+import type { MusicItemFull } from "../../domain/types";
+import type { PrimaryFeedKey } from "../../domain/rss";
 import type { ReleaseAlertView } from "../../server/release-alerts";
 
 type StackInfo = { id: number; name: string };

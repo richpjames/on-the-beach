@@ -20,7 +20,7 @@ import type {
   TrackedArtist,
   ArtistFollowState,
   MbArtistCandidateView,
-} from "../types";
+} from "../../domain/types";
 
 import { CSRF_COOKIE_NAME, CSRF_HEADER_NAME } from "../../server/csrf";
 

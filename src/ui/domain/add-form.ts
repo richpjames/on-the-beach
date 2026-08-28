@@ -1,4 +1,4 @@
-import type { CreateMusicItemInput, ItemType } from "../../types";
+import type { CreateMusicItemInput, ItemType } from "../../../domain/types";
 
 export interface AddFormValues {
   url: string;

@@ -1,5 +1,5 @@
 import { Mistral } from "@mistralai/mistralai";
-import type { ItemType, LinkReleaseCandidate } from "../src/types";
+import type { ItemType, LinkReleaseCandidate } from "../domain/types";
 import { decodeHtmlEntities } from "./html-metadata";
 
 const DEFAULT_LINK_MODEL = "mistral-small-latest";

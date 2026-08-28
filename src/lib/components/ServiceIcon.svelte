@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { SourceName } from "../../types";
+  import type { SourceName } from "../../../domain/types";
 
   /**
    * The mark a service is known by, drawn in place of a generic link glyph.

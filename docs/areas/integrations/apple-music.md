@@ -74,7 +74,7 @@ the edit form without actually changing those fields leaves the marker alone.
   with the developer token, and exposes a small reactive facade (availability,
   authorised, playing, position/duration, now-playing metadata) plus
   `authorize`, `playResource`, `togglePlay`, `seek`, and `stop`.
-- `shared/apple-music.ts` parses a stored `music.apple.com` URL into the
+- `domain/apple-music.ts` parses a stored `music.apple.com` URL into the
   `{ kind, id }` MusicKit's `setQueue` needs (`album` / `song` / `playlist` /
   `musicVideo`), including `?i=` track deep-links.
 - `src/lib/player.svelte.ts` gains an `apple_music` mode alongside the existing

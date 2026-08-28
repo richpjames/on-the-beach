@@ -18,7 +18,7 @@ const config = {
       config: (tsconfig) => ({
         ...tsconfig,
         // Typecheck the app source, matching the pre-SvelteKit typecheck
-        // scope (src only). Server, shared, test, and eval code runs under
+        // scope (src only). Server, domain, test, and eval code runs under
         // bun and is exercised by `bun test`.
         include: tsconfig.include.filter((pattern) => !pattern.startsWith("../test")),
       }),

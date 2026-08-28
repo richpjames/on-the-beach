@@ -13,7 +13,7 @@ import {
   itemSuggestions,
 } from "../db/schema";
 import { isValidUrl, normalize } from "../utils";
-import { applyOrder, buildContextKey } from "../../shared/music-list-context";
+import { applyOrder, buildContextKey } from "../../domain/music-list-context";
 import {
   AmbiguousLinkSelectionError,
   fullItemSelect,
@@ -34,7 +34,7 @@ import type {
   ListenStatus,
   PurchaseIntent,
   ItemType,
-} from "../../src/types";
+} from "../../domain/types";
 
 export const musicItemRoutes = new Hono();
 const LOCAL_UPLOADS_PATTERN = /^\/uploads\/[A-Za-z0-9._-]+$/;
