@@ -26,6 +26,12 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile --ignore-scripts
 
+      # The layer boundaries in .oxlintrc.json are only enforced where oxlint
+      # runs. Without this step it fires in the pre-commit hook and nowhere
+      # else, so anything landing via --no-verify or the web UI skips it.
+      - name: Lint
+        run: bun run lint
+
       - name: Run unit tests
         run: bun run test:unit
 
