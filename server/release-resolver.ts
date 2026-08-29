@@ -15,6 +15,7 @@ import {
 } from "./musicbrainz";
 import { pickArtistFromSearch } from "./artist-identity";
 import { editDistance } from "./title-similarity";
+import type { ItemType } from "../domain/types";
 
 // ---------------------------------------------------------------------------
 // Release identifier resolution
@@ -333,11 +334,36 @@ export function scoreCandidate(
 }
 
 /**
- * The most credible accepted candidate, or null if none verifies. Ties break
- * towards the candidate whose year is closest to the one asked for, which is
- * the only thing year is allowed to decide.
+ * A record and the 7" cut from it share an artist, a title and usually a year,
+ * so text similarity cannot separate them at all. Jayme Marques' "¡Que Cosa Mas
+ * Linda!" is both a Venezuelan LP and a Spanish 7", every candidate scores 1.0,
+ * and Discogs returns the 7" first. Popularity does not help either — the 7"
+ * has 232 copies logged against the LP's none.
+ *
+ * What does separate them is size, because the input is a photograph of a
+ * sleeve and a 12" is what people photograph. So this demotes the 7" formats
+ * and leaves everything else alone: `parseItemType` files a 12" maxi-single
+ * under "ep", which is why an EP must not be ranked below an album. Patrick
+ * Cowley's "Menergy" is a 12" maxi-single sharing its name with the LP, and
+ * ordering albums first picked the wrong one.
+ *
+ * Within a tier the provider's own ordering stands — sort is stable, and
+ * nothing here claims to know better than Discogs which pressing is meant.
  */
-export function pickBest<T extends { artist: string; title: string; year?: number | null }>(
+const SEVEN_INCH_FORMATS = new Set<ItemType>(["single", "track"]);
+
+function itemTypeRank(itemType: ItemType | undefined): number {
+  return itemType && SEVEN_INCH_FORMATS.has(itemType) ? 1 : 0;
+}
+
+/**
+ * The most credible accepted candidate, or null if none verifies. Ties break
+ * towards the candidate whose year is closest to the one asked for — the only
+ * thing year is allowed to decide — and then towards the preferred format.
+ */
+export function pickBest<
+  T extends { artist: string; title: string; year?: number | null; itemType?: ItemType },
+>(
   query: ReleaseQuery,
   candidates: T[],
   thresholds: MatchThresholds = DEFAULT_THRESHOLDS,
@@ -349,7 +375,10 @@ export function pickBest<T extends { artist: string; title: string; year?: numbe
 
   accepted.sort((a, b) => {
     if (b.score.confidence !== a.score.confidence) return b.score.confidence - a.score.confidence;
-    return yearDistance(query.year, a.candidate.year) - yearDistance(query.year, b.candidate.year);
+    const byYear =
+      yearDistance(query.year, a.candidate.year) - yearDistance(query.year, b.candidate.year);
+    if (byYear !== 0) return byYear;
+    return itemTypeRank(a.candidate.itemType) - itemTypeRank(b.candidate.itemType);
   });
   return accepted[0];
 }
@@ -410,6 +439,7 @@ interface Scorable<T> {
   artist: string;
   title: string;
   year: number | null;
+  itemType: ItemType;
   value: T;
 }
 
@@ -588,6 +618,7 @@ export function resolveDiscogs(
       artist: c.artist,
       title: c.title,
       year: c.year,
+      itemType: c.itemType,
       value: c,
     }),
     resolved.thresholds,
@@ -603,7 +634,13 @@ export async function resolveMusicBrainz(
     query,
     musicbrainzVariants(query, resolved.maxVariants),
     (variant) => searchReleaseCandidates({ ...variant, limit: resolved.candidateLimit }),
-    (c) => ({ artist: c.artistCredit, title: c.title, year: yearFromDate(c.date), value: c }),
+    (c) => ({
+      artist: c.artistCredit,
+      title: c.title,
+      year: yearFromDate(c.date),
+      itemType: c.itemType,
+      value: c,
+    }),
     resolved.thresholds,
   );
   if (main.kind !== "absent" || resolved.maxVariants < Number.MAX_SAFE_INTEGER) return main;

@@ -322,6 +322,39 @@ describe("searchReleases", () => {
     expect(candidate?.title).toBe("Land of Hunger");
   });
 
+  test('reads the format so an LP can be told from a 7" of the same name', async () => {
+    spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      searchResponse([
+        {
+          id: 8117908,
+          master_id: 915552,
+          title: "Jayme Marques - \u00a1Que Cosa Mas Linda!",
+          formats: [{ name: "Vinyl", qty: "1", descriptions: ['7"', "45 RPM", "Single"] }],
+        },
+        {
+          id: 29167312,
+          master_id: 845372,
+          title: "Jayme Marques - \u00a1Que Cosa Mas Linda!",
+          formats: [{ name: "Vinyl", qty: "1", descriptions: ["LP", "Stereo"] }],
+        },
+      ]),
+    );
+
+    const candidates = await searchReleases({ artist: "Jayme Marques" });
+
+    expect(candidates.map((c) => c.itemType)).toEqual(["single", "album"]);
+  });
+
+  test("a result with no formats is treated as an album", async () => {
+    spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      searchResponse([{ id: 4, title: "Olu - Living Free" }]),
+    );
+
+    const [candidate] = await searchReleases({ artist: "Olu" });
+
+    expect(candidate?.itemType).toBe("album");
+  });
+
   test("strips the disambiguation suffix from the artist half", async () => {
     spyOn(globalThis, "fetch").mockResolvedValueOnce(
       searchResponse([{ id: 2, title: "Bana (2) - Eroticorythmotropicalomanie Vol. 3" }]),

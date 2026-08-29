@@ -1,0 +1,1828 @@
+{
+  "runAt": "2026-08-29T15:09:26.096Z",
+  "config": "ground-truth",
+  "caseCount": 99,
+  "strategies": {
+    "R4": {
+      "name": "Both databases",
+      "options": {},
+      "summary": {
+        "mb": {
+          "hit": 51,
+          "false-id": 5,
+          "miss": 1,
+          "correct-abstain": 42,
+          "resolvable": 55,
+          "total": 99,
+          "resolutionRate": 0.9272727272727272,
+          "falseIdRate": 0.050505050505050504
+        },
+        "discogs": {
+          "hit": 96,
+          "false-id": 1,
+          "miss": 0,
+          "correct-abstain": 2,
+          "resolvable": 97,
+          "total": 99,
+          "resolutionRate": 0.9896907216494846,
+          "falseIdRate": 0.010101010101010102
+        },
+        "either": {
+          "hit": 96,
+          "false-id": 1,
+          "miss": 0,
+          "correct-abstain": 2,
+          "resolvable": 97,
+          "total": 99,
+          "resolutionRate": 0.9896907216494846,
+          "falseIdRate": 0.010101010101010102
+        }
+      },
+      "failures": 0,
+      "cases": [
+        {
+          "id": "the-earons-land-of-hunger",
+          "mb": "hit",
+          "discogs": "hit",
+          "either": "hit",
+          "input": {
+            "artist": "The Earons",
+            "title": "Land Of Hunger"
+          },
+          "returned": {
+            "musicbrainzReleaseGroupId": "732b0804-4460-4b64-89d8-7d627ef1b662",
+            "musicbrainzReleaseId": "c2ae2f7c-3d6b-48d3-900c-3d92a580e9da",
+            "discogsMasterId": 147257,
+            "discogsReleaseId": 370884
+          },
+          "status": "matched",
+          "errors": []
+        },
+        {
+          "id": "louis-chedid-ainsi-soit-il",
+          "mb": "hit",
+          "discogs": "hit",
+          "either": "hit",
+          "input": {
+            "artist": "Louis Chedid",
+            "title": "Ainsi Soit-Il"
+          },
+          "returned": {
+            "musicbrainzReleaseGroupId": "df1fec14-64bb-35bd-9e26-1d7656e2fc4a",
+            "musicbrainzReleaseId": "5a18e89e-3c1d-43f1-89a6-d8c7dba5890c",
+            "discogsMasterId": 553717,
+            "discogsReleaseId": 2500475
+          },
+          "status": "matched",
+          "errors": []
+        },
+        {
+          "id": "ed-lincoln-ontem-hoje-sempre",
+          "mb": "correct-abstain",
+          "discogs": "hit",
+          "either": "hit",
+          "input": {
+            "artist": "Ed Lincoln",
+            "title": "Ontem Hoje Sempre"
+          },
+          "returned": {
+            "musicbrainzReleaseGroupId": null,
+            "musicbrainzReleaseId": null,
+            "discogsMasterId": 2115715,
+            "discogsReleaseId": 16698117
+          },
+          "status": "partial",
+          "errors": []
+        },
+        {
+          "id": "caetano-veloso-caetano-veloso",
+          "mb": "false-id",
+          "discogs": "false-id",
+          "either": "false-id",
+          "input": {
+            "artist": "Caetano Veloso",
+            "title": "Caetano Veloso"
+          },
+          "returned": {
+            "musicbrainzReleaseGroupId": "4a790f7b-cdad-37b1-8647-523a4b980059",
+            "musicbrainzReleaseId": "067fe766-e176-4b3d-a80e-706bc1f1bfe9",
+            "discogsMasterId": 422737,
+            "discogsReleaseId": 4632674
+          },
+          "status": "matched",
+          "errors": []
+        },
+        {
+          "id": "pipos-4-o-encontro-da-massa",
+          "mb": "correct-abstain",
+          "discogs": "hit",
+          "either": "hit",
+          "input": {
+            "artist": "Pipo's 4",
+            "title": "O Encontro da Massa"
+          },
+          "returned": {
+            "musicbrainzReleaseGroupId": null,
+            "musicbrainzReleaseId": null,
+            "discogsMasterId": null,
+            "discogsReleaseId": 4084391
+          },
+          "status": "partial",
+          "errors": []
+        },
+        {
+          "id": "quarteto-em-cy-tamba-trio-som-definitivo",
+          "mb": "hit",
+          "discogs": "hit",
+          "either": "hit",
+          "input": {
+            "artist": "Quarteto Em Cy & Tamba Trio",
+            "title": "Som Definitivo"
+          },
+          "returned": {
+            "musicbrainzReleaseGroupId": "ff7a1b16-468e-375f-b17f-3232e5da44a2",
+            "musicbrainzReleaseId": "ed2eb549-6609-44de-aff6-b971247a2a62",
+            "discogsMasterId": 453524,
+            "discogsReleaseId": 11495613
+          },
+          "status": "matched",
+          "errors": []
+        },
+        {
+          "id": "esperanza-spalding-emilys-devolution",
+          "mb": "hit",
+          "discogs": "hit",
+          "either": "hit",
+          "input": {
+            "artist": "Esperanza Spalding",
+            "title": "Emily's D+Evolution"
+          },
+          "returned": {
+            "musicbrainzReleaseGroupId": "68b352ae-a374-4535-834a-96e920782e8f",
+            "musicbrainzReleaseId": "967cca56-b787-4023-93e3-c0a6cd2c58e2",
+            "discogsMasterId": 966960,
+            "discogsReleaseId": 16793610
+          },
+          "status": "matched",
+          "errors": []
+        },
+        {
+          "id": "machito-tanga",
+          "mb": "correct-abstain",
+          "discogs": "hit",
+          "either": "hit",
+          "input": {
+            "artist": "Machito & His Afro-Cubans",
+            "title": "Tanga"
+          },
+          "returned": {
+            "musicbrainzReleaseGroupId": null,
+            "musicbrainzReleaseId": null,
+            "discogsMasterId": null,
+            "discogsReleaseId": 15972766
+          },
+          "status": "partial",
+          "errors": []
+        },
+        {
+          "id": "orquesta-el-macabeo-salsa-bestial",
+          "mb": "correct-abstain",
+          "discogs": "hit",
+          "either": "hit",
+          "input": {
+            "artist": "Orquesta El Macabeo",
+            "title": "Salsa Bestial"
+          },
+          "returned": {
+            "musicbrainzReleaseGroupId": null,
+            "musicbrainzReleaseId": null,
+            "discogsMasterId": 706722,
+            "discogsReleaseId": 4419535
+          },
+          "status": "partial",
+          "errors": []
+        },
+        {
+          "id": "t-rex-t-rex",
+          "mb": "hit",
+          "discogs": "hit",
+          "either": "hit",
+          "input": {
+            "artist": "T. Rex",
+            "title": "T. Rex"
+          },
+          "returned": {
+            "musicbrainzReleaseGroupId": "00333095-980d-332e-bc3b-47629fa2912a",
+            "musicbrainzReleaseId": "f64fac95-74fa-461f-8a0d-3ff6de6fe171",
+            "discogsMasterId": 72465,
+            "discogsReleaseId": 3807942
+          },
+          "status": "matched",
+          "errors": []
+        },
+        {
+          "id": "various-rico-rico",
+          "mb": "correct-abstain",
+          "discogs": "hit",
+          "either": "hit",
+          "input": {
+            "artist": "Various",
+            "title": "Rico Rico - 50 Exitos Tropicales"
+          },
+          "returned": {
+            "musicbrainzReleaseGroupId": null,
+            "musicbrainzReleaseId": null,
+            "discogsMasterId": null,
+            "discogsReleaseId": 19218739
+          },
+          "status": "partial",
+          "errors": []
+        },
+        {
+          "id": "various-seattle-the-dark-side",
+          "mb": "hit",
+          "discogs": "hit",
+          "either": "hit",
+          "input": {
+            "artist": "Various",
+            "title": "Seattle... The Dark Side"
+          },
+          "returned": {
+            "musicbrainzReleaseGroupId": "8323e203-2be7-4389-89ae-a9d9ef574be9",
+            "musicbrainzReleaseId": "1fce191c-3bcb-4d01-9247-98cb0caefa87",
+            "discogsMasterId": 133994,
+            "discogsReleaseId": 14452508
+          },
+          "status": "matched",
+          "errors": []
+        },
+        {
+          "id": "determine-never-know",
+          "mb": "correct-abstain",
+          "discogs": "hit",
+          "either": "hit",
+          "input": {
+            "artist": "Determine",
+            "title": "Never Know"
+          },
+          "returned": {
+            "musicbrainzReleaseGroupId": null,
+            "musicbrainzReleaseId": null,
+            "discogsMasterId": null,
+            "discogsReleaseId": 620497
+          },
+          "status": "partial",
+          "errors": []
+        },
+        {
+          "id": "discotex-records-6am-wanna-be-down",
+          "mb": "correct-abstain",
+          "discogs": "hit",
+          "either": "hit",
+          "input": {
+            "artist": "Dawna Lee",
+            "title": "Wanna Be Down"
+          },
+          "returned": {
+            "musicbrainzReleaseGroupId": null,
+            "musicbrainzReleaseId": null,
+            "discogsMasterId": null,
+            "discogsReleaseId": 4727092
+          },
+          "status": "partial",
+          "errors": []
+        },
+        {
+          "id": "legends-of-the-dark-ground-cabra",
+          "mb": "hit",
+          "discogs": "hit",
+          "either": "hit",
+          "input": {
+            "artist": "Legends Of The Underground",
+            "title": "Cafira (Seiji Re-Rinse)"
+          },
+          "returned": {
+            "musicbrainzReleaseGroupId": "f960df62-56eb-4cfa-9339-56ee5212bf62",
+            "musicbrainzReleaseId": "c0926dcf-d47f-443e-8c42-288e94ad85a6",
+            "discogsMasterId": 299366,
+            "discogsReleaseId": 2630775
+          },
+          "status": "matched",
+          "errors": []
+        },
+        {
+          "id": "wedding-hands-in-the-till",
+          "mb": "hit",
+          "discogs": "hit",
+          "either": "hit",
+          "input": {
+            "artist": "Wedding",
+            "title": "Hands In The Till / A Little Love"
+          },
+          "returned": {
+            "musicbrainzReleaseGroupId": "a5993e87-d69e-43f2-985a-98778f4dac76",
+            "musicbrainzReleaseId": "62980466-c7fc-4632-8cb1-a900761a7b60",
+            "discogsMasterId": null,
+            "discogsReleaseId": 23433719
+          },
+          "status": "matched",
+          "errors": []
+        },
+        {
+          "id": "olu-living-free",
+          "mb": "correct-abstain",
+          "discogs": "hit",
+          "either": "hit",
+          "input": {
+            "artist": "Olu",
+            "title": "Living Free"
+          },
+          "returned": {
+            "musicbrainzReleaseGroupId": null,
+            "musicbrainzReleaseId": null,
+            "discogsMasterId": 239435,
+            "discogsReleaseId": 83593
+          },
+          "status": "partial",
+          "errors": []
+        },
+        {
+          "id": "big-bub-i-dont-mind",
+          "mb": "correct-abstain",
+          "discogs": "hit",
+          "either": "hit",
+          "input": {
+            "artist": "Big Bub",
+            "title": "I Don't Mind"
+          },
+          "returned": {
+            "musicbrainzReleaseGroupId": null,
+            "musicbrainzReleaseId": null,
+            "discogsMasterId": 251748,
+            "discogsReleaseId": 1607384
+          },
+          "status": "partial",
+          "errors": []
+        },
+        {
+          "id": "patrick-cowley-menergy",
+          "mb": "false-id",
+          "discogs": "hit",
+          "either": "hit",
+          "input": {
+            "artist": "Patrick Cowley",
+            "title": "Menergy"
+          },
+          "returned": {
+            "musicbrainzReleaseGroupId": "cb628693-4612-4c0c-bde5-a1d98423647a",
+            "musicbrainzReleaseId": "bfc36f18-11d2-4af3-bf27-5581d07e4863",
+            "discogsMasterId": 74424,
+            "discogsReleaseId": 70529
+          },
+          "status": "matched",
+          "errors": []
+        },
+        {
+          "id": "sleepy-brown-i-cant-wait",
+          "mb": "correct-abstain",
+          "discogs": "hit",
+          "either": "hit",
+          "input": {
+            "artist": "Sleepy Brown feat. Outkast",
+            "title": "I Can't Wait"
+          },
+          "returned": {
+            "musicbrainzReleaseGroupId": null,
+            "musicbrainzReleaseId": null,
+            "discogsMasterId": 828491,
+            "discogsReleaseId": 640255
+          },
+          "status": "partial",
+          "errors": []
+        },
+        {
+          "id": "mc-mell-o-first-chronicles",
+          "mb": "correct-abstain",
+          "discogs": "hit",
+          "either": "hit",
+          "input": {
+            "artist": "MC Mell 'O'",
+            "title": "The First Chronicles of D.E.T.T."
+          },
+          "returned": {
+            "musicbrainzReleaseGroupId": null,
+            "musicbrainzReleaseId": null,
+            "discogsMasterId": 52258,
+            "discogsReleaseId": 5918605
+          },
+          "status": "partial",
+          "errors": []
+        },
+        {
+          "id": "natural-black-early-on-before",
+          "mb": "correct-abstain",
+          "discogs": "hit",
+          "either": "hit",
+          "input": {
+            "artist": "Natural Black",
+            "title": "Early On Before"
+          },
+          "returned": {
+            "musicbrainzReleaseGroupId": null,
+            "musicbrainzReleaseId": null,
+            "discogsMasterId": null,
+            "discogsReleaseId": 3193831
+          },
+          "status": "partial",
+          "errors": []
+        },
+        {
+          "id": "young-peoples-records-all-aboard",
+          "mb": "correct-abstain",
+          "discogs": "hit",
+          "either": "hit",
+          "input": {
+            "artist": "Young People's Records",
+            "title": "All Aboard! Train To The Zoo / Train To The Farm / Train To The Ranch"
+          },
+          "returned": {
+            "musicbrainzReleaseGroupId": null,
+            "musicbrainzReleaseId": null,
+            "discogsMasterId": null,
+            "discogsReleaseId": 1914320
+          },
+          "status": "partial",
+          "errors": []
+        },
+        {
+          "id": "mario-telles-mario-telles",
+          "mb": "hit",
+          "discogs": "hit",
+          "either": "hit",
+          "input": {
+            "artist": "Mario Telles",
+            "title": "Mario Telles"
+          },
+          "returned": {
+            "musicbrainzReleaseGroupId": "86c5f490-ce6c-3a6a-9ac8-24830ab302df",
+            "musicbrainzReleaseId": "2c03ebda-9bf3-43a8-8e2f-3bc12f361024",
+            "discogsMasterId": 1012099,
+            "discogsReleaseId": 28183675
+          },
+          "status": "matched",
+          "errors": []
+        },
+        {
+          "id": "lecuona-plays-for-two",
+          "mb": "correct-abstain",
+          "discogs": "hit",
+          "either": "hit",
+          "input": {
+            "artist": "Ernesto Lecuona",
+            "title": "Lecuona Plays For Two"
+          },
+          "returned": {
+            "musicbrainzReleaseGroupId": null,
+            "musicbrainzReleaseId": null,
+            "discogsMasterId": 1542480,
+            "discogsReleaseId": 3770028
+          },
+          "status": "partial",
+          "errors": []
+        },
+        {
+          "id": "aeoliah-crystal-illumination",
+          "mb": "hit",
+          "discogs": "hit",
+          "either": "hit",
+          "input": {
+            "artist": "Aeoliah",
+            "title": "Crystal Illumination"
+          },
+          "returned": {
+            "musicbrainzReleaseGroupId": "e8d6377f-b7d4-3c34-8f3d-6af1dfbdf316",
+            "musicbrainzReleaseId": "f5ed0c77-acf7-4768-ad55-c9d1a8d278f2",
+            "discogsMasterId": 237162,
+            "discogsReleaseId": 6138966
+          },
+          "status": "matched",
+          "errors": []
+        },
+        {
+          "id": "maggie-carles-luis-nodal-y-los-magneticos",
+          "mb": "correct-abstain",
+          "discogs": "hit",
+          "either": "hit",
+          "input": {
+            "artist": "Maggie Carlés / Luis Nodal y los Magnéticos",
+            "title": "Maggie Carlés / Luis Nodal y los Magnéticos"
+          },
+          "returned": {
+            "musicbrainzReleaseGroupId": null,
+            "musicbrainzReleaseId": null,
+            "discogsMasterId": null,
+            "discogsReleaseId": 9649433
+          },
+          "status": "partial",
+          "errors": []
+        },
+        {
+          "id": "lucho-gatica-antonio-machin",
+          "mb": "correct-abstain",
+          "discogs": "hit",
+          "either": "hit",
+          "input": {
+            "artist": "Lucho Gatica / Antonio Machin",
+            "title": "Lucho Gatica / Antonio Machin"
+          },
+          "returned": {
+            "musicbrainzReleaseGroupId": null,
+            "musicbrainzReleaseId": null,
+            "discogsMasterId": null,
+            "discogsReleaseId": 31151219
+          },
+          "status": "partial",
+          "errors": []
+        },
+        {
+          "id": "cesaria-evora-cabo-verde",
+          "mb": "hit",
+          "discogs": "hit",
+          "either": "hit",
+          "input": {
+            "artist": "Cesaria Evora",
+            "title": "Cabo Verde"
+          },
+          "returned": {
+            "musicbrainzReleaseGroupId": "ece2cfa1-bda2-34ac-9de4-2b8eba279d2e",
+            "musicbrainzReleaseId": "67bb7b45-cdf8-4f53-a4a4-c6f3e9fba8d7",
+            "discogsMasterId": 132726,
+            "discogsReleaseId": 15795063
+          },
+          "status": "matched",
+          "errors": []
+        },
+        {
+          "id": "melanie-golden-hour-of-melanie",
+          "mb": "correct-abstain",
+          "discogs": "hit",
+          "either": "hit",
+          "input": {
+            "artist": "Melanie",
+            "title": "Golden Hour Of Melanie"
+          },
+          "returned": {
+            "musicbrainzReleaseGroupId": null,
+            "musicbrainzReleaseId": null,
+            "discogsMasterId": 1324704,
+            "discogsReleaseId": 26668559
+          },
+          "status": "partial",
+          "errors": []
+        },
+        {
+          "id": "neil-young-after-the-gold-rush",
+          "mb": "hit",
+          "discogs": "hit",
+          "either": "hit",
+          "input": {
+            "artist": "Neil Young",
+            "title": "After The Gold Rush"
+          },
+          "returned": {
+            "musicbrainzReleaseGroupId": "b6a3952b-9977-351c-a80a-73e023143858",
+            "musicbrainzReleaseId": "e73c316a-7564-4ee1-80c5-3a2b0748bbd4",
+            "discogsMasterId": 38433,
+            "discogsReleaseId": 3208494
+          },
+          "status": "matched",
+          "errors": []
+        },
+        {
+          "id": "steve-reich-sextet-six-marimbas",
+          "mb": "hit",
+          "discogs": "hit",
+          "either": "hit",
+          "input": {
+            "artist": "Steve Reich",
+            "title": "Sextet / Six Marimbas"
+          },
+          "returned": {
+            "musicbrainzReleaseGroupId": "2f576031-e06a-3555-9c8f-497d0d9d9c7f",
+            "musicbrainzReleaseId": "ef1a0c0b-3a83-44c6-8981-707f4af18412",
+            "discogsMasterId": 32968,
+            "discogsReleaseId": 6971880
+          },
+          "status": "matched",
+          "errors": []
+        },
+        {
+          "id": "gregory-isaacs-lovers-rock",
+          "mb": "hit",
+          "discogs": "hit",
+          "either": "hit",
+          "input": {
+            "artist": "Gregory Isaacs",
+            "title": "Lovers' Rock"
+          },
+          "returned": {
+            "musicbrainzReleaseGroupId": "6476874b-568b-404f-9fff-210f27722701",
+            "musicbrainzReleaseId": "a3aaa346-259d-4301-b119-e4cb8ab289fd",
+            "discogsMasterId": 679306,
+            "discogsReleaseId": 1662446
+          },
+          "status": "matched",
+          "errors": []
+        },
+        {
+          "id": "curtis-mayfield-curtis-live",
+          "mb": "hit",
+          "discogs": "hit",
+          "either": "hit",
+          "input": {
+            "artist": "Curtis Mayfield",
+            "title": "Curtis/Live!"
+          },
+          "returned": {
+            "musicbrainzReleaseGroupId": "a374f6fc-48c1-305b-a626-7c81cef08a8f",
+            "musicbrainzReleaseId": "612778a3-22ec-4cc1-8f93-dd17d4bc51f6",
+            "discogsMasterId": 30127,
+            "discogsReleaseId": 1492253
+          },
+          "status": "matched",
+          "errors": []
+        },
+        {
+          "id": "j-dilla-donuts",
+          "mb": "hit",
+          "discogs": "hit",
+          "either": "hit",
+          "input": {
+            "artist": "J Dilla",
+            "title": "Donuts"
+          },
+          "returned": {
+            "musicbrainzReleaseGroupId": "6b78c33a-64c4-3472-99e9-be45a392acb4",
+            "musicbrainzReleaseId": "b5d33ae3-685e-4baa-b272-a98688534344",
+            "discogsMasterId": 68208,
+            "discogsReleaseId": 12909920
+          },
+          "status": "matched",
+          "errors": []
+        },
+        {
+          "id": "hugo-jara-estado-de-animo",
+          "mb": "correct-abstain",
+          "discogs": "hit",
+          "either": "hit",
+          "input": {
+            "artist": "Hugo Jasa",
+            "title": "Estados De Animo"
+          },
+          "returned": {
+            "musicbrainzReleaseGroupId": null,
+            "musicbrainzReleaseId": null,
+            "discogsMasterId": 1598747,
+            "discogsReleaseId": 9490831
+          },
+          "status": "partial",
+          "errors": []
+        },
+        {
+          "id": "dorival-caymmi-caymmi",
+          "mb": "false-id",
+          "discogs": "hit",
+          "either": "hit",
+          "input": {
+            "artist": "Dorival Caymmi",
+            "title": "Caymmi"
+          },
+          "returned": {
+            "musicbrainzReleaseGroupId": "1eaf627b-b221-4a26-abcf-56906a5bcc9b",
+            "musicbrainzReleaseId": "5e75ed16-a112-4eef-8300-8d4b42e3a74e",
+            "discogsMasterId": 608159,
+            "discogsReleaseId": 2228118
+          },
+          "status": "matched",
+          "errors": []
+        },
+        {
+          "id": "dorival-caymmi-caymmi-odeon",
+          "mb": "hit",
+          "discogs": "hit",
+          "either": "hit",
+          "input": {
+            "artist": "Dorival Caymmi",
+            "title": "Eu Não Tenho Onde Morar"
+          },
+          "returned": {
+            "musicbrainzReleaseGroupId": "bca3c82c-b318-49ae-9815-66032f199d6a",
+            "musicbrainzReleaseId": "f750fe10-b190-4f85-9873-137cdae72d1c",
+            "discogsMasterId": 570822,
+            "discogsReleaseId": 19304584
+          },
+          "status": "matched",
+          "errors": []
+        },
+        {
+          "id": "stevie-wonder-hotter-than-july",
+          "mb": "hit",
+          "discogs": "hit",
+          "either": "hit",
+          "input": {
+            "artist": "Stevie Wonder",
+            "title": "Hotter Than July"
+          },
+          "returned": {
+            "musicbrainzReleaseGroupId": "6fbde199-c971-3d4f-a8df-ca13a998e3c7",
+            "musicbrainzReleaseId": "a3768611-93fe-4acc-8509-02a5c15d97cf",
+            "discogsMasterId": 87442,
+            "discogsReleaseId": 7169614
+          },
+          "status": "matched",
+          "errors": []
+        },
+        {
+          "id": "nite-jewel-no-sun",
+          "mb": "hit",
+          "discogs": "hit",
+          "either": "hit",
+          "input": {
+            "artist": "Nite Jewel",
+            "title": "No Sun"
+          },
+          "returned": {
+            "musicbrainzReleaseGroupId": "2027c14e-75b9-455b-8eff-7ceb51ae44dc",
+            "musicbrainzReleaseId": "5f30ad45-3f73-4bbb-866e-1b8cfbb9b2a3",
+            "discogsMasterId": 2278780,
+            "discogsReleaseId": 20104222
+          },
+          "status": "matched",
+          "errors": []
+        },
+        {
+          "id": "horace-silver-and-the-jazz-messengers",
+          "mb": "hit",
+          "discogs": "hit",
+          "either": "hit",
+          "input": {
+            "artist": "Horace Silver and the Jazz Messengers",
+            "title": "Horace Silver and the Jazz Messengers"
+          },
+          "returned": {
+            "musicbrainzReleaseGroupId": "ea8ca1bb-5a93-40d8-aa99-dec4fe715af1",
+            "musicbrainzReleaseId": "9ad56baa-8590-47e9-a3d8-a3b60fbff8f2",
+            "discogsMasterId": 155021,
+            "discogsReleaseId": 11258882
+          },
+          "status": "matched",
+          "errors": []
+        },
+        {
+          "id": "max-romeo-revelation-time",
+          "mb": "hit",
+          "discogs": "hit",
+          "either": "hit",
+          "input": {
+            "artist": "Max Romeo",
+            "title": "Revelation Time"
+          },
+          "returned": {
+            "musicbrainzReleaseGroupId": "b7bb8543-a670-463b-a14a-b6d2591bfc6f",
+            "musicbrainzReleaseId": "a721a28d-9e72-4ae9-ad6e-1bad172d7bbf",
+            "discogsMasterId": 359653,
+            "discogsReleaseId": 3492325
+          },
+          "status": "matched",
+          "errors": []
+        },
+        {
+          "id": "various-beat-girls-espanol",
+          "mb": "hit",
+          "discogs": "hit",
+          "either": "hit",
+          "input": {
+            "artist": "Various",
+            "title": "Beat Girls Español!"
+          },
+          "returned": {
+            "musicbrainzReleaseGroupId": "5b0ab0c9-616f-4adc-99fc-4c65e9340490",
+            "musicbrainzReleaseId": "ad8241e8-8f1a-456d-ab99-9f9561bc7e26",
+            "discogsMasterId": 1315136,
+            "discogsReleaseId": 11569965
+          },
+          "status": "matched",
+          "errors": []
+        },
+        {
+          "id": "team-shadetek-pale-fire",
+          "mb": "hit",
+          "discogs": "hit",
+          "either": "hit",
+          "input": {
+            "artist": "Team Shadetek",
+            "title": "Pale Fire"
+          },
+          "returned": {
+            "musicbrainzReleaseGroupId": "938a7854-bd15-3b0d-8831-d7c7fae8f0fd",
+            "musicbrainzReleaseId": "5644d531-ab72-45f4-8d0f-1ad85a7fb1a1",
+            "discogsMasterId": 115613,
+            "discogsReleaseId": 1083272
+          },
+          "status": "matched",
+          "errors": []
+        },
+        {
+          "id": "astrud-gilberto-compact-jazz",
+          "mb": "hit",
+          "discogs": "hit",
+          "either": "hit",
+          "input": {
+            "artist": "Astrud Gilberto",
+            "title": "Compact Jazz: Astrud Gilberto"
+          },
+          "returned": {
+            "musicbrainzReleaseGroupId": "d1b55d44-dc6e-327a-974c-49fb82d41cc1",
+            "musicbrainzReleaseId": "b86bd910-ef90-4e59-b217-50a02e31e9ac",
+            "discogsMasterId": 148351,
+            "discogsReleaseId": 1839321
+          },
+          "status": "matched",
+          "errors": []
+        },
+        {
+          "id": "astrud-gilberto-beach-samba",
+          "mb": "hit",
+          "discogs": "hit",
+          "either": "hit",
+          "input": {
+            "artist": "Astrud Gilberto",
+            "title": "Beach Samba"
+          },
+          "returned": {
+            "musicbrainzReleaseGroupId": "1b08b70f-61a6-3f78-880c-d0bc4d204d83",
+            "musicbrainzReleaseId": "9258903a-6546-4508-9a3b-debfb5b335c8",
+            "discogsMasterId": 111015,
+            "discogsReleaseId": 4788865
+          },
+          "status": "matched",
+          "errors": []
+        },
+        {
+          "id": "various-campeones-xvii-concurso-cancion-asturiana",
+          "mb": "correct-abstain",
+          "discogs": "correct-abstain",
+          "either": "correct-abstain",
+          "input": {
+            "artist": "Various",
+            "title": "Campeones XVII Concurso de Canción Asturiana"
+          },
+          "returned": {
+            "musicbrainzReleaseGroupId": null,
+            "musicbrainzReleaseId": null,
+            "discogsMasterId": null,
+            "discogsReleaseId": null
+          },
+          "status": "absent",
+          "errors": []
+        },
+        {
+          "id": "paddy-mcaloon-i-trawl-the-megahertz",
+          "mb": "hit",
+          "discogs": "hit",
+          "either": "hit",
+          "input": {
+            "artist": "Paddy McAloon",
+            "title": "I Trawl the Megahertz"
+          },
+          "returned": {
+            "musicbrainzReleaseGroupId": "41a8dc75-766d-3744-a627-a065fb8c3e96",
+            "musicbrainzReleaseId": "96f5664b-3612-4eb6-b12d-efbe342b0739",
+            "discogsMasterId": 53413,
+            "discogsReleaseId": 879407
+          },
+          "status": "matched",
+          "errors": []
+        },
+        {
+          "id": "maranata-maranata",
+          "mb": "hit",
+          "discogs": "hit",
+          "either": "hit",
+          "input": {
+            "artist": "Maranata",
+            "title": "Maranata"
+          },
+          "returned": {
+            "musicbrainzReleaseGroupId": "4d036374-2a5a-4454-8d9d-8fc1dfdf926b",
+            "musicbrainzReleaseId": "9c50454e-983f-481d-8836-17d7309028ff",
+            "discogsMasterId": 56523,
+            "discogsReleaseId": 8643201
+          },
+          "status": "matched",
+          "errors": []
+        },
+        {
+          "id": "antonio-carlos-jobim-tide",
+          "mb": "hit",
+          "discogs": "hit",
+          "either": "hit",
+          "input": {
+            "artist": "Antonio Carlos Jobim",
+            "title": "Tide"
+          },
+          "returned": {
+            "musicbrainzReleaseGroupId": "27d85194-e2e9-3d86-b6c2-53fc3d7eb15c",
+            "musicbrainzReleaseId": "9e01f8d8-f965-4ed6-a5ba-27629895a12f",
+            "discogsMasterId": 153471,
+            "discogsReleaseId": 8482383
+          },
+          "status": "matched",
+          "errors": []
+        },
+        {
+          "id": "refused-songs-to-fan-the-flames-of-discontent",
+          "mb": "hit",
+          "discogs": "hit",
+          "either": "hit",
+          "input": {
+            "artist": "Refused",
+            "title": "Songs to Fan the Flames of Discontent"
+          },
+          "returned": {
+            "musicbrainzReleaseGroupId": "857ba0e6-3a30-31b0-938f-41e9b88adde1",
+            "musicbrainzReleaseId": "3e0273bd-5af0-45b3-9a20-9df5a64e8adc",
+            "discogsMasterId": 77275,
+            "discogsReleaseId": 33314397
+          },
+          "status": "matched",
+          "errors": []
+        },
+        {
+          "id": "collard-roge-satie-4-handed-piano",
+          "mb": "hit",
+          "discogs": "hit",
+          "either": "hit",
+          "input": {
+            "artist": "Jean-Philippe Collard & Pascal Rogé",
+            "title": "Satie: The 4 Handed Piano"
+          },
+          "returned": {
+            "musicbrainzReleaseGroupId": "e3dec670-662f-4b8a-b8ad-6aec62ee9830",
+            "musicbrainzReleaseId": "ec0cd42f-bb40-45c0-883c-b2beafcbc44b",
+            "discogsMasterId": 929568,
+            "discogsReleaseId": 4047712
+          },
+          "status": "matched",
+          "errors": []
+        },
+        {
+          "id": "oren-ambarchi-shebang",
+          "mb": "hit",
+          "discogs": "hit",
+          "either": "hit",
+          "input": {
+            "artist": "Oren Ambarchi",
+            "title": "Shebang"
+          },
+          "returned": {
+            "musicbrainzReleaseGroupId": "782a87bc-d19a-436d-ad7b-6cd9dfd85aa3",
+            "musicbrainzReleaseId": "1a37bbff-d41b-4004-b56f-a66bedcb4fed",
+            "discogsMasterId": 2812079,
+            "discogsReleaseId": 25419196
+          },
+          "status": "matched",
+          "errors": []
+        },
+        {
+          "id": "laurent-garnier-planet-house-ep",
+          "mb": "hit",
+          "discogs": "hit",
+          "either": "hit",
+          "input": {
+            "artist": "Laurent Garnier",
+            "title": "Planet House EP"
+          },
+          "returned": {
+            "musicbrainzReleaseGroupId": "06251eb2-3d87-3f3f-bca1-af051e9d5bd1",
+            "musicbrainzReleaseId": "1d1a0f30-e77b-4b0e-9a6c-6287ab8d2282",
+            "discogsMasterId": 9530,
+            "discogsReleaseId": 338626
+          },
+          "status": "matched",
+          "errors": []
+        },
+        {
+          "id": "various-trojan-reggae-party-volume-one",
+          "mb": "correct-abstain",
+          "discogs": "hit",
+          "either": "hit",
+          "input": {
+            "artist": "Various",
+            "title": "Trojan Reggae Party Volume One"
+          },
+          "returned": {
+            "musicbrainzReleaseGroupId": null,
+            "musicbrainzReleaseId": null,
+            "discogsMasterId": 1032007,
+            "discogsReleaseId": 27192972
+          },
+          "status": "partial",
+          "errors": []
+        },
+        {
+          "id": "violeta-parra-un-rio-de-sangre",
+          "mb": "hit",
+          "discogs": "hit",
+          "either": "hit",
+          "input": {
+            "artist": "Violeta Parra",
+            "title": "Un Rio de Sangre"
+          },
+          "returned": {
+            "musicbrainzReleaseGroupId": "421468f3-0dff-41db-b17d-5325de561a71",
+            "musicbrainzReleaseId": "b5d1fbcd-7952-4b3a-a2d9-e4999904353d",
+            "discogsMasterId": 727981,
+            "discogsReleaseId": 7553656
+          },
+          "status": "matched",
+          "errors": []
+        },
+        {
+          "id": "bob-marley-and-the-wailers-uprising",
+          "mb": "hit",
+          "discogs": "hit",
+          "either": "hit",
+          "input": {
+            "artist": "Bob Marley & The Wailers",
+            "title": "Uprising"
+          },
+          "returned": {
+            "musicbrainzReleaseGroupId": "6dd29c00-7539-319d-98e0-b2f07e861497",
+            "musicbrainzReleaseId": "3c7ae9fc-a06d-4be1-bbe3-cd10615d031f",
+            "discogsMasterId": 66044,
+            "discogsReleaseId": 3495534
+          },
+          "status": "matched",
+          "errors": []
+        },
+        {
+          "id": "various-macondo-revisitado",
+          "mb": "correct-abstain",
+          "discogs": "hit",
+          "either": "hit",
+          "input": {
+            "artist": "Various",
+            "title": "Macondo Revisitado"
+          },
+          "returned": {
+            "musicbrainzReleaseGroupId": null,
+            "musicbrainzReleaseId": null,
+            "discogsMasterId": 1852503,
+            "discogsReleaseId": 9875626
+          },
+          "status": "partial",
+          "errors": []
+        },
+        {
+          "id": "barry-brown-vibes-of-barry-brown",
+          "mb": "correct-abstain",
+          "discogs": "hit",
+          "either": "hit",
+          "input": {
+            "artist": "Barry Brown",
+            "title": "Vibes of Barry Brown"
+          },
+          "returned": {
+            "musicbrainzReleaseGroupId": null,
+            "musicbrainzReleaseId": null,
+            "discogsMasterId": 1084337,
+            "discogsReleaseId": 9297015
+          },
+          "status": "partial",
+          "errors": []
+        },
+        {
+          "id": "los-llopis-los-llopis",
+          "mb": "correct-abstain",
+          "discogs": "hit",
+          "either": "hit",
+          "input": {
+            "artist": "Los Llopis",
+            "title": "Versiones Originales"
+          },
+          "returned": {
+            "musicbrainzReleaseGroupId": null,
+            "musicbrainzReleaseId": null,
+            "discogsMasterId": 1260230,
+            "discogsReleaseId": 30087657
+          },
+          "status": "partial",
+          "errors": []
+        },
+        {
+          "id": "jorge-negrete-jorge-negrete",
+          "mb": "correct-abstain",
+          "discogs": "hit",
+          "either": "hit",
+          "input": {
+            "artist": "Jorge Negrete",
+            "title": "Mejicano Universal"
+          },
+          "returned": {
+            "musicbrainzReleaseGroupId": null,
+            "musicbrainzReleaseId": null,
+            "discogsMasterId": 1319865,
+            "discogsReleaseId": 12239632
+          },
+          "status": "partial",
+          "errors": []
+        },
+        {
+          "id": "baden-powell-estudos",
+          "mb": "hit",
+          "discogs": "hit",
+          "either": "hit",
+          "input": {
+            "artist": "Baden Powell",
+            "title": "Estudos"
+          },
+          "returned": {
+            "musicbrainzReleaseGroupId": "76f5eaa7-fd0b-4239-abc9-15261eaf394c",
+            "musicbrainzReleaseId": "1d03b8b8-6d76-4b52-9b31-3965943fd078",
+            "discogsMasterId": 278128,
+            "discogsReleaseId": 7910858
+          },
+          "status": "matched",
+          "errors": []
+        },
+        {
+          "id": "tipico-santa-rosa-tipico-santa-rosa",
+          "mb": "correct-abstain",
+          "discogs": "correct-abstain",
+          "either": "correct-abstain",
+          "input": {
+            "artist": "Tipico Santa Rosa",
+            "title": "Tipico Santa Rosa"
+          },
+          "returned": {
+            "musicbrainzReleaseGroupId": null,
+            "musicbrainzReleaseId": null,
+            "discogsMasterId": null,
+            "discogsReleaseId": null
+          },
+          "status": "absent",
+          "errors": []
+        },
+        {
+          "id": "antonio-carlos-e-jocafi-o-primeiro-amor",
+          "mb": "miss",
+          "discogs": "hit",
+          "either": "hit",
+          "input": {
+            "artist": "Antonio Carlos e Jocafi",
+            "title": "O Primeiro Amor"
+          },
+          "returned": {
+            "musicbrainzReleaseGroupId": null,
+            "musicbrainzReleaseId": null,
+            "discogsMasterId": 952419,
+            "discogsReleaseId": 8057180
+          },
+          "status": "partial",
+          "errors": []
+        },
+        {
+          "id": "jah-thomas-stop-yu-loafin",
+          "mb": "hit",
+          "discogs": "hit",
+          "either": "hit",
+          "input": {
+            "artist": "Jah Thomas",
+            "title": "Stop Yu Loafin"
+          },
+          "returned": {
+            "musicbrainzReleaseGroupId": "a3491ea2-4d56-48fe-bd77-14b8857780d8",
+            "musicbrainzReleaseId": "4b7b5945-58e7-4ae1-84f5-58692aea1f4d",
+            "discogsMasterId": 472336,
+            "discogsReleaseId": 3319936
+          },
+          "status": "matched",
+          "errors": []
+        },
+        {
+          "id": "yellowman-josey-wales-two-giants-clash",
+          "mb": "hit",
+          "discogs": "hit",
+          "either": "hit",
+          "input": {
+            "artist": "Yellowman & Josey Wales",
+            "title": "Two Giants Clash"
+          },
+          "returned": {
+            "musicbrainzReleaseGroupId": "ef4e0a95-7df3-3ab6-96cf-96edfac49046",
+            "musicbrainzReleaseId": "67bbead5-0755-4712-8baf-39f69dcdd8e2",
+            "discogsMasterId": 195198,
+            "discogsReleaseId": 5301291
+          },
+          "status": "matched",
+          "errors": []
+        },
+        {
+          "id": "os-afonsinhos-do-condado-no-parque-mayer",
+          "mb": "correct-abstain",
+          "discogs": "hit",
+          "either": "hit",
+          "input": {
+            "artist": "Os Afonsinhos do Condado",
+            "title": "No Parque Mayer"
+          },
+          "returned": {
+            "musicbrainzReleaseGroupId": null,
+            "musicbrainzReleaseId": null,
+            "discogsMasterId": 1376222,
+            "discogsReleaseId": 2135106
+          },
+          "status": "partial",
+          "errors": []
+        },
+        {
+          "id": "aldemaro-romero-y-su-orquesta-de-salon-caracas-de-noche",
+          "mb": "correct-abstain",
+          "discogs": "hit",
+          "either": "hit",
+          "input": {
+            "artist": "Aldemaro Romero y su Orquesta de Salón",
+            "title": "Caracas de Noche"
+          },
+          "returned": {
+            "musicbrainzReleaseGroupId": null,
+            "musicbrainzReleaseId": null,
+            "discogsMasterId": 521415,
+            "discogsReleaseId": 13384959
+          },
+          "status": "partial",
+          "errors": []
+        },
+        {
+          "id": "angela-carrasco-la-candela",
+          "mb": "hit",
+          "discogs": "hit",
+          "either": "hit",
+          "input": {
+            "artist": "Angela Carrasco",
+            "title": "La Candela"
+          },
+          "returned": {
+            "musicbrainzReleaseGroupId": "0d6751b2-cecf-44c6-bf38-56996076c41e",
+            "musicbrainzReleaseId": "bc62119a-648b-4a16-8d63-3927be7d7158",
+            "discogsMasterId": 926230,
+            "discogsReleaseId": 18253423
+          },
+          "status": "matched",
+          "errors": []
+        },
+        {
+          "id": "gran-orquesta-tipica-de-armando-zulueta-frenesi",
+          "mb": "correct-abstain",
+          "discogs": "hit",
+          "either": "hit",
+          "input": {
+            "artist": "Gran Orquesta Típica de Armando Zulueta",
+            "title": "Frenesí"
+          },
+          "returned": {
+            "musicbrainzReleaseGroupId": null,
+            "musicbrainzReleaseId": null,
+            "discogsMasterId": 433435,
+            "discogsReleaseId": 13950144
+          },
+          "status": "partial",
+          "errors": []
+        },
+        {
+          "id": "baden-powell-poema-on-guitar",
+          "mb": "hit",
+          "discogs": "hit",
+          "either": "hit",
+          "input": {
+            "artist": "Baden Powell",
+            "title": "Poema on Guitar"
+          },
+          "returned": {
+            "musicbrainzReleaseGroupId": "d6ae4a6c-6042-3c65-8c51-7b62b0024d9d",
+            "musicbrainzReleaseId": "8df5e4a1-bd5e-480a-9d39-d9e3f2b7659d",
+            "discogsMasterId": 210473,
+            "discogsReleaseId": 14058600
+          },
+          "status": "matched",
+          "errors": []
+        },
+        {
+          "id": "baden-powell-face-au-public",
+          "mb": "correct-abstain",
+          "discogs": "hit",
+          "either": "hit",
+          "input": {
+            "artist": "Baden Powell",
+            "title": "Face au Public"
+          },
+          "returned": {
+            "musicbrainzReleaseGroupId": null,
+            "musicbrainzReleaseId": null,
+            "discogsMasterId": 347248,
+            "discogsReleaseId": 1015183
+          },
+          "status": "partial",
+          "errors": []
+        },
+        {
+          "id": "baden-powell-ritmos-de-brasil",
+          "mb": "correct-abstain",
+          "discogs": "hit",
+          "either": "hit",
+          "input": {
+            "artist": "Baden Powell",
+            "title": "Ritmos de Brasil"
+          },
+          "returned": {
+            "musicbrainzReleaseGroupId": null,
+            "musicbrainzReleaseId": null,
+            "discogsMasterId": 382971,
+            "discogsReleaseId": 27258630
+          },
+          "status": "partial",
+          "errors": []
+        },
+        {
+          "id": "bana-eroticorythmotropicalomanie-vol-3",
+          "mb": "correct-abstain",
+          "discogs": "hit",
+          "either": "hit",
+          "input": {
+            "artist": "Bana",
+            "title": "Eroticorythmotropicalomanie Vol. 3"
+          },
+          "returned": {
+            "musicbrainzReleaseGroupId": null,
+            "musicbrainzReleaseId": null,
+            "discogsMasterId": 1891431,
+            "discogsReleaseId": 5042293
+          },
+          "status": "partial",
+          "errors": []
+        },
+        {
+          "id": "la-banda-del-caribe-movimiento-sexy",
+          "mb": "correct-abstain",
+          "discogs": "hit",
+          "either": "hit",
+          "input": {
+            "artist": "La Banda del Caribe",
+            "title": "Movimiento Sexy"
+          },
+          "returned": {
+            "musicbrainzReleaseGroupId": null,
+            "musicbrainzReleaseId": null,
+            "discogsMasterId": null,
+            "discogsReleaseId": 5042857
+          },
+          "status": "partial",
+          "errors": []
+        },
+        {
+          "id": "the-bhundu-boys-pamberi",
+          "mb": "hit",
+          "discogs": "hit",
+          "either": "hit",
+          "input": {
+            "artist": "The Bhundu Boys",
+            "title": "Pamberi!"
+          },
+          "returned": {
+            "musicbrainzReleaseGroupId": "5315d780-9b7a-4df4-a283-164cba4ecc54",
+            "musicbrainzReleaseId": "f58d829e-2218-4603-9d18-195fa5ce9c7e",
+            "discogsMasterId": 177411,
+            "discogsReleaseId": 1731990
+          },
+          "status": "matched",
+          "errors": []
+        },
+        {
+          "id": "celia-cruz-johnny-pacheco-de-nuevo",
+          "mb": "hit",
+          "discogs": "hit",
+          "either": "hit",
+          "input": {
+            "artist": "Celia Cruz & Johnny Pacheco",
+            "title": "De Nuevo"
+          },
+          "returned": {
+            "musicbrainzReleaseGroupId": "193754e2-7322-4b8d-8614-eccf16d6c0d1",
+            "musicbrainzReleaseId": "508c3ea1-f4c8-40ef-a805-82c8c0fc6cfa",
+            "discogsMasterId": 759845,
+            "discogsReleaseId": 37545186
+          },
+          "status": "matched",
+          "errors": []
+        },
+        {
+          "id": "celia-cruz-y-la-sonora-matancera-feliz-encuentro-en-el-carnaval-de-tenerife",
+          "mb": "false-id",
+          "discogs": "hit",
+          "either": "hit",
+          "input": {
+            "artist": "Celia Cruz y La Sonora Matancera",
+            "title": "Feliz Encuentro en el Carnaval de Tenerife"
+          },
+          "returned": {
+            "musicbrainzReleaseGroupId": "7fc1f2b3-da31-446c-9e86-483ff2cc29dc",
+            "musicbrainzReleaseId": "b5133d2a-ecfa-4cda-bf77-e8aff9b1c9da",
+            "discogsMasterId": 1004292,
+            "discogsReleaseId": 5409316
+          },
+          "status": "matched",
+          "errors": []
+        },
+        {
+          "id": "celia-cruz-con-la-sonora-matancera-la-tierna-conmovedora-bamboleadora",
+          "mb": "hit",
+          "discogs": "hit",
+          "either": "hit",
+          "input": {
+            "artist": "Celia Cruz con la Sonora Matancera",
+            "title": "La Tierna, Conmovedora, Bamboleadora"
+          },
+          "returned": {
+            "musicbrainzReleaseGroupId": "38334bc9-a05b-430a-a890-e919314aeff6",
+            "musicbrainzReleaseId": "84380a9d-2547-4fee-a15d-d83429e583ab",
+            "discogsMasterId": 574354,
+            "discogsReleaseId": 24270920
+          },
+          "status": "matched",
+          "errors": []
+        },
+        {
+          "id": "celia-cruz-a-todos-mis-amigos",
+          "mb": "hit",
+          "discogs": "hit",
+          "either": "hit",
+          "input": {
+            "artist": "Celia Cruz",
+            "title": "A Todos Mis Amigos"
+          },
+          "returned": {
+            "musicbrainzReleaseGroupId": "f342d6d1-5799-4cc2-b25c-357829b76d8c",
+            "musicbrainzReleaseId": "fbde6faa-d1aa-4774-b7d7-c5da49f7eaa8",
+            "discogsMasterId": 761418,
+            "discogsReleaseId": 6333198
+          },
+          "status": "matched",
+          "errors": []
+        },
+        {
+          "id": "el-combo-belga-y-sus-furiosos-rumberos-rompiendo-clave",
+          "mb": "correct-abstain",
+          "discogs": "hit",
+          "either": "hit",
+          "input": {
+            "artist": "El Combo Belga y sus Furiosos Rumberos",
+            "title": "Rompiendo Clave"
+          },
+          "returned": {
+            "musicbrainzReleaseGroupId": null,
+            "musicbrainzReleaseId": null,
+            "discogsMasterId": null,
+            "discogsReleaseId": 34973987
+          },
+          "status": "partial",
+          "errors": []
+        },
+        {
+          "id": "elba-ramalho-fruto",
+          "mb": "hit",
+          "discogs": "hit",
+          "either": "hit",
+          "input": {
+            "artist": "Elba Ramalho",
+            "title": "Fruto"
+          },
+          "returned": {
+            "musicbrainzReleaseGroupId": "03f9eaef-dbb1-4db0-a6fd-61a876af7a96",
+            "musicbrainzReleaseId": "e8d9f664-a0af-4e6d-b083-19fc3ea89109",
+            "discogsMasterId": 727343,
+            "discogsReleaseId": 29358577
+          },
+          "status": "matched",
+          "errors": []
+        },
+        {
+          "id": "eydie-gorme-y-el-trio-los-panchos-cuatro-vidas",
+          "mb": "hit",
+          "discogs": "hit",
+          "either": "hit",
+          "input": {
+            "artist": "Eydie Gorme y el Trío Los Panchos",
+            "title": "Cuatro Vidas"
+          },
+          "returned": {
+            "musicbrainzReleaseGroupId": "021ae27f-1b0f-4cfe-963d-c0f3e127abca",
+            "musicbrainzReleaseId": "765bfcf2-8765-4604-945d-2bb2c03b7855",
+            "discogsMasterId": 323387,
+            "discogsReleaseId": 5175163
+          },
+          "status": "matched",
+          "errors": []
+        },
+        {
+          "id": "jayme-marques-que-cosa-mas-linda",
+          "mb": "correct-abstain",
+          "discogs": "hit",
+          "either": "hit",
+          "input": {
+            "artist": "Jayme Marques",
+            "title": "Que Cosa Mas Linda!"
+          },
+          "returned": {
+            "musicbrainzReleaseGroupId": null,
+            "musicbrainzReleaseId": null,
+            "discogsMasterId": 845372,
+            "discogsReleaseId": 29167312
+          },
+          "status": "partial",
+          "errors": []
+        },
+        {
+          "id": "jayme-marques-sol-de-verano",
+          "mb": "correct-abstain",
+          "discogs": "hit",
+          "either": "hit",
+          "input": {
+            "artist": "Jayme Marques",
+            "title": "Sol de Verano"
+          },
+          "returned": {
+            "musicbrainzReleaseGroupId": null,
+            "musicbrainzReleaseId": null,
+            "discogsMasterId": 990124,
+            "discogsReleaseId": 8414448
+          },
+          "status": "partial",
+          "errors": []
+        },
+        {
+          "id": "juan-carlos-senante-chateaubriand-filete-y-salsa",
+          "mb": "correct-abstain",
+          "discogs": "hit",
+          "either": "hit",
+          "input": {
+            "artist": "Juan Carlos Senante",
+            "title": "Chateaubriand (Filete y Salsa)"
+          },
+          "returned": {
+            "musicbrainzReleaseGroupId": null,
+            "musicbrainzReleaseId": null,
+            "discogsMasterId": 2947375,
+            "discogsReleaseId": 8323233
+          },
+          "status": "partial",
+          "errors": []
+        },
+        {
+          "id": "juan-luis-guerra-y-440-areito",
+          "mb": "hit",
+          "discogs": "hit",
+          "either": "hit",
+          "input": {
+            "artist": "Juan Luis Guerra y 440",
+            "title": "Areito"
+          },
+          "returned": {
+            "musicbrainzReleaseGroupId": "bee64ca0-9c3c-3652-a0db-9f74d13e7163",
+            "musicbrainzReleaseId": "564b0465-9db8-43af-8040-bc86f4a29282",
+            "discogsMasterId": 229032,
+            "discogsReleaseId": 13401881
+          },
+          "status": "matched",
+          "errors": []
+        },
+        {
+          "id": "juan-luis-guerra-y-440-el-original-440",
+          "mb": "hit",
+          "discogs": "hit",
+          "either": "hit",
+          "input": {
+            "artist": "Juan Luis Guerra y 4.40",
+            "title": "El Original 4.40"
+          },
+          "returned": {
+            "musicbrainzReleaseGroupId": "d7b08d13-a7c9-4b22-a02a-0eb34512e6c3",
+            "musicbrainzReleaseId": "d7d46950-1a1d-4b28-a47c-69b2308d2658",
+            "discogsMasterId": 705888,
+            "discogsReleaseId": 29294863
+          },
+          "status": "matched",
+          "errors": []
+        },
+        {
+          "id": "kamac-pacha-inti-mi-raza",
+          "mb": "correct-abstain",
+          "discogs": "hit",
+          "either": "hit",
+          "input": {
+            "artist": "Kamac Pacha Inti",
+            "title": "Mi Raza"
+          },
+          "returned": {
+            "musicbrainzReleaseGroupId": null,
+            "musicbrainzReleaseId": null,
+            "discogsMasterId": 1421762,
+            "discogsReleaseId": 5024294
+          },
+          "status": "partial",
+          "errors": []
+        },
+        {
+          "id": "the-manhattan-transfer-brasil",
+          "mb": "hit",
+          "discogs": "hit",
+          "either": "hit",
+          "input": {
+            "artist": "The Manhattan Transfer",
+            "title": "Brasil"
+          },
+          "returned": {
+            "musicbrainzReleaseGroupId": "e627c97d-b5d7-309f-9aef-8592f8e7fcea",
+            "musicbrainzReleaseId": "4589d46c-277c-4c3e-9142-c648bd846091",
+            "discogsMasterId": 97208,
+            "discogsReleaseId": 6718086
+          },
+          "status": "matched",
+          "errors": []
+        },
+        {
+          "id": "luis-kalaff-con-los-alegres-dominicanos-bailemos-merengue",
+          "mb": "correct-abstain",
+          "discogs": "hit",
+          "either": "hit",
+          "input": {
+            "artist": "Luis Kalaff con Los Alegres Dominicanos",
+            "title": "Bailemos Merengue"
+          },
+          "returned": {
+            "musicbrainzReleaseGroupId": null,
+            "musicbrainzReleaseId": null,
+            "discogsMasterId": 500840,
+            "discogsReleaseId": 25011811
+          },
+          "status": "partial",
+          "errors": []
+        },
+        {
+          "id": "orquesta-encantada-sabroson",
+          "mb": "hit",
+          "discogs": "hit",
+          "either": "hit",
+          "input": {
+            "artist": "Orquesta Encantada",
+            "title": "Sabrosón"
+          },
+          "returned": {
+            "musicbrainzReleaseGroupId": "c584c6fd-a793-4e4d-be59-ed93a4a6369d",
+            "musicbrainzReleaseId": "688f2977-0934-49a2-9275-c2c9faf8bcb4",
+            "discogsMasterId": 2556560,
+            "discogsReleaseId": 32637183
+          },
+          "status": "matched",
+          "errors": []
+        },
+        {
+          "id": "ranking-joe-weakheart-fadeaway",
+          "mb": "hit",
+          "discogs": "hit",
+          "either": "hit",
+          "input": {
+            "artist": "Ranking Joe",
+            "title": "Weakheart Fadeaway"
+          },
+          "returned": {
+            "musicbrainzReleaseGroupId": "77411dea-db4b-3afe-8593-41727b9434e4",
+            "musicbrainzReleaseId": "b7b824e0-2aa1-4c66-a23e-6c0e1a8fdac4",
+            "discogsMasterId": 217951,
+            "discogsReleaseId": 1519066
+          },
+          "status": "matched",
+          "errors": []
+        },
+        {
+          "id": "beth-carvalho-feliz",
+          "mb": "hit",
+          "discogs": "hit",
+          "either": "hit",
+          "input": {
+            "artist": "Beth Carvalho",
+            "title": "Coração Feliz"
+          },
+          "returned": {
+            "musicbrainzReleaseGroupId": "6cad772e-0b7d-4c71-8b02-19d672143eb4",
+            "musicbrainzReleaseId": "cca3265e-b2bd-42b1-a38e-04cd0b13b7e3",
+            "discogsMasterId": 1248313,
+            "discogsReleaseId": 18996907
+          },
+          "status": "matched",
+          "errors": []
+        },
+        {
+          "id": "billos-caracas-boys-la-rubia-y-la-triguena",
+          "mb": "correct-abstain",
+          "discogs": "hit",
+          "either": "hit",
+          "input": {
+            "artist": "Billo's Caracas Boys",
+            "title": "La Rubia y la Trigueña"
+          },
+          "returned": {
+            "musicbrainzReleaseGroupId": null,
+            "musicbrainzReleaseId": null,
+            "discogsMasterId": 1455365,
+            "discogsReleaseId": 13860676
+          },
+          "status": "partial",
+          "errors": []
+        },
+        {
+          "id": "crispin-licuado",
+          "mb": "false-id",
+          "discogs": "hit",
+          "either": "hit",
+          "input": {
+            "artist": "Crispin",
+            "title": "Licuado"
+          },
+          "returned": {
+            "musicbrainzReleaseGroupId": "468fea46-9c82-40c7-a522-1ae8efbb397a",
+            "musicbrainzReleaseId": "39263f74-c10a-48e9-8257-a34e2f4cf932",
+            "discogsMasterId": 1251497,
+            "discogsReleaseId": 10996643
+          },
+          "status": "matched",
+          "errors": []
+        },
+        {
+          "id": "aurelio-reinoso-don-reinoso",
+          "mb": "correct-abstain",
+          "discogs": "hit",
+          "either": "hit",
+          "input": {
+            "artist": "Aurelio Reinoso",
+            "title": "Don Reinoso"
+          },
+          "returned": {
+            "musicbrainzReleaseGroupId": null,
+            "musicbrainzReleaseId": null,
+            "discogsMasterId": null,
+            "discogsReleaseId": 7086205
+          },
+          "status": "partial",
+          "errors": []
+        },
+        {
+          "id": "grupo-guaco-guaco-76",
+          "mb": "correct-abstain",
+          "discogs": "hit",
+          "either": "hit",
+          "input": {
+            "artist": "Grupo Guaco",
+            "title": "Guaco 76"
+          },
+          "returned": {
+            "musicbrainzReleaseGroupId": null,
+            "musicbrainzReleaseId": null,
+            "discogsMasterId": 1424881,
+            "discogsReleaseId": 6237605
+          },
+          "status": "partial",
+          "errors": []
+        },
+        {
+          "id": "pacho-via-libre-llego",
+          "mb": "correct-abstain",
+          "discogs": "hit",
+          "either": "hit",
+          "input": {
+            "artist": "Pacho",
+            "title": "Via Libre Llego"
+          },
+          "returned": {
+            "musicbrainzReleaseGroupId": null,
+            "musicbrainzReleaseId": null,
+            "discogsMasterId": 786503,
+            "discogsReleaseId": 2733412
+          },
+          "status": "partial",
+          "errors": []
+        }
+      ]
+    }
+  }
+}

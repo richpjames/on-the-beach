@@ -35,10 +35,12 @@
         "mb": {
           "resolvable": true,
           "releaseGroupIds": [
-            "3eaf5cc4-e086-4518-8cc6-579bb9db4615"
+            "df1fec14-64bb-35bd-9e26-1d7656e2fc4a"
           ],
           "releaseIds": [
-            "9cfe34fb-1ec7-42a4-a07e-3aacb13688dc"
+            "e172667b-22d3-4d74-ae32-9111f50bf6d1",
+            "61cce0d3-9cab-4e7d-b19d-583f2a16e073",
+            "5a18e89e-3c1d-43f1-89a6-d8c7dba5890c"
           ]
         },
         "discogs": {

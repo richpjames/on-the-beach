@@ -298,6 +298,12 @@ export interface DiscogsReleaseCandidate {
   country: string | null;
   label: string | null;
   catalogueNumber: string | null;
+  /**
+   * Album, single, EP... Derived from the pressing's format, so it describes
+   * this pressing and not the work. Used to break a dead heat between an LP and
+   * a 7" that share an artist, a title and a year.
+   */
+  itemType: ItemType;
 }
 
 export interface DiscogsSearchQuery {
@@ -319,6 +325,7 @@ interface DiscogsSearchResult {
   country?: unknown;
   label?: unknown;
   catno?: unknown;
+  formats?: unknown;
 }
 
 /**
@@ -360,6 +367,7 @@ function parseSearchResult(raw: unknown): DiscogsReleaseCandidate | null {
     label:
       Array.isArray(result.label) && typeof result.label[0] === "string" ? result.label[0] : null,
     catalogueNumber: typeof result.catno === "string" ? result.catno : null,
+    itemType: parseItemType(result.formats),
   };
 }
 
