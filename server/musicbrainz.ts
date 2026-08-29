@@ -1,3 +1,4 @@
+import type { ItemType } from "../domain/types";
 import type { ReleaseLengthPreference } from "./settings";
 import { titleMatchesAny } from "./title-similarity";
 
@@ -623,6 +624,11 @@ export interface MbReleaseCandidate {
   label: string | null;
   catalogueNumber: string | null;
   /**
+   * The release group's primary type, mapped onto our vocabulary. Used to break
+   * a dead heat between an album and a single of the same name.
+   */
+  itemType: ItemType;
+  /**
    * MusicBrainz's own relevance score, 0–100.
    *
    * NOT a confidence signal. It measures how well the document matched the
@@ -690,6 +696,19 @@ function buildReleaseQuery({
   return parts.join(" ");
 }
 
+const ITEM_TYPES = new Set<ItemType>(["album", "ep", "single", "track", "mix", "compilation"]);
+
+/**
+ * MusicBrainz primary types map onto our item types where they overlap.
+ *
+ * Lives here rather than in `release-alerts` — which is where it started — so
+ * that parsing a search result does not drag the database module in with it.
+ */
+export function itemTypeForReleaseGroup(primaryType: string | null): ItemType {
+  const candidate = primaryType?.toLowerCase();
+  return candidate && ITEM_TYPES.has(candidate as ItemType) ? (candidate as ItemType) : "album";
+}
+
 interface MbSearchRelease {
   id?: unknown;
   title?: unknown;
@@ -720,7 +739,7 @@ function parseSearchCandidate(raw: unknown): MbReleaseCandidate | null {
   if (typeof release.id !== "string") return null;
 
   const { name, id: artistId } = parseArtistCredit(release["artist-credit"]);
-  const group = release["release-group"] as { id?: unknown } | undefined;
+  const group = release["release-group"] as { id?: unknown; "primary-type"?: unknown } | undefined;
   const { label, catalogueNumber } = parseLabelInfo(release["label-info"]);
 
   return {
@@ -733,6 +752,9 @@ function parseSearchCandidate(raw: unknown): MbReleaseCandidate | null {
     country: typeof release.country === "string" ? release.country : null,
     label,
     catalogueNumber,
+    itemType: itemTypeForReleaseGroup(
+      typeof group?.["primary-type"] === "string" ? group["primary-type"] : null,
+    ),
     score: typeof release.score === "number" ? release.score : 0,
   };
 }

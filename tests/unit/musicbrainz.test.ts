@@ -981,6 +981,35 @@ describe("searchReleaseCandidates", () => {
     expect(candidate?.score).toBe(100);
   });
 
+  test("carries the release group's primary type", async () => {
+    spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      makeSearchResponse([
+        {
+          id: "single-uuid",
+          title: "Ainsi soit-il",
+          "release-group": { id: "rg-single", "primary-type": "Single" },
+        },
+        {
+          id: "album-uuid",
+          title: "Ainsi soit\u2010il",
+          "release-group": { id: "rg-album", "primary-type": "Album" },
+        },
+      ]),
+    );
+
+    const candidates = await searchReleaseCandidates({ artist: "Louis Chedid", title: "x" });
+
+    expect(candidates.map((c) => c.itemType)).toEqual(["single", "album"]);
+  });
+
+  test("an untyped release group falls back to album", async () => {
+    spyOn(globalThis, "fetch").mockResolvedValueOnce(makeSearchResponse([CANDIDATE]));
+
+    const [candidate] = await searchReleaseCandidates({ artist: "Violeta Parra", title: "x" });
+
+    expect(candidate?.itemType).toBe("album");
+  });
+
   test("joins a multi-artist credit with its join phrases", async () => {
     spyOn(globalThis, "fetch").mockResolvedValueOnce(
       makeSearchResponse([

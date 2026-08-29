@@ -26,7 +26,11 @@ import {
   type AlertReason,
 } from "./artist-watch";
 import { getArtistWatchSettings, getNewReleasesStackId, setNewReleasesStackId } from "./settings";
-import type { ItemType } from "../domain/types";
+// Defined in ./musicbrainz so the release query layer can classify a search
+// result without importing this module and the database with it.
+import { itemTypeForReleaseGroup } from "./musicbrainz";
+
+export { itemTypeForReleaseGroup };
 
 // ---------------------------------------------------------------------------
 // The alert queue: reading it, and the three things you can do with a card.
@@ -202,14 +206,6 @@ export async function ensureNewReleasesStack(): Promise<number> {
     .returning({ id: stacks.id });
   await setNewReleasesStackId(created.id);
   return created.id;
-}
-
-const ITEM_TYPES = new Set<ItemType>(["album", "ep", "single", "track", "mix", "compilation"]);
-
-/** MusicBrainz primary types map onto our item types where they overlap. */
-export function itemTypeForReleaseGroup(primaryType: string | null): ItemType {
-  const candidate = primaryType?.toLowerCase();
-  return candidate && ITEM_TYPES.has(candidate as ItemType) ? (candidate as ItemType) : "album";
 }
 
 /** The link that vouched for the release, as shown back to the user. */

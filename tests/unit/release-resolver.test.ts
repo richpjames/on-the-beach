@@ -136,6 +136,51 @@ describe("pickBest", () => {
     ]);
     expect(best?.candidate.year).toBe(1984);
   });
+
+  // Jayme Marques' "¡Que Cosa Mas Linda!" is both a Venezuelan LP and a Spanish
+  // 7" of the same year, and Discogs returns the 7" first.
+  test('breaks a dead heat away from the 7"', () => {
+    const best = pickBest({ artist: "Jayme Marques", title: "Que Cosa Mas Linda!" }, [
+      { artist: "Jayme Marques", title: "¡Que Cosa Mas Linda!", year: 1981, itemType: "single" },
+      { artist: "Jayme Marques", title: "¡Que Cosa Mas Linda!", year: 1981, itemType: "album" },
+    ] as const);
+    expect(best?.candidate.itemType).toBe("album");
+  });
+
+  test("format never outranks the year asked for", () => {
+    const best = pickBest({ ...query, year: 1984 }, [
+      { artist: "The Earons", title: "Land of Hunger", year: 1984, itemType: "single" },
+      { artist: "The Earons", title: "Land of Hunger", year: 1999, itemType: "album" },
+    ] as const);
+    expect(best?.candidate.year).toBe(1984);
+  });
+
+  test("format never outranks confidence", () => {
+    const best = pickBest(query, [
+      { artist: "The Earons", title: "Land of Hunger", year: 1984, itemType: "single" },
+      { artist: "The Earons", title: "Land of Hunger (Remix)", year: 1984, itemType: "album" },
+    ] as const);
+    expect(best?.candidate.title).toBe("Land of Hunger");
+  });
+
+  // Patrick Cowley's "Menergy" is a 12" maxi-single — filed as an EP — sharing
+  // its name with the LP. Both are 12", so neither is demoted and the
+  // provider's own ordering stands.
+  test("leaves the provider's order alone between two full-size formats", () => {
+    const best = pickBest({ artist: "Patrick Cowley", title: "Menergy" }, [
+      { artist: "Patrick Cowley", title: "Menergy", year: 1981, itemType: "ep" },
+      { artist: "Patrick Cowley", title: "Menergy", year: 1981, itemType: "album" },
+    ] as const);
+    expect(best?.candidate.itemType).toBe("ep");
+  });
+
+  test("a candidate with no format is not demoted", () => {
+    const best = pickBest(query, [
+      { artist: "The Earons", title: "Land of Hunger", year: 1984 },
+      { artist: "The Earons", title: "Land of Hunger", year: 1984, itemType: "single" },
+    ] as const);
+    expect(best?.candidate.itemType).toBeUndefined();
+  });
 });
 
 // ---------------------------------------------------------------------------
