@@ -1,0 +1,61 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "overrides": [
+    {
+      // domain/ is the core: it may not reach outward. The folder is flat, so
+      // any relative import leaving it starts with "../". If domain/ ever gains
+      // subdirectories, loosen this to name the outward folders instead.
+      "files": ["domain/**/*.ts"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "group": ["../**"],
+                "message": "domain/ is the core and must not import from outside itself."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      // server/ must not depend on the SvelteKit app. The reverse is correct
+      // and deliberately unrestricted: route loaders driving the application
+      // is what a driving adapter is for.
+      "files": ["server/**/*.ts"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "group": ["**/src/**"],
+                "message": "server/ must not import from src/. Shared types belong in domain/."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      // Browser-side code must not pull in server modules. src/routes and
+      // src/hooks.server.ts are excluded: running on the server is their job.
+      "files": ["src/lib/**/*.ts", "src/ui/**/*.ts"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "group": ["**/server/**"],
+                "message": "Client code must not import server modules. Go through src/services/api-client.ts."
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}
