@@ -131,6 +131,90 @@ describe("GET /feed/:filter.rss", () => {
   });
 });
 
+describe("release artwork", () => {
+  const noStacks = mock(async (_id: number) => null);
+  const noItems = mock(async (_id: number) => []);
+
+  async function allFeedBodyFor(item: MusicItemFull): Promise<string> {
+    const app = makeApp(
+      noStacks,
+      noItems,
+      mock(async (_feed: PrimaryFeedKey) => [item]),
+    );
+    return await (await app.request("http://localhost/feed/all.rss")).text();
+  }
+
+  test("external artwork is offered as media content, thumbnail and inline image", async () => {
+    const body = await allFeedBodyFor(
+      makeItem({ artwork_url: "https://cdn.example.com/covers/rounds.jpg" }),
+    );
+
+    expect(body).toContain(
+      '<media:content url="https://cdn.example.com/covers/rounds.jpg" medium="image" type="image/jpeg" />',
+    );
+    expect(body).toContain('<media:thumbnail url="https://cdn.example.com/covers/rounds.jpg" />');
+    expect(body).toContain('<img src="https://cdn.example.com/covers/rounds.jpg"');
+  });
+
+  test("the media namespace is declared on the feed", async () => {
+    const body = await allFeedBodyFor(makeItem({ artwork_url: "https://cdn.example.com/a.jpg" }));
+
+    expect(body).toContain('xmlns:media="http://search.yahoo.com/mrss/"');
+  });
+
+  test("uploaded artwork is resolved against the request origin", async () => {
+    // A reader fetches images from wherever it runs, so `/uploads/…` has to
+    // become an absolute URL or it resolves against the reader, not the app.
+    const body = await allFeedBodyFor(makeItem({ artwork_url: "/uploads/cover.png" }));
+
+    expect(body).toContain('<media:content url="http://localhost/uploads/cover.png"');
+    expect(body).toContain('type="image/png"');
+    expect(body).toContain('<img src="http://localhost/uploads/cover.png"');
+  });
+
+  test("artwork carries the item title as alt text", async () => {
+    const body = await allFeedBodyFor(
+      makeItem({
+        title: "Rounds",
+        artist_name: "Four Tet",
+        artwork_url: "https://cdn.example.com/a.jpg",
+      }),
+    );
+
+    expect(body).toContain('alt="Four Tet — Rounds"');
+  });
+
+  test("an item without artwork gets no image markup", async () => {
+    const body = await allFeedBodyFor(makeItem({ artwork_url: null }));
+
+    expect(body).not.toContain("<media:content");
+    expect(body).not.toContain("<media:thumbnail");
+    expect(body).not.toContain("<img");
+  });
+
+  test("artwork that is not an http(s) URL is skipped", async () => {
+    const body = await allFeedBodyFor(makeItem({ artwork_url: "data:image/png;base64,iVBORw0KG" }));
+
+    expect(body).not.toContain("<media:content");
+    expect(body).not.toContain("<img");
+  });
+
+  test("description text is escaped for the HTML readers render it as", async () => {
+    const body = await allFeedBodyFor(
+      makeItem({ artwork_url: null, notes: "Simon & Garfunkel <b>bootleg</b>" }),
+    );
+
+    expect(body).toContain("Simon &amp; Garfunkel &lt;b&gt;bootleg&lt;/b&gt;");
+  });
+
+  test("notes cannot close the description's CDATA section early", async () => {
+    const body = await allFeedBodyFor(makeItem({ artwork_url: null, notes: "sneaky ]]> text" }));
+
+    expect(body).toContain("sneaky ]]&gt; text");
+    expect(body).not.toContain("]]></description>]]>");
+  });
+});
+
 describe("GET /feed/new-releases.rss", () => {
   const noStacks = mock(async (_id: number) => null);
   const noItems = mock(async (_id: number) => []);

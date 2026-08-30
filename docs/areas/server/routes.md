@@ -7,7 +7,7 @@
 - `server/routes/stacks.ts` owns stack CRUD, item membership, and parent/child stack hierarchy rules.
 - `server/routes/release.ts` owns image upload, cover scanning, MusicBrainz lookup, and Apple Music enrichment.
 - `server/routes/ingest.ts` owns authenticated email, single-link, and photo ingestion endpoints (the share sheet posts links to `/link` and images to `/photo`, both of which can file the item into lists and set a reminder). When a shared page names several releases, `/link` returns `409 ambiguous_link` with the candidates — the same payload shape as `POST /api/music-items` — and the share sheet re-posts with `selectedCandidateIds` to create one item per chosen release.
-- `server/routes/rss.ts` exposes the feed surfaces.
+- `server/routes/rss.ts` exposes the feed surfaces. Entries carry the release artwork as Media RSS (`media:content`/`media:thumbnail`) and as an inline `<img>` in the HTML description, so readers show a cover thumbnail whichever of the two they honour; `/uploads/…` artwork is made absolute against the request origin first.
 
 ## Page data (SvelteKit)
 
