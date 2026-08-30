@@ -2,7 +2,9 @@ import { and, eq, isNull } from "drizzle-orm";
 import { db } from "./db/index";
 import { artists, musicItems, musicLinks, sources } from "./db/schema";
 import { parseUrl } from "./utils";
-import { searchAppleMusic, searchSpotify, type ServiceSearchResult } from "./scraper";
+import type { ServiceSearchResult } from "../ports/service-search";
+import { searchAppleMusic } from "./apple-music";
+import { searchSpotify } from "./scraper";
 import { searchYouTube } from "./youtube-search";
 import { getLookupService, type LookupService } from "./settings";
 

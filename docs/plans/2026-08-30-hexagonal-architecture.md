@@ -71,11 +71,31 @@ A fourth `overrides` entry fences the folder — frameworks (`svelte`, `xstate`,
 
 The estimate of fourteen importers was low, and instructively so: a string search for `ui/domain` misses `src/ui/state/add-form-machine.ts`, which reaches its sibling as `../domain/add-form`. Same resolved-vs-literal gap this plan flags for `no-restricted-imports` below.
 
-### Task 3 — Extract Apple Music
+### Task 3 — Extract Apple Music ✅ done
 
-The largest single source in `scraper.ts` (~250 lines): OG parsing, oEmbed, the iTunes lookup fallback, and `searchAppleMusic`. Follow `mixcloud.ts`.
+`server/scraper.ts` is down from 985 to **648 lines**. Apple Music became a folder rather than the single file `mixcloud.ts` suggested, because there were already three Apple modules and "follow mixcloud.ts" had no single answer:
 
-Do this one **first** among the sources, because it is also where `ServiceSearchResult` stops being an incidental export of `apple-music-catalog.ts` and becomes a named port — Task 6 partly falls out of it. Extracting 15-line sources first is motion without progress.
+```
+server/apple-music/
+  index.ts    the adapter's public face — callers import from here
+  scrape.ts   OG parsing, oEmbed, the iTunes lookup, searchAppleMusic
+  catalog.ts  was apple-music-catalog.ts
+  token.ts    was apple-music-token.ts
+  match.ts    normalizeForMatch, previously duplicated in two of the above
+```
+
+`domain/apple-music.ts` deliberately stays put: parsing a catalogue URL is pure and the browser needs it too.
+
+**`ports/` now exists.** `ServiceSearchResult` moved to `ports/service-search.ts` and the six importers name it directly, so `scraper.ts` no longer re-exports a type it doesn't own. `ServiceSearch` is declared alongside it as the function shape `searchAppleMusic`, `searchSpotify` and `searchYouTube` already satisfy — most of Task 6 for the search side.
+
+A fifth `overrides` entry keeps `ports/` importing nothing at all.
+
+Two notes for the remaining extractions:
+
+- **The seam is where the thinking is.** The moved code was byte-identical; what needed designing was the boundary. `scrapeUrl` threaded three Apple locals (`appleMusicOEmbed`, `appleMusicLookup`, `appleMusicMetadata`) through 100 lines of unrelated orchestration. They collapse into one `AppleMusicApiMetadata` value, with the oEmbed → lookup ladder moved inside `fetchAppleMusicApiMetadata`. Expect the same shape wherever a source pre-fetches before the page.
+- **The ladder had no test.** `scrapeUrl(url, "apple_music")` was uncovered, so restructuring it was unverified by the suite. `tests/unit/apple-music.test.ts` now covers the complete-from-oEmbed path; the incomplete-oEmbed fallback is a `test.todo`.
+
+Still duplicated after this: `normalizeForMatch` also has private copies in `youtube-search.ts` and `release-resolver.ts`. Deduping those means deciding whether they want the same answer, which is a behaviour question, not a move — left alone deliberately.
 
 ### Task 4 — Extract the remaining sources
 

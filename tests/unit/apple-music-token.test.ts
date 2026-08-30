@@ -8,7 +8,7 @@ import {
   readAppleMusicCredentials,
   resetDeveloperTokenCache,
   type AppleMusicCredentials,
-} from "../../server/apple-music-token";
+} from "../../server/apple-music/token";
 
 // A throwaway EC P-256 key pair for signing/verifying test tokens.
 const { privateKey, publicKey } = crypto.generateKeyPairSync("ec", { namedCurve: "P-256" });

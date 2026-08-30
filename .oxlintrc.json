@@ -21,6 +21,25 @@
       }
     },
     {
+      // ports/ names the contracts the layers meet at: it is types and nothing
+      // else, so it may not reach anywhere. A port that imports an adapter has
+      // stopped being a port.
+      "files": ["ports/**/*.ts"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "group": ["../**", "**/server/**", "**/src/**"],
+                "message": "ports/ declares contracts only. It may not import from server/, src/ or domain/."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
       // server/ must not depend on the SvelteKit app. The reverse is correct
       // and deliberately unrestricted: route loaders driving the application
       // is what a driving adapter is for.

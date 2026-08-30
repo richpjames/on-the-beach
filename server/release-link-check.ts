@@ -6,7 +6,7 @@ import {
   stampLookup,
 } from "./secondary-link-enrichment";
 import { getLookupService, type LookupService } from "./settings";
-import type { ServiceSearchResult } from "./scraper";
+import type { ServiceSearchResult } from "../ports/service-search";
 import { parseUrl } from "./utils";
 
 // ---------------------------------------------------------------------------

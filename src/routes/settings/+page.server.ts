@@ -8,7 +8,7 @@ import {
 } from "../../../server/settings";
 import { listTrackedArtists } from "../../../server/artist-watch";
 import { LOOKUP_SERVICE_CONFIG } from "../../../server/secondary-link-enrichment";
-import { isAppleMusicConfigured, getStorefront } from "../../../server/apple-music-token";
+import { isAppleMusicConfigured, getStorefront } from "../../../server/apple-music";
 
 export const load: PageServerLoad = async () => {
   return {

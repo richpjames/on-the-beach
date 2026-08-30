@@ -1,4 +1,6 @@
-import { getDeveloperToken, getStorefront, isAppleMusicConfigured } from "./apple-music-token";
+import { getDeveloperToken, getStorefront, isAppleMusicConfigured } from "./token";
+import type { ServiceSearchResult } from "../../ports/service-search";
+import { normalizeForMatch } from "./match";
 
 // ---------------------------------------------------------------------------
 // Apple Music Catalog API search
@@ -14,23 +16,6 @@ const API_BASE = "https://api.music.apple.com/v1/catalog";
 
 /** The square pixel size we bake into Apple Music artwork template URLs. */
 const ARTWORK_SIZE = 1200;
-
-/**
- * The result of resolving a release on a streaming service: its catalogue URL
- * plus, when the service exposes one, a ready-to-use cover artwork URL.
- */
-export interface ServiceSearchResult {
-  url: string;
-  artworkUrl: string | null;
-}
-
-function normalizeForMatch(s: string): string {
-  return s
-    .toLowerCase()
-    .replace(/[^\w\s]/g, "")
-    .replace(/\s+/g, " ")
-    .trim();
-}
 
 interface CatalogResource {
   attributes?: {

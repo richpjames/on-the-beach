@@ -2,7 +2,7 @@ import { error } from "@sveltejs/kit";
 import type { PageServerLoad } from "./$types";
 import { fetchFullItem } from "../../../../server/music-item-creator";
 import { getLookupService } from "../../../../server/settings";
-import { isAppleMusicConfigured } from "../../../../server/apple-music-token";
+import { isAppleMusicConfigured } from "../../../../server/apple-music";
 import {
   parseUrl,
   extractYouTubeVideoId,
