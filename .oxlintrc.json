@@ -56,6 +56,30 @@
           }
         ]
       }
+    },
+    {
+      // src/ui/logic/ is view-model logic: framework-free, and testable in plain
+      // bun without a DOM. It imports only domain/ and itself today; these rules
+      // keep it that way. The second is about direction — state/ and components/
+      // drive logic/, never the reverse.
+      "files": ["src/ui/logic/**/*.ts"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "group": ["svelte", "svelte/**", "xstate", "xstate/**", "$app/**"],
+                "message": "src/ui/logic/ must stay framework-free. Framework wiring belongs in src/ui/state/ or a component."
+              },
+              {
+                "group": ["../state/**", "../components/**"],
+                "message": "src/ui/logic/ is the inner ring: state/ and components/ import it, not the reverse. Shared types belong in domain/."
+              }
+            ]
+          }
+        ]
+      }
     }
   ]
 }
