@@ -2,7 +2,8 @@ import { eq, and, isNull } from "drizzle-orm";
 import { db } from "./db/index";
 import { musicItems, musicLinks, sources, artists } from "./db/schema";
 import { parseUrl } from "./utils";
-import { searchAppleMusic, type ServiceSearchResult } from "./scraper";
+import type { ServiceSearchResult } from "../ports/service-search";
+import { searchAppleMusic } from "./apple-music";
 
 export interface ItemInfoForLookup {
   title: string;

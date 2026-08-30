@@ -1,4 +1,4 @@
-import type { ServiceSearchResult } from "./apple-music-catalog";
+import type { ServiceSearchResult } from "../ports/service-search";
 import { decodeHtmlEntities } from "./html-metadata";
 
 // ---------------------------------------------------------------------------

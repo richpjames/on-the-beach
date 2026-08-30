@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { getDeveloperToken, getStorefront, isAppleMusicConfigured } from "../apple-music-token";
+import { getDeveloperToken, getStorefront, isAppleMusicConfigured } from "../apple-music";
 
 /**
  * Endpoints backing the browser MusicKit integration.

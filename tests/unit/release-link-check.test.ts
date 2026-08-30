@@ -5,7 +5,7 @@ import {
   type ReleaseLinkDeps,
 } from "../../server/release-link-check";
 import type { MbUrlRelation } from "../../server/musicbrainz";
-import type { ServiceSearchResult } from "../../server/scraper";
+import type { ServiceSearchResult } from "../../ports/service-search";
 
 const QUERY = {
   title: "Ordinary Record",

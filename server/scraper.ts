@@ -5,7 +5,15 @@ import {
   matchReleaseUrls,
 } from "./link-extractor";
 import { fetchDiscogsRelease } from "./discogs";
-import { searchAppleMusicCatalog, type ServiceSearchResult } from "./apple-music-catalog";
+import type { ServiceSearchResult } from "../ports/service-search";
+import {
+  fetchAppleMusicApiMetadata,
+  isCompleteAppleMusicMetadata,
+  mergeAppleMusicPageMetadata,
+  NO_APPLE_MUSIC_API_METADATA,
+  parseAppleMusicOg,
+  type AppleMusicApiMetadata,
+} from "./apple-music";
 import {
   decodeHtmlEntities,
   extractImageFromJsonLdValue,
@@ -28,7 +36,6 @@ import {
   parseMixcloudOg,
 } from "./mixcloud";
 
-export type { ServiceSearchResult } from "./apple-music-catalog";
 export type { OgData, ScrapedMetadata } from "./html-metadata";
 
 type OgParser = (og: OgData) => ScrapedMetadata;
@@ -257,53 +264,6 @@ export function parseSoundcloudOg(og: OgData): ScrapedMetadata {
   return { potentialTitle: title || undefined, imageUrl: og.ogImage };
 }
 
-export function parseAppleMusicOg(og: OgData): ScrapedMetadata {
-  const result: ScrapedMetadata = { imageUrl: og.ogImage };
-  const title = og.ogTitle?.trim();
-
-  if (title) {
-    const byMatch = title.match(/^(.+?)\s+by\s+(.+?)\s+on\s+Apple Music$/i);
-    if (byMatch) {
-      result.potentialTitle = byMatch[1].trim();
-      result.potentialArtist = byMatch[2].trim();
-    } else {
-      result.potentialTitle = title;
-    }
-  }
-
-  // og:description is often "Artist · YEAR · N Songs", but may also be "Release · ...".
-  if (!result.potentialArtist && og.ogDescription) {
-    const artistMatch = og.ogDescription.match(/^(.+?)\s+[·-]\s+/i);
-    const candidateArtist = artistMatch?.[1]?.trim();
-    if (
-      candidateArtist &&
-      !/^(album|playlist|station|music video|single|ep)$/i.test(candidateArtist)
-    ) {
-      result.potentialArtist = candidateArtist;
-    }
-  }
-
-  return result;
-}
-
-function hasCompleteAppleMusicMetadata(
-  metadata: ScrapedMetadata | null | undefined,
-): metadata is ScrapedMetadata {
-  return Boolean(metadata?.potentialArtist && metadata?.potentialTitle && metadata?.imageUrl);
-}
-
-function mergeScrapedMetadata(
-  ...entries: Array<ScrapedMetadata | null | undefined>
-): ScrapedMetadata | null {
-  const merged: ScrapedMetadata = {
-    potentialArtist: firstDefined(...entries.map((entry) => entry?.potentialArtist)),
-    potentialTitle: firstDefined(...entries.map((entry) => entry?.potentialTitle)),
-    imageUrl: firstDefined(...entries.map((entry) => entry?.imageUrl)),
-  };
-
-  return hasScrapedMetadata(merged) ? merged : null;
-}
-
 async function scrapeYouTubeOEmbed(
   url: string,
   timeoutMs: number,
@@ -332,146 +292,6 @@ async function scrapeYouTubeOEmbed(
     if (!potentialTitle && !potentialArtist && !imageUrl) return null;
 
     return { potentialTitle, potentialArtist, imageUrl };
-  } catch {
-    return null;
-  }
-}
-
-async function scrapeAppleMusicOEmbed(
-  url: string,
-  timeoutMs: number,
-): Promise<ScrapedMetadata | null> {
-  try {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), timeoutMs);
-    const oembedUrl = `https://music.apple.com/api/oembed?url=${encodeURIComponent(url)}`;
-
-    const response = await fetch(oembedUrl, {
-      signal: controller.signal,
-      headers: { Accept: "application/json" },
-    });
-
-    clearTimeout(timer);
-
-    if (!response.ok) {
-      return null;
-    }
-
-    const data = (await response.json()) as unknown;
-    if (!isRecord(data)) {
-      return null;
-    }
-
-    const potentialTitle = firstDefined(getString(data.title), getString(data.name));
-    const potentialArtist = firstDefined(
-      getString(data.author_name),
-      getString(data.author),
-      getString(data.uploader),
-    );
-    const imageUrl = normalizeAppleMusicImageUrl(
-      firstDefined(getString(data.thumbnail_url), getString(data.thumbnail), getString(data.image)),
-    );
-
-    if (!potentialTitle && !potentialArtist && !imageUrl) {
-      return null;
-    }
-
-    return {
-      potentialTitle,
-      potentialArtist,
-      imageUrl,
-    };
-  } catch {
-    return null;
-  }
-}
-
-function extractAppleMusicLookupId(url: string): string | undefined {
-  try {
-    const parsed = new URL(url);
-    const trackId = parsed.searchParams.get("i");
-    if (trackId && /^\d+$/.test(trackId)) {
-      return trackId;
-    }
-
-    const segments = parsed.pathname.split("/").filter(Boolean);
-    for (let i = segments.length - 1; i >= 0; i -= 1) {
-      if (/^\d+$/.test(segments[i])) {
-        return segments[i];
-      }
-    }
-  } catch {
-    return undefined;
-  }
-
-  return undefined;
-}
-
-function normalizeAppleMusicImageUrl(url: string | undefined): string | undefined {
-  if (!url) {
-    return undefined;
-  }
-
-  return url.replace(/\/\d+x\d+(?:bb|sr)\./i, "/1200x1200bb.");
-}
-
-async function scrapeAppleMusicLookup(
-  url: string,
-  timeoutMs: number,
-): Promise<ScrapedMetadata | null> {
-  try {
-    const lookupId = extractAppleMusicLookupId(url);
-    if (!lookupId) {
-      return null;
-    }
-
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), timeoutMs);
-    const lookupUrl = `https://itunes.apple.com/lookup?id=${encodeURIComponent(lookupId)}`;
-
-    const response = await fetch(lookupUrl, {
-      signal: controller.signal,
-      headers: { Accept: "application/json" },
-    });
-
-    clearTimeout(timer);
-
-    if (!response.ok) {
-      return null;
-    }
-
-    const data = (await response.json()) as unknown;
-    if (!isRecord(data) || !Array.isArray(data.results)) {
-      return null;
-    }
-
-    const primary = data.results.find((entry) => isRecord(entry));
-    if (!primary) {
-      return null;
-    }
-
-    const potentialTitle = firstDefined(
-      getString(primary.collectionName),
-      getString(primary.trackName),
-      getString(primary.name),
-    );
-    const potentialArtist = firstDefined(
-      getString(primary.artistName),
-      getString(primary.collectionArtistName),
-    );
-    const imageUrl = normalizeAppleMusicImageUrl(
-      firstDefined(getString(primary.artworkUrl100), getString(primary.artworkUrl60)),
-    );
-
-    if (!potentialTitle && !potentialArtist && !imageUrl) {
-      return null;
-    }
-
-    return {
-      potentialTitle,
-      potentialArtist,
-      imageUrl,
-    };
   } catch {
     return null;
   }
@@ -605,25 +425,17 @@ export async function scrapeUrl(
   timeoutMs = 5000,
 ): Promise<ScrapedMetadata | null> {
   let mixcloudOEmbed: ScrapedMetadata | null = null;
-  let appleMusicOEmbed: ScrapedMetadata | null = null;
-  let appleMusicLookup: ScrapedMetadata | null = null;
-  let appleMusicMetadata: ScrapedMetadata | null = null;
+  let appleMusic: AppleMusicApiMetadata = NO_APPLE_MUSIC_API_METADATA;
 
   if (source === "mixcloud") {
     mixcloudOEmbed = await fetchMixcloudOEmbed(url, timeoutMs);
   }
 
   if (source === "apple_music") {
-    appleMusicOEmbed = await scrapeAppleMusicOEmbed(url, timeoutMs);
-    appleMusicMetadata = mergeScrapedMetadata(appleMusicOEmbed);
-    if (hasCompleteAppleMusicMetadata(appleMusicMetadata)) {
-      return appleMusicMetadata;
-    }
-
-    appleMusicLookup = await scrapeAppleMusicLookup(url, timeoutMs);
-    appleMusicMetadata = mergeScrapedMetadata(appleMusicOEmbed, appleMusicLookup);
-    if (hasCompleteAppleMusicMetadata(appleMusicMetadata)) {
-      return appleMusicMetadata;
+    appleMusic = await fetchAppleMusicApiMetadata(url, timeoutMs);
+    // Complete from Apple's own APIs — no need to fetch the page at all.
+    if (isCompleteAppleMusicMetadata(appleMusic.merged)) {
+      return appleMusic.merged;
     }
   }
 
@@ -640,8 +452,8 @@ export async function scrapeUrl(
       return mixcloudOEmbed;
     }
 
-    if (source === "apple_music" && hasScrapedMetadata(appleMusicMetadata)) {
-      return appleMusicMetadata;
+    if (source === "apple_music" && hasScrapedMetadata(appleMusic.merged)) {
+      return appleMusic.merged;
     }
 
     const controller = new AbortController();
@@ -659,7 +471,7 @@ export async function scrapeUrl(
 
     const contentType = response.headers.get("content-type") || "";
     const fallback =
-      source === "mixcloud" ? mixcloudOEmbed : source === "apple_music" ? appleMusicMetadata : null;
+      source === "mixcloud" ? mixcloudOEmbed : source === "apple_music" ? appleMusic.merged : null;
 
     if (!contentType.includes("text/html")) {
       return hasScrapedMetadata(fallback) ? fallback : null;
@@ -716,8 +528,7 @@ export async function scrapeUrl(
     }
 
     if (source === "apple_music") {
-      const appleMusicOg = parseAppleMusicOg(og);
-      return mergeScrapedMetadata(appleMusicOEmbed, appleMusicLookup, appleMusicOg);
+      return mergeAppleMusicPageMetadata(og, appleMusic);
     }
 
     if (source === "nts") {
@@ -753,7 +564,7 @@ export async function scrapeUrl(
     }
 
     const fallback =
-      source === "mixcloud" ? mixcloudOEmbed : source === "apple_music" ? appleMusicMetadata : null;
+      source === "mixcloud" ? mixcloudOEmbed : source === "apple_music" ? appleMusic.merged : null;
     return hasScrapedMetadata(fallback) ? fallback : null;
   }
 }
@@ -800,154 +611,6 @@ export async function scrapeOgImage(url: string, timeoutMs = 5000): Promise<stri
     reader.cancel();
 
     return parseOgTags(html).ogImage ?? null;
-  } catch {
-    return null;
-  }
-}
-
-function normalizeForMatch(s: string): string {
-  return s
-    .toLowerCase()
-    .replace(/[^\w\s]/g, "")
-    .replace(/\s+/g, " ")
-    .trim();
-}
-
-/**
- * Search Apple Music for a release by title and artist, returning the best
- * matching catalogue URL together with its cover artwork, or null if not found.
- *
- * Prefers the official Apple Music Catalog API (api.music.apple.com) when
- * MusicKit is configured — those URLs carry the catalogue ids the browser SDK
- * needs to stream full tracks — and falls back to the open iTunes Search API
- * when unconfigured or when the catalogue search comes up empty.
- */
-export async function searchAppleMusic(
-  title: string,
-  artist: string | null,
-  timeoutMs = 8000,
-): Promise<ServiceSearchResult | null> {
-  const catalogResult = await searchAppleMusicCatalog(title, artist, timeoutMs);
-  if (catalogResult) return catalogResult;
-  return searchAppleMusicViaItunes(title, artist, timeoutMs);
-}
-
-/**
- * Search Apple Music via the open iTunes Search API. Returns the Apple Music
- * URL for the best matching result together with its cover artwork, or null if
- * not found.
- *
- * Matching strategy (in order):
- *  1. Exact title + artist match
- *  2. Partial match — one title is a prefix/substring of the other (handles
- *     Wikipedia-style disambiguators like "Foo (1981 album)" vs "Foo")
- *  3. First result whose artist matches (search query is already specific)
- */
-export async function searchAppleMusicViaItunes(
-  title: string,
-  artist: string | null,
-  timeoutMs = 8000,
-): Promise<ServiceSearchResult | null> {
-  // Test environments set this to keep the release page deterministic — the
-  // visual snapshot can't depend on whether iTunes responds in time.
-  if (process.env.OTB_DISABLE_EXTERNAL_LOOKUPS) return null;
-
-  try {
-    const term = [artist, title].filter(Boolean).join(" ");
-    const searchUrl = `https://itunes.apple.com/search?term=${encodeURIComponent(term)}&media=music&entity=album,musicTrack,mix&limit=10`;
-
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), timeoutMs);
-
-    const response = await fetch(searchUrl, {
-      signal: controller.signal,
-      headers: { Accept: "application/json" },
-    });
-
-    clearTimeout(timer);
-
-    if (!response.ok) return null;
-
-    const data = (await response.json()) as unknown;
-    if (!isRecord(data) || !Array.isArray(data.results) || data.results.length === 0) return null;
-
-    const normalizedTitle = normalizeForMatch(title);
-    const normalizedArtist = artist ? normalizeForMatch(artist) : null;
-
-    function artistMatches(resultArtist: string | undefined): boolean {
-      if (!normalizedArtist || !resultArtist) return true;
-      return normalizeForMatch(resultArtist) === normalizedArtist;
-    }
-
-    function titlesCompatible(resultTitle: string): boolean {
-      const rn = normalizeForMatch(resultTitle);
-      return (
-        rn === normalizedTitle || rn.startsWith(normalizedTitle) || normalizedTitle.startsWith(rn)
-      );
-    }
-
-    function resultUrl(result: Record<string, unknown>): string | undefined {
-      const raw = firstDefined(getString(result.collectionViewUrl), getString(result.trackViewUrl));
-      if (!raw) return undefined;
-      try {
-        const u = new URL(raw);
-        u.search = "";
-        if (u.hostname === "itunes.apple.com") {
-          u.hostname = "music.apple.com";
-          // iTunes paths use /id123456789 suffix; Apple Music uses /123456789
-          u.pathname = u.pathname.replace(/\/id(\d+)$/, "/$1");
-        }
-        return u.toString();
-      } catch {
-        return raw;
-      }
-    }
-
-    function toResult(result: Record<string, unknown>): ServiceSearchResult | undefined {
-      const url = resultUrl(result);
-      if (!url) return undefined;
-      const artworkUrl =
-        normalizeAppleMusicImageUrl(
-          firstDefined(getString(result.artworkUrl100), getString(result.artworkUrl60)),
-        ) ?? null;
-      return { url, artworkUrl };
-    }
-
-    // Pass 1: exact title + artist
-    for (const result of data.results) {
-      if (!isRecord(result)) continue;
-      const resultTitle = firstDefined(
-        getString(result.collectionName),
-        getString(result.trackName),
-      );
-      if (!resultTitle || normalizeForMatch(resultTitle) !== normalizedTitle) continue;
-      if (!artistMatches(getString(result.artistName))) continue;
-      const match = toResult(result);
-      if (match) return match;
-    }
-
-    // Pass 2: compatible title (one is a prefix of the other) + artist
-    for (const result of data.results) {
-      if (!isRecord(result)) continue;
-      const resultTitle = firstDefined(
-        getString(result.collectionName),
-        getString(result.trackName),
-      );
-      if (!resultTitle || !titlesCompatible(resultTitle)) continue;
-      if (!artistMatches(getString(result.artistName))) continue;
-      const match = toResult(result);
-      if (match) return match;
-    }
-
-    // Pass 3: first result whose artist matches (search query is already scoped)
-    for (const result of data.results) {
-      if (!isRecord(result)) continue;
-      if (!artistMatches(getString(result.artistName))) continue;
-      const match = toResult(result);
-      if (match) return match;
-    }
-
-    return null;
   } catch {
     return null;
   }
