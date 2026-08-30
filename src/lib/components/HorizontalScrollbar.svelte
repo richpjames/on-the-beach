@@ -7,7 +7,7 @@
     thumbOffsetForTrackClick,
     thumbOffsetToScroll,
     type ScrollMetrics,
-  } from "../../ui/domain/scrollbar";
+  } from "../../ui/logic/scrollbar";
 
   let {
     target,

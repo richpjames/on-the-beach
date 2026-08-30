@@ -8,7 +8,7 @@ import {
   thumbOffsetToScroll,
   thumbSize,
   type ScrollMetrics,
-} from "../../src/ui/domain/scrollbar";
+} from "../../src/ui/logic/scrollbar";
 
 /** A long playlist: 300 cards in a short window, so the thumb hits its floor. */
 const longList: ScrollMetrics = {

@@ -11,7 +11,7 @@ import {
   slugifyStackName,
   stackIdFromListPath,
   type ListViewState,
-} from "../../src/ui/domain/list-url";
+} from "../../src/ui/logic/list-url";
 
 function params(query: string): URLSearchParams {
   return new URLSearchParams(query);

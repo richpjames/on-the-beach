@@ -5,19 +5,19 @@ import {
   getCoverScanErrorMessage,
   hasAnyNonEmptyField,
   toListSearchQuery,
-} from "../../src/ui/domain/add-form";
+} from "../../src/ui/logic/add-form";
 import {
   buildMusicItemFilters,
   getEmptyStateHint,
   getEmptyStateMessage,
   buildContextKey,
   applyOrder,
-} from "../../src/ui/domain/music-list";
+} from "../../src/ui/logic/music-list";
 import {
   constrainDimensions,
   imageCompressionAttempts,
   MAX_UPLOAD_BASE64_LENGTH,
-} from "../../src/ui/domain/scan";
+} from "../../src/ui/logic/scan";
 
 describe("app domain helpers", () => {
   it("detects whether add form has any user input", () => {
