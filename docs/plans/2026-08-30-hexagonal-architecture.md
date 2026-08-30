@@ -63,9 +63,13 @@ Shipped in [#310](https://github.com/richpjames/on-the-beach/pull/310). `shared/
 
 Boundaries are enforced by `no-restricted-imports` with per-directory `overrides` in `.oxlintrc.json`, backed by `tests/unit/layer-boundaries.test.ts` for `.svelte` files, which oxlint does not parse. `test.yml` runs `bun run lint` so the rules gate CI rather than only the pre-commit hook.
 
-### Task 2 — Rename `src/ui/domain/`
+### Task 2 — Rename `src/ui/domain/` ✅ done
 
-Top-level `domain/` and `src/ui/domain/` now read confusingly. The UI one holds view-model logic — URL state, scrollbar geometry, empty-state copy — so `src/ui/logic/` fits. Fourteen files import from it; the change is mechanical. Do this before the extraction tasks, while the habit is still cheap to change.
+Shipped in [#314](https://github.com/richpjames/on-the-beach/pull/314). `src/ui/domain/` became `src/ui/logic/`: 7 files, 21 import sites across components, a route loader, `add-form-machine.ts` and the unit tests. "Domain" now means one thing.
+
+A fourth `overrides` entry fences the folder — frameworks (`svelte`, `xstate`, `$app`) to keep it testable in plain bun, siblings (`../state`, `../components`) to keep the direction right. Unlike the `src/ui/**` rule it is leaf-scoped, so renaming `logic/` again would silently stop it applying.
+
+The estimate of fourteen importers was low, and instructively so: a string search for `ui/domain` misses `src/ui/state/add-form-machine.ts`, which reaches its sibling as `../domain/add-form`. Same resolved-vs-literal gap this plan flags for `no-restricted-imports` below.
 
 ### Task 3 — Extract Apple Music
 
