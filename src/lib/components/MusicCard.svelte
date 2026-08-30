@@ -2,8 +2,8 @@
   import Case from "case";
   import { tick } from "svelte";
   import type { ListenStatus, MusicItemFull, StackWithCount } from "../../../domain/types";
-  import { buildReleaseHref } from "../../ui/domain/list-url";
-  import { STATUS_LABELS } from "../../ui/domain/status";
+  import { buildReleaseHref } from "../../ui/logic/list-url";
+  import { STATUS_LABELS } from "../../ui/logic/status";
   import { api } from "../api";
   import { registerOpenPopover, unregisterPopover } from "../popover-registry";
   import { flipPopoverUpIfClipped } from "../popover";

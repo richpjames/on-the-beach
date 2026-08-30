@@ -2,7 +2,7 @@ import {
   constrainDimensions,
   imageCompressionAttempts,
   MAX_UPLOAD_BASE64_LENGTH,
-} from "../ui/domain/scan";
+} from "../ui/logic/scan";
 
 const DEFAULT_MAX_EDGE = 1024;
 const DEFAULT_QUALITY = 0.85;

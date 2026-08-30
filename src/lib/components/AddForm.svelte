@@ -1,8 +1,8 @@
 <script lang="ts">
   import { tick } from "svelte";
   import type { StackWithCount } from "../../../domain/types";
-  import type { AddFormValues } from "../../ui/domain/add-form";
-  import { getCoverScanErrorMessage, toListSearchQuery } from "../../ui/domain/add-form";
+  import type { AddFormValues } from "../../ui/logic/add-form";
+  import { getCoverScanErrorMessage, toListSearchQuery } from "../../ui/logic/add-form";
   import { addFormMachine, RECORD_DURATION_MS } from "../../ui/state/add-form-machine";
   import { api } from "../api";
   import { encodeImageFile } from "../encode-image";

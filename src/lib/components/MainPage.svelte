@@ -3,7 +3,7 @@
   import { page } from "$app/state";
   import { onMount } from "svelte";
   import type { ItemSuggestion, ListenStatus, MusicItemFull, StackWithCount } from "../../../domain/types";
-  import { buildContextKey, buildMusicItemFilters } from "../../ui/domain/music-list";
+  import { buildContextKey, buildMusicItemFilters } from "../../ui/logic/music-list";
   import {
     buildListHref,
     buildReleaseHref,
@@ -12,7 +12,7 @@
     parseListViewState,
     stackIdFromListPath,
     type ListViewState,
-  } from "../../ui/domain/list-url";
+  } from "../../ui/logic/list-url";
   import { normalizeStarRating } from "../../ui/components/star-rating";
   import { addFormMachine } from "../../ui/state/add-form-machine";
   import { appMachine } from "../../ui/state/app-machine";

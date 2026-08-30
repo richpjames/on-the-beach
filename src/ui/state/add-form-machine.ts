@@ -2,8 +2,8 @@ import { assign, fromCallback, fromPromise, sendTo, setup } from "xstate";
 
 export const RECORD_DURATION_MS = 15000;
 import type { LinkReleaseCandidate } from "../../../domain/types";
-import type { AddFormValues } from "../domain/add-form";
-import { buildCreateMusicItemInputFromValues } from "../domain/add-form";
+import type { AddFormValues } from "../logic/add-form";
+import { buildCreateMusicItemInputFromValues } from "../logic/add-form";
 import { AmbiguousLinkApiError, type ApiClient } from "../../services/api-client";
 
 type ScanResultData = {

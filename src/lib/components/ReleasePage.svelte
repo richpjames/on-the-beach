@@ -11,7 +11,7 @@
   import ServiceIcon from "./ServiceIcon.svelte";
   import StarRating from "./StarRating.svelte";
   import SuggestionPickerModal from "./SuggestionPickerModal.svelte";
-  import { linkService } from "../../ui/domain/link-service";
+  import { linkService } from "../../ui/logic/link-service";
 
   // The page wraps this component in {#key item.id}, so all state below is
   // (re)initialised per release — the same lifecycle as the old full-page SSR.

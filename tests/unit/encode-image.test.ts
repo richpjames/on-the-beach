@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 
 import { encodeImageFile } from "../../src/lib/encode-image";
-import { MAX_UPLOAD_BASE64_LENGTH } from "../../src/ui/domain/scan";
+import { MAX_UPLOAD_BASE64_LENGTH } from "../../src/ui/logic/scan";
 
 // The encoder is browser code (FileReader, Image, canvas), so the DOM pieces it
 // touches are stubbed here. The fake canvas models a JPEG encoder: payload size

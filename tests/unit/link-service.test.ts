@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { linkService, serviceFromUrl } from "../../src/ui/domain/link-service";
+import { linkService, serviceFromUrl } from "../../src/ui/logic/link-service";
 
 describe("serviceFromUrl", () => {
   test("recognises the services a release can link to", () => {

@@ -14,7 +14,7 @@
 ## Rendering
 
 - Markup lives in Svelte components under `src/lib/components/`; SvelteKit server-renders the initial page from `+page.server.ts` data.
-- `src/ui/domain/*` still contains the small view-model helpers for list filters, scan sizing, add-form value shaping, and status display — they are framework-free and unit-tested.
+- `src/ui/logic/*` still contains the small view-model helpers for list filters, scan sizing, add-form value shaping, and status display — they are framework-free and unit-tested.
 - Drag reordering is the one place the DOM is mutated outside Svelte: sortablejs owns the move, `MusicList.svelte` persists the new order, and the next list refetch re-renders from state.
 
 ## Design tradeoff
