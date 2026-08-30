@@ -27,6 +27,8 @@ export interface FeedEntry {
   /** ISO 8601; rendered as RFC 2822. */
   pubDate: string;
   description: string;
+  /** Absolute URL of the release artwork, when the item has one. */
+  imageUrl?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -42,8 +44,56 @@ function escapeXml(str: string): string {
     .replace(/'/g, "&apos;");
 }
 
+/**
+ * Escapes text destined for the HTML body of a `<description>`. The description
+ * is CDATA as far as XML is concerned, but readers parse its contents as HTML,
+ * so an artist called "Simon & Garfunkel" still needs escaping.
+ */
+function escapeHtml(str: string): string {
+  return str
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+/** Wraps a string in CDATA, splitting any `]]>` that would close it early. */
+function cdata(str: string): string {
+  return `<![CDATA[${str.replace(/]]>/g, "]]]]><![CDATA[>")}]]>`;
+}
+
 function toRfc2822(isoDate: string): string {
   return new Date(isoDate).toUTCString();
+}
+
+/**
+ * Artwork lives either on a remote host (Apple Music, Bandcamp) or on this app
+ * as `/uploads/…`. A feed reader fetches images from wherever it happens to be
+ * running, so the relative form has to be resolved against the request origin.
+ * Anything that isn't http(s) — a `data:` URI, say — is no use to a reader.
+ */
+function absoluteArtworkUrl(artworkUrl: string | null, baseUrl: string): string | undefined {
+  if (!artworkUrl) return undefined;
+  if (/^https?:\/\//i.test(artworkUrl)) return artworkUrl;
+  if (artworkUrl.startsWith("/")) return `${baseUrl}${artworkUrl}`;
+  return undefined;
+}
+
+/** Best guess at an image MIME type, for readers that want one up front. */
+function imageMimeType(url: string): string {
+  const extension = url.split(/[?#]/)[0]?.split(".").pop()?.toLowerCase();
+  switch (extension) {
+    case "png":
+      return "image/png";
+    case "gif":
+      return "image/gif";
+    case "webp":
+      return "image/webp";
+    case "avif":
+      return "image/avif";
+    default:
+      return "image/jpeg";
+  }
 }
 
 function capitalize(str: string): string {
@@ -112,6 +162,7 @@ function itemToEntry(item: MusicItemFull, baseUrl: string): FeedEntry {
     link: `${baseUrl}/r/${item.id}`,
     pubDate: item.created_at,
     description: renderItemDescription(item),
+    imageUrl: absoluteArtworkUrl(item.artwork_url, baseUrl),
   };
 }
 
@@ -150,6 +201,35 @@ function alertToEntry(alert: ReleaseAlertView, baseUrl: string): FeedEntry {
   };
 }
 
+/**
+ * The description as HTML: the artwork first, then the metadata lines. Readers
+ * render the description as HTML and most of them take the first `<img>` in it
+ * as the entry's thumbnail, so this doubles as the fallback for readers that
+ * ignore the Media RSS elements below.
+ */
+function renderDescriptionHtml(entry: FeedEntry): string {
+  const body = escapeHtml(entry.description).replace(/\n/g, "<br />");
+  if (!entry.imageUrl) return `<p>${body}</p>`;
+
+  return `<p><img src="${escapeHtml(entry.imageUrl)}" alt="${escapeHtml(entry.title)}" /></p>
+<p>${body}</p>`;
+}
+
+/**
+ * Media RSS artwork. Readers differ in what they look for — `media:content`,
+ * `media:thumbnail`, or the description's first image — so the same URL is
+ * offered three ways rather than betting on one.
+ */
+function renderMediaXml(entry: FeedEntry): string {
+  if (!entry.imageUrl) return "";
+
+  const url = escapeXml(entry.imageUrl);
+  const type = imageMimeType(entry.imageUrl);
+  return `
+      <media:content url="${url}" medium="image" type="${type}" />
+      <media:thumbnail url="${url}" />`;
+}
+
 function renderRss(feed: FeedInfo, entries: FeedEntry[]): string {
   const itemsXml = entries
     .map((entry) => {
@@ -162,13 +242,13 @@ function renderRss(feed: FeedInfo, entries: FeedEntry[]): string {
       <link>${link}</link>
       <pubDate>${pubDate}</pubDate>
       <guid isPermaLink="false">${entry.guid}</guid>
-      <description><![CDATA[${entry.description}]]></description>
+      <description>${cdata(renderDescriptionHtml(entry))}</description>${renderMediaXml(entry)}
     </item>`;
     })
     .join("\n");
 
   return `<?xml version="1.0" encoding="UTF-8"?>
-<rss version="2.0">
+<rss version="2.0" xmlns:media="http://search.yahoo.com/mrss/">
   <channel>
     <title>${escapeXml(feed.title)}</title>
     <description>${escapeXml(feed.description)}</description>
