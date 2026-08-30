@@ -19,7 +19,7 @@ import {
   MAX_UPLOAD_BASE64_LENGTH,
 } from "../../src/ui/logic/scan";
 
-describe("app domain helpers", () => {
+describe("app logic helpers", () => {
   it("detects whether add form has any user input", () => {
     expect(hasAnyNonEmptyField(["", "   "])).toBe(false);
     expect(hasAnyNonEmptyField(["", " title "])).toBe(true);
