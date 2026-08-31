@@ -295,8 +295,9 @@
     <section class="settings__section" id="release-length-settings">
       <h2 class="settings__heading">Suggested release length</h2>
       <p class="settings__hint">
-        When suggesting another release by an artist you've listened to, which length to favour.
-        Changing this re-picks any queued suggestions.
+        Suggestions come from as close to the release date of the record you listened to as
+        possible; this is which length to favour when two are equally close. Changing this re-picks
+        any queued suggestions.
       </p>
       <form id="release-length-form" class="settings__options">
         {#each data.releaseLengthPreferences as preference (preference)}

@@ -182,6 +182,16 @@ function lengthRank(trackCount: number | null, preference: ReleaseLengthPreferen
   return order.indexOf(lengthBucket(trackCount));
 }
 
+/**
+ * How far a candidate release sits from the release that prompted the
+ * suggestion — lower is better. An undated candidate ranks below every dated
+ * one rather than being treated as a perfect match, which is what a distance
+ * of 0 would make it.
+ */
+export function yearDistance(year: number | null, sourceYear: number): number {
+  return year === null ? Number.MAX_SAFE_INTEGER : Math.abs(year - sourceYear);
+}
+
 interface MbArtistReleasesResponse {
   releases?: unknown[];
 }
@@ -226,11 +236,13 @@ async function fetchArtistReleases(mbid: string): Promise<MbArtistRelease[]> {
 
 /**
  * Find up to `limit` releases by the artist whose titles neither match nor are
- * close to anything in `trackedTitles`. Candidates are ranked by release length
- * under `lengthPreference` (albums before EPs before singles by default,
- * reversed for "shorter"), then by year: closest to `sourceYear`, or most
- * recent when null. The picks are distinct records, not editions of one — see
- * the dedupe below.
+ * close to anything in `trackedTitles`. Candidates are ranked by year first —
+ * closest to `sourceYear`, or most recent when null — because a suggestion
+ * made off the back of a listen should come from the same period of the
+ * artist's work as the record that prompted it. Release length under
+ * `lengthPreference` (albums before EPs before singles by default, reversed
+ * for "shorter") breaks ties between releases that are equally close. The
+ * picks are distinct records, not editions of one — see the dedupe below.
  *
  * Returns an empty array when the artist can't be found or has no untracked
  * releases. Network failures and non-2xx MusicBrainz responses THROW so callers
@@ -303,15 +315,22 @@ export async function findSuggestedReleases(opts: {
     }
     // Closest in year to the source release; undated releases last rather
     // than treated as a perfect match.
-    const distance = (year: number | null) =>
-      year === null ? Number.MAX_SAFE_INTEGER : Math.abs(year - sourceYear);
-    return distance(a.year) - distance(b.year);
+    return yearDistance(a.year, sourceYear) - yearDistance(b.year, sourceYear);
   };
 
+  const byLength = (a: { trackCount: number | null }, b: { trackCount: number | null }): number =>
+    lengthRank(a.trackCount, lengthPreference) - lengthRank(b.trackCount, lengthPreference);
+
+  // Year leads when there's an original release date to stay near: the whole
+  // point of suggesting off the back of a listen is to land in the same era as
+  // the record just listened to, so a contemporaneous EP beats an album from
+  // two decades later. Length only separates releases that are equally close.
+  // With no source year there's nothing to be close to, so the length
+  // preference leads and recency breaks its ties.
   ranked.sort(
-    (a, b) =>
-      lengthRank(a.trackCount, lengthPreference) - lengthRank(b.trackCount, lengthPreference) ||
-      byYear(a, b),
+    sourceYear === null
+      ? (a, b) => byLength(a, b) || byYear(a, b)
+      : (a, b) => byYear(a, b) || byLength(a, b),
   );
 
   // MB lists every pressing of a record separately — a reissue, a Japanese

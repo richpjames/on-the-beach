@@ -205,7 +205,7 @@ describe("findSuggestedReleases", () => {
     expect(result).toBeNull();
   });
 
-  test("prefers longer releases by default, even when a shorter one is closer in year", async () => {
+  test("prefers the release closest in year over the preferred length", async () => {
     spyOn(globalThis, "fetch").mockResolvedValueOnce(
       makeMbArtistReleasesResponse([
         { id: "r1", title: "Anvil Vapre", date: "1995", media: [{ "track-count": 4 }] },
@@ -220,13 +220,74 @@ describe("findSuggestedReleases", () => {
       sourceYear: 1995,
     });
 
-    expect(result?.title).toBe("Chiastic Slide");
+    // The EP shares the source release's year, so it wins despite "longer"
+    // being the default length preference.
+    expect(result?.title).toBe("Anvil Vapre");
   });
 
-  test("prefers shorter releases when lengthPreference is 'shorter'", async () => {
+  test("breaks year ties with the length preference", async () => {
     spyOn(globalThis, "fetch").mockResolvedValueOnce(
       makeMbArtistReleasesResponse([
         { id: "r1", title: "Anvil Vapre", date: "1995", media: [{ "track-count": 4 }] },
+        { id: "r2", title: "Tri Repetae", date: "1995", media: [{ "track-count": 9 }] },
+      ]),
+    );
+
+    const result = await findSuggestedRelease({
+      mbArtistId: "artist-uuid",
+      artistName: "Autechre",
+      trackedTitles: new Set(),
+      sourceYear: 1995,
+    });
+
+    expect(result?.title).toBe("Tri Repetae");
+  });
+
+  test("breaks year ties towards shorter releases when asked to", async () => {
+    spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      makeMbArtistReleasesResponse([
+        { id: "r1", title: "Anvil Vapre", date: "1995", media: [{ "track-count": 4 }] },
+        { id: "r2", title: "Tri Repetae", date: "1995", media: [{ "track-count": 9 }] },
+      ]),
+    );
+
+    const result = await findSuggestedRelease({
+      mbArtistId: "artist-uuid",
+      artistName: "Autechre",
+      trackedTitles: new Set(),
+      sourceYear: 1995,
+      lengthPreference: "shorter",
+    });
+
+    expect(result?.title).toBe("Anvil Vapre");
+  });
+
+  test("treats years either side of the source as equally close", async () => {
+    spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      makeMbArtistReleasesResponse([
+        { id: "r1", title: "Anvil Vapre", date: "1997", media: [{ "track-count": 4 }] },
+        { id: "r2", title: "Incunabula", date: "1993", media: [{ "track-count": 9 }] },
+      ]),
+    );
+
+    const result = await findSuggestedRelease({
+      mbArtistId: "artist-uuid",
+      artistName: "Autechre",
+      trackedTitles: new Set(),
+      sourceYear: 1995,
+    });
+
+    // Two years before and two years after are the same distance, so the
+    // length preference decides — a suggestion is not biased towards later work.
+    expect(result?.title).toBe("Incunabula");
+  });
+
+  test("falls back to the length preference when there is no source year", async () => {
+    // Nothing to be close to, so the old ranking stands: preferred length
+    // first, most recent breaking its ties.
+    spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      makeMbArtistReleasesResponse([
+        { id: "r1", title: "Anvil Vapre", date: "2005", media: [{ "track-count": 4 }] },
         { id: "r2", title: "Chiastic Slide", date: "1997", media: [{ "track-count": 9 }] },
       ]),
     );
@@ -235,29 +296,10 @@ describe("findSuggestedReleases", () => {
       mbArtistId: "artist-uuid",
       artistName: "Autechre",
       trackedTitles: new Set(),
-      sourceYear: 1997,
-      lengthPreference: "shorter",
+      sourceYear: null,
     });
 
-    expect(result?.title).toBe("Anvil Vapre");
-  });
-
-  test("breaks length-bucket ties by year proximity", async () => {
-    spyOn(globalThis, "fetch").mockResolvedValueOnce(
-      makeMbArtistReleasesResponse([
-        { id: "r1", title: "Incunabula", date: "1993", media: [{ "track-count": 9 }] },
-        { id: "r2", title: "LP5", date: "1998", media: [{ "track-count": 11 }] },
-      ]),
-    );
-
-    const result = await findSuggestedRelease({
-      mbArtistId: "artist-uuid",
-      artistName: "Autechre",
-      trackedTitles: new Set(),
-      sourceYear: 1999,
-    });
-
-    expect(result?.title).toBe("LP5");
+    expect(result?.title).toBe("Chiastic Slide");
   });
 
   test("ranks releases without track data below sized ones", async () => {
