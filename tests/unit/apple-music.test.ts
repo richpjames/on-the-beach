@@ -215,8 +215,6 @@ describe("scrapeUrl: apple_music", () => {
   }
 
   /** The iTunes lookup-by-id endpoint — the second rung. */
-  // Scaffolding for the test.todo below; delete the disable when it's written.
-  // eslint-disable-next-line no-unused-vars
   function lookupResponse(results: object[], status = 200): Response {
     return new Response(JSON.stringify({ results }), {
       status,
@@ -247,18 +245,39 @@ describe("scrapeUrl: apple_music", () => {
     mock.restore();
   });
 
-  // TODO(rich): the case the extraction actually restructured.
-  //
-  // When oEmbed answers but is INCOMPLETE — say it gives the title and image
-  // but no artist — `fetchAppleMusicApiMetadata` must fall through to the
-  // iTunes lookup and merge the two, with oEmbed winning on the fields it did
-  // supply. Mock two responses in order (oEmbed, then lookup) and assert on
-  // the merge.
-  //
-  // The lookup's shape: { results: [{ collectionName, artistName,
-  // artworkUrl100 }] }. Worth deciding what you want asserted — that the
-  // artist is backfilled is the obvious one, but the precedence question
-  // (whose title wins when both supply one?) is the one that would catch a
-  // regression in the merge order.
-  test.todo("falls back to the iTunes lookup when oEmbed is incomplete");
+  test("falls back to the iTunes lookup when oEmbed is incomplete", async () => {
+    // oEmbed answers, but without an artist it isn't complete, so the ladder
+    // continues to the lookup rather than returning early.
+    const fetchSpy = spyOn(globalThis, "fetch");
+    fetchSpy.mockResolvedValueOnce(
+      oEmbedResponse({
+        title: "Random Access Memories",
+        thumbnail_url: "https://is1-ssl.mzstatic.com/image/600x600bb.jpg",
+      }),
+    );
+    fetchSpy.mockResolvedValueOnce(
+      lookupResponse([
+        {
+          collectionName: "Random Access Memories (Deluxe)",
+          artistName: "Daft Punk",
+          artworkUrl100: "https://is1-ssl.mzstatic.com/image/100x100bb.jpg",
+        },
+      ]),
+    );
+
+    const result = await scrapeUrl(URL, "apple_music");
+
+    expect(fetchSpy).toHaveBeenCalledTimes(2);
+    expect(result).not.toBeNull();
+    // The lookup backfills the field oEmbed left out.
+    expect(result!.potentialArtist).toBe("Daft Punk");
+    // Precedence: the merge order is (oEmbed, lookup, page OG) and `firstDefined`
+    // takes the first non-empty value, so oEmbed wins every field it supplied.
+    // The lookup's "(Deluxe)" title loses. This pins that ordering — it matters
+    // most for deep-linked tracks (`?i=`), where the lookup returns the track's
+    // *album* via collectionName while oEmbed returns the song's own title.
+    expect(result!.potentialTitle).toBe("Random Access Memories");
+    expect(result!.imageUrl).toBe("https://is1-ssl.mzstatic.com/image/1200x1200bb.jpg");
+    mock.restore();
+  });
 });
