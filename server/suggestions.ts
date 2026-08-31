@@ -2,7 +2,7 @@ import { and, desc, eq, isNotNull, isNull } from "drizzle-orm";
 import { isVariousArtists } from "./artist-identity";
 import { db } from "./db/index";
 import { musicItems, artists, itemSuggestions } from "./db/schema";
-import { fetchReleaseGroupIdForRelease, findSuggestedReleases } from "./musicbrainz";
+import { fetchReleaseGroupIdForRelease, findSuggestedReleases, yearDistance } from "./musicbrainz";
 import { getReleaseLengthPreference } from "./settings";
 import { normalize } from "./utils";
 
@@ -73,6 +73,13 @@ export async function findPendingSuggestionsForArtist(
  * other pending suggestions fill the remaining slots — items created before
  * the prefetch existed (or whose sibling triggered it) still get the
  * artist-level ones.
+ *
+ * When the item has a year, the combined set is then re-ordered by how close
+ * each suggestion came out to it. The stored rows were ranked against whatever
+ * item triggered the lookup, which for the artist-level ones is a sibling with
+ * a year of its own — so without this the prompt for a 1972 record can lead
+ * with the artist's 1989 comeback simply because that row was fetched first.
+ * Ties keep the own-item-first order above.
  */
 export async function findPendingSuggestionsForItem(
   itemId: number,
@@ -85,7 +92,7 @@ export async function findPendingSuggestionsForItem(
     .orderBy(itemSuggestions.id);
 
   const itemRow = await db
-    .select({ artistName: artists.name })
+    .select({ artistName: artists.name, year: musicItems.year })
     .from(musicItems)
     .innerJoin(artists, eq(musicItems.artistId, artists.id))
     .where(eq(musicItems.id, itemId))
@@ -103,6 +110,11 @@ export async function findPendingSuggestionsForItem(
     if (isVariousArtists(row.artistName)) continue;
     seen.add(row.id);
     combined.push(row);
+  }
+
+  const sourceYear = itemRow?.year ?? null;
+  if (sourceYear !== null) {
+    combined.sort((a, b) => yearDistance(a.year, sourceYear) - yearDistance(b.year, sourceYear));
   }
   return combined.slice(0, limit);
 }

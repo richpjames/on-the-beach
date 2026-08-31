@@ -19,6 +19,7 @@ async function createArtistWithItem(
   artistName: string,
   title: string,
   listenStatus: "to-listen" | "listened" = "to-listen",
+  year: number | null = null,
 ): Promise<{ artistId: number; itemId: number }> {
   const [artist] = await db
     .insert(artists)
@@ -35,7 +36,7 @@ async function createArtistWithItem(
 
   const [item] = await db
     .insert(musicItems)
-    .values({ title, normalizedTitle: normalize(title), artistId, listenStatus })
+    .values({ title, normalizedTitle: normalize(title), artistId, listenStatus, year })
     .returning({ id: musicItems.id });
 
   return { artistId, itemId: item.id };
@@ -45,15 +46,26 @@ async function createArtistWithItem(
 async function seedSuggestion(
   sourceItemId: number,
   artistName: string,
-  { releaseId, groupId }: { releaseId: string | null; groupId?: string | null },
+  {
+    releaseId,
+    groupId,
+    title,
+    year,
+  }: {
+    releaseId: string | null;
+    groupId?: string | null;
+    title?: string;
+    year?: number | null;
+  },
 ) {
   return db
     .insert(itemSuggestions)
     .values({
       sourceItemId,
-      title: `Seeded ${sourceItemId}`,
+      title: title ?? `Seeded ${sourceItemId}`,
       artistName,
       itemType: "album",
+      year: year ?? null,
       musicbrainzReleaseId: releaseId,
       musicbrainzReleaseGroupId: groupId ?? null,
       status: "pending",
@@ -458,6 +470,52 @@ describe("findPendingSuggestionsForItem", () => {
     expect(found.length).toBe(SUGGESTION_TARGET);
     expect(found[0].sourceItemId).toBe(sibling.id);
     expect(found.map((row) => row.title)).toContain("Tri Repetae");
+  });
+
+  test("leads with the suggestion closest to the item's own release year", async () => {
+    // The artist's pending rows were fetched against a sibling from a
+    // different era, so their stored order says nothing about the item being
+    // marked listened.
+    const name = `Proximity Band ${Date.now()}`;
+    const { artistId, itemId } = await createArtistWithItem(name, "Early Album", "to-listen", 1972);
+    const [sibling] = await db
+      .insert(musicItems)
+      .values({
+        title: "Comeback Album",
+        normalizedTitle: normalize("Comeback Album"),
+        artistId,
+        year: 1989,
+      })
+      .returning({ id: musicItems.id });
+    await seedSuggestion(sibling.id, name, {
+      releaseId: "late-release",
+      title: "Late Comeback",
+      year: 1991,
+    });
+    await seedSuggestion(sibling.id, name, {
+      releaseId: "early-release",
+      title: "Early Follow-Up",
+      year: 1973,
+    });
+
+    const found = await findPendingSuggestionsForItem(itemId);
+
+    expect(found.map((row) => row.title)).toEqual(["Early Follow-Up", "Late Comeback"]);
+  });
+
+  test("surfaces undated suggestions behind dated ones", async () => {
+    const name = `Undated Suggestion Band ${Date.now()}`;
+    const { itemId } = await createArtistWithItem(name, "Dated Album", "to-listen", 1980);
+    await seedSuggestion(itemId, name, { releaseId: "undated-release", title: "No Date At All" });
+    await seedSuggestion(itemId, name, {
+      releaseId: "far-release",
+      title: "Two Decades Later",
+      year: 2001,
+    });
+
+    const found = await findPendingSuggestionsForItem(itemId);
+
+    expect(found.map((row) => row.title)).toEqual(["Two Decades Later", "No Date At All"]);
   });
 
   test("caps the set at the requested limit", async () => {
