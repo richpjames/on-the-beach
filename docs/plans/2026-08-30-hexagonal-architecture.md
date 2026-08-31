@@ -93,7 +93,9 @@ A fifth `overrides` entry keeps `ports/` importing nothing at all.
 Two notes for the remaining extractions:
 
 - **The seam is where the thinking is.** The moved code was byte-identical; what needed designing was the boundary. `scrapeUrl` threaded three Apple locals (`appleMusicOEmbed`, `appleMusicLookup`, `appleMusicMetadata`) through 100 lines of unrelated orchestration. They collapse into one `AppleMusicApiMetadata` value, with the oEmbed → lookup ladder moved inside `fetchAppleMusicApiMetadata`. Expect the same shape wherever a source pre-fetches before the page.
-- **The ladder had no test.** `scrapeUrl(url, "apple_music")` was uncovered, so restructuring it was unverified by the suite. `tests/unit/apple-music.test.ts` now covers the complete-from-oEmbed path; the incomplete-oEmbed fallback is a `test.todo`.
+- **The ladder had no test.** `scrapeUrl(url, "apple_music")` was uncovered, so restructuring it was unverified by the suite. `tests/unit/apple-music.test.ts` now covers both rungs: complete-from-oEmbed (which must stop after one fetch) and the fallback to the iTunes lookup.
+
+  The fallback test pins the **merge precedence**, which was previously written down nowhere. The order is `(oEmbed, lookup, page OG)` and `firstDefined` takes the first non-empty value, so oEmbed wins every field it supplied and the lookup only backfills. Confirmed against `origin/main` by running the same probe in a worktree — the extraction did not change it. Worth knowing before anyone flips it: `scrapeAppleMusicLookup` prefers `collectionName` over `trackName`, and a deep-linked track (`?i=`) looks up the *track* id, so its `collectionName` is the album. Making the lookup win would turn song links into album titles unless that field order is fixed at the same time.
 
 Still duplicated after this: `normalizeForMatch` also has private copies in `youtube-search.ts` and `release-resolver.ts`. Deduping those means deciding whether they want the same answer, which is a behaviour question, not a move — left alone deliberately.
 
