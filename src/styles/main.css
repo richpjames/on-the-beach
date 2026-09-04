@@ -2613,6 +2613,17 @@ a:hover {
   min-width: 0;
 }
 
+.player-window__title--link {
+  color: #ffffff;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.player-window__title--link:hover,
+.player-window__title--link:focus-visible {
+  text-decoration: underline;
+}
+
 .player-window__winbtns {
   display: flex;
   gap: var(--space-1);

@@ -59,6 +59,11 @@ export const player = {
   get playerType() {
     return snapshot.context.playerType;
   },
+  /** Link back to the release that started playback, or null if unknown. */
+  get releaseHref() {
+    const id = snapshot.context.itemId;
+    return id === null ? null : `/r/${id}`;
+  },
   get isAppleMusic() {
     return snapshot.matches("appleMusic");
   },
@@ -73,13 +78,25 @@ export const player = {
   },
 
   /** Play an iframe-embedded source (Bandcamp, YouTube, Mixcloud, AM preview). */
-  load(src: string, title: string, artist: string, playerType: PlayerType = "audio"): void {
-    actor.send({ type: "LOAD_IFRAME", src, label: toLabel(title, artist), playerType });
+  load(
+    src: string,
+    title: string,
+    artist: string,
+    playerType: PlayerType = "audio",
+    itemId?: number,
+  ): void {
+    actor.send({ type: "LOAD_IFRAME", src, label: toLabel(title, artist), playerType, itemId });
   },
 
   /** Play a full Apple Music catalogue resource via MusicKit. */
-  loadAppleMusic(kind: AppleMusicKind, id: string, title: string, artist: string): void {
-    actor.send({ type: "LOAD_APPLE_MUSIC", kind, id, label: toLabel(title, artist) });
+  loadAppleMusic(
+    kind: AppleMusicKind,
+    id: string,
+    title: string,
+    artist: string,
+    itemId?: number,
+  ): void {
+    actor.send({ type: "LOAD_APPLE_MUSIC", kind, id, label: toLabel(title, artist), itemId });
   },
 
   stop(): void {

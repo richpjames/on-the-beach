@@ -99,7 +99,7 @@
     if (window.matchMedia("(pointer: coarse)").matches && embed.href) {
       window.open(embed.href, "_blank", "noopener,noreferrer");
     } else {
-      player.load(embed.src, item.title, item.artist_name ?? "", embed.playerType);
+      player.load(embed.src, item.title, item.artist_name ?? "", embed.playerType, item.id);
     }
   }
 
@@ -114,6 +114,7 @@
         listenTarget.resource.id,
         item.title,
         item.artist_name ?? "",
+        item.id,
       );
       return;
     }
@@ -123,7 +124,7 @@
     }
     // Unconfigured (preview) fallback.
     if (listenTarget.src) {
-      player.load(listenTarget.src, item.title, item.artist_name ?? "", "audio");
+      player.load(listenTarget.src, item.title, item.artist_name ?? "", "audio", item.id);
     } else {
       window.open(listenTarget.href, "_blank", "noopener,noreferrer");
     }
@@ -134,7 +135,7 @@
   function listenLookupAppleMusic(url: string): void {
     const resource = parseAppleMusicCatalogUrl(url);
     if (resource && !window.matchMedia("(pointer: coarse)").matches) {
-      player.loadAppleMusic(resource.kind, resource.id, item.title, item.artist_name ?? "");
+      player.loadAppleMusic(resource.kind, resource.id, item.title, item.artist_name ?? "", item.id);
     } else {
       window.open(url, "_blank", "noopener,noreferrer");
     }

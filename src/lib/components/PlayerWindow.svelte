@@ -12,6 +12,12 @@
 
   let windowEl: HTMLElement | undefined = $state();
 
+  // The titlebar does double duty: it drags the window and it links back to the
+  // release. A drag ends with a click on the link, so remember whether the
+  // pointer actually moved and swallow that click if it did.
+  const DRAG_THRESHOLD_PX = 4;
+  let dragged = false;
+
   function onTitlebarMousedown(e: MouseEvent): void {
     if ((e.target as Element).closest("button") || !windowEl) return;
     const el = windowEl;
@@ -20,9 +26,16 @@
     const rect = el.getBoundingClientRect();
     const startLeft = rect.left;
     const startTop = rect.top;
+    dragged = false;
     e.preventDefault();
 
     const onMove = (ev: MouseEvent): void => {
+      if (
+        Math.abs(ev.clientX - startX) > DRAG_THRESHOLD_PX ||
+        Math.abs(ev.clientY - startY) > DRAG_THRESHOLD_PX
+      ) {
+        dragged = true;
+      }
       el.style.left = `${startLeft + (ev.clientX - startX)}px`;
       el.style.top = `${startTop + (ev.clientY - startY)}px`;
       el.style.bottom = "auto";
@@ -36,6 +49,10 @@
       },
       { once: true },
     );
+  }
+
+  function onReleaseLinkClick(e: MouseEvent): void {
+    if (dragged) e.preventDefault();
   }
 
   function stop(): void {
@@ -85,9 +102,20 @@
     role="presentation"
   >
     <span class="player-window__icon" aria-hidden="true">♫</span>
-    <span class="player-window__title" id="player-title-text"
-      >{player.active ? player.label : "Now Playing"}</span
-    >
+    {#if player.releaseHref}
+      <a
+        class="player-window__title player-window__title--link"
+        id="player-title-text"
+        href={player.releaseHref}
+        title="Go to {player.label}"
+        onclick={onReleaseLinkClick}
+        ondragstart={(e) => e.preventDefault()}>{player.label}</a
+      >
+    {:else}
+      <span class="player-window__title" id="player-title-text"
+        >{player.active ? player.label : "Now Playing"}</span
+      >
+    {/if}
     <div class="player-window__winbtns">
       <button
         class="player-window__winbtn"

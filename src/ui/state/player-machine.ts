@@ -27,13 +27,15 @@ export interface PlayerContext extends PlayerEffects {
   apple: AppleMusicTarget | null;
   /** "{artist} — {title}" (or just the title) shown in the window/taskbar. */
   label: string;
+  /** The release this playback came from, so the window can link back to it. */
+  itemId: number | null;
   playerType: PlayerType;
   minimized: boolean;
 }
 
 export type PlayerEvent =
-  | { type: "LOAD_IFRAME"; src: string; label: string; playerType: PlayerType }
-  | { type: "LOAD_APPLE_MUSIC"; kind: AppleMusicKind; id: string; label: string }
+  | { type: "LOAD_IFRAME"; src: string; label: string; playerType: PlayerType; itemId?: number }
+  | { type: "LOAD_APPLE_MUSIC"; kind: AppleMusicKind; id: string; label: string; itemId?: number }
   | { type: "STOP" }
   | { type: "MINIMIZE" }
   | { type: "TOGGLE_WINDOW" };
@@ -73,6 +75,7 @@ export const playerMachine = setup({
     src: null,
     apple: null,
     label: "",
+    itemId: null,
     playerType: "audio",
     minimized: false,
     playAppleMusic: input?.playAppleMusic ?? noop,
@@ -90,6 +93,7 @@ export const playerMachine = setup({
         src: event.src,
         apple: null,
         label: event.label,
+        itemId: event.itemId ?? null,
         playerType: event.playerType,
         minimized: false,
       })),
@@ -100,6 +104,7 @@ export const playerMachine = setup({
         src: null,
         apple: { kind: event.kind, id: event.id },
         label: event.label,
+        itemId: event.itemId ?? null,
         playerType: "audio" as const,
         minimized: false,
       })),
@@ -110,6 +115,7 @@ export const playerMachine = setup({
         src: null,
         apple: null,
         label: "",
+        itemId: null,
         playerType: "audio" as const,
         minimized: false,
       }),

@@ -806,6 +806,30 @@ describe("player state machine", () => {
     expect(calls).toEqual([]);
   });
 
+  it("remembers the release behind playback so the window can link back", () => {
+    const { actor } = makePlayer();
+    actor.send({
+      type: "LOAD_IFRAME",
+      src: "https://bandcamp/x",
+      label: "A",
+      playerType: "audio",
+      itemId: 42,
+    });
+    expect(actor.getSnapshot().context.itemId).toBe(42);
+
+    actor.send({ type: "LOAD_APPLE_MUSIC", kind: "albums", id: "1", label: "B", itemId: 7 });
+    expect(actor.getSnapshot().context.itemId).toBe(7);
+
+    actor.send({ type: "STOP" });
+    expect(actor.getSnapshot().context.itemId).toBeNull();
+  });
+
+  it("leaves the release unknown when playback starts without one", () => {
+    const { actor } = makePlayer();
+    actor.send({ type: "LOAD_IFRAME", src: "https://bandcamp/x", label: "A", playerType: "audio" });
+    expect(actor.getSnapshot().context.itemId).toBeNull();
+  });
+
   it("clears a minimized flag when new playback starts", () => {
     const { actor } = makePlayer();
     actor.send({ type: "LOAD_IFRAME", src: "https://bandcamp/x", label: "A", playerType: "audio" });
