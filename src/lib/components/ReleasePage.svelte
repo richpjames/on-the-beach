@@ -396,10 +396,79 @@
   // the pair as one line for the same reason.
   const labelLine = $derived([item.label, item.catalogue_number].filter(Boolean).join(" · "));
 
+  // ── The listen row ─────────────────────────────────────────────────────────
+  // The play controls read as one sentence — "listen: here there" — instead of
+  // as a rank of service names; the service each word hides behind is in its
+  // tooltip and its accessible name. The joke only has two words in it, so a
+  // third option onwards is named plainly.
+  type ListenTarget = {
+    key: string;
+    service: string;
+    href?: string;
+    src?: string;
+    playerType?: "audio" | "video";
+    amMode?: string;
+    apple?: boolean;
+    play: () => void;
+  };
+
+  const listenTargets = $derived.by<ListenTarget[]>(() => {
+    const targets: ListenTarget[] = [];
+    const bandcamp = data.bandcampEmbed;
+    if (bandcamp) {
+      targets.push({
+        key: "bandcamp",
+        service: "Bandcamp",
+        href: bandcamp.href ?? undefined,
+        src: bandcamp.src,
+        playerType: bandcamp.playerType,
+        play: () => listen(bandcamp),
+      });
+    }
+    const youtube = data.youtubeEmbed;
+    if (youtube) {
+      targets.push({
+        key: "youtube",
+        service: "YouTube",
+        href: youtube.href ?? undefined,
+        src: youtube.src,
+        playerType: youtube.playerType,
+        play: () => listen(youtube),
+      });
+    }
+    const appleMusic = data.appleMusicListen;
+    if (appleMusic) {
+      targets.push({
+        key: "apple-music",
+        service: "Apple Music",
+        href: appleMusic.href,
+        amMode: appleMusic.mode,
+        apple: true,
+        play: () => listenAppleMusic(appleMusic),
+      });
+    }
+    const lookup = lookupLink;
+    if (lookup && lookupIsPlayableAppleMusic) {
+      targets.push({
+        key: "apple-music-lookup",
+        service: "Apple Music",
+        amMode: "musickit",
+        apple: true,
+        play: () => listenLookupAppleMusic(lookup.url),
+      });
+    }
+    return targets;
+  });
+
+  /** "here" and "there", then the service's own name once the words run out. */
+  function listenWord(index: number, service: string): string {
+    return index === 0 ? "here" : index === 1 ? "there" : service;
+  }
+
   // The primary-source link (e.g. "Spotify", "Discogs") is a plain external
   // link. Hide it when a play button already targets the same URL — otherwise
-  // it just duplicates that button (e.g. the "▶ YouTube" play button already
-  // links to the same YouTube page).
+  // it just duplicates that button (e.g. the YouTube word in the listen row
+  // already links to the same YouTube page).
   const playHrefs = $derived(
     new Set(
       [data.bandcampEmbed?.href, data.youtubeEmbed?.href, data.appleMusicListen?.href].filter(
@@ -494,46 +563,24 @@
             }}
           />
           <div class="release-page__actions">
-            {#if data.bandcampEmbed}
+            {#if listenTargets.length}
+              <span class="release-page__listen-label">listen:</span>
+            {/if}
+            {#each listenTargets as target, i (target.key)}
               <button
                 class="release-page__listen-btn"
-                data-src={data.bandcampEmbed.src}
+                class:release-page__listen-btn--apple={target.apple}
+                data-src={target.src}
                 data-title={item.title}
                 data-artist={item.artist_name ?? ""}
-                data-href={data.bandcampEmbed.href}
-                onclick={() => listen(data.bandcampEmbed!)}>▶ Bandcamp</button
+                data-player-type={target.playerType}
+                data-am-mode={target.amMode}
+                data-href={target.href}
+                title={target.service}
+                aria-label={`Listen on ${target.service}`}
+                onclick={target.play}>{listenWord(i, target.service)}</button
               >
-            {/if}
-            {#if data.youtubeEmbed}
-              <button
-                class="release-page__listen-btn"
-                data-src={data.youtubeEmbed.src}
-                data-title={item.title}
-                data-artist={item.artist_name ?? ""}
-                data-player-type="video"
-                data-href={data.youtubeEmbed.href}
-                onclick={() => listen(data.youtubeEmbed!)}>▶ YouTube</button
-              >
-            {/if}
-            {#if data.appleMusicListen}
-              <button
-                class="release-page__listen-btn release-page__listen-btn--apple"
-                data-am-mode={data.appleMusicListen.mode}
-                data-title={item.title}
-                data-artist={item.artist_name ?? ""}
-                data-href={data.appleMusicListen.href}
-                onclick={() => listenAppleMusic(data.appleMusicListen!)}
-                >▶ Apple Music</button
-              >
-            {/if}
-            {#if lookupLink && lookupIsPlayableAppleMusic}
-              <button
-                class="release-page__listen-btn release-page__listen-btn--apple"
-                data-am-mode="musickit"
-                onclick={() => listenLookupAppleMusic(lookupLink!.url)}
-                >▶ Apple Music</button
-              >
-            {/if}
+            {/each}
             {#if showSourceLink}
               <a
                 class="release-page__link-btn"

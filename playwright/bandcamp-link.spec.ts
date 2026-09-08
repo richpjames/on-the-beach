@@ -84,8 +84,8 @@ test("a Bandcamp link added by hand is reachable from the release page", async (
   });
   await page.locator("#cancel-btn").click();
 
-  // Exactly one control in view mode reaches the link: the ▶ Bandcamp button
-  // when the scrape found an album id, the plain source link when it didn't
+  // Exactly one control in view mode reaches the link: the listen-row word for
+  // Bandcamp when the scrape found an album id, the plain source link when it didn't
   // (whether it does is left to the route's own test, which doesn't depend on
   // Bandcamp being up). Before, a first Bandcamp link produced neither.
   const actions = page.locator(".release-page__actions");
