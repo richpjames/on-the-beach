@@ -3212,6 +3212,13 @@ a:hover {
   display: none;
 }
 
+/* "listen:" introduces the words that follow it ("here", "there"), so it reads
+   as prose in the row rather than as another button. */
+.release-page__listen-label {
+  color: var(--chrome-darker);
+  font-size: var(--text-base);
+}
+
 .release-page__listen-btn {
   display: inline-flex;
   align-items: center;
@@ -3289,6 +3296,12 @@ a:hover {
      an odd last button takes the full remaining width. */
   .release-page__actions {
     gap: var(--space-2);
+  }
+
+  /* The label takes the whole row so the play words still pair up beneath it
+     rather than leaving a half-width gap at the end. */
+  .release-page__actions .release-page__listen-label {
+    flex: 1 0 100%;
   }
 
   .release-page__actions .release-page__listen-btn {
