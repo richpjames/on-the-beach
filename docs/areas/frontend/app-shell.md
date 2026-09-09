@@ -19,7 +19,7 @@
 - `AddForm.svelte` — add form, cover scan, and song recognition flows (driven by `add-form-machine`).
 - `MusicList.svelte` / `MusicCard.svelte` / `FolderRow.svelte` — the playlist, drag reordering (sortablejs), folder rows, and breadcrumbs.
 - `StackBar.svelte` / `StackManagePanel.svelte` / `StackDropdown.svelte` — stack tabs, management, and pickers.
-- `BrowseControls.svelte` — filter bar, search, and sort panels.
+- `BrowseControls.svelte` — filter bar, search, and sort panels, plus Pick One: a roll over the list as it is currently filtered, narrowed by an optional star range that press-and-hold (or the down arrow) opens.
 - `LinkPickerModal.svelte` / `SuggestionPickerModal.svelte` / `AddLoadingOverlay.svelte` — modal surfaces.
 - `PlayerWindow.svelte` / `Taskbar.svelte` — persistent chrome rendered by the layout.
 - `VerticalScrollbar.svelte` / `HorizontalScrollbar.svelte` — the retro custom scrollbars.

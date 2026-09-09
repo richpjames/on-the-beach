@@ -24,6 +24,7 @@ describe("defaultListViewState", () => {
       search: "",
       sort: "date-added",
       sortDirection: "desc",
+      pick: null,
     });
   });
 
@@ -35,13 +36,26 @@ describe("defaultListViewState", () => {
 describe("parseListViewState", () => {
   test("reads every control out of the query string", () => {
     expect(
-      parseListViewState(params("filter=listened&q=aphex&sort=star-rating&dir=asc"), null),
+      parseListViewState(
+        params("filter=listened&q=aphex&sort=star-rating&dir=asc&pick=3-4.5"),
+        null,
+      ),
     ).toEqual({
       filter: "listened",
       search: "aphex",
       sort: "star-rating",
       sortDirection: "asc",
+      pick: { min: 3, max: 4.5 },
     });
+  });
+
+  test("reads a single-value pick range", () => {
+    expect(parseListViewState(params("pick=4"), null).pick).toEqual({ min: 4, max: 4 });
+  });
+
+  test("ignores a junk pick range", () => {
+    expect(parseListViewState(params("pick=nonsense"), null).pick).toBeNull();
+    expect(parseListViewState(params(""), null).pick).toBeNull();
   });
 
   test("falls back to defaults for unknown values", () => {
@@ -61,11 +75,21 @@ describe("buildListSearch", () => {
     search: "  boards of canada  ",
     sort: "artist-name",
     sortDirection: "asc",
+    pick: null,
   };
 
   test("serialises non-default controls and trims the search", () => {
     expect(buildListSearch(state, null)).toBe(
       "?filter=listened&q=boards+of+canada&sort=artist-name&dir=asc",
+    );
+  });
+
+  test("carries the Pick One range so it survives a trip to a release", () => {
+    expect(buildListSearch({ ...defaultListViewState(null), pick: { min: 3, max: 5 } }, null)).toBe(
+      "?pick=3-5",
+    );
+    expect(buildListSearch({ ...defaultListViewState(null), pick: { min: 4, max: 4 } }, null)).toBe(
+      "?pick=4",
     );
   });
 
@@ -81,9 +105,10 @@ describe("buildListSearch", () => {
   });
 
   test("round-trips through parseListViewState", () => {
-    const query = buildListSearch(state, null);
+    const withPick: ListViewState = { ...state, pick: { min: 2.5, max: 5 } };
+    const query = buildListSearch(withPick, null);
     expect(parseListViewState(params(query.slice(1)), null)).toEqual({
-      ...state,
+      ...withPick,
       search: "boards of canada",
     });
   });
@@ -100,6 +125,12 @@ describe("isDefaultListViewState", () => {
     expect(
       isDefaultListViewState({ ...defaultListViewState(null), sortDirection: "asc" }, null),
     ).toBe(false);
+  });
+
+  test("ignores the Pick One range, which doesn't change what the list shows", () => {
+    expect(
+      isDefaultListViewState({ ...defaultListViewState(null), pick: { min: 4, max: 5 } }, null),
+    ).toBe(true);
   });
 });
 
@@ -140,6 +171,10 @@ describe("sanitizeListHref", () => {
     expect(sanitizeListHref("/s/9/ambient?filter=listened&q=aphex")).toBe(
       "/s/9/ambient?filter=listened&q=aphex",
     );
+  });
+
+  test("keeps the Pick One range on the way back from a release", () => {
+    expect(sanitizeListHref("/?filter=all&pick=3-4")).toBe("/?filter=all&pick=3-4");
   });
 
   test("drops unknown query params and normalises junk values", () => {

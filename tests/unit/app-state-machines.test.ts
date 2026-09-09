@@ -91,6 +91,7 @@ describe("app state machine", () => {
       searchQuery: "",
       sort: "date-listened",
       sortDirection: "asc",
+      pickRange: { min: 3, max: 5 },
     });
 
     const ctx = actor.getSnapshot().context;
@@ -99,7 +100,39 @@ describe("app state machine", () => {
     expect(ctx.searchQuery).toBe("");
     expect(ctx.currentSort).toBe("date-listened");
     expect(ctx.currentSortDirection).toBe("asc");
+    expect(ctx.pickRange).toEqual({ min: 3, max: 5 });
     expect(ctx.listVersion).toBe(before + 1);
+  });
+
+  it("keeps the Pick One range until it is changed", () => {
+    const actor = createActor(appMachine, { input: {} }).start();
+
+    expect(actor.getSnapshot().context.pickRange).toBeNull();
+
+    actor.send({ type: "PICK_RANGE_UPDATED", range: { min: 3.5, max: 5 } });
+    // Rolling takes the user to a release and back; filtering, searching and
+    // sorting in between must not lose the window they set.
+    actor.send({ type: "FILTER_SELECTED", filter: "listened" });
+    actor.send({ type: "SEARCH_UPDATED", query: "dub" });
+    expect(actor.getSnapshot().context.pickRange).toEqual({ min: 3.5, max: 5 });
+
+    actor.send({ type: "PICK_RANGE_UPDATED", range: null });
+    expect(actor.getSnapshot().context.pickRange).toBeNull();
+  });
+
+  it("does not refetch the list when only the Pick One range changes", () => {
+    const actor = createActor(appMachine, { input: {} }).start();
+    const before = actor.getSnapshot().context.listVersion;
+
+    actor.send({ type: "PICK_RANGE_UPDATED", range: { min: 1, max: 2 } });
+
+    expect(actor.getSnapshot().context.listVersion).toBe(before);
+  });
+
+  it("seeds the Pick One range from the URL", () => {
+    const actor = createActor(appMachine, { input: { pickRange: { min: 2, max: 4 } } }).start();
+
+    expect(actor.getSnapshot().context.pickRange).toEqual({ min: 2, max: 4 });
   });
 
   it("resets active stack when deleted", () => {

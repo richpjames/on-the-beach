@@ -1,5 +1,6 @@
 import type { MusicItemSort, MusicItemSortDirection } from "../../../domain/types";
-import type { FilterSelection } from "../../../domain/types";
+import type { FilterSelection, PickRatingRange } from "../../../domain/types";
+import { formatPickRange, parsePickRange } from "./pick-one";
 
 /**
  * How a list page (`/` or `/s/:id/:name`) is being browsed.
@@ -13,6 +14,8 @@ export interface ListViewState {
   search: string;
   sort: MusicItemSort;
   sortDirection: MusicItemSortDirection;
+  /** The star window Pick One rolls within; null rolls over any rating. */
+  pick: PickRatingRange | null;
 }
 
 const FILTERS: readonly FilterSelection[] = ["all", "to-listen", "listened", "scheduled"];
@@ -33,10 +36,16 @@ export function defaultListViewState(stackId: number | null): ListViewState {
     search: "",
     sort: "date-added",
     sortDirection: "desc",
+    pick: null,
   };
 }
 
-/** True when the state matches what the server renders without any query params. */
+/**
+ * True when the state matches what the server renders without any query params.
+ *
+ * The Pick One range is deliberately not part of this: it narrows a roll, not
+ * the list, so a saved range never costs a refetch on load.
+ */
 export function isDefaultListViewState(state: ListViewState, stackId: number | null): boolean {
   const defaults = defaultListViewState(stackId);
   return (
@@ -61,6 +70,7 @@ export function parseListViewState(params: URLSearchParams, stackId: number | nu
     search: params.get("q") ?? "",
     sort: SORTS.includes(sort as MusicItemSort) ? (sort as MusicItemSort) : defaults.sort,
     sortDirection: direction === "asc" || direction === "desc" ? direction : defaults.sortDirection,
+    pick: parsePickRange(params.get("pick")),
   };
 }
 
@@ -74,6 +84,8 @@ export function buildListSearch(state: ListViewState, stackId: number | null): s
   if (search) params.set("q", search);
   if (state.sort !== defaults.sort) params.set("sort", state.sort);
   if (state.sortDirection !== defaults.sortDirection) params.set("dir", state.sortDirection);
+  const pick = formatPickRange(state.pick);
+  if (pick !== null) params.set("pick", pick);
 
   const query = params.toString();
   return query ? `?${query}` : "";

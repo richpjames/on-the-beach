@@ -3,6 +3,7 @@ import type {
   ListenStatus,
   MusicItemSort,
   MusicItemSortDirection,
+  PickRatingRange,
   StackWithCount,
 } from "../../../domain/types";
 
@@ -12,6 +13,13 @@ export interface AppContext {
   searchQuery: string;
   currentSort: MusicItemSort;
   currentSortDirection: MusicItemSortDirection;
+  /**
+   * The star window Pick One rolls within, or null for any rating. It outlives
+   * a roll — the roll leaves for a release page and the range has to be there
+   * when the user comes back — so it rides in the list URL like the rest of the
+   * browsing view.
+   */
+  pickRange: PickRatingRange | null;
   stacks: StackWithCount[];
   isReady: boolean;
   stackManageOpen: boolean;
@@ -29,6 +37,7 @@ export type AppEvent =
   | { type: "SEARCH_UPDATED"; query: string }
   | { type: "SORT_UPDATED"; sort: MusicItemSort }
   | { type: "SORT_DIRECTION_UPDATED"; direction: MusicItemSortDirection }
+  | { type: "PICK_RANGE_UPDATED"; range: PickRatingRange | null }
   | { type: "STACKS_LOADED"; stacks: StackWithCount[] }
   | { type: "STACK_MANAGE_TOGGLED" }
   | { type: "STACK_DELETED"; stackId: number }
@@ -44,6 +53,7 @@ export type AppEvent =
       searchQuery: string;
       sort: MusicItemSort;
       sortDirection: MusicItemSortDirection;
+      pickRange: PickRatingRange | null;
     }
   | { type: "REMINDERS_READY"; itemIds: number[] };
 
@@ -55,6 +65,7 @@ export interface AppInput {
   searchQuery?: string;
   currentSort?: MusicItemSort;
   currentSortDirection?: MusicItemSortDirection;
+  pickRange?: PickRatingRange | null;
   /**
    * Set when the seeded view differs from what the server rendered, so the
    * client refetches the list on mount instead of showing the default one.
@@ -72,6 +83,7 @@ export const appMachine = createMachine({
     searchQuery: input?.searchQuery ?? "",
     currentSort: input?.currentSort ?? ("date-added" as const),
     currentSortDirection: input?.currentSortDirection ?? ("desc" as const),
+    pickRange: input?.pickRange ?? null,
     stacks: input?.stacks ?? [],
     isReady: false,
     stackManageOpen: false,
@@ -124,6 +136,11 @@ export const appMachine = createMachine({
         listVersion: context.listVersion + 1,
       })),
     },
+    // Narrowing the roll doesn't change the list, so no listVersion bump: the
+    // range only decides which of the shown releases Pick One can land on.
+    PICK_RANGE_UPDATED: {
+      actions: assign(({ event }) => ({ pickRange: event.range })),
+    },
     STACKS_LOADED: {
       actions: assign(({ event }) => ({ stacks: event.stacks })),
     },
@@ -174,6 +191,7 @@ export const appMachine = createMachine({
         searchQuery: event.searchQuery,
         currentSort: event.sort,
         currentSortDirection: event.sortDirection,
+        pickRange: event.pickRange,
         listVersion: context.listVersion + 1,
         stackBarVersion: context.stackBarVersion + 1,
       })),

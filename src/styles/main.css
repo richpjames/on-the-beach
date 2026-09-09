@@ -962,12 +962,22 @@ select.input {
   margin-left: 0;
 }
 
+/* The retained range rides on the button in a smaller face, so setting one
+   doesn't widen the control enough to wrap the filter row. */
+.pick-random__badge {
+  margin-left: 4px;
+  font-size: var(--text-2xs);
+  font-weight: normal;
+  letter-spacing: 0.02em;
+}
+
 .pick-random__menu {
   position: absolute;
   top: calc(100% + 2px);
   right: 0;
   z-index: 40;
-  min-width: 160px;
+  min-width: 210px;
+  max-width: min(260px, calc(100vw - var(--space-4)));
   max-height: 60vh;
   overflow-y: auto;
   background: var(--chrome);
@@ -975,48 +985,63 @@ select.input {
   border-style: solid;
   border-color: var(--bevel-raised);
   box-shadow: 2px 2px 0 rgba(0, 0, 0, 0.35);
-  padding: 2px;
+  padding: 2px 4px 4px;
 }
 
 .pick-random__menu-heading {
-  padding: 3px 8px 4px;
+  padding: 3px 4px 4px;
   font-size: var(--text-sm, 0.75rem);
   font-weight: bold;
   color: #000000;
   border-bottom: 1px solid var(--bevel-sunken);
-  margin-bottom: 2px;
+  margin-bottom: 4px;
 }
 
-.pick-random__menu-item {
+/* One end of the range: a fixed-width caption so From and To line up, and a
+   select wide enough for "★★★★★ 5" at any text size. */
+.pick-random__range {
   display: flex;
   align-items: center;
-  gap: 8px;
-  width: 100%;
-  padding: 4px 8px;
-  background: transparent;
-  border: none;
+  gap: var(--space-2);
+  padding: 2px 4px;
+}
+
+.pick-random__range + .pick-random__range {
+  margin-top: 2px;
+}
+
+.pick-random__range-label {
+  flex: 0 0 3em;
+  font-size: var(--text-sm, 0.75rem);
+  font-weight: bold;
   color: #000000;
-  font-size: var(--text-base);
-  text-align: left;
-  cursor: pointer;
 }
 
-.pick-random__menu-item:hover,
-.pick-random__menu-item:focus-visible {
-  background: var(--chrome-mid);
-  outline: none;
+.pick-random__range-select {
+  flex: 1 1 auto;
+  min-width: 0;
 }
 
-.pick-random__menu-stars {
-  color: #b8860b;
-  letter-spacing: 0.02em;
+.pick-random__menu-actions {
+  display: flex;
+  gap: var(--space-2);
+  margin-top: 6px;
+  padding: 4px 4px 0;
+  border-top: 1px solid var(--bevel-sunken);
+}
+
+.pick-random__menu-btn {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding-inline: 6px;
   white-space: nowrap;
 }
 
-.pick-random__menu-label {
-  margin-left: auto;
-  color: var(--chrome-dark, #555);
-  font-size: var(--text-sm, 0.75rem);
+/* Sunken like an active filter, so "Any rating" reads as the current setting. */
+.pick-random__menu-btn.is-active {
+  background: var(--chrome-mid);
+  border-color: var(--bevel-sunken);
+  font-weight: bold;
 }
 
 .browse-tools {

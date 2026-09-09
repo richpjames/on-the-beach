@@ -2,7 +2,8 @@
 
 ## State machines
 
-- `src/ui/state/app-machine.ts` stores browse state: current filter, selected stack, search text, sort, stack list, and UI panel toggles. It accepts an input seed (`stacks`, `currentStack`) so server-rendered pages start with the right context.
+- `src/ui/state/app-machine.ts` stores browse state: current filter, selected stack, search text, sort, the Pick One star range, stack list, and UI panel toggles. It accepts an input seed (`stacks`, `currentStack`) so server-rendered pages start with the right context.
+- The whole browsing view — including the Pick One range — is mirrored into the list URL by `src/ui/logic/list-url.ts`, so a roll can leave for a release page and come back to the same view with the same range still set.
 - `src/ui/state/add-form-machine.ts` stores add-form flow: manual entry, ambiguous link selection, scan progress, selected stacks, and submit lifecycle.
 - Version counters such as `listVersion` and `stackBarVersion` trigger targeted refetches from `$effect`s in `MainPage.svelte`.
 

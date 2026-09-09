@@ -1,7 +1,15 @@
 <script lang="ts">
   import { tick } from "svelte";
   import type { MusicItemSort, MusicItemSortDirection } from "../../../domain/types";
-  import type { FilterSelection } from "../../../domain/types";
+  import type { FilterSelection, PickRatingRange } from "../../../domain/types";
+  import {
+    FULL_PICK_RANGE,
+    makePickRange,
+    PICK_RATING_STEPS,
+    pickRangeAriaLabel,
+    pickRangeLabel,
+    ratingStars,
+  } from "../../ui/logic/pick-one";
   import type { appMachine } from "../../ui/state/app-machine";
   import type { MachineHandle } from "../use-machine.svelte";
 
@@ -10,7 +18,7 @@
     onPickRandom,
   }: {
     app: MachineHandle<typeof appMachine>;
-    onPickRandom: (rating?: number | null) => Promise<{ id: number } | null>;
+    onPickRandom: (range?: PickRatingRange | null) => Promise<{ id: number } | null>;
   } = $props();
 
   const ctx = $derived(app.snapshot.context);
@@ -84,21 +92,46 @@
   }
 
   // ── Random pick ────────────────────────────────────────────────────────────
-  let randomBtnText = $state("🎲 Pick One");
-  let randomBtnDisabled = $state(false);
-
-  // Press-and-hold on Pick One opens a menu to constrain the roll to a rating.
-  const RATING_OPTIONS: number[] = [5, 4.5, 4, 3.5, 3, 2.5, 2, 1.5, 1, 0.5];
+  //
+  // Pick One rolls over the list as it stands — whatever filter, stack and
+  // search are applied — and press-and-hold narrows that to a star range. The
+  // range lives in machine context (and from there in the URL), so it is still
+  // set when the user comes back from the release a roll landed on.
+  const PICK_LABEL = "🎲 Pick One";
   const LONG_PRESS_MS = 450;
+
+  type RollMiss = "none" | "empty" | "no-matches";
+
+  let rolling = $state(false);
+  let rollMiss = $state<RollMiss>("none");
   let ratingMenuOpen = $state(false);
   let pickRandomEl: HTMLElement | undefined = $state();
+  let rangeMinEl: HTMLSelectElement | undefined = $state();
   let longPressTimer: ReturnType<typeof setTimeout> | undefined;
+  let missTimer: ReturnType<typeof setTimeout> | undefined;
   let longPressFired = false;
 
-  function ratingStars(value: number): string {
-    const full = Math.floor(value);
-    return "★".repeat(full) + (value - full >= 0.5 ? "½" : "");
-  }
+  const pickRange = $derived(ctx.pickRange);
+  /** The menu's two ends: the live range, or the widest window to start from. */
+  const rangeDraft = $derived(ctx.pickRange ?? FULL_PICK_RANGE);
+  const rangeLabel = $derived(pickRangeLabel(ctx.pickRange));
+
+  const randomBtnText = $derived(
+    rolling
+      ? "🎲 Rolling…"
+      : rollMiss === "empty"
+        ? "🎲 Nothing yet"
+        : rollMiss === "no-matches"
+          ? "🎲 No matches"
+          : PICK_LABEL,
+  );
+  /** The live range, worn on the button so a retained window is never a surprise. */
+  const rangeBadge = $derived(rolling || rollMiss !== "none" ? null : rangeLabel);
+  const randomBtnDisabled = $derived(rolling || rollMiss !== "none");
+  const randomBtnAriaLabel = $derived(
+    `Pick a random release from the list, rated ${pickRangeAriaLabel(ctx.pickRange)}. ` +
+      "Press and hold to choose a rating range.",
+  );
 
   function openRatingMenu(): void {
     if (randomBtnDisabled) return;
@@ -131,7 +164,7 @@
       longPressFired = false;
       return;
     }
-    void pickRandom(null);
+    void roll();
   }
 
   function onPickRandomContextMenu(event: Event): void {
@@ -142,30 +175,57 @@
     openRatingMenu();
   }
 
-  function selectRating(rating: number | null): void {
-    closeRatingMenu();
-    void pickRandom(rating);
+  /** Down-arrow opens the range menu — the keyboard's stand-in for a long press. */
+  function onPickRandomKeydown(event: KeyboardEvent): void {
+    if (event.key !== "ArrowDown") return;
+    event.preventDefault();
+    clearLongPress();
+    openRatingMenu();
+    tick().then(() => rangeMinEl?.focus());
   }
 
-  async function pickRandom(rating: number | null): Promise<void> {
+  /**
+   * Move one end of the range, pushing the other along rather than crossing it,
+   * so "from 5" reads as "5 stars" instead of quietly widening the window.
+   */
+  function moveRangeEdge(edge: "min" | "max", value: number): void {
+    const { min, max } = rangeDraft;
+    const next =
+      edge === "min"
+        ? makePickRange(value, Math.max(value, max))
+        : makePickRange(Math.min(value, min), value);
+    app.send({ type: "PICK_RANGE_UPDATED", range: next });
+  }
+
+  function onRangeEdgeChange(edge: "min" | "max", event: Event): void {
+    moveRangeEdge(edge, Number((event.currentTarget as HTMLSelectElement).value));
+  }
+
+  function clearRange(): void {
+    app.send({ type: "PICK_RANGE_UPDATED", range: null });
+  }
+
+  function rollFromMenu(): void {
+    closeRatingMenu();
+    void roll();
+  }
+
+  async function roll(): Promise<void> {
     if (randomBtnDisabled) return;
-    randomBtnDisabled = true;
-    randomBtnText = "🎲 Rolling…";
+    const range = ctx.pickRange;
+    rolling = true;
     try {
-      const picked = await onPickRandom(rating);
+      const picked = await onPickRandom(range);
       if (!picked) {
-        randomBtnText = rating === null ? "🎲 Nothing yet" : "🎲 No matches";
-        setTimeout(() => {
-          randomBtnText = "🎲 Pick One";
-          randomBtnDisabled = false;
+        // Nothing came back: with no range the list itself is empty, with one
+        // it's the range that ruled everything out.
+        rollMiss = range === null ? "empty" : "no-matches";
+        missTimer = setTimeout(() => {
+          rollMiss = "none";
         }, 1500);
-      } else {
-        randomBtnText = "🎲 Pick One";
       }
     } finally {
-      if (randomBtnText === "🎲 Pick One") {
-        randomBtnDisabled = false;
-      }
+      rolling = false;
     }
   }
 
@@ -191,6 +251,8 @@
     return () => {
       document.removeEventListener("click", onDocumentClick);
       document.removeEventListener("keydown", onEscape);
+      clearLongPress();
+      if (missTimer !== undefined) clearTimeout(missTimer);
     };
   });
 </script>
@@ -210,38 +272,73 @@
           type="button"
           id="pick-random-btn"
           class="filter-btn filter-btn--action"
-          title="Pick a random item from To Listen — hold to pick by rating"
-          aria-label="Pick a random item from To Listen. Press and hold to pick by star rating."
-          aria-haspopup="menu"
+          title="Pick a random release from the list — hold to pick by rating"
+          aria-label={randomBtnAriaLabel}
+          aria-haspopup="dialog"
           aria-expanded={ratingMenuOpen ? "true" : "false"}
+          aria-controls="pick-range-menu"
+          data-pick-range={pickRange === null ? "any" : `${pickRange.min}-${pickRange.max}`}
           disabled={randomBtnDisabled}
           onclick={onPickRandomClick}
+          onkeydown={onPickRandomKeydown}
           onpointerdown={startLongPress}
           onpointerup={clearLongPress}
           onpointerleave={clearLongPress}
           onpointercancel={clearLongPress}
-          oncontextmenu={onPickRandomContextMenu}>{randomBtnText}</button
+          oncontextmenu={onPickRandomContextMenu}
+          >{randomBtnText}{#if rangeBadge}<span class="pick-random__badge">{rangeBadge}</span
+            >{/if}</button
         >
         {#if ratingMenuOpen}
-          <div class="pick-random__menu" role="menu" aria-label="Pick a release rated">
+          <div
+            id="pick-range-menu"
+            class="pick-random__menu"
+            role="dialog"
+            aria-label="Pick one rated"
+          >
             <div class="pick-random__menu-heading">Pick one rated…</div>
-            <button
-              type="button"
-              class="pick-random__menu-item"
-              role="menuitem"
-              onclick={() => selectRating(null)}>Any rating</button
-            >
-            {#each RATING_OPTIONS as value (value)}
+            <label class="pick-random__range" for="pick-range-min">
+              <span class="pick-random__range-label">From</span>
+              <select
+                id="pick-range-min"
+                class="input pick-random__range-select"
+                bind:this={rangeMinEl}
+                value={rangeDraft.min}
+                onchange={(event) => onRangeEdgeChange("min", event)}
+              >
+                {#each PICK_RATING_STEPS as option (option)}
+                  <option value={option}>{ratingStars(option)} {option}</option>
+                {/each}
+              </select>
+            </label>
+            <label class="pick-random__range" for="pick-range-max">
+              <span class="pick-random__range-label">To</span>
+              <select
+                id="pick-range-max"
+                class="input pick-random__range-select"
+                value={rangeDraft.max}
+                onchange={(event) => onRangeEdgeChange("max", event)}
+              >
+                {#each PICK_RATING_STEPS as option (option)}
+                  <option value={option}>{ratingStars(option)} {option}</option>
+                {/each}
+              </select>
+            </label>
+            <div class="pick-random__menu-actions">
               <button
                 type="button"
-                class="pick-random__menu-item"
-                role="menuitem"
-                onclick={() => selectRating(value)}
+                id="pick-range-any"
+                class="btn pick-random__menu-btn{pickRange === null ? ' is-active' : ''}"
+                aria-pressed={pickRange === null}
+                onclick={clearRange}>Any rating</button
               >
-                <span class="pick-random__menu-stars" aria-hidden="true">{ratingStars(value)}</span>
-                <span class="pick-random__menu-label">{value} star{value === 1 ? "" : "s"}</span>
-              </button>
-            {/each}
+              <button
+                type="button"
+                id="pick-range-roll"
+                class="btn pick-random__menu-btn"
+                onclick={rollFromMenu}>🎲 Roll</button
+              >
+            </div>
           </div>
         {/if}
       </div>

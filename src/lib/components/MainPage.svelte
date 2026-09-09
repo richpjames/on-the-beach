@@ -2,7 +2,13 @@
   import { goto } from "$app/navigation";
   import { page } from "$app/state";
   import { onMount } from "svelte";
-  import type { ItemSuggestion, ListenStatus, MusicItemFull, StackWithCount } from "../../../domain/types";
+  import type {
+    ItemSuggestion,
+    ListenStatus,
+    MusicItemFull,
+    PickRatingRange,
+    StackWithCount,
+  } from "../../../domain/types";
   import { buildContextKey, buildMusicItemFilters } from "../../ui/logic/music-list";
   import {
     buildListHref,
@@ -13,6 +19,7 @@
     stackIdFromListPath,
     type ListViewState,
   } from "../../ui/logic/list-url";
+  import { matchesPickRange } from "../../ui/logic/pick-one";
   import { normalizeStarRating } from "../../ui/components/star-rating";
   import { addFormMachine } from "../../ui/state/add-form-machine";
   import { appMachine } from "../../ui/state/app-machine";
@@ -59,6 +66,7 @@
       searchQuery: initialView.search,
       currentSort: initialView.sort,
       currentSortDirection: initialView.sortDirection,
+      pickRange: initialView.pick,
       // The payload only covers the default view of the scope it was loaded
       // for, so anything else needs a refetch as soon as we hydrate.
       needsListRefresh:
@@ -165,6 +173,7 @@
     search: ctx.searchQuery,
     sort: ctx.currentSort,
     sortDirection: ctx.currentSortDirection,
+    pick: ctx.pickRange,
   });
 
   /** The list path for the machine's stack scope, or null if we can't name it yet. */
@@ -241,6 +250,7 @@
       searchQuery: view.search,
       sort: view.sort,
       sortDirection: view.sortDirection,
+      pickRange: view.pick,
     });
   });
 
@@ -339,13 +349,24 @@
     target.classList.remove("music-card--roulette");
   }
 
-  async function pickRandom(rating: number | null = null): Promise<{ id: number } | null> {
-    const filters = buildMusicItemFilters("to-listen", ctx.currentStack);
+  /**
+   * Roll over the list as it is being browsed — the filter, stack scope and
+   * search the user can see — narrowed to `range` when one is set. Rolling
+   * outside the visible list would drop the user on a release they weren't
+   * looking for, and the roulette sweep would have no card to land on.
+   */
+  async function pickRandom(range: PickRatingRange | null = null): Promise<{ id: number } | null> {
+    const filters = buildMusicItemFilters(
+      ctx.currentFilter,
+      ctx.currentStack,
+      ctx.searchQuery,
+      ctx.currentSort,
+      ctx.currentSortDirection,
+    );
     const result = await api.listMusicItems(filters);
-    const pool =
-      rating === null
-        ? result.items
-        : result.items.filter((item) => normalizeStarRating(item.rating) === rating);
+    const pool = result.items.filter((item) =>
+      matchesPickRange(normalizeStarRating(item.rating), range),
+    );
     if (pool.length === 0) {
       return null;
     }

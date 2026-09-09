@@ -13,6 +13,18 @@ export type MusicItemSortDirection = "asc" | "desc";
 /** What a browse list is filtered down to — the statuses plus the two pseudo-filters. */
 export type FilterSelection = ListenStatus | "all" | "scheduled";
 
+/**
+ * The inclusive star window a Pick One roll is narrowed to.
+ *
+ * `null` wherever this is used means "any rating" — no constraint at all, so
+ * unrated releases are eligible too. A range always excludes them, even the
+ * widest one (0.5–5), because an unrated release has no star to fall inside it.
+ */
+export interface PickRatingRange {
+  min: number;
+  max: number;
+}
+
 export type SourceName =
   | "bandcamp"
   | "spotify"
