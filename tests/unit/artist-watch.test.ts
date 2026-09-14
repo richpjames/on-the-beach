@@ -6,17 +6,19 @@ import { artistReleases, artists, musicItems, releaseAlerts } from "../../server
 import { normalize } from "../../server/utils";
 import {
   alertReasonFor,
-  earliestInstant,
-  isAnnouncedRelease,
   listTrackedArtists,
   nextPollInterval,
-  parseReleaseYear,
   passesNoiseFilters,
   pollArtist,
-  remindAtForReleaseDate,
   sweepArtistReleases,
   type TrackedArtistRow,
 } from "../../server/artist-watch";
+import {
+  earliestInstant,
+  isAnnouncedRelease,
+  parseReleaseYear,
+  remindAtForReleaseDate,
+} from "../../server/release-dates";
 import {
   DEFAULT_ARTIST_WATCH_SETTINGS,
   setArtistWatchSettings,

@@ -1,4 +1,4 @@
-import { describe, it, expect, mock, beforeEach, afterEach, afterAll } from "bun:test";
+import { describe, it, expect, mock, spyOn, beforeEach, afterEach, afterAll } from "bun:test";
 import { Hono } from "hono";
 // Imported before mock.module so the real exports can be passed through below.
 import * as realCreator from "../../server/music-item-creator";
@@ -13,6 +13,7 @@ const mockCreateMany = mock();
 const mockCreateDirect = mock();
 const mockSaveImage = mock();
 const mockScan = mock();
+const mockPreviewLink = mock();
 const mockListStacks = mock();
 const mockResolveOrCreateStack = mock();
 const mockAttachItemToStack = mock();
@@ -55,6 +56,7 @@ function makeApp() {
     createIngestRoutes({
       scanPhoto: mockScan,
       savePhoto: mockSaveImage,
+      previewLink: mockPreviewLink,
       listStacks: mockListStacks,
       resolveOrCreateStack: mockResolveOrCreateStack,
       attachItemToStack: mockAttachItemToStack,
@@ -695,6 +697,161 @@ describe("GET /api/ingest/stats", () => {
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body).toEqual({ to_listen: 42 });
+  });
+});
+
+describe("GET /api/ingest/link-preview", () => {
+  const originalEnv = { ...process.env };
+
+  beforeEach(() => {
+    process.env.INGEST_API_KEY = "test-secret";
+    delete process.env.INGEST_ENABLED;
+    mockPreviewLink.mockReset();
+  });
+
+  afterEach(() => {
+    process.env = { ...originalEnv };
+  });
+
+  function getPreview(app: Hono, url: string, opts?: { apiKey?: string }) {
+    const headers: Record<string, string> = {};
+    if (opts?.apiKey) headers.Authorization = `Bearer ${opts.apiKey}`;
+    return app.request(`http://localhost/api/ingest/link-preview?url=${encodeURIComponent(url)}`, {
+      headers,
+    });
+  }
+
+  it("returns 401 when no Authorization header is provided", async () => {
+    const app = makeApp();
+    const res = await getPreview(app, "https://artist.bandcamp.com/album/soon");
+    expect(res.status).toBe(401);
+    expect(mockPreviewLink).not.toHaveBeenCalled();
+  });
+
+  it("returns 400 when the url is missing or invalid", async () => {
+    const app = makeApp();
+
+    const missing = await app.request("http://localhost/api/ingest/link-preview", {
+      headers: { Authorization: "Bearer test-secret" },
+    });
+    expect(missing.status).toBe(400);
+
+    const invalid = await getPreview(app, "not-a-url", { apiKey: "test-secret" });
+    expect(invalid.status).toBe(400);
+    expect(mockPreviewLink).not.toHaveBeenCalled();
+  });
+
+  it("hands back the release date a pre-order page names, and the date to arm", async () => {
+    mockPreviewLink.mockResolvedValue({
+      url: "https://artist.bandcamp.com/album/soon",
+      source: "bandcamp",
+      releaseDate: "2099-06-02",
+      remindAt: "2099-06-02",
+    });
+
+    const app = makeApp();
+    const res = await getPreview(app, "https://artist.bandcamp.com/album/soon", {
+      apiKey: "test-secret",
+    });
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({
+      url: "https://artist.bandcamp.com/album/soon",
+      source: "bandcamp",
+      releaseDate: "2099-06-02",
+      remindAt: "2099-06-02",
+    });
+  });
+
+  it("arms nothing for a record that is already out", async () => {
+    mockPreviewLink.mockResolvedValue({
+      url: "https://artist.bandcamp.com/album/out",
+      source: "bandcamp",
+      releaseDate: "1999-03-14",
+      remindAt: null,
+    });
+
+    const app = makeApp();
+    const res = await getPreview(app, "https://artist.bandcamp.com/album/out", {
+      apiKey: "test-secret",
+    });
+
+    const body = await res.json();
+    expect(body.releaseDate).toBe("1999-03-14");
+    expect(body.remindAt).toBeNull();
+  });
+});
+
+describe("previewLink", () => {
+  const originalEnv = { ...process.env };
+
+  beforeEach(() => {
+    process.env.INGEST_API_KEY = "test-secret";
+    delete process.env.INGEST_ENABLED;
+  });
+
+  afterEach(() => {
+    process.env = { ...originalEnv };
+    mock.restore();
+  });
+
+  /** The real preview, so the default implementation is exercised end to end. */
+  function makeRealPreviewApp() {
+    const app = new Hono();
+    app.route("/api/ingest", createIngestRoutes());
+    return app;
+  }
+
+  function getPreview(app: Hono, url: string) {
+    return app.request(`http://localhost/api/ingest/link-preview?url=${encodeURIComponent(url)}`, {
+      headers: { Authorization: "Bearer test-secret" },
+    });
+  }
+
+  it("reads the date off a Bandcamp page", async () => {
+    const html = `<html><head>
+      <meta property="og:title" content="Soon, by Artist" />
+    </head><body>
+      <div class="tralbumData tralbum-credits">releases 2 June 2099</div>
+    </body></html>`;
+    const fetchMock = spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(html, { headers: { "content-type": "text/html" } }),
+    );
+
+    const res = await getPreview(makeRealPreviewApp(), "https://artist.bandcamp.com/album/soon");
+
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.source).toBe("bandcamp");
+    expect(body.releaseDate).toBe("2099-06-02");
+    expect(body.remindAt).toBe("2099-06-02");
+    expect(fetchMock).toHaveBeenCalled();
+  });
+
+  it("fetches nothing for a source that never names a release date", async () => {
+    const fetchMock = spyOn(globalThis, "fetch");
+
+    const res = await getPreview(
+      makeRealPreviewApp(),
+      "https://open.spotify.com/album/4aawyAB9vmqN3uQ7FjRGTy",
+    );
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({
+      source: "spotify",
+      releaseDate: null,
+      remindAt: null,
+    });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("reports no date rather than failing when the page can't be read", async () => {
+    spyOn(globalThis, "fetch").mockRejectedValue(new Error("network down"));
+
+    const res = await getPreview(makeRealPreviewApp(), "https://artist.bandcamp.com/album/soon");
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({ releaseDate: null, remindAt: null });
   });
 });
 

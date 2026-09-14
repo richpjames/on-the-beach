@@ -5,6 +5,13 @@
 - `server/routes/ingest.ts` exposes authenticated endpoints under `/api/ingest`.
 - `POST /api/ingest/email` accepts provider-shaped email payloads, extracts music URLs, and creates items.
 - `POST /api/ingest/link` creates items from one explicit URL.
+- `GET /api/ingest/link-preview` reads a link's release date without adding anything, so a client can fill its own date control in before the user commits (see `docs/areas/server/routes.md`).
+
+## Release dates
+
+- A page that names a release date dates the item it creates, and a date still to come schedules it: `remind_at` is set to release day, so a Bandcamp pre-order lands in Scheduled and arrives in To Listen when it's out, rather than sitting in To Listen with nothing to play.
+- Gated on the same "Schedule unreleased records to arrive in To Listen on release day" setting as an accepted release alert, and computed with the same `remindAtForReleaseDate` (`server/release-dates.ts`), so a record reaching the library by either route is scheduled for the same day.
+- An explicit `remindAt` in the request is applied after creation and so overrides the scraped date — the user's own choice wins.
 
 ## URL extraction
 

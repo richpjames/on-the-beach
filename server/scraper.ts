@@ -35,6 +35,7 @@ import {
   mergeMixcloudPageMetadata,
   parseMixcloudOg,
 } from "./mixcloud";
+import { parseReleaseYear } from "./release-dates";
 
 export type { OgData, ScrapedMetadata } from "./html-metadata";
 
@@ -250,6 +251,89 @@ export function extractBandcampEmbedMetadata(html: string): Record<string, strin
   return null;
 }
 
+const MONTH_NAMES = [
+  "january",
+  "february",
+  "march",
+  "april",
+  "may",
+  "june",
+  "july",
+  "august",
+  "september",
+  "october",
+  "november",
+  "december",
+] as const;
+
+/** `2026-03-14` from a day, a month name (or its three-letter short form) and a year. */
+function toIsoDate(day: string, monthName: string, year: string): string | undefined {
+  const lower = monthName.toLowerCase();
+  const month = MONTH_NAMES.findIndex((name) => name.startsWith(lower.slice(0, 3)));
+  if (month < 0) return undefined;
+
+  const dayNum = Number.parseInt(day, 10);
+  if (!Number.isFinite(dayNum) || dayNum < 1 || dayNum > 31) return undefined;
+
+  return `${year}-${String(month + 1).padStart(2, "0")}-${String(dayNum).padStart(2, "0")}`;
+}
+
+/**
+ * "released 14 March 2024" (worldwide) or "released March 14, 2024" (US), read
+ * out of a fragment of markup — "releases" where the record isn't out yet.
+ */
+function matchVisibleReleaseDate(fragment: string): string | undefined {
+  const text = stripHtmlForAnalysis(fragment);
+  const months = MONTH_NAMES.join("|");
+
+  const dayFirst = text.match(
+    new RegExp(String.raw`\brelease[ds]\s+(\d{1,2})\s+(${months})\s+(\d{4})`, "i"),
+  );
+  if (dayFirst) return toIsoDate(dayFirst[1], dayFirst[2], dayFirst[3]);
+
+  const monthFirst = text.match(
+    new RegExp(String.raw`\brelease[ds]\s+(${months})\s+(\d{1,2}),?\s+(\d{4})`, "i"),
+  );
+  if (monthFirst) return toIsoDate(monthFirst[2], monthFirst[1], monthFirst[3]);
+
+  return undefined;
+}
+
+/**
+ * The release date a Bandcamp page names, as `YYYY-MM-DD`.
+ *
+ * Every album and track page states it in the credits under the tracklist —
+ * "released 14 March 2024" for something already out, "releases 14 March 2026"
+ * for a pre-order. That one word is the whole difference between a record to
+ * listen to now and one to be reminded about, so it's worth reading: the
+ * caller turns a date still to come into the item's schedule.
+ *
+ * The credits block is searched before the rest of the page, because the
+ * sleeve notes above it are free text and a reissue's "originally released
+ * March 1985" would otherwise be read as this record's date. `TralbumData`'s
+ * GMT timestamp is the last resort, for layouts that render no credits at all
+ * (an embed, say); it can sit a day either side of what the page displays.
+ */
+export function parseBandcampReleaseDate(html: string): string | undefined {
+  const credits = html.match(
+    /<[^>]*class=["'][^"']*tralbum-credits[^"']*["'][^>]*>([\s\S]*?)<\/div>/i,
+  );
+  const fromCredits = credits ? matchVisibleReleaseDate(credits[1]) : undefined;
+  if (fromCredits) return fromCredits;
+
+  const fromPage = matchVisibleReleaseDate(html);
+  if (fromPage) return fromPage;
+
+  // Fallback: TralbumData's "release_date" / "album_release_date", which read
+  // as "14 Mar 2026 00:00:00 GMT".
+  const embedded = html.match(
+    /"(?:album_)?release_date"\s*:\s*"(\d{1,2})\s+([A-Za-z]{3,})\s+(\d{4})/,
+  );
+  if (embedded) return toIsoDate(embedded[1], embedded[2], embedded[3]);
+
+  return undefined;
+}
+
 export function parseSoundcloudOg(og: OgData): ScrapedMetadata {
   const title = og.ogTitle || og.title || "";
   // SoundCloud format: "Track by Artist" or "Stream Track by Artist"
@@ -410,6 +494,16 @@ export function parseNtsOg(og: OgData): ScrapedMetadata {
   };
 }
 
+/**
+ * The sources whose pages state a release date (see `ScrapedMetadata.releaseDate`).
+ *
+ * Asking is what saves a page fetch: a client wanting nothing but the date has
+ * no reason to scrape a Spotify link that will never carry one.
+ */
+export function sourceNamesReleaseDate(source: SourceName): boolean {
+  return source === "bandcamp";
+}
+
 export const SOURCE_PARSERS: Partial<Record<SourceName, OgParser>> = {
   bandcamp: parseBandcampOg,
   soundcloud: parseSoundcloudOg,
@@ -556,6 +650,13 @@ export async function scrapeUrl(
     const result = parser(og);
     if (source === "bandcamp" && result) {
       result.embedMetadata = extractBandcampEmbedMetadata(html) ?? undefined;
+      const releaseDate = parseBandcampReleaseDate(html);
+      if (releaseDate) {
+        result.releaseDate = releaseDate;
+        // Bandcamp's OG tags name no year, so the date it prints is the only
+        // one going — fill the item's year in from it.
+        result.year ??= parseReleaseYear(releaseDate) ?? undefined;
+      }
     }
     return result;
   } catch (err) {

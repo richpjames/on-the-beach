@@ -32,6 +32,17 @@ final class ShareViewController: UIViewController {
         let stacks: [Stack]
     }
 
+    /// `GET /api/ingest/link-preview`: what the server can already tell about
+    /// the shared link. `remindAt` is the day to pre-arm the "Release date"
+    /// control with — a Bandcamp page for a record that isn't out yet says
+    /// "releases 14 March 2026" in its credits, and that date is the whole
+    /// point of the control. It comes back null for a record already out, so
+    /// there's nothing to decide here: arm it when it's there.
+    private struct LinkPreviewResponse: Decodable {
+        let releaseDate: String?
+        let remindAt: String?
+    }
+
     /// The slice of the `POST /api/ingest/link` response the confirmation toast
     /// needs: whether anything was created or skipped as a duplicate, and which
     /// lists the item was filed into.
@@ -167,6 +178,7 @@ final class ShareViewController: UIViewController {
                 switch content {
                 case .link(let url):
                     self.compose.setURL(url)
+                    self.fetchLinkPreview(for: url)
                 case .images(let payloads):
                     // Keep bytes and previews in step: anything that won't
                     // decode here is dropped from both, so the filmstrip shows
@@ -642,6 +654,47 @@ final class ShareViewController: UIViewController {
         }.resume()
     }
 
+    // MARK: - Reading what the shared page already says
+
+    /// Asks the server what it can fill in for this link and, when it answers
+    /// with a release still to come, pre-arms the "Release date" control with
+    /// that day — so sharing a pre-order schedules it for release day without
+    /// the user having to read the date off the page and re-enter it.
+    ///
+    /// Best-effort by design: a failure, a slow answer, or a page with no date
+    /// simply leaves the form as it was. The extraction that feeds this is
+    /// async too, so the answer can land after the user has started filling the
+    /// form in — `prefillReleaseDate` leaves their own choice alone.
+    private func fetchLinkPreview(for url: URL) {
+        guard !apiKey.isEmpty,
+              var components = URLComponents(string: baseURL + "/api/ingest/link-preview") else {
+            return
+        }
+        components.queryItems = [URLQueryItem(name: "url", value: url.absoluteString)]
+        guard let endpoint = components.url else { return }
+
+        var request = URLRequest(url: endpoint)
+        request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+        request.timeoutInterval = 15
+
+        URLSession.shared.dataTask(with: request) { [weak self] data, _, _ in
+            guard let self, let data,
+                  let payload = try? JSONDecoder().decode(LinkPreviewResponse.self, from: data),
+                  let remindAt = payload.remindAt else {
+                return
+            }
+            DispatchQueue.main.async { self.applyLinkPreview(remindAt: remindAt) }
+        }.resume()
+    }
+
+    /// Turns the preview's `yyyy-MM-dd` into the picker's date, on the main
+    /// queue — the same formatter the schedule is posted back with, so what the
+    /// sheet shows and what the server stores are the same day.
+    private func applyLinkPreview(remindAt: String) {
+        guard let date = Self.scheduleFormatter.date(from: remindAt) else { return }
+        compose.prefillReleaseDate(date)
+    }
+
     // MARK: - Posting to the ingest endpoint
 
     private func postLink(
@@ -1025,6 +1078,9 @@ private final class ComposeFormController: UIViewController, UITextViewDelegate 
     private let listValueLabel = UILabel()
     private let scheduleSwitch = UISwitch()
     private let datePicker = UIDatePicker()
+    /// Whether the user has set the "Release date" switch themselves — see
+    /// `prefillReleaseDate`.
+    private var scheduleTouched = false
     private let postingIndicator = PostingIndicator()
     private lazy var postingItem = UIBarButtonItem(customView: postingIndicator)
     private lazy var addButton = OTBTheme.addBarButton(target: self, action: #selector(didTapAdd))
@@ -1265,6 +1321,23 @@ private final class ComposeFormController: UIViewController, UITextViewDelegate 
         addButton.isEnabled = value && !isPosting
     }
 
+    /// Fills the "Release date" control in from the shared page's own date and
+    /// switches it on, revealing the picker so the date is visible rather than
+    /// applied behind a closed switch.
+    ///
+    /// The preview it comes from is async, so this can arrive after the user
+    /// has already touched the switch themselves — their choice wins, whichever
+    /// way they set it. A date before today can't be shown by the picker
+    /// (`minimumDate` is the start of today), so it's ignored; the server only
+    /// sends a date still to come.
+    func prefillReleaseDate(_ date: Date) {
+        guard !scheduleTouched, date >= (datePicker.minimumDate ?? date) else { return }
+
+        datePicker.date = date
+        scheduleSwitch.setOn(true, animated: true)
+        UIView.animate(withDuration: 0.2) { self.datePicker.isHidden = false }
+    }
+
     /// Reflects the chosen lists in the "List" row: "None", the single name, or
     /// all names joined so the user can see everything the item will be filed into.
     func setListNames(_ names: [String]) {
@@ -1296,6 +1369,9 @@ private final class ComposeFormController: UIViewController, UITextViewDelegate 
 
     /// Reveal or hide the date picker alongside the "Release date" switch.
     @objc private func didToggleSchedule() {
+        // Once the user has decided for themselves, a late-arriving preview of
+        // the shared page must not undo it.
+        scheduleTouched = true
         UIView.animate(withDuration: 0.2) {
             self.datePicker.isHidden = !self.scheduleSwitch.isOn
         }
