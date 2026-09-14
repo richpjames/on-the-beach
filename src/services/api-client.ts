@@ -14,6 +14,7 @@ import type {
   RecognizeResult,
   ItemSuggestion,
   ReleaseAlert,
+  ReleaseAlertDetailResult,
   ReleaseAlertLink,
   ReleaseAlertStatus,
   AddReleaseAlertResult,
@@ -434,6 +435,18 @@ export class ApiClient {
       link: ReleaseAlertLink | null;
     };
     return { added: true, item: body.item, remindAt: body.remindAt, link: body.link ?? null };
+  }
+
+  /**
+   * The expanded view of an alert — tracklist, external links, the rest of
+   * what MusicBrainz has. Fetched when a card is opened, never with the queue:
+   * every card would be a MusicBrainz request, at one a second.
+   */
+  async getReleaseAlertDetail(alertId: number): Promise<ReleaseAlertDetailResult> {
+    return this.requestJson<ReleaseAlertDetailResult>(
+      `/api/release-alerts/${alertId}/details`,
+      "getReleaseAlertDetail",
+    );
   }
 
   async dismissReleaseAlert(alertId: number): Promise<void> {

@@ -270,6 +270,59 @@ export interface ReleaseAlert {
   first_release_year: number | null;
 }
 
+/** One of MusicBrainz's external links, tidied for display on a card. */
+export interface ReleaseAlertDetailLink {
+  url: string;
+  /** The site, as a person would name it — "Bandcamp", "Apple Music". */
+  label: string;
+  /** MB's relationship type: "streaming", "free streaming", "discogs"… */
+  kind: string | null;
+  /** Somewhere you can actually hear the record, as opposed to read about it. */
+  listenable: boolean;
+}
+
+export interface ReleaseAlertTrack {
+  /** MB's track number verbatim — "1", or "A2" on a vinyl tracklist. */
+  number: string | null;
+  title: string;
+  lengthMs: number | null;
+}
+
+/**
+ * The expanded view of an alert: what MusicBrainz knows about the record
+ * beyond the handful of fields the watcher stored when it raised the alert.
+ * Fetched on demand when a card is opened, never as part of the queue.
+ */
+export interface ReleaseAlertDetail {
+  musicbrainzUrl: string;
+  artistMusicbrainzUrl: string | null;
+  coverArtUrl: string;
+  disambiguation: string | null;
+  artistCredit: string | null;
+  firstReleaseDate: string | null;
+  primaryType: string | null;
+  secondaryTypes: string[];
+  links: ReleaseAlertDetailLink[];
+  tracks: ReleaseAlertTrack[];
+  trackCount: number | null;
+  totalLengthMs: number | null;
+  label: string | null;
+  country: string | null;
+  format: string | null;
+  /** The edition `tracks` was read from — editions differ, so it's named. */
+  releaseTitle: string | null;
+  releaseDate: string | null;
+}
+
+/**
+ * MusicBrainz is a third party that can be down, throttling, or switched off
+ * (`OTB_DISABLE_EXTERNAL_LOOKUPS`). A panel that can't be filled says so
+ * rather than rendering an empty tracklist as though the record had none.
+ */
+export type ReleaseAlertDetailResult =
+  | { detail: ReleaseAlertDetail; error: null }
+  | { detail: null; error: string };
+
 /** The link that vouched for an accepted release. */
 export interface ReleaseAlertLink {
   url: string;

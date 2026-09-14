@@ -1,5 +1,5 @@
 import path from "node:path";
-import type { APIRequestContext, Page } from "@playwright/test";
+import type { APIRequestContext, Locator, Page } from "@playwright/test";
 import { expect, test } from "../../playwright/fixtures/parallel-test";
 
 // CSS injected before each screenshot to produce stable, deterministic renders.
@@ -16,6 +16,12 @@ const VISUAL_CSS = `
   }
 
   #app-version {
+    visibility: hidden;
+  }
+
+  /* "Spotted" is the day the watcher raised the alert — today, on every run.
+     Hidden rather than removed so the fact grid keeps its shape. */
+  .alert-details__spotted {
     visibility: hidden;
   }
 
@@ -47,6 +53,68 @@ const LONG_LIST_FIXTURES = [
   { title: "Channel Glass", artist: "North Index" },
   { title: "Tape Horizon", artist: "Soft Relay" },
 ];
+
+const ALERT_FIXTURES = [
+  {
+    artistName: "Shore Unit",
+    title: "Moon Pool",
+    firstReleaseDate: "2026-05-01",
+    reason: "new-release",
+    mbReleaseGroupId: "rg-visual-moon-pool",
+  },
+  {
+    artistName: "Nera Coast",
+    title: "Glass Harbour",
+    firstReleaseDate: "2099-09-18",
+    reason: "announced",
+    mbReleaseGroupId: "rg-visual-glass-harbour",
+  },
+];
+
+// What an opened card renders. MusicBrainz is unreachable under test
+// (OTB_DISABLE_EXTERNAL_LOOKUPS), and a live lookup would be a different
+// record every time it edited anyway — the panel's layout is what's under test.
+const ALERT_DETAIL = {
+  detail: {
+    musicbrainzUrl: "https://musicbrainz.org/release-group/rg-visual-moon-pool",
+    artistMusicbrainzUrl: "https://musicbrainz.org/artist/a-visual-shore-unit",
+    coverArtUrl: "https://coverartarchive.org/release-group/rg-visual-moon-pool/front-500",
+    disambiguation: "first pressing, with the original sleeve",
+    artistCredit: "Shore Unit & The Harbour Board",
+    firstReleaseDate: "2026-05-01",
+    primaryType: "Album",
+    secondaryTypes: ["Live"],
+    links: [
+      {
+        url: "https://example.test/a",
+        label: "Bandcamp",
+        kind: "free streaming",
+        listenable: true,
+      },
+      { url: "https://example.test/b", label: "Apple Music", kind: "streaming", listenable: true },
+      { url: "https://example.test/c", label: "Discogs", kind: "discogs", listenable: false },
+      { url: "https://example.test/d", label: "Wikidata", kind: "wikidata", listenable: false },
+    ],
+    tracks: [
+      { number: "A1", title: "Slack Water", lengthMs: 245_000 },
+      { number: "A2", title: "Spring Tide", lengthMs: 372_000 },
+      { number: "B1", title: "Neap", lengthMs: 198_000 },
+      {
+        number: "B2",
+        title: "A Very Long Track Title That Will Certainly Need Truncating Somewhere",
+        lengthMs: 611_000,
+      },
+    ],
+    trackCount: 4,
+    totalLengthMs: 1_426_000,
+    label: "Harbour Tapes",
+    country: "GB",
+    format: '12" Vinyl',
+    releaseTitle: "Moon Pool",
+    releaseDate: "2026-05-01",
+  },
+  error: null,
+};
 
 test.beforeEach(async ({ request }) => {
   await request.post("/api/__test__/reset");
@@ -112,17 +180,55 @@ test("captures main long-list view", async ({ page, request }) => {
   await captureSnapshot(page, "main-app-long-list-view");
 });
 
+test("captures the new releases queue, closed and open", async ({ page, request }) => {
+  for (const alert of ALERT_FIXTURES) {
+    const response = await request.post("/api/__test__/release-alerts", { data: alert });
+    expect(response.ok()).toBe(true);
+  }
+
+  // Cover Art Archive is a third party the test machine may or may not reach;
+  // serve the same sleeve every time so the baseline is about our layout.
+  const coverPath = path.join(process.cwd(), "playwright/fixtures/cover-sample.png");
+  await page.route("**coverartarchive.org/**", (route) =>
+    route.fulfill({ status: 200, contentType: "image/png", path: coverPath }),
+  );
+  await page.route("**/api/release-alerts/*/details", (route) =>
+    route.fulfill({ json: ALERT_DETAIL }),
+  );
+
+  await page.goto("/new-releases");
+  const cards = page.locator(".alert-card");
+  await expect(cards).toHaveCount(ALERT_FIXTURES.length);
+  await expect(page.locator(".alert-card__artwork img").first()).toBeVisible();
+  await captureSnapshot(page, "new-releases-queue-view");
+
+  // The card the stub describes, so the panel reads as one record.
+  const opened = cards.filter({ hasText: ALERT_DETAIL.detail.releaseTitle });
+  await opened.locator('[data-alert-action="details"]').click();
+  await expect(page.locator(".alert-details__tracks")).toBeVisible();
+  await expect(page.locator(".alert-details__cover img")).toBeVisible();
+
+  // The open card, not the page: the panel runs past the bottom of the window
+  // on both viewports, and a viewport screenshot would baseline only its top.
+  await captureSnapshot(opened, "new-releases-detail-view", page);
+});
+
 // ---------------------------------------------------------------------------
 // Screenshot helper
 // ---------------------------------------------------------------------------
 
-async function captureSnapshot(page: Page, name: string): Promise<void> {
-  await page.addStyleTag({ content: VISUAL_CSS });
+async function captureSnapshot(
+  target: Page | Locator,
+  name: string,
+  // Styles go on the page; pass it when `target` is an element on that page.
+  stylePage?: Page,
+): Promise<void> {
+  await (stylePage ?? (target as Page)).addStyleTag({ content: VISUAL_CSS });
 
   // maxDiffPixelRatio: 0.01 — tune this down (e.g. 0.001) for strict
   // pixel-perfect comparisons, or up (e.g. 0.05) if minor font-rendering
   // differences between machines cause false positives.
-  await expect(page).toHaveScreenshot(`${name}.png`, {
+  await expect(target).toHaveScreenshot(`${name}.png`, {
     maxDiffPixelRatio: 0.01,
   });
 }

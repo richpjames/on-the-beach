@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, mock, spyOn, test } from "bun:
 import {
   lookupRelease,
   findSuggestedReleases,
+  fetchReleaseGroupDetail,
   fetchReleaseGroupIdForRelease,
   fetchReleaseGroupUrlRelations,
   fetchArtistReleaseGroups,
@@ -1113,5 +1114,171 @@ describe("searchReleaseCandidates — compilations", () => {
     expect(query).not.toContain("Antonio Carlos");
     expect(query).toContain(`arid:${VARIOUS_ARTISTS_MBID}`);
     expect(query).toContain('release:"O Primeiro Amor"');
+  });
+});
+
+describe("fetchReleaseGroupDetail", () => {
+  afterEach(() => {
+    mock.restore();
+  });
+
+  function json(body: unknown): Response {
+    return new Response(JSON.stringify(body), {
+      headers: { "content-type": "application/json" },
+    });
+  }
+
+  const GROUP = {
+    id: "rg1",
+    title: "Tri Repetae",
+    "primary-type": "Album",
+    "secondary-types": ["Live"],
+    "first-release-date": "1995-11-13",
+    disambiguation: "original UK pressing",
+    "artist-credit": [{ name: "Autechre", joinphrase: " & " }, { name: "Gescom" }],
+    relations: [
+      { type: "streaming", url: { resource: "https://open.spotify.com/album/1" } },
+      { type: "discogs", url: { resource: "https://www.discogs.com/master/1" } },
+    ],
+  };
+
+  test("assembles the group, its links and a stand-in tracklist", async () => {
+    const fetchSpy = spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(json(GROUP))
+      .mockResolvedValueOnce(
+        json({
+          releases: [
+            {
+              id: "rel1",
+              title: "Tri Repetae",
+              date: "1995-11-13",
+              status: "Official",
+              country: "GB",
+              "label-info": [{ label: { name: "Warp" }, "catalog-number": "WARP38" }],
+              media: [
+                {
+                  format: ' 12" Vinyl',
+                  tracks: [
+                    { number: "A1", title: "Dael", length: 300_000 },
+                    { number: "A2", title: "Clipper", recording: { length: 420_000 } },
+                  ],
+                },
+              ],
+            },
+          ],
+        }),
+      );
+
+    const detail = await fetchReleaseGroupDetail("rg1");
+
+    const [groupUrl] = fetchSpy.mock.calls[0] as [string];
+    expect(groupUrl).toContain("/release-group/rg1?");
+    expect(groupUrl).toContain("inc=url-rels%2Bartist-credits");
+    const [browseUrl] = fetchSpy.mock.calls[1] as [string];
+    expect(browseUrl).toContain("release-group=rg1");
+
+    expect(detail.primaryType).toBe("Album");
+    expect(detail.secondaryTypes).toEqual(["Live"]);
+    expect(detail.firstReleaseDate).toBe("1995-11-13");
+    expect(detail.disambiguation).toBe("original UK pressing");
+    expect(detail.artistCredit).toBe("Autechre & Gescom");
+    expect(detail.links).toEqual([
+      { type: "streaming", url: "https://open.spotify.com/album/1" },
+      { type: "discogs", url: "https://www.discogs.com/master/1" },
+    ]);
+
+    // A track's own length wins; the recording's stands in when it has none.
+    expect(detail.tracks).toEqual([
+      { number: "A1", title: "Dael", lengthMs: 300_000 },
+      { number: "A2", title: "Clipper", lengthMs: 420_000 },
+    ]);
+    expect(detail.trackCount).toBe(2);
+    expect(detail.totalLengthMs).toBe(720_000);
+    expect(detail.label).toBe("Warp");
+    expect(detail.country).toBe("GB");
+    expect(detail.format).toBe(' 12" Vinyl');
+    expect(detail.releaseTitle).toBe("Tri Repetae");
+    expect(detail.releaseDate).toBe("1995-11-13");
+  });
+
+  test("stands the group in with the earliest official release that has a tracklist", async () => {
+    spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(json(GROUP))
+      .mockResolvedValueOnce(
+        json({
+          releases: [
+            // No tracklist at all — never the answer, however early.
+            { id: "rel0", title: "Promo", date: "1995-01-01", status: "Official", media: [] },
+            {
+              id: "rel2",
+              title: "2008 reissue",
+              date: "2008-01-01",
+              status: "Official",
+              media: [{ tracks: [{ number: "1", title: "Dael" }] }],
+            },
+            {
+              id: "rel1",
+              title: "Original",
+              date: "1995-11-13",
+              status: "Official",
+              media: [{ tracks: [{ number: "1", title: "Dael" }] }],
+            },
+            // Earlier still, but a bootleg is not the record people mean.
+            {
+              id: "rel3",
+              title: "Bootleg",
+              date: "1995-01-02",
+              status: "Bootleg",
+              media: [{ tracks: [{ number: "1", title: "Dael" }] }],
+            },
+          ],
+        }),
+      );
+
+    const detail = await fetchReleaseGroupDetail("rg1");
+    expect(detail.releaseTitle).toBe("Original");
+  });
+
+  test("a total length is only claimed when every track carries one", async () => {
+    spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(json(GROUP))
+      .mockResolvedValueOnce(
+        json({
+          releases: [
+            {
+              id: "rel1",
+              media: [
+                {
+                  tracks: [
+                    { number: "1", title: "Dael", length: 300_000 },
+                    { number: "2", title: "Clipper" },
+                  ],
+                },
+              ],
+            },
+          ],
+        }),
+      );
+
+    const detail = await fetchReleaseGroupDetail("rg1");
+    expect(detail.tracks).toHaveLength(2);
+    expect(detail.totalLengthMs).toBeNull();
+  });
+
+  test("a failed release browse still yields the group — the tracklist is the nice-to-have", async () => {
+    spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(json(GROUP))
+      .mockResolvedValueOnce(new Response("rate limited", { status: 503 }));
+
+    const detail = await fetchReleaseGroupDetail("rg1");
+    expect(detail.tracks).toEqual([]);
+    expect(detail.trackCount).toBeNull();
+    expect(detail.releaseTitle).toBeNull();
+    expect(detail.links).toHaveLength(2);
+  });
+
+  test("throws on a non-2xx group lookup — a throttled request is not an empty record", async () => {
+    spyOn(globalThis, "fetch").mockResolvedValueOnce(new Response("nope", { status: 503 }));
+    expect(fetchReleaseGroupDetail("rg1")).rejects.toThrow("503");
   });
 });
