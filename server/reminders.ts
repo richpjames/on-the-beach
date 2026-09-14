@@ -1,7 +1,7 @@
 import { lte, eq, and, inArray, sql } from "drizzle-orm";
 import { db } from "./db/index";
 import { artistReleases, artists, musicItems, musicLinks, releaseAlerts } from "./db/schema";
-import { earliestInstant } from "./artist-watch";
+import { earliestInstant } from "./release-dates";
 import { enrichSecondaryLinkInBackground } from "./secondary-link-enrichment";
 import {
   checkReleaseLink,

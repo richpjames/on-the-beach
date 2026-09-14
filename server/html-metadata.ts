@@ -27,6 +27,11 @@ export interface ScrapedMetadata {
   /** The page's own title (og:title, else <title>) — names the page a release was lifted from. */
   pageTitle?: string;
   embedMetadata?: Record<string, string>;
+  /**
+   * The release date the page names, as `YYYY-MM-DD` — Bandcamp prints one on
+   * every album page. A date still to come is what the item is scheduled for.
+   */
+  releaseDate?: string;
   year?: number;
   genre?: string;
   /** The releasing label, where the source names one (Discogs does). */
