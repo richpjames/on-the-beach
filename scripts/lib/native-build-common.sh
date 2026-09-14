@@ -81,6 +81,9 @@ native_regenerate() {
   # Widget injection runs after the share extension (which owns the app-level
   # Catalyst / deployment-target / CFBundleName patches).
   ruby scripts/add-widget-extension.rb
+  # The app side of the Listen widget: deep-link handler, URL scheme, the app
+  # icon's long-press quick action, and the microphone purpose string.
+  ruby scripts/add-listen-shortcut.rb
 }
 
 # --- Restore the committed app icon ------------------------------------------

@@ -1,4 +1,4 @@
-import { createActor, waitFor } from "xstate";
+import { createActor, fromCallback, waitFor } from "xstate";
 import { describe, expect, it } from "bun:test";
 
 import { addFormMachine } from "../../src/ui/state/add-form-machine";
@@ -584,6 +584,41 @@ describe("add form machine — scan flow", () => {
     expect(ctx.scanResult).toBeNull();
     expect(ctx.scanError).toBeNull();
     expect(ctx.pendingScanBase64).toBeNull();
+  });
+});
+
+describe("add form machine — the home-screen Listen shortcut", () => {
+  // The iOS Listen widget and the app icon's long-press quick action open the
+  // app at `/?action=listen`; MainPage turns that into this one event on mount
+  // (src/ui/logic/launch-action.ts, native/App/OTBLaunchActions.swift).
+  const withStubbedRecorder = () =>
+    addFormMachine.provide({
+      // There's no microphone under `bun test`, so stand in for the recorder.
+      actors: { recordAudio: fromCallback(() => {}) as any },
+    });
+
+  it("starts recording straight away", () => {
+    const actor = createActor(withStubbedRecorder(), {
+      input: { api: makeMockApi() as any },
+    }).start();
+
+    actor.send({ type: "RECOGNIZE_CLICKED" });
+
+    expect(actor.getSnapshot().value).toBe("recording");
+    expect(actor.getSnapshot().context.recognizeState).toBe("recording");
+  });
+
+  it("hands a captured clip to recognition", async () => {
+    const actor = createActor(withStubbedRecorder(), {
+      input: { api: makeMockApi({ recognizeMusic: async () => ({ recognized: false }) }) as any },
+    }).start();
+
+    actor.send({ type: "RECOGNIZE_CLICKED" });
+    actor.send({ type: "AUDIO_CAPTURED", audioBase64: "clip", mimeType: "audio/webm" });
+
+    expect(actor.getSnapshot().context.recognizeState).toBe("recognizing");
+    await waitFor(actor, (s) => s.value === "idle", { timeout: 5000 });
+    expect(actor.getSnapshot().context.recognizeError).toContain("Song not recognised");
   });
 });
 

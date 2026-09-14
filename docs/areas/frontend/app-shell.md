@@ -6,6 +6,7 @@
 - `src/routes/+page.svelte` and `src/routes/s/[id]/[name]/+page.svelte` render `$lib/components/MainPage.svelte`, seeded from their `+page.server.ts` load.
 - `src/routes/r/[id]/+page.svelte` renders `$lib/components/ReleasePage.svelte`, keyed by item id so navigation between releases fully re-initialises the page state.
 - `src/services/api-client.ts` remains the typed boundary to `/api/*` (shared via `$lib/api.ts`).
+- `MainPage.svelte` reads a launch action out of the URL on mount (`src/ui/logic/launch-action.ts`). The iOS home-screen shortcuts — the Listen widget and the app icon's long-press quick action — open the app at `/?action=listen`, which starts song recognition straight away; the param drops out of the address bar on the first URL sync. See `docs/ios-native-app.md`.
 
 ## Rendering model
 

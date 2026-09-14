@@ -18,6 +18,9 @@
 # is idempotent: re-running removes any OTBWidget target/group/embed phase it
 # previously added and rebuilds them.
 #
+# The Listen tile's deep link needs an app that answers `onthebeach://` — that's
+# the job of `scripts/add-listen-shortcut.rb`, which runs after this one.
+#
 # Usage:  ruby scripts/add-widget-extension.rb
 #
 # Requires the `xcodeproj` gem (`gem install xcodeproj`) — same as the share
@@ -32,9 +35,13 @@ NATIVE_DIR = File.join(REPO_ROOT, "native", "Widget")
 SWIFT_SOURCE = File.join(NATIVE_DIR, "OTBWidget.swift")
 INFO_PLIST = File.join(NATIVE_DIR, "Info.plist")
 ENTITLEMENTS = File.join(NATIVE_DIR, "OTBWidget.entitlements")
-# The widget draws the brand master itself, so the PNG is copied into the
-# extension's bundle (referenced in place — assets/logo.png stays the one
-# source of truth for every icon in the project).
+# The widget draws the app icon, so the icon master is bundled with the
+# extension (referenced in place — native/AppIcon.appiconset stays the one
+# source of truth for the icon, itself generated from assets/logo.png by
+# scripts/generate-brand-assets.sh).
+APP_ICON = File.join(REPO_ROOT, "native", "AppIcon.appiconset", "AppIcon-512@2x.png")
+# The brand master, bundled as the widget's fallback if the icon above ever
+# goes missing (assets/logo.png stays the one source of truth for every icon).
 LOGO = File.join(REPO_ROOT, "assets", "logo.png")
 
 EXT_NAME = "OTBWidget"
@@ -54,6 +61,7 @@ die "no Xcode project at #{PROJECT_PATH} — run `bun run cap:add` first" unless
 die "missing #{SWIFT_SOURCE}" unless File.exist?(SWIFT_SOURCE)
 die "missing #{INFO_PLIST}" unless File.exist?(INFO_PLIST)
 die "missing #{LOGO}" unless File.exist?(LOGO)
+die "missing #{APP_ICON} — run `bun run brand:assets` and commit it" unless File.exist?(APP_ICON)
 
 project = Xcodeproj::Project.open(PROJECT_PATH)
 
@@ -148,11 +156,13 @@ ext_target.add_file_references([swift_ref])
 group.new_file(INFO_PLIST)
 group.new_file(ENTITLEMENTS) if File.exist?(ENTITLEMENTS)
 
-# --- Bundle the logo ----------------------------------------------------------
-# The widget's only content is the brand master, which it loads by filename
-# (`UIImage(named: "logo")`), so copy assets/logo.png into the extension bundle.
+# --- Bundle the artwork -------------------------------------------------------
+# The widget draws the app icon (loaded by filename, `AppIcon-512@2x.png`), with
+# the brand master (`UIImage(named: "logo")`) as its fallback, so both PNGs go
+# into the extension bundle.
+icon_ref = group.new_file(APP_ICON)
 logo_ref = group.new_file(LOGO)
-ext_target.add_resources([logo_ref])
+ext_target.add_resources([icon_ref, logo_ref])
 
 # --- Embed the widget in the app ---------------------------------------------
 app_target.add_dependency(ext_target)
