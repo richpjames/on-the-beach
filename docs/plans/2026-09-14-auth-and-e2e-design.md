@@ -162,35 +162,50 @@ rather than by default — it's the difference between one deployable and two.
 The mistake to avoid is testing the handshake 25 times. Split by what each layer actually
 de-risks.
 
-### Layer 1 — Every existing spec: mint a session, skip the handshake
+### Layer 1 — Every existing spec: mint a session **without an HTTP endpoint**
 
-`server/routes/test.ts` is already mounted at `/api/__test__` only under `NODE_ENV=test`
-(`server/app.ts`). Add one route to it:
+The obvious move is a test-only route (`POST /api/__test__/session`) next to the `/reset`
+route, mounted only under `NODE_ENV=test`. **Don't.** An endpoint whose whole job is "issue a
+valid session for any user" is the one piece of code where a gate failure is not a bug but a
+total auth bypass, and it would be reachable by anyone who guesses the path.
 
-```ts
-// server/routes/test.ts — alongside /reset, /suggestions, /release-alerts
-testRoutes.post("/session", async (c) => {
-  const { email } = await c.req.json();
-  const user = await upsertUser(email ?? "test@on-the-beach.local");
-  const session = await createSession(user.id);
-  return c.json({ cookie: SESSION_COOKIE_NAME, value: session.id });
-});
-```
-
-Then extend the **worker** fixture in `playwright/fixtures/parallel-test.ts` — which already
-overrides `contextOptions` and `request`, so both hooks exist:
+Mint it out of band instead. The worker fixture already shells out to a Bun script against
+the worker's own database file before the server boots:
 
 ```ts
-// after startWorkerServer(), before use()
-const storageState = await mintTestSession(port);   // POST /api/__test__/session
-
-contextOptions: async ({ contextOptions, workerBaseURL, storageState }, use) => {
-  await use({ ...contextOptions, baseURL: workerBaseURL, storageState });
-},
+// playwright/fixtures/parallel-test.ts:39 — this already exists
+await runCommand(["server/db/seed.ts"], env);
 ```
 
-All 25 spec files, visual regression included, keep passing with **zero edits**. That is the
-whole reason to put the seam at the callback.
+So add a sibling script that inserts a `users` row and a `sessions` row directly and prints
+the cookie value:
+
+```ts
+await runCommand(["server/db/seed.ts"], env);
+const cookie = await runCommand(["scripts/mint-test-session.ts"], env);  // stdout
+const storageState = { cookies: [{ name: SESSION_COOKIE_NAME, value: cookie, ... }] };
+```
+
+Then pass `storageState` through the `contextOptions` override the fixture already has. All
+25 spec files — `playwright/*.spec.ts` and `tests/visual/ui.spec.ts` — pass unedited.
+
+**The privilege is filesystem access to the SQLite file, not knowledge of a URL.** There is
+no route to discover, nothing to guess, and no gate to fail open. An attacker who can already
+write to `DATABASE_PATH` does not need a session-minting endpoint; they have the data.
+
+This also removes the need for a `NODE_ENV` check on the auth path entirely — the script is
+in `scripts/`, never imported by `server/app.ts`, so it cannot be reached over HTTP by any
+configuration mistake.
+
+#### Second choice: log in for real
+
+If a session row ever gets complicated enough that writing one by hand duplicates production
+logic, drive the real login instead: point the fixture at the layer-2 fake IdP, hit
+`/auth/login`, let it auto-approve, and let the real `/auth/callback` set the real cookie.
+Strictly better fidelity — it exercises the production code path — at the cost of a redirect
+chain per worker and wiring the fake provider into every project rather than one spec.
+
+Still no test-only endpoint either way. That is the property worth protecting.
 
 Two follow-ups this implies:
 
@@ -230,6 +245,55 @@ provider drift within a day.
 
 ---
 
+## The test-route boundary we already have, and why it needs hardening anyway
+
+Avoiding a session-minting endpoint is necessary but not sufficient, because **the repo
+already ships a test-only route to production**. This is measured, not assumed —
+`bun run build` on `main` produces:
+
+```
+$ grep -rl "__test__" build/
+build/server/chunks/chunks/app.js-_BcF2hrg.js
+
+$ sed -n '1801,1804p' build/server/chunks/chunks/app.js-_BcF2hrg.js
+if (process.env["NODE_ENV"] === "test") {
+  const { testRoutes } = await import('./test.js-B8Gs8BMa.js');
+  apiApp.route("/api/__test__", testRoutes);
+}
+
+$ grep -n "delete(" build/server/chunks/chunks/test.js-B8Gs8BMa.js
+12:  await db.delete(musicItemStacks);
+...            # all ten tables, in the shipped artifact
+```
+
+The dynamic import sits behind a runtime `process.env` read, so Rollup cannot eliminate it:
+`test.js-B8Gs8BMa.js` is emitted as a real chunk and deployed. The only thing between a
+production `POST /api/__test__/reset` and `DELETE` on every table is **one string comparison
+at `server/app.ts:36`**, evaluated once at module load.
+
+That gate is currently holding — `NODE_ENV=production` is set in both `Dockerfile:16` and
+`docker-compose.yml:11`, and Coolify preview deploys use the same Dockerfile. But it is a
+single point of failure guarding total data loss, and adding auth raises what's behind it
+from "the data" to "the data and the identity system".
+
+Two fixes, both cheap, and worth doing **whether or not** we ever add auth:
+
+1. **Make it a build-time exclusion, not a runtime branch.** Set `NODE_ENV` via Vite's
+   `define` so the condition folds to `false` and the chunk is never emitted, or swap
+   `server/routes/test.ts` for a stub module in production builds. Code that isn't in the
+   artifact cannot be reached by any misconfiguration.
+2. **Assert it in CI.** One step in `test.yml` after the build:
+
+   ```sh
+   ! grep -rq "__test__" build/ || { echo "test routes leaked into the production build"; exit 1; }
+   ```
+
+   This is the regression test for the trust boundary itself, and it's three lines.
+
+Fix 2 alone converts "we're pretty sure the env var is right everywhere" into "CI fails if it
+ever isn't", which is the property actually worth having.
+
+---
 ## Concrete change list
 
 Ordered so each step is shippable and nothing is load-bearing until the last one.
@@ -253,7 +317,12 @@ Ordered so each step is shippable and nothing is load-bearing until the last one
    cookie authority, so they should be CSRF-exempt by *mechanism* rather than by the current
    hardcoded `EXEMPT_PATH_PREFIXES = ["/api/ingest"]`. That list becomes "requests
    authenticated by bearer token", which is both stricter and less brittle.
-7. **Test route + fixture** (layer 1) — the step that keeps the suite green.
+7. **Session minting for tests** (layer 1): `scripts/mint-test-session.ts` plus the
+   `parallel-test.ts` fixture edit — the step that keeps the suite green. No route, no
+   `NODE_ENV` gate on the auth path.
+7a. **Harden the existing boundary**: strip `server/routes/test.ts` from production builds and
+   add the `grep -rq "__test__" build/` assertion to `test.yml`. Independent of everything
+   else here and worth landing first — it protects `/reset` today.
 8. **Migrate machine clients**: `INGEST_API_KEY` → an `api_tokens` row at startup if absent,
    so the Shortcut, Share Extension and webhook are untouched. Feed URLs gain tokens, with
    the old unauthenticated paths kept behind a deprecation window since existing readers are
@@ -271,6 +340,11 @@ Ordered so each step is shippable and nothing is load-bearing until the last one
   fixture, so an auth redirect that lands before first paint rewrites every committed
   baseline in `tests/visual/ui.spec.ts-snapshots/`. Layer 1 avoids this by construction —
   but it's the thing to check first if baselines start churning.
+- **A test-only endpoint would be an auth bypass, not a bug.** This is why layer 1 mints
+  sessions through the filesystem rather than over HTTP. The rule to hold: nothing that
+  issues credentials is ever reachable by URL, in any environment. The existing
+  `/api/__test__/reset` shows how easily a runtime-gated route reaches the production
+  artifact — see the section above.
 - **Fake-provider drift.** Layer 2 is only as good as its fidelity. Layer 3 exists precisely
   for this; skipping it means the fake becomes the spec.
 - **RSS tokens leak by design.** A token in a URL ends up in reader logs and sync services.
