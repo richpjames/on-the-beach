@@ -45,6 +45,11 @@ eval/fixtures/pending-review.json
 # on every native build, so this committed copy is the source of truth that
 # scripts/lib/native-build-common.sh restores into the project after `cap add`.
 !native/AppIcon.appiconset/*.png
+# ...and the visual-regression baselines ARE tracked: they're the reference the
+# Visual Regression workflow compares every PR against. Without this they were
+# only in the repo because someone had force-added them, so a new page's
+# baselines were silently dropped on the next `test:visual:update`.
+!tests/visual/ui.spec.ts-snapshots/*.png
 
 # Runtime cover-image uploads dir (UPLOADS_DIR default). Anchored to the repo
 # root so it doesn't also swallow src/routes/uploads/ (the serving route).
