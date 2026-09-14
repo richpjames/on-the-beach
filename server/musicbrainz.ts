@@ -887,8 +887,12 @@ export async function fetchReleaseGroupUrlRelations(
   }
 
   const data = (await response.json()) as { relations?: unknown[] };
+  return parseUrlRelations(data.relations);
+}
+
+function parseUrlRelations(raw: unknown): MbUrlRelation[] {
   const relations: MbUrlRelation[] = [];
-  for (const entry of Array.isArray(data.relations) ? data.relations : []) {
+  for (const entry of Array.isArray(raw) ? raw : []) {
     if (!entry || typeof entry !== "object") continue;
     const relation = entry as Record<string, unknown>;
     const target = relation.url;
@@ -901,4 +905,247 @@ export async function fetchReleaseGroupUrlRelations(
     });
   }
   return relations;
+}
+
+// ---------------------------------------------------------------------------
+// Release-group detail (the New Releases card, opened up)
+//
+// An alert row carries only what the watcher needed to decide it was new:
+// title, type, date. Everything a person wants before triaging the card — what
+// the record actually is, what's on it, where you could go and hear it — lives
+// on MusicBrainz and is fetched on demand, one card at a time.
+//
+// Two requests, and no more: the shared gate paces MusicBrainz at roughly one
+// per second, so a third would put a card open behind three seconds of waiting.
+// ---------------------------------------------------------------------------
+
+export interface MbTrack {
+  /** MB's track number verbatim — "1", "A2", "B1" on a vinyl tracklist. */
+  number: string | null;
+  title: string;
+  lengthMs: number | null;
+}
+
+export interface MbReleaseGroupDetail {
+  id: string;
+  title: string;
+  primaryType: string | null;
+  secondaryTypes: string[];
+  firstReleaseDate: string | null;
+  /** MB's disambiguation comment — what tells two records of a name apart. */
+  disambiguation: string | null;
+  /** The joined credit, e.g. "Yellowman & Josey Wales". */
+  artistCredit: string | null;
+  links: MbUrlRelation[];
+  /**
+   * The tracklist of one release standing in for the group. Editions differ —
+   * a reissue carries bonus tracks the original never had — so this is
+   * illustrative, which is why the release it came from is named alongside it.
+   */
+  tracks: MbTrack[];
+  trackCount: number | null;
+  /** Total playing time of `tracks`, when every track carries a length. */
+  totalLengthMs: number | null;
+  label: string | null;
+  country: string | null;
+  /** "12\" Vinyl", "CD", "Digital Media" — the format of the release below. */
+  format: string | null;
+  /** The release `tracks` was read from, so the panel can say whose it is. */
+  releaseId: string | null;
+  releaseTitle: string | null;
+  releaseDate: string | null;
+}
+
+function joinArtistCredit(raw: unknown): string | null {
+  if (!Array.isArray(raw) || raw.length === 0) return null;
+  let credit = "";
+  for (const entry of raw) {
+    if (!entry || typeof entry !== "object") continue;
+    const part = entry as Record<string, unknown>;
+    const name =
+      typeof part.name === "string"
+        ? part.name
+        : typeof (part.artist as Record<string, unknown> | undefined)?.name === "string"
+          ? ((part.artist as Record<string, unknown>).name as string)
+          : null;
+    if (!name) continue;
+    credit += name + (typeof part.joinphrase === "string" ? part.joinphrase : "");
+  }
+  return credit.length > 0 ? credit : null;
+}
+
+function parseTracks(media: unknown): MbTrack[] {
+  const tracks: MbTrack[] = [];
+  for (const medium of Array.isArray(media) ? media : []) {
+    const raw = (medium as { tracks?: unknown }).tracks;
+    for (const entry of Array.isArray(raw) ? raw : []) {
+      if (!entry || typeof entry !== "object") continue;
+      const track = entry as Record<string, unknown>;
+      const title =
+        typeof track.title === "string"
+          ? track.title
+          : typeof (track.recording as Record<string, unknown> | undefined)?.title === "string"
+            ? ((track.recording as Record<string, unknown>).title as string)
+            : null;
+      if (!title) continue;
+
+      // A track's own length is the edition's; the recording's is the work's.
+      // Either answers "how long is this", and MB routinely carries only one.
+      const length =
+        typeof track.length === "number"
+          ? track.length
+          : typeof (track.recording as Record<string, unknown> | undefined)?.length === "number"
+            ? ((track.recording as Record<string, unknown>).length as number)
+            : null;
+
+      tracks.push({
+        number: typeof track.number === "string" ? track.number : null,
+        title,
+        lengthMs: length !== null && Number.isFinite(length) && length > 0 ? length : null,
+      });
+    }
+  }
+  return tracks;
+}
+
+/**
+ * Score a release on how well it stands in for the whole group. A tracklist is
+ * the point of the request, so a release without one is never the answer; an
+ * official pressing beats a promo or a bootleg; and the earliest date wins the
+ * rest, since the first edition is the record people mean.
+ */
+function releaseStandInRank(release: Record<string, unknown>): [number, number, string] {
+  const media = Array.isArray(release.media) ? release.media : [];
+  const trackCount = parseTracks(media).length;
+  const status = typeof release.status === "string" ? release.status : null;
+  return [
+    trackCount > 0 ? 0 : 1,
+    status === "Official" ? 0 : 1,
+    // Undated editions sort last: "9999" is past any real release date.
+    typeof release.date === "string" && release.date.length > 0 ? release.date : "9999",
+  ];
+}
+
+function pickStandInRelease(releases: unknown[]): Record<string, unknown> | null {
+  let best: Record<string, unknown> | null = null;
+  let bestRank: [number, number, string] | null = null;
+
+  for (const entry of releases) {
+    if (!entry || typeof entry !== "object") continue;
+    const release = entry as Record<string, unknown>;
+    const rank = releaseStandInRank(release);
+    if (
+      bestRank === null ||
+      rank[0] < bestRank[0] ||
+      (rank[0] === bestRank[0] &&
+        (rank[1] < bestRank[1] || (rank[1] === bestRank[1] && rank[2] < bestRank[2])))
+    ) {
+      best = release;
+      bestRank = rank;
+    }
+  }
+  return best;
+}
+
+// Enough editions to find an official one with a tracklist, without pulling
+// every pressing of a record that has been reissued forty times.
+const STAND_IN_RELEASE_LIMIT = 10;
+
+async function fetchStandInRelease(
+  releaseGroupId: string,
+): Promise<Record<string, unknown> | null> {
+  const params = new URLSearchParams({
+    "release-group": releaseGroupId,
+    inc: "recordings+media+labels",
+    limit: String(STAND_IN_RELEASE_LIMIT),
+    fmt: "json",
+  });
+  const response = await mbFetch(`${MB_API_BASE}/release?${params}`);
+  if (!response.ok) {
+    throw new MusicBrainzHttpError(
+      response.status,
+      `MusicBrainz release browse returned ${response.status} for ${releaseGroupId}`,
+    );
+  }
+
+  const data = (await response.json()) as { releases?: unknown[] };
+  return pickStandInRelease(Array.isArray(data.releases) ? data.releases : []);
+}
+
+/**
+ * Everything worth showing about a release group: what MusicBrainz calls it,
+ * where its external links point, and the tracklist of a representative
+ * edition.
+ *
+ * Throws `MusicBrainzHttpError` on a non-2xx response and the underlying error
+ * on a network failure. The caller decides what a failure means to the user —
+ * here, a panel that says the details couldn't be loaded, rather than one that
+ * quietly claims the record has no tracks and nowhere to hear it.
+ */
+export async function fetchReleaseGroupDetail(
+  releaseGroupId: string,
+): Promise<MbReleaseGroupDetail> {
+  const params = new URLSearchParams({ inc: "url-rels+artist-credits", fmt: "json" });
+  const response = await mbFetch(`${MB_API_BASE}/release-group/${releaseGroupId}?${params}`);
+  if (!response.ok) {
+    throw new MusicBrainzHttpError(
+      response.status,
+      `MusicBrainz release-group lookup returned ${response.status} for ${releaseGroupId}`,
+    );
+  }
+
+  const group = (await response.json()) as Record<string, unknown>;
+
+  // The tracklist is the nice-to-have of the two: a group whose editions can't
+  // be browsed still has a type, a date and its external links, and a panel
+  // showing those beats one that refuses to open.
+  let standIn: Record<string, unknown> | null = null;
+  try {
+    standIn = await fetchStandInRelease(releaseGroupId);
+  } catch (err) {
+    console.warn(`[musicbrainz] Release browse failed for ${releaseGroupId}:`, err);
+  }
+
+  const tracks = standIn ? parseTracks(standIn.media) : [];
+  const everyTrackTimed = tracks.length > 0 && tracks.every((track) => track.lengthMs !== null);
+  const { label } = standIn
+    ? parseLabelInfo(standIn["label-info"])
+    : { label: null as string | null };
+
+  const media = standIn && Array.isArray(standIn.media) ? standIn.media : [];
+  const formats = media
+    .map((medium) => (medium as { format?: unknown }).format)
+    .filter((format): format is string => typeof format === "string" && format.length > 0);
+
+  return {
+    id: typeof group.id === "string" ? group.id : releaseGroupId,
+    title: typeof group.title === "string" ? group.title : "",
+    primaryType: typeof group["primary-type"] === "string" ? group["primary-type"] : null,
+    secondaryTypes: Array.isArray(group["secondary-types"])
+      ? group["secondary-types"].filter((type): type is string => typeof type === "string")
+      : [],
+    firstReleaseDate:
+      typeof group["first-release-date"] === "string" && group["first-release-date"].length > 0
+        ? group["first-release-date"]
+        : null,
+    disambiguation:
+      typeof group.disambiguation === "string" && group.disambiguation.length > 0
+        ? group.disambiguation
+        : null,
+    artistCredit: joinArtistCredit(group["artist-credit"]),
+    links: parseUrlRelations(group.relations),
+    tracks,
+    trackCount: tracks.length > 0 ? tracks.length : (parseTrackCount(media) ?? null),
+    totalLengthMs: everyTrackTimed
+      ? tracks.reduce((total, track) => total + (track.lengthMs ?? 0), 0)
+      : null,
+    label,
+    country: standIn && typeof standIn.country === "string" ? standIn.country : null,
+    // A double LP is one format, not two; distinct media (LP + CD) both show.
+    format: formats.length > 0 ? [...new Set(formats)].join(" + ") : null,
+    releaseId: standIn && typeof standIn.id === "string" ? standIn.id : null,
+    releaseTitle: standIn && typeof standIn.title === "string" ? standIn.title : null,
+    releaseDate:
+      standIn && typeof standIn.date === "string" && standIn.date.length > 0 ? standIn.date : null,
+  };
 }

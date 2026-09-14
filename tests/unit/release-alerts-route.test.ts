@@ -149,6 +149,110 @@ describe("POST /api/release-alerts/mark-seen", () => {
   });
 });
 
+describe("GET /api/release-alerts/:id/details", () => {
+  afterEach(() => {
+    mock.restore();
+  });
+
+  function mbResponses(): void {
+    spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            id: "rg1",
+            title: "Detailed Record",
+            "primary-type": "Album",
+            "secondary-types": [],
+            "first-release-date": "2026-06-01",
+            disambiguation: "deluxe edition",
+            "artist-credit": [{ name: "The Credited Name" }],
+            relations: [
+              { type: "streaming", url: { resource: "https://open.spotify.com/album/1" } },
+              { type: "discogs", url: { resource: "https://www.discogs.com/master/1" } },
+            ],
+          }),
+          { headers: { "content-type": "application/json" } },
+        ),
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            releases: [
+              {
+                id: "rel1",
+                title: "Detailed Record",
+                date: "2026-06-01",
+                status: "Official",
+                media: [{ format: "CD", tracks: [{ number: "1", title: "Opener" }] }],
+              },
+            ],
+          }),
+          { headers: { "content-type": "application/json" } },
+        ),
+      );
+  }
+
+  test("returns the tracklist and links for the card just opened", async () => {
+    const { alertId } = await makeAlert({ title: "Detailed Record" });
+    // The queue's own tests run with lookups off; this endpoint's whole job is
+    // to make one.
+    delete process.env.OTB_DISABLE_EXTERNAL_LOOKUPS;
+    mbResponses();
+
+    const res = await makeApp().request(`http://localhost/api/release-alerts/${alertId}/details`);
+    expect(res.status).toBe(200);
+
+    const body = await res.json();
+    expect(body.error).toBeNull();
+    expect(body.detail.artistCredit).toBe("The Credited Name");
+    expect(body.detail.disambiguation).toBe("deluxe edition");
+    expect(body.detail.tracks).toEqual([{ number: "1", title: "Opener", lengthMs: null }]);
+    expect(body.detail.format).toBe("CD");
+    expect(body.detail.musicbrainzUrl).toContain("/release-group/");
+    expect(body.detail.coverArtUrl).toContain("coverartarchive.org");
+
+    // Somewhere to hear it leads; the reference links follow.
+    expect(body.detail.links.map((link: { label: string }) => link.label)).toEqual([
+      "Spotify",
+      "Discogs",
+    ]);
+    expect(body.detail.links[0].listenable).toBe(true);
+    expect(body.detail.links[1].listenable).toBe(false);
+  });
+
+  test("a MusicBrainz failure is an explanation, not an empty record", async () => {
+    const { alertId } = await makeAlert();
+    delete process.env.OTB_DISABLE_EXTERNAL_LOOKUPS;
+    spyOn(globalThis, "fetch").mockResolvedValueOnce(new Response("nope", { status: 503 }));
+
+    const res = await makeApp().request(`http://localhost/api/release-alerts/${alertId}/details`);
+    expect(res.status).toBe(200);
+
+    const body = await res.json();
+    expect(body.detail).toBeNull();
+    expect(body.error).toBeTruthy();
+  });
+
+  test("says so rather than guessing when lookups are switched off", async () => {
+    const { alertId } = await makeAlert();
+    const res = await makeApp().request(`http://localhost/api/release-alerts/${alertId}/details`);
+
+    const body = await res.json();
+    expect(body.detail).toBeNull();
+    expect(body.error).toContain("switched off");
+  });
+
+  test("404s an alert that doesn't exist, 400s an id that isn't one", async () => {
+    const app = makeApp();
+    expect((await app.request("http://localhost/api/release-alerts/999999/details")).status).toBe(
+      404,
+    );
+    expect((await app.request("http://localhost/api/release-alerts/nope/details")).status).toBe(
+      400,
+    );
+  });
+});
+
 describe("POST /api/release-alerts/:id/add", () => {
   test("creates the item and files it in the New Releases stack", async () => {
     const { alertId } = await makeAlert({ title: "Accepted Record" });

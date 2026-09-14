@@ -69,6 +69,92 @@ test("muting an artist from a card clears their whole queue", async ({ page, req
   await expect(page.locator("#alerts-status")).toContainText("Muted Parallel Park");
 });
 
+test("clicking a card opens the release detail", async ({ page, request }) => {
+  await request.post("/api/__test__/release-alerts", {
+    data: { artistName: "Cove Signal", title: "Tidal Drift", firstReleaseDate: "2026-05-01" },
+  });
+
+  // The detail comes from MusicBrainz, which e2e runs without
+  // (OTB_DISABLE_EXTERNAL_LOOKUPS) — stand in for it so the panel has
+  // something to render.
+  await page.route("**/api/release-alerts/*/details", (route) =>
+    route.fulfill({
+      json: {
+        detail: {
+          musicbrainzUrl: "https://musicbrainz.org/release-group/rg-test",
+          artistMusicbrainzUrl: null,
+          coverArtUrl: "https://coverartarchive.org/release-group/rg-test/front-500",
+          disambiguation: "first pressing",
+          artistCredit: "Cove Signal",
+          firstReleaseDate: "2026-05-01",
+          primaryType: "Album",
+          secondaryTypes: [],
+          links: [
+            {
+              url: "https://example.test/listen",
+              label: "Bandcamp",
+              kind: "free streaming",
+              listenable: true,
+            },
+          ],
+          tracks: [
+            { number: "1", title: "Slack Water", lengthMs: 245_000 },
+            { number: "2", title: "Spring Tide", lengthMs: null },
+          ],
+          trackCount: 2,
+          totalLengthMs: null,
+          label: "Harbour Tapes",
+          country: "GB",
+          format: "LP",
+          releaseTitle: "Tidal Drift",
+          releaseDate: "2026-05-01",
+        },
+        error: null,
+      },
+    }),
+  );
+
+  await page.goto("/new-releases");
+
+  const card = page.locator(".alert-card").first();
+  const toggle = card.locator('[data-alert-action="details"]');
+  await expect(toggle).toHaveAttribute("aria-expanded", "false");
+  await expect(card.locator(".alert-details")).toHaveCount(0);
+
+  await toggle.click();
+
+  const details = card.locator(".alert-details");
+  await expect(details).toBeVisible();
+  await expect(toggle).toHaveAttribute("aria-expanded", "true");
+  await expect(details).toContainText("Slack Water");
+  await expect(details).toContainText("4:05");
+  await expect(details).toContainText("first pressing");
+  await expect(details).toContainText("Harbour Tapes");
+  await expect(details.locator(".alert-details__link--listen")).toHaveText("Bandcamp");
+
+  // Clicking again puts it away.
+  await toggle.click();
+  await expect(card.locator(".alert-details")).toHaveCount(0);
+});
+
+test("a release whose details can't be fetched still opens", async ({ page, request }) => {
+  await request.post("/api/__test__/release-alerts", {
+    data: { artistName: "Null Buoy", title: "Dead Reckoning", firstReleaseDate: "2026-05-01" },
+  });
+
+  // No stub this time: e2e runs with external lookups off, which is exactly
+  // the case the panel has to survive.
+  await page.goto("/new-releases");
+  await page.locator('[data-alert-action="details"]').first().click();
+
+  const details = page.locator(".alert-details");
+  await expect(details).toBeVisible();
+  await expect(details.locator(".alert-details__note")).toBeVisible();
+  // What the queue already knew is shown regardless.
+  await expect(details).toContainText("Album");
+  await expect(details).toContainText("1 May 2026");
+});
+
 test("alert cards stay usable at mobile width", async ({ page, request }) => {
   await request.post("/api/__test__/release-alerts", {
     data: {
@@ -87,6 +173,12 @@ test("alert cards stay usable at mobile width", async ({ page, request }) => {
   // Nothing overflows the viewport, and every action is a real touch target.
   const cardBox = await card.boundingBox();
   expect(cardBox!.width).toBeLessThanOrEqual(390);
+
+  // The open detail panel stays inside the viewport too.
+  await card.locator('[data-alert-action="details"]').click();
+  const details = card.locator(".alert-details");
+  await expect(details).toBeVisible();
+  expect((await details.boundingBox())!.width).toBeLessThanOrEqual(390);
 
   for (const action of ["add", "dismiss", "mute"]) {
     const button = card.locator(`[data-alert-action="${action}"]`);
