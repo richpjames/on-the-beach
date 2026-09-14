@@ -353,8 +353,8 @@
                         <dt>Format</dt>
                         <dd>{detail.format}</dd>
                       {/if}
-                      <dt>Spotted</dt>
-                      <dd>{spottedLabel(alert)}</dd>
+                      <dt class="alert-details__spotted">Spotted</dt>
+                      <dd class="alert-details__spotted">{spottedLabel(alert)}</dd>
                     </dl>
                   </div>
 
@@ -432,8 +432,8 @@
                     <dd>{typeLabel(alert)}</dd>
                     <dt>Released</dt>
                     <dd>{releaseDateLabel(alert)}</dd>
-                    <dt>Spotted</dt>
-                    <dd>{spottedLabel(alert)}</dd>
+                    <dt class="alert-details__spotted">Spotted</dt>
+                    <dd class="alert-details__spotted">{spottedLabel(alert)}</dd>
                   </dl>
                 {/if}
               </div>
