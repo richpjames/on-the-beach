@@ -13,6 +13,7 @@
     stackIdFromListPath,
     type ListViewState,
   } from "../../ui/logic/list-url";
+  import { parseLaunchAction } from "../../ui/logic/launch-action";
   import { normalizeStarRating } from "../../ui/components/star-rating";
   import { addFormMachine } from "../../ui/state/add-form-machine";
   import { appMachine } from "../../ui/state/app-machine";
@@ -49,6 +50,11 @@
   const initialStackId = stackIdFromListPath(page.url.pathname);
   // svelte-ignore state_referenced_locally
   const initialView = parseListViewState(page.url.searchParams, initialStackId);
+  // What the home screen asked for on the way in (the iOS Listen widget, or the
+  // app icon's long-press quick action), read before the URL sync below
+  // rewrites the address bar without it.
+  // svelte-ignore state_referenced_locally
+  const launchAction = parseLaunchAction(page.url.searchParams);
 
   // svelte-ignore state_referenced_locally
   const app = useMachine(appMachine, {
@@ -90,6 +96,12 @@
 
   onMount(() => {
     app.send({ type: "APP_READY" });
+
+    // Opened from the home screen's Listen shortcut — start recognising
+    // straight away. That's the whole point of the shortcut: without it the
+    // widget and the quick action would only open the app and leave the user
+    // to find the Listen button while the record is still playing.
+    if (launchAction === "listen") form.send({ type: "RECOGNIZE_CLICKED" });
 
     if (ctx.currentStack !== null) {
       void refreshChildStacks();

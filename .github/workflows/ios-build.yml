@@ -1,13 +1,14 @@
 name: iOS Build
 
-# Compiles the native iOS app *and its Share Extension and Widget* on PRs that
-# touch native code, so a broken ShareViewController.swift / OTBWidget.swift (or
-# Capacitor/Info.plist change) fails the check instead of only surfacing when
-# someone next opens Xcode.
+# Compiles the native iOS app *and its Share Extension and Widgets* on PRs that
+# touch native code, so a broken ShareViewController.swift / OTBWidget.swift /
+# OTBLaunchActions.swift (or Capacitor/Info.plist change) fails the check instead
+# of only surfacing when someone next opens Xcode.
 #
 # The whole `ios/` project is generated (see docs/ios-native-app.md), so this job
-# reproduces it from scratch: cap add -> inject the extension targets with
-# scripts/add-share-extension.rb + scripts/add-widget-extension.rb -> xcodebuild.
+# reproduces it from scratch: cap add -> inject the extension targets and the
+# Listen shortcut with scripts/add-share-extension.rb +
+# scripts/add-widget-extension.rb + scripts/add-listen-shortcut.rb -> xcodebuild.
 # It builds for the iOS Simulator with signing disabled, so it needs no
 # certificates, provisioning profiles, or the real ingest key.
 #
@@ -22,6 +23,7 @@ on:
       - "capacitor.config.ts"
       - "scripts/add-share-extension.rb"
       - "scripts/add-widget-extension.rb"
+      - "scripts/add-listen-shortcut.rb"
       - ".github/workflows/ios-build.yml"
       - "package.json"
       - "bun.lock"
@@ -96,16 +98,36 @@ jobs:
         # genuinely compiled by the xcodebuild steps below.
         run: ruby scripts/add-widget-extension.rb
 
-      - name: Verify Widget sandbox + bundled logo
+      - name: Inject Listen shortcut (app side)
+        # The app half of the Listen widget: the deep-link handler compiled into
+        # the App target, the onthebeach:// scheme, the app icon's long-press
+        # quick action, and the microphone purpose string.
+        run: ruby scripts/add-listen-shortcut.rb
+
+      - name: Verify Widget sandbox + bundled artwork
         # macOS always sandboxes an app extension, so assert the entitlements
         # file declares the sandbox and the injector wired it (macOS-scoped) onto
-        # the widget target. The widget's whole content is assets/logo.png, which
-        # it loads by filename, so also assert the injector copied it into the
-        # bundle — without it the widget falls back to a bare wordmark.
+        # the widget target. The widget draws the app icon (falling back to
+        # assets/logo.png), both loaded by filename, so also assert the injector
+        # copied them into the bundle — without them the tiles fall back to a
+        # bare wordmark.
         run: |
           grep -q 'com.apple.security.app-sandbox' native/Widget/OTBWidget.entitlements
           grep -q 'native/Widget/OTBWidget.entitlements' ios/App/App.xcodeproj/project.pbxproj
+          grep -q 'AppIcon-512@2x.png in Resources' ios/App/App.xcodeproj/project.pbxproj
           grep -q 'logo.png in Resources' ios/App/App.xcodeproj/project.pbxproj
+
+      - name: Verify Listen shortcut wiring
+        # The widget's LISTEN tile and the app icon's quick action are inert
+        # without all three of these, and none of them is a compile error: the
+        # handler must be in the App target's sources, the scheme and quick
+        # action must be declared, and the microphone purpose string must exist
+        # or iOS terminates the app the first time the recogniser asks for audio.
+        run: |
+          grep -q 'OTBLaunchActions.swift in Sources' ios/App/App.xcodeproj/project.pbxproj
+          grep -q 'onthebeach' ios/App/App/Info.plist
+          grep -q 'otb-listen' ios/App/App/Info.plist
+          grep -q 'NSMicrophoneUsageDescription' ios/App/App/Info.plist
 
       - name: Verify Share Extension macOS entitlements
         # Regression guard for a bug that only bit the real Mac app: macOS always

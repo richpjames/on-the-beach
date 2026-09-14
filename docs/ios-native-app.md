@@ -106,8 +106,11 @@ iOS share sheet ──► ShareExtension compose form ──┬─► POST /api/
 | `native/ShareExtension/Info.plist`   | hand-authored   | yes        |
 | `native/ShareExtension/Secrets.xcconfig` | you create locally | no (gitignored) |
 | `native/Widget/*.swift`, `Info.plist`, `OTBWidget.entitlements` | hand-authored | yes |
+| `native/App/OTBLaunchActions.swift` | hand-authored | yes        |
+| `native/AppIcon.appiconset/`      | generated from `assets/logo.png` | yes |
 | `scripts/add-share-extension.rb`  | hand-authored   | yes        |
 | `scripts/add-widget-extension.rb` | hand-authored   | yes        |
+| `scripts/add-listen-shortcut.rb`  | hand-authored   | yes        |
 | `assets/logo.png`                 | hand-authored (the one brand master) | yes |
 | `scripts/generate-brand-assets.sh` | hand-authored  | yes        |
 | `public/favicon*`, `public/*-chrome-*`, `apple-touch-icon.png` | generated from `assets/logo.png` | yes |
@@ -115,8 +118,9 @@ iOS share sheet ──► ShareExtension compose form ──┬─► POST /api/
 
 The whole `ios/` directory is generated, not committed, so it's never stale
 relative to the Capacitor version. Regenerate it any time by removing `ios/` and
-running `bun run cap:add` followed by `ruby scripts/add-share-extension.rb` and
-`ruby scripts/add-widget-extension.rb` to re-inject the extension targets.
+running `bun run cap:add` followed by `ruby scripts/add-share-extension.rb`,
+`ruby scripts/add-widget-extension.rb` and `ruby scripts/add-listen-shortcut.rb`
+to re-inject the extension targets and the Listen shortcut.
 Because the targets are scripted (not hand-clicked in Xcode), CI can reproduce
 the whole build on every PR — see `.github/workflows/ios-build.yml`.
 
@@ -151,41 +155,94 @@ renditions and rewrites `Contents.json`. Requires ImageMagick (`magick`).
 To rebrand: replace `assets/logo.png` and run `bun run brand:assets` (then
 `bun run cap:sync` to copy the web assets into the app).
 
-## Home-screen Widget
+## Home-screen Widgets
 
-A small (square) **WidgetKit** widget shows the logo — the surfing capybara on
-the black playlist well — and opens the app when tapped. That's all it does on
-purpose: the app is about enjoying music, not about clearing a queue, so the
-widget is a shortcut and a bit of character rather than a number to drive down.
-It's the widget sibling of the Share Extension: hand-authored SwiftUI in
+Two small (square) **WidgetKit** tiles, both drawing the **app icon** — the
+surfing capybara, the same `native/AppIcon.appiconset` master the Home Screen
+uses — on the black playlist well:
+
+- **On The Beach** — the icon. Tapping it opens the app. That's all it does on
+  purpose: the app is about enjoying music, not about clearing a queue, so the
+  widget is a shortcut and a bit of character rather than a number to drive down.
+- **Listen** — the icon over a Windows 98 `LISTEN` button. Tapping it opens the
+  app straight into song recognition, which is the one thing worth doing without
+  unlocking into the app first: something is playing *now*.
+
+They're the widget siblings of the Share Extension: hand-authored SwiftUI in
 `native/Widget/OTBWidget.swift`, injected into the generated Xcode project by
 `scripts/add-widget-extension.rb` (extension point
 `com.apple.widgetkit-extension`), and compiled in CI by the same `ios-build.yml`
 job that builds the app and Share Extension.
 
-- **Data: none.** The widget makes no network requests and needs no ingest key,
-  session or App Group. Its timeline is a single entry with a `.never` refresh
+- **Data: none.** The widgets make no network requests and need no ingest key,
+  session or App Group. Their timeline is a single entry with a `.never` refresh
   policy — there's nothing to reload.
-- **The image.** `scripts/add-widget-extension.rb` copies the brand master
-  `assets/logo.png` into the extension bundle (referenced in place, so the master
-  stays the single source of truth), and the view loads it by filename with
-  `UIImage(named: "logo")`. If that resource ever goes missing the view falls
-  back to a text wordmark rather than an empty tile.
+- **The image.** `scripts/add-widget-extension.rb` bundles
+  `native/AppIcon.appiconset/AppIcon-512@2x.png` (the app icon master) and
+  `assets/logo.png` with the extension — referenced in place, so both stay single
+  sources of truth — and the view loads the icon by filename, falling back to the
+  logo and then to a text wordmark rather than showing an empty tile. The icon is
+  loaded by URL, not `UIImage(named:)`: the `@2x` in the filename is a scale
+  suffix that would send `UIImage` looking for an `AppIcon-512`.
+- **Two tiles, not one button.** WidgetKit gives a `systemSmall` widget exactly
+  one tap target (`widgetURL`); `Link` only splits mediums and larges. And iOS
+  reserves a widget's own long-press menu (Edit Widget / Remove Widget) — apps
+  cannot add to it. So "start Listen" is its own tile, and the long-press route
+  to Listen lives on the app icon (next section).
 - **Families.** Home Screen `systemSmall` only. The Lock Screen accessory
-  families are rendered monochrome by the system, which reduces the logo to an
+  families are rendered monochrome by the system, which reduces the icon to an
   unreadable silhouette.
-- **Styling.** Like the Share Extension, the widget can't reach the web app's
+- **Styling.** Like the Share Extension, the widgets can't reach the web app's
   stylesheet, so the Windows 98 / Winamp look (black playlist well, electric-blue
-  accent, Courier chrome type) is mirrored in the file's `OTBTheme`.
+  accent, chrome-grey bevelled button, Courier/Verdana type) is mirrored in the
+  file's `OTBTheme`.
 - **Mac Catalyst + sandbox.** `SUPPORTS_MACCATALYST` is enabled and
   `native/Widget/OTBWidget.entitlements` declares the App Sandbox (macOS always
   sandboxes an app extension). Unlike the Share Extension it grants no
-  `com.apple.security.network.client` — the widget never makes a request. It's
+  `com.apple.security.network.client` — the widgets never make a request. It's
   wired via `CODE_SIGN_ENTITLEMENTS[sdk=macosx*]` so iOS device signing is
   untouched.
 
-To add it to your home screen: long-press the home screen ▸ **+** ▸ search **On
-The Beach** ▸ pick the small **On The Beach** widget. Tapping it opens the app.
+To add one to your home screen: long-press the home screen ▸ **+** ▸ search **On
+The Beach** ▸ pick **On The Beach** (opens the app) or **Listen** (starts
+recognising).
+
+## Listen from the home screen
+
+The **Listen** feature — record ~15s, name the release, file it — is reachable
+without opening the app first, in two ways:
+
+- **Long-press the app icon ▸ Listen.** A static Home Screen quick action
+  (`UIApplicationShortcutItems`). This is where a long press can offer it: iOS
+  gives apps no way to add entries to a *widget's* long-press menu.
+- **The Listen widget.** Its tile opens `onthebeach://listen`.
+
+Both land in `native/App/OTBLaunchActions.swift`, which is compiled into the App
+target (not an extension) by `scripts/add-listen-shortcut.rb`. The shell is a
+`WKWebView` pointed at the live site, so nothing native can press a button in the
+page; instead the handler loads `<server.url>/?action=listen`, and the web app
+reads that on mount (`src/ui/logic/launch-action.ts` →
+`MainPage.svelte`) and starts the recogniser. The param is dropped from the
+address bar by the list's URL sync, so a reload doesn't fire it twice.
+
+- **Hooks, not edits.** The handler is an `extension AppDelegate` implementing
+  `willFinishLaunchingWithOptions` (to observe Capacitor's `.capacitorOpenURL`
+  notification before the launch URL arrives) and `performActionFor` (the quick
+  action). Capacitor's generated `AppDelegate.swift` implements neither, so
+  nothing has to be patched inside a file `cap add` rewrites. If a future
+  Capacitor template adds them, this fails to compile — loudly, in CI — rather
+  than silently doing nothing.
+- **Cold launch.** A shortcut is delivered before the bridge view controller has
+  loaded its web view, so the action is held and retried for ~5s, then dropped
+  rather than firing at some unrelated later moment.
+- **Microphone.** `scripts/add-listen-shortcut.rb` also writes
+  `NSMicrophoneUsageDescription` into the app's Info.plist. Capacitor
+  auto-grants the WebKit-level capture permission, but without the purpose string
+  iOS terminates the app the first time the page asks for audio — so Listen
+  cannot work inside the native shell without it.
+- **Mac Catalyst.** The quick-action hook is compiled out (`#if
+  !targetEnvironment(macCatalyst)`) — a Mac has no Home Screen. The widget's deep
+  link works there as it does on iOS.
 
 ## Prerequisites (mac only)
 
@@ -206,6 +263,7 @@ bun run build        # produces build/client — cap sync needs webDir to exist
 bun run cap:add      # cap add ios — creates ios/App/ (gitignored)
 ruby scripts/add-share-extension.rb   # inject the Share Extension target (§2)
 ruby scripts/add-widget-extension.rb  # inject the Widget target (after §2)
+ruby scripts/add-listen-shortcut.rb   # Listen deep link + quick action (after §2)
 bun run brand:assets # capybara app icon + splash into ios/ (needs ImageMagick)
 bun run cap:open     # cap open ios — opens ios/App/App.xcworkspace in Xcode
 ```

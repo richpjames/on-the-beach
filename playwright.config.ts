@@ -79,7 +79,14 @@ export default defineConfig({
       use: {
         ...devices["Desktop Chrome"],
         launchOptions: {
-          args: ["--no-sandbox"],
+          args: [
+            "--no-sandbox",
+            // Song recognition ("Listen") needs a microphone: accept the
+            // permission without a prompt and feed it a synthetic tone, so
+            // listen-shortcut.spec.ts can exercise the flow headlessly.
+            "--use-fake-ui-for-media-stream",
+            "--use-fake-device-for-media-stream",
+          ],
           executablePath: resolveChromeExecutable(),
         },
       },
