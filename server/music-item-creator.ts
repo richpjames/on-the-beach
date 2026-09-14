@@ -4,6 +4,8 @@ import { db } from "./db/index";
 import { musicItems, musicLinks, sources } from "./db/schema";
 import { parseUrl, isValidUrl, normalize, capitalize } from "./utils";
 import { scrapeUrl, UnsupportedMusicLinkError } from "./scraper";
+import { remindAtForReleaseDate } from "./release-dates";
+import { getArtistWatchSettings } from "./settings";
 import { enrichSecondaryLinkInBackground } from "./secondary-link-enrichment";
 import { pickPrimaryReleaseCandidate } from "./link-extractor";
 import { fullItemSelect } from "./queries/full-item-select";
@@ -90,6 +92,8 @@ interface ReleaseCandidateInput {
   evidence?: string;
   isPrimary?: boolean;
   embedMetadata?: Record<string, string>;
+  /** `YYYY-MM-DD` where the page named one — a date still to come is scheduled. */
+  releaseDate?: string;
   year?: number;
   genre?: string;
   label?: string;
@@ -127,6 +131,27 @@ function composeNotes(notes: string | null | undefined, sourceNote?: string): st
     .filter((part): part is string => Boolean(part));
 
   return parts.length ? parts.join(" — ") : null;
+}
+
+/**
+ * The schedule a scraped release date earns, or null for one that's already
+ * out. A Bandcamp pre-order page says "releases 14 March 2026"; an item added
+ * from it belongs in Scheduled until that day rather than in To Listen now.
+ *
+ * Gated on the same setting as an accepted release alert ("Schedule unreleased
+ * records to arrive in To Listen on release day") — turning that off means it
+ * everywhere. The setting is only read once there's a future date to weigh, so
+ * the overwhelmingly common case costs nothing.
+ */
+export async function remindAtForScrapedRelease(
+  releaseDate: string | undefined,
+  now: Date = new Date(),
+): Promise<Date | null> {
+  const remindAt = remindAtForReleaseDate(releaseDate ?? null, now);
+  if (!remindAt) return null;
+
+  const settings = await getArtistWatchSettings();
+  return settings.scheduleAnnouncedReleases ? remindAt : null;
 }
 
 export class AmbiguousLinkSelectionError extends Error {
@@ -223,6 +248,8 @@ async function insertMusicItemWithLink(
   const linkSource = candidate.url ? (candidate.source ?? "unknown") : sourceName;
   const sourceId = await getSourceId(linkSource);
 
+  const remindAt = await remindAtForScrapedRelease(candidate.releaseDate);
+
   const [inserted] = await db
     .insert(musicItems)
     .values({
@@ -241,6 +268,7 @@ async function insertMusicItemWithLink(
       catalogueNumber: overrides?.catalogueNumber ?? null,
       musicbrainzReleaseId: overrides?.musicbrainzReleaseId ?? null,
       musicbrainzArtistId: overrides?.musicbrainzArtistId ?? null,
+      remindAt,
     })
     .returning({ id: musicItems.id });
 
@@ -315,6 +343,7 @@ async function resolveReleaseCandidates(
           itemType: overrides?.itemType ?? scraped?.itemType ?? "album",
           artworkUrl: overrides?.artworkUrl ?? scraped?.imageUrl ?? null,
           embedMetadata: scraped?.embedMetadata,
+          releaseDate: scraped?.releaseDate,
           year: overrides?.year ?? scraped?.year,
           genre: overrides?.genre ?? scraped?.genre,
           label: overrides?.label ?? scraped?.label,
