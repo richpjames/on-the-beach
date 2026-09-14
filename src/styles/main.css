@@ -163,12 +163,8 @@ body {
   );
   margin: calc(var(--window-top-space) + var(--safe-top)) auto
     calc(var(--window-top-space) + var(--taskbar-clearance));
-  height: calc(
-    100vh - (var(--window-top-space) * 2) - var(--safe-top) - var(--taskbar-clearance)
-  );
-  height: calc(
-    100dvh - (var(--window-top-space) * 2) - var(--safe-top) - var(--taskbar-clearance)
-  );
+  height: calc(100vh - (var(--window-top-space) * 2) - var(--safe-top) - var(--taskbar-clearance));
+  height: calc(100dvh - (var(--window-top-space) * 2) - var(--safe-top) - var(--taskbar-clearance));
   max-height: calc(
     100dvh - (var(--window-top-space) * 2) - var(--safe-top) - var(--taskbar-clearance)
   );
@@ -4025,7 +4021,10 @@ a:hover {
 
 .alert-card {
   display: grid;
-  grid-template-columns: 64px 1fr auto;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas:
+    "summary actions"
+    "details details";
   align-items: center;
   gap: var(--space-4);
   padding: var(--space-3);
@@ -4037,6 +4036,38 @@ a:hover {
 
 .alert-card--busy {
   opacity: 0.6;
+}
+
+/* The record itself is the disclosure control — clicking the sleeve or the
+   title opens the detail panel. Button chrome is reset away: this is a row. */
+.alert-card__summary {
+  grid-area: summary;
+  display: grid;
+  grid-template-columns: 64px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-4);
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.alert-card__summary:hover .alert-card__title {
+  color: var(--win-blue);
+}
+
+.alert-card__summary:focus-visible {
+  outline: 1px dotted var(--chrome-darker);
+  outline-offset: 2px;
+}
+
+.alert-card__disclosure {
+  font-size: var(--text-xs);
+  color: var(--chrome-darker);
 }
 
 .alert-card__artwork {
@@ -4116,33 +4147,207 @@ a:hover {
 }
 
 .alert-card__actions {
+  grid-area: actions;
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
+}
+
+/* ── Opened card: what MusicBrainz knows about the record ── */
+
+.alert-details {
+  grid-area: details;
+  align-self: stretch;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding: var(--space-4);
+  background: var(--chrome-light);
+  border-width: 2px;
+  border-style: solid;
+  border-color: var(--bevel-field);
+  font-size: var(--text-base);
+}
+
+.alert-details__top {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-4);
+}
+
+.alert-details__cover {
+  flex: 0 0 120px;
+  width: 120px;
+  height: 120px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--chrome-mid);
+  border-width: 1px;
+  border-style: solid;
+  border-color: var(--bevel-field);
+  overflow: hidden;
+}
+
+.alert-details__cover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.alert-details__cover-placeholder {
+  font-size: var(--text-xl);
+  color: var(--chrome-darker);
+}
+
+.alert-details__facts {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-content: start;
+  gap: var(--space-2) var(--space-4);
+}
+
+.alert-details__facts dt {
+  font-size: var(--text-2xs);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--chrome-darker);
+}
+
+.alert-details__facts dd {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.alert-details__section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.alert-details__subheading {
+  margin: 0;
+  font-size: var(--text-2xs);
+  font-weight: bold;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--chrome-darker);
+}
+
+/* Which edition the tracklist came from is a caption, not part of the label. */
+.alert-details__edition {
+  font-weight: normal;
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--chrome-dark);
+}
+
+/* Winamp playlist treatment: a tracklist is a listing, not prose. */
+.alert-details__tracks {
+  list-style: none;
+  max-height: 220px;
+  overflow-y: auto;
+  background: var(--playlist-bg);
+  color: var(--playlist-text);
+  border-width: 2px;
+  border-style: solid;
+  border-color: var(--bevel-field);
+  font-family: var(--font-mono);
+}
+
+.alert-details__track {
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr) auto;
+  gap: var(--space-3);
+  padding: 2px var(--space-3);
+}
+
+.alert-details__track:nth-child(even) {
+  background: var(--playlist-bg-alt);
+}
+
+.alert-details__track-number {
+  color: var(--accent-soft);
+  text-align: right;
+}
+
+.alert-details__track-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.alert-details__track-length {
+  color: var(--accent-soft);
+}
+
+.alert-details__links {
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.alert-details__link {
+  display: inline-block;
+  padding: 3px var(--space-3);
+  border: 1px solid var(--chrome-darker);
+  background: var(--chrome);
+  color: var(--chrome-darker);
+  font-size: var(--text-xs);
+  text-decoration: none;
+}
+
+.alert-details__link:hover {
+  background: var(--chrome-white);
+}
+
+/* Somewhere you can actually hear it leads — the rest is reading matter. */
+.alert-details__link--listen {
+  background: var(--win-blue);
+  border-color: var(--win-blue);
+  color: var(--chrome-white);
+}
+
+.alert-details__link--listen:hover {
+  background: var(--accent);
+}
+
+.alert-details__note,
+.alert-details__sources {
+  font-size: var(--text-xs);
+  color: var(--chrome-dark);
+}
+
+.alert-details__sources a {
+  color: var(--chrome-darker);
 }
 
 /* On a phone the three-column card stops working: stack it, and let the
    actions run across the full width as a row of thumb-sized targets. */
 @media (max-width: 560px) {
   .alert-card {
-    grid-template-columns: 48px 1fr;
+    grid-template-columns: minmax(0, 1fr);
     grid-template-areas:
-      "art main"
-      "actions actions";
+      "summary"
+      "actions"
+      "details";
+  }
+
+  .alert-card__summary {
+    grid-template-columns: 48px minmax(0, 1fr) auto;
+    gap: var(--space-3);
   }
 
   .alert-card__artwork {
-    grid-area: art;
     width: 48px;
     height: 48px;
   }
 
-  .alert-card__main {
-    grid-area: main;
-  }
-
   .alert-card__actions {
-    grid-area: actions;
     flex-direction: row;
     flex-wrap: wrap;
   }
@@ -4150,6 +4355,19 @@ a:hover {
   .alert-card__actions .btn {
     flex: 1 1 auto;
     min-height: var(--touch-icon);
+  }
+
+  /* The sleeve stops being a sidebar and becomes the top of the panel. */
+  .alert-details__top {
+    flex-direction: column;
+  }
+
+  .alert-details__cover {
+    flex: 0 0 auto;
+    width: 100%;
+    max-width: 180px;
+    height: auto;
+    aspect-ratio: 1;
   }
 }
 

@@ -3,6 +3,7 @@ import {
   acceptAlert,
   countPendingAlerts,
   dismissAlert,
+  getAlertDetail,
   listReleaseAlerts,
   markAlertsSeen,
   type AlertStatus,
@@ -50,6 +51,19 @@ export function createReleaseAlertRoutes(): Hono {
   routes.post("/mark-seen", async (c) => {
     const seen = await markAlertsSeen();
     return c.json({ seen });
+  });
+
+  // GET /:id/details — what MusicBrainz knows about the record, for the card
+  // the user just opened. A lookup that didn't happen comes back 200 with an
+  // `error` string rather than a status code: the panel has something to show
+  // either way, and a failed third-party call is not a failed request.
+  routes.get("/:id/details", async (c) => {
+    const id = parseId(c.req.param("id"));
+    if (id === null) return c.json({ error: "Invalid ID" }, 400);
+
+    const result = await getAlertDetail(id);
+    if (!result) return c.json({ error: "Alert not found" }, 404);
+    return c.json(result);
   });
 
   // POST /:id/add — create the item, file it in New Releases, schedule it if

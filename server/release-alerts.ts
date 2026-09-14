@@ -1,4 +1,5 @@
 import { and, count, desc, eq, inArray, ne } from "drizzle-orm";
+import type { ReleaseAlertDetailLink, ReleaseAlertDetailResult } from "../domain/types";
 import { db } from "./db/index";
 import {
   artistReleases,
@@ -28,7 +29,12 @@ import {
 import { getArtistWatchSettings, getNewReleasesStackId, setNewReleasesStackId } from "./settings";
 // Defined in ./musicbrainz so the release query layer can classify a search
 // result without importing this module and the database with it.
-import { itemTypeForReleaseGroup } from "./musicbrainz";
+import {
+  fetchReleaseGroupDetail,
+  itemTypeForReleaseGroup,
+  type MbReleaseGroupDetail,
+  type MbUrlRelation,
+} from "./musicbrainz";
 
 export { itemTypeForReleaseGroup };
 
@@ -115,6 +121,137 @@ export async function listReleaseAlerts(
     first_release_date: row.firstReleaseDate,
     first_release_year: row.firstReleaseYear,
   }));
+}
+
+// ---------------------------------------------------------------------------
+// Card detail
+//
+// The queue row is what the watcher needed to decide the record was new. A
+// person deciding whether to *file* it wants more than that — what the record
+// is, what's on it, and whether there's anywhere to hear it — so opening a card
+// asks MusicBrainz, once, for the rest.
+// ---------------------------------------------------------------------------
+
+/** Sites you can hear a record on, as opposed to read about it. */
+const LISTENABLE_RELATION_TYPES = new Set(["streaming", "free streaming", "download for free"]);
+
+const LINK_LABELS: ReadonlyArray<{ host: string; label: string; listenable: boolean }> = [
+  { host: "bandcamp.com", label: "Bandcamp", listenable: true },
+  { host: "music.apple.com", label: "Apple Music", listenable: true },
+  { host: "open.spotify.com", label: "Spotify", listenable: true },
+  { host: "soundcloud.com", label: "SoundCloud", listenable: true },
+  { host: "youtube.com", label: "YouTube", listenable: true },
+  { host: "youtu.be", label: "YouTube", listenable: true },
+  { host: "tidal.com", label: "Tidal", listenable: true },
+  { host: "deezer.com", label: "Deezer", listenable: true },
+  { host: "mixcloud.com", label: "Mixcloud", listenable: true },
+  { host: "discogs.com", label: "Discogs", listenable: false },
+  { host: "wikidata.org", label: "Wikidata", listenable: false },
+  { host: "wikipedia.org", label: "Wikipedia", listenable: false },
+  { host: "rateyourmusic.com", label: "RateYourMusic", listenable: false },
+];
+
+/** Strip the leading "www." so "www.discogs.com" reads as the site it is. */
+function hostLabel(hostname: string): string {
+  return hostname.replace(/^www\./, "");
+}
+
+function describeLink(relation: MbUrlRelation): ReleaseAlertDetailLink | null {
+  let hostname: string;
+  try {
+    hostname = new URL(relation.url).hostname.toLowerCase();
+  } catch {
+    // MB's url relations are editor-entered; an unparseable one is not a link.
+    return null;
+  }
+
+  const known = LINK_LABELS.find(
+    (entry) => hostname === entry.host || hostname.endsWith(`.${entry.host}`),
+  );
+
+  return {
+    url: relation.url,
+    label: known?.label ?? hostLabel(hostname),
+    kind: relation.type,
+    // The relationship type is the authority — MB marks a Bandcamp page that
+    // is download-only as such — and the host table only fills its silence.
+    listenable: relation.type
+      ? LISTENABLE_RELATION_TYPES.has(relation.type)
+      : (known?.listenable ?? false),
+  };
+}
+
+/** Listenable links first, then alphabetically — the useful ones lead. */
+function sortLinks(links: ReleaseAlertDetailLink[]): ReleaseAlertDetailLink[] {
+  return [...links].sort((a, b) => {
+    if (a.listenable !== b.listenable) return a.listenable ? -1 : 1;
+    return a.label.localeCompare(b.label);
+  });
+}
+
+/**
+ * The expanded view of one alert. Returns `null` when there's no such alert,
+ * and an `error` result when MusicBrainz couldn't be asked — a panel that says
+ * so is honest, where an empty tracklist would be a claim about the record.
+ */
+export async function getAlertDetail(alertId: number): Promise<ReleaseAlertDetailResult | null> {
+  const alert = await db
+    .select({
+      mbReleaseGroupId: artistReleases.mbReleaseGroupId,
+      primaryType: artistReleases.primaryType,
+      secondaryTypes: artistReleases.secondaryTypes,
+      firstReleaseDate: artistReleases.firstReleaseDate,
+      musicbrainzArtistId: artists.musicbrainzArtistId,
+    })
+    .from(releaseAlerts)
+    .innerJoin(artistReleases, eq(artistReleases.id, releaseAlerts.artistReleaseId))
+    .innerJoin(artists, eq(artists.id, releaseAlerts.artistId))
+    .where(eq(releaseAlerts.id, alertId))
+    .get();
+
+  if (!alert) return null;
+  if (process.env.OTB_DISABLE_EXTERNAL_LOOKUPS) {
+    return { detail: null, error: "Release lookups are switched off." };
+  }
+
+  let group: MbReleaseGroupDetail;
+  try {
+    group = await fetchReleaseGroupDetail(alert.mbReleaseGroupId);
+  } catch (err) {
+    console.warn(`[release-alerts] Detail lookup failed for alert ${alertId}:`, err);
+    return { detail: null, error: "Couldn't reach MusicBrainz for the details." };
+  }
+
+  return {
+    detail: {
+      musicbrainzUrl: `https://musicbrainz.org/release-group/${alert.mbReleaseGroupId}`,
+      artistMusicbrainzUrl: alert.musicbrainzArtistId
+        ? `https://musicbrainz.org/artist/${alert.musicbrainzArtistId}`
+        : null,
+      // Same wiring the card's thumbnail uses, one size up for the open panel.
+      coverArtUrl: `https://coverartarchive.org/release-group/${encodeURIComponent(alert.mbReleaseGroupId)}/front-500`,
+      disambiguation: group.disambiguation,
+      artistCredit: group.artistCredit,
+      // MusicBrainz is the newer word on all three: a date firms up from a
+      // year to a day, and a type is re-filed, long after the alert was raised.
+      firstReleaseDate: group.firstReleaseDate ?? alert.firstReleaseDate,
+      primaryType: group.primaryType ?? alert.primaryType,
+      secondaryTypes:
+        group.secondaryTypes.length > 0
+          ? group.secondaryTypes
+          : parseSecondaryTypes(alert.secondaryTypes),
+      links: sortLinks(group.links.flatMap((link) => describeLink(link) ?? [])),
+      tracks: group.tracks,
+      trackCount: group.trackCount,
+      totalLengthMs: group.totalLengthMs,
+      label: group.label,
+      country: group.country,
+      format: group.format,
+      releaseTitle: group.releaseTitle,
+      releaseDate: group.releaseDate,
+    },
+    error: null,
+  };
 }
 
 export async function countPendingAlerts(): Promise<number> {
