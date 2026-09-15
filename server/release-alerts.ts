@@ -19,12 +19,8 @@ import {
   type ReleaseLinkQuery,
 } from "./release-link-check";
 import { LOOKUP_SERVICE_CONFIG } from "./secondary-link-enrichment";
-import {
-  isAnnouncedRelease,
-  remindAtForReleaseDate,
-  parseSecondaryTypes,
-  type AlertReason,
-} from "./artist-watch";
+import { parseSecondaryTypes, type AlertReason } from "./artist-watch";
+import { isAnnouncedRelease, remindAtForReleaseDate } from "./release-dates";
 import { getArtistWatchSettings, getNewReleasesStackId, setNewReleasesStackId } from "./settings";
 // Defined in ./musicbrainz so the release query layer can classify a search
 // result without importing this module and the database with it.

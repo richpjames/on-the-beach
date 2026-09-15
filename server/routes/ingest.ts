@@ -5,9 +5,11 @@ import {
   AmbiguousLinkSelectionError,
   createMusicItemDirect,
   createMusicItemsFromUrl,
+  remindAtForScrapedRelease,
 } from "../music-item-creator";
 import { scheduleAppleMusicBackfill } from "../apple-music-backfill";
-import { isValidUrl } from "../utils";
+import { scrapeUrl, sourceNamesReleaseDate } from "../scraper";
+import { isValidUrl, parseUrl } from "../utils";
 import { saveImageFromBase64, validateImageBase64 } from "../uploads";
 import { createScanEnricher } from "../scan-enricher";
 import { extractReleaseInfo, extractReleaseInfoFromWebContext } from "../vision";
@@ -15,7 +17,7 @@ import { getWebContext } from "../google-vision";
 import { lookupRelease } from "../musicbrainz";
 import { db } from "../db";
 import { stacks, musicItemStacks, musicItems } from "../db/schema";
-import type { CreateMusicItemInput, ScanResult } from "../../domain/types";
+import type { CreateMusicItemInput, ScanResult, SourceName } from "../../domain/types";
 
 interface EmailEnvelope {
   from: string;
@@ -47,6 +49,24 @@ export interface IngestStack {
   name: string;
 }
 
+/**
+ * What a link says about itself before anything is added — today just the
+ * release date, which is what the share sheet's "Release date" control wants
+ * filled in for it.
+ *
+ * `remindAt` is the date the sheet should pre-arm: the release date when the
+ * record isn't out yet, null when it is (or when scheduling is switched off).
+ * Deciding that here rather than in the client keeps a shared pre-order and an
+ * ingested one landing on exactly the same day.
+ */
+export interface LinkPreview {
+  url: string;
+  source: SourceName;
+  releaseDate: string | null;
+  remindAt: string | null;
+}
+
+export type PreviewLinkFn = (url: string) => Promise<LinkPreview>;
 export type ListStacksFn = () => Promise<IngestStack[]>;
 export type ResolveOrCreateStackFn = (name: string) => Promise<IngestStack>;
 export type AttachItemToStackFn = (itemId: number, stackId: number) => Promise<void>;
@@ -56,11 +76,47 @@ export type CountToListenFn = () => Promise<number>;
 export interface IngestRoutesDeps {
   scanPhoto?: ScanPhotoFn;
   savePhoto?: SavePhotoFn;
+  previewLink?: PreviewLinkFn;
   listStacks?: ListStacksFn;
   resolveOrCreateStack?: ResolveOrCreateStackFn;
   attachItemToStack?: AttachItemToStackFn;
   setItemReminder?: SetItemReminderFn;
   countToListen?: CountToListenFn;
+}
+
+/**
+ * Read a link's release date without adding anything.
+ *
+ * Only sources that print one are fetched — everything else answers from the
+ * URL alone, so previewing a Spotify share costs no request. A scrape that
+ * fails is reported as "no date": the preview is a convenience, and a share
+ * must never be held up by it.
+ */
+async function defaultPreviewLink(url: string): Promise<LinkPreview> {
+  const parsed = parseUrl(url);
+  const empty: LinkPreview = {
+    url: parsed.normalizedUrl,
+    source: parsed.source,
+    releaseDate: null,
+    remindAt: null,
+  };
+
+  if (!sourceNamesReleaseDate(parsed.source)) return empty;
+
+  try {
+    const scraped = await scrapeUrl(parsed.normalizedUrl, parsed.source);
+    const releaseDate = scraped?.releaseDate ?? null;
+    const remindAt = await remindAtForScrapedRelease(releaseDate ?? undefined);
+
+    return {
+      ...empty,
+      releaseDate,
+      remindAt: remindAt ? remindAt.toISOString().slice(0, 10) : null,
+    };
+  } catch (err) {
+    console.error(`[api] GET /api/ingest/link-preview failed to read ${url}:`, err);
+    return empty;
+  }
 }
 
 /** Every list, id + name, alphabetised — the payload the extension's picker shows. */
@@ -200,6 +256,7 @@ export function createIngestRoutes(deps: IngestRoutesDeps = {}): Hono {
       extractReleaseInfoFromWebContext,
     );
   const savePhoto = deps.savePhoto ?? saveImageFromBase64;
+  const previewLink = deps.previewLink ?? defaultPreviewLink;
   const listStacks = deps.listStacks ?? defaultListStacks;
   const resolveOrCreateStack = deps.resolveOrCreateStack ?? defaultResolveOrCreateStack;
   const attachItemToStack = deps.attachItemToStack ?? defaultAttachItemToStack;
@@ -248,6 +305,32 @@ export function createIngestRoutes(deps: IngestRoutesDeps = {}): Hono {
     }
 
     return c.json({ to_listen: await countToListen() });
+  });
+
+  // GET /link-preview?url=… — what the share sheet can fill in before the user
+  // taps Add. Bearer-authed with the ingest key like /stacks and /stats, since
+  // the extension has no session either.
+  routes.get("/link-preview", async (c) => {
+    const apiKey = process.env.INGEST_API_KEY;
+    if (!apiKey) {
+      return c.json({ error: "Ingest not configured" }, 503);
+    }
+
+    if (process.env.INGEST_ENABLED === "false") {
+      return c.json({ error: "Ingest disabled" }, 503);
+    }
+
+    const auth = c.req.header("Authorization");
+    if (auth !== `Bearer ${apiKey}`) {
+      return c.json({ error: "Unauthorized" }, 401);
+    }
+
+    const url = (c.req.query("url") ?? "").trim();
+    if (!url || !isValidUrl(url)) {
+      return c.json({ error: "Missing or invalid url" }, 400);
+    }
+
+    return c.json(await previewLink(url));
   });
 
   routes.post("/email", async (c) => {

@@ -130,7 +130,10 @@ export interface ArtistWatchSettings {
   alertOnCatalogueAdditions: boolean;
   /** Secondary types that never raise an alert, lower-cased. */
   excludedSecondaryTypes: string[];
-  /** Set `remind_at` from a future release date when an alert is accepted. */
+  /**
+   * Set `remind_at` from a future release date — both when an alert is
+   * accepted and when a link names a release that isn't out yet.
+   */
   scheduleAnnouncedReleases: boolean;
   /**
    * Only auto-track artists with at least one release rated this many stars

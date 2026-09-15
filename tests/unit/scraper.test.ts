@@ -7,6 +7,7 @@ import {
   scrapeUrl,
   UnsupportedMusicLinkError,
   extractBandcampEmbedMetadata,
+  parseBandcampReleaseDate,
   parseNtsOg,
   parsePitchforkOg,
   parsePitchforkJsonLd,
@@ -675,6 +676,90 @@ describe("scrapeUrl", () => {
 
     mock.restore();
     process.env = { ...originalEnv };
+  });
+});
+
+describe("parseBandcampReleaseDate", () => {
+  // The credits line as Bandcamp renders it under the tracklist.
+  function creditsPage(line: string): string {
+    return `<html><head><meta property="og:title" content="Album, by Artist" /></head><body>
+      <div class="tralbumData tralbum-credits"> ${line} </div>
+    </body></html>`;
+  }
+
+  test("reads a record that is already out", () => {
+    expect(parseBandcampReleaseDate(creditsPage("released 14 March 2024"))).toBe("2024-03-14");
+  });
+
+  test("reads a pre-order's future date from 'releases'", () => {
+    expect(parseBandcampReleaseDate(creditsPage("releases 2 June 2026"))).toBe("2026-06-02");
+  });
+
+  test("reads the month-first spelling", () => {
+    expect(parseBandcampReleaseDate(creditsPage("released March 14, 2024"))).toBe("2024-03-14");
+    expect(parseBandcampReleaseDate(creditsPage("releases June 2, 2026"))).toBe("2026-06-02");
+  });
+
+  test("reads through the markup Bandcamp wraps the date in", () => {
+    const html = `<div class="tralbumData tralbum-credits">
+      releases <span class="release-date">14 <em>March</em> 2026</span>
+    </div>`;
+    expect(parseBandcampReleaseDate(html)).toBe("2026-03-14");
+  });
+
+  test("prefers the credits line over a date in the sleeve notes above it", () => {
+    // A reissue's own blurb dates the original pressing; the credits line dates
+    // this record, and sits after the blurb in the page.
+    const html = `<html><body>
+      <div class="tralbumData tralbum-about">Originally released March 14, 1985. Remastered from the master tapes.</div>
+      <div class="tralbumData tralbum-credits">released 2 June 2026</div>
+    </body></html>`;
+    expect(parseBandcampReleaseDate(html)).toBe("2026-06-02");
+  });
+
+  test("falls back to TralbumData when the credits line isn't in the page", () => {
+    const html = `<script>TralbumData = {"id":123,"current":{"release_date":"14 Mar 2026 00:00:00 GMT"}}</script>`;
+    expect(parseBandcampReleaseDate(html)).toBe("2026-03-14");
+  });
+
+  test("returns undefined when the page names no date", () => {
+    expect(parseBandcampReleaseDate("<html><body>by Artist</body></html>")).toBeUndefined();
+  });
+
+  test("ignores a line that says 'released' without a date", () => {
+    expect(parseBandcampReleaseDate(creditsPage("released by Some Label"))).toBeUndefined();
+  });
+});
+
+describe("scrapeUrl bandcamp release date", () => {
+  test("carries the release date and its year off an album page", async () => {
+    const html = `<html><head>
+      <meta property="og:title" content="My Album, by Artist" />
+    </head><body>
+      <div class="tralbumData tralbum-credits">released 14 March 2024</div>
+    </body></html>`;
+    spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      new Response(html, { headers: { "content-type": "text/html" } }),
+    );
+
+    const result = await scrapeUrl("https://artist.bandcamp.com/album/my-album", "bandcamp");
+    expect(result?.releaseDate).toBe("2024-03-14");
+    expect(result?.year).toBe(2024);
+    mock.restore();
+  });
+
+  test("leaves the date unset when the page names none", async () => {
+    const html = `<html><head>
+      <meta property="og:title" content="My Album, by Artist" />
+    </head><body></body></html>`;
+    spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      new Response(html, { headers: { "content-type": "text/html" } }),
+    );
+
+    const result = await scrapeUrl("https://artist.bandcamp.com/album/my-album", "bandcamp");
+    expect(result?.releaseDate).toBeUndefined();
+    expect(result?.year).toBeUndefined();
+    mock.restore();
   });
 });
 

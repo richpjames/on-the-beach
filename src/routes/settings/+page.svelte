@@ -352,6 +352,10 @@
           />
           <span>Schedule unreleased records to arrive in To Listen on release day</span>
         </label>
+        <p class="settings__hint">
+          Applies to records you add yourself too — a Bandcamp pre-order page names the day
+          it comes out, and the record is scheduled for it.
+        </p>
         <label class="settings__option">
           <input
             type="checkbox"

@@ -34,6 +34,14 @@ for free by building the same targets with **Mac Catalyst** (see [Enable macOS
   name. On **Add** it `POST`s the URL — plus `notes` and `listName` when set — to
   `POST /api/ingest/link` with a `Bearer` token. The extension talks to the server
   directly, so a share works even when the app isn't running.
+- The **Release date** switch is filled in for you where the page says what it is.
+  On extracting the link the extension asks `GET /api/ingest/link-preview`, and when
+  the answer names a release still to come — a Bandcamp pre-order page reads "releases
+  14 March 2026" in its credits — the switch flips on with that day already in the
+  picker, so sharing a pre-order schedules it for release day with nothing to type. A
+  record already out arms nothing. It's best-effort: a failed or slow preview leaves the
+  form exactly as it was, and if you've already set the switch yourself a late answer
+  doesn't touch it.
 - The list picker has a **search field pinned above the rows**, the native counterpart
   of the web app's `StackDropdown` (same "Search or add a list…" placeholder). Typing
   filters your lists case- and accent-insensitively; pressing Return files the item into
