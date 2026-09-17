@@ -1,21 +1,12 @@
 import { db } from "./index";
 import { sources } from "./schema";
+import { SEED_SOURCES } from "./seed-sources";
 
-const SEED_SOURCES = [
-  { name: "bandcamp", displayName: "Bandcamp", urlPattern: "bandcamp.com" },
-  { name: "spotify", displayName: "Spotify", urlPattern: "open.spotify.com" },
-  { name: "soundcloud", displayName: "SoundCloud", urlPattern: "soundcloud.com" },
-  { name: "youtube", displayName: "YouTube", urlPattern: "youtube.com" },
-  { name: "apple_music", displayName: "Apple Music", urlPattern: "music.apple.com" },
-  { name: "discogs", displayName: "Discogs", urlPattern: "discogs.com" },
-  { name: "tidal", displayName: "Tidal", urlPattern: "tidal.com" },
-  { name: "deezer", displayName: "Deezer", urlPattern: "deezer.com" },
-  { name: "mixcloud", displayName: "Mixcloud", urlPattern: "mixcloud.com" },
-  { name: "nts", displayName: "NTS Radio", urlPattern: "nts.live" },
-  { name: "pitchfork", displayName: "Pitchfork", urlPattern: "pitchfork.com" },
-  { name: "physical", displayName: "Physical Media", urlPattern: null },
-] as const;
-
+/**
+ * Explicit re-seed (`bun run db:seed`). The same list runs automatically on
+ * first database open in ./index.ts, so this is only needed to repair a
+ * database whose reference rows were deleted.
+ */
 async function seed() {
   console.log("Seeding sources...");
   for (const source of SEED_SOURCES) {

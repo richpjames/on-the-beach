@@ -28,12 +28,13 @@ import { saveArtwork } from "../secondary-link-enrichment";
 import { UnsupportedMusicLinkError } from "../scraper";
 import { ensureSuggestionsForItemNow, findPendingSuggestionsForItem } from "../suggestions";
 import { scheduleAppleMusicBackfill } from "../apple-music-backfill";
-import type {
-  CreateMusicItemInput,
-  UpdateMusicItemInput,
-  ListenStatus,
-  PurchaseIntent,
-  ItemType,
+import {
+  NO_SOURCE_CAPABILITIES,
+  type CreateMusicItemInput,
+  type UpdateMusicItemInput,
+  type ListenStatus,
+  type PurchaseIntent,
+  type ItemType,
 } from "../../domain/types";
 
 export const musicItemRoutes = new Hono();
@@ -667,12 +668,23 @@ musicItemRoutes.get("/:id/links", async (c) => {
       source_name: sources.name,
       display_name: sources.displayName,
       is_primary: musicLinks.isPrimary,
+      can_play: sources.canPlay,
+      can_buy: sources.canBuy,
+      is_editorial: sources.isEditorial,
     })
     .from(musicLinks)
     .leftJoin(sources, eq(musicLinks.sourceId, sources.id))
     .where(eq(musicLinks.musicItemId, id));
 
-  return c.json(rows);
+  // A link on a source we don't model joins to nothing; it offers nothing.
+  return c.json(
+    rows.map((r) => ({
+      ...r,
+      can_play: r.can_play ?? NO_SOURCE_CAPABILITIES.can_play,
+      can_buy: r.can_buy ?? NO_SOURCE_CAPABILITIES.can_buy,
+      is_editorial: r.is_editorial ?? NO_SOURCE_CAPABILITIES.is_editorial,
+    })),
+  );
 });
 
 // ---------------------------------------------------------------------------
@@ -697,11 +709,21 @@ musicItemRoutes.post("/:id/links", async (c) => {
   const name = rawName.toLowerCase().replace(/\s+/g, "_");
   const displayName = rawName.charAt(0).toUpperCase() + rawName.slice(1);
 
-  // Upsert source — insert if new, reuse if existing
+  // Upsert source — insert if new, reuse if existing. A source invented here
+  // from a user-supplied name keeps the all-false capability defaults: we know
+  // nothing about what it offers, so it promises nothing until classified in
+  // server/db/seed-sources.ts.
   await db.insert(sources).values({ name, displayName }).onConflictDoNothing();
 
   const [source] = await db
-    .select({ id: sources.id, name: sources.name, displayName: sources.displayName })
+    .select({
+      id: sources.id,
+      name: sources.name,
+      displayName: sources.displayName,
+      canPlay: sources.canPlay,
+      canBuy: sources.canBuy,
+      isEditorial: sources.isEditorial,
+    })
     .from(sources)
     .where(eq(sources.name, name))
     .limit(1);
@@ -750,6 +772,9 @@ musicItemRoutes.post("/:id/links", async (c) => {
       source_name: source.name,
       display_name: source.displayName,
       is_primary: link.isPrimary,
+      can_play: source.canPlay,
+      can_buy: source.canBuy,
+      is_editorial: source.isEditorial,
       artwork_url: item?.artworkUrl ?? scraped.imageUrl,
     },
     201,

@@ -5,7 +5,12 @@ import { normalize, capitalize } from "./utils";
 import { enrichSecondaryLinkInBackground } from "./secondary-link-enrichment";
 import { fetchSuggestionInBackground } from "./suggestions";
 import { fullItemSelect } from "./queries/full-item-select";
-import type { CreateMusicItemInput, MusicItemFull } from "../domain/types";
+import {
+  NO_SOURCE_CAPABILITIES,
+  type CreateMusicItemInput,
+  type MusicItemFull,
+  type MusicItemLink,
+} from "../domain/types";
 
 // ---------------------------------------------------------------------------
 // Item reads and URL-less writes.
@@ -59,6 +64,9 @@ export async function fetchFullItem(id: number): Promise<MusicItemFull | null> {
         source_name: sources.name,
         display_name: sources.displayName,
         is_primary: musicLinks.isPrimary,
+        can_play: sources.canPlay,
+        can_buy: sources.canBuy,
+        is_editorial: sources.isEditorial,
       })
       .from(musicLinks)
       .leftJoin(sources, eq(musicLinks.sourceId, sources.id))
@@ -68,21 +76,21 @@ export async function fetchFullItem(id: number): Promise<MusicItemFull | null> {
   const item = {
     ...(rows[0] as unknown as MusicItemFull),
     stacks: [] as Array<{ id: number; name: string }>,
-    links: [] as Array<{
-      id: number;
-      url: string;
-      source_name: string | null;
-      display_name: string | null;
-      is_primary: boolean;
-    }>,
+    links: [] as MusicItemLink[],
   };
   item.stacks = stackRows.map((r) => ({ id: r.id, name: r.name }));
+  // The source join is a LEFT one, so a link to somewhere we don't model has no
+  // capabilities of its own — it promises nothing rather than defaulting to
+  // playable.
   item.links = linkRows.map((r) => ({
     id: r.id,
     url: r.url,
     source_name: r.source_name,
     display_name: r.display_name,
     is_primary: r.is_primary,
+    can_play: r.can_play ?? NO_SOURCE_CAPABILITIES.can_play,
+    can_buy: r.can_buy ?? NO_SOURCE_CAPABILITIES.can_buy,
+    is_editorial: r.is_editorial ?? NO_SOURCE_CAPABILITIES.is_editorial,
   }));
   return item;
 }
