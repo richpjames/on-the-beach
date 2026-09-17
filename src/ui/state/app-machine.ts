@@ -105,11 +105,13 @@ export const appMachine = createMachine({
         stackBarVersion: context.stackBarVersion + 1,
       })),
     },
+    // Only the query moves. Typing updates the input and the stack bar's
+    // client-side filter instantly, while the expensive reactions — the list
+    // fetch and the address-bar write — wait for the query to settle in
+    // MainPage, so a keystroke costs neither a request nor a navigation.
     SEARCH_UPDATED: {
-      actions: assign(({ context, event }) => ({
+      actions: assign(({ event }) => ({
         searchQuery: event.query,
-        listVersion: context.listVersion + 1,
-        stackBarVersion: context.stackBarVersion + 1,
       })),
     },
     SORT_UPDATED: {

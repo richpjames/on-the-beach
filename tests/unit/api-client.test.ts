@@ -81,4 +81,21 @@ describe("ApiClient.listMusicItems", () => {
       undefined,
     );
   });
+
+  test("forwards an abort signal so a superseded list fetch can be cancelled", async () => {
+    const fetchSpy = spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      new Response(JSON.stringify({ items: [], total: 0 }), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      }),
+    );
+
+    const client = new ApiClient();
+    const controller = new AbortController();
+    await client.listMusicItems({ search: "dub" }, { signal: controller.signal });
+
+    expect(fetchSpy).toHaveBeenCalledWith("/api/music-items?search=dub", {
+      signal: controller.signal,
+    });
+  });
 });
