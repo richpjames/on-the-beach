@@ -160,7 +160,10 @@ export class ApiClient {
     });
   }
 
-  async listMusicItems(filters?: MusicItemFilters): Promise<PaginatedResult<MusicItemFull>> {
+  async listMusicItems(
+    filters?: MusicItemFilters,
+    options?: { signal?: AbortSignal },
+  ): Promise<PaginatedResult<MusicItemFull>> {
     const params = new URLSearchParams();
 
     if (filters?.listenStatus) {
@@ -197,9 +200,12 @@ export class ApiClient {
     }
 
     const qs = params.toString();
+    // Lets the caller abort a fetch a newer view has superseded.
+    const init = options?.signal ? { signal: options.signal } : undefined;
     return this.requestJson<PaginatedResult<MusicItemFull>>(
       `/api/music-items${qs ? `?${qs}` : ""}`,
       "listMusicItems",
+      init,
     );
   }
 

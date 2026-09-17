@@ -103,10 +103,6 @@
     // to find the Listen button while the record is still playing.
     if (launchAction === "listen") form.send({ type: "RECOGNIZE_CLICKED" });
 
-    if (ctx.currentStack !== null) {
-      void refreshChildStacks();
-    }
-
     // Check for items that were moved back to to-listen by the reminder cron
     api
       .getPendingReminders()
@@ -134,7 +130,27 @@
     void refreshList();
   });
 
+  /**
+   * How long the search query must stay quiet before the list refetches and
+   * the address bar catches up.
+   */
+  const SEARCH_SETTLE_MS = 250;
+
+  // The query the list was last fetched (and the URL last written) with. A
+  // keystroke debounces against it; every other refresh path stamps it in
+  // `refreshList` because its fetch runs with the query in hand.
+  let settledSearch = initialView.search;
+
+  // Aborts the in-flight list fetch whenever a newer view supersedes it, so a
+  // slow early response can never clobber a later one.
+  let listFetchAbort: AbortController | undefined;
+
   async function refreshList(): Promise<void> {
+    settledSearch = ctx.searchQuery;
+    listFetchAbort?.abort();
+    const controller = new AbortController();
+    listFetchAbort = controller;
+
     const filters = buildMusicItemFilters(
       ctx.currentFilter,
       ctx.currentStack,
@@ -142,8 +158,13 @@
       ctx.currentSort,
       ctx.currentSortDirection,
     );
-    const [result] = await Promise.all([api.listMusicItems(filters), refreshChildStacks()]);
-    items = result.items;
+    try {
+      const result = await api.listMusicItems(filters, { signal: controller.signal });
+      items = result.items;
+    } catch (error) {
+      // A superseded fetch aborting is expected; real failures surface as before.
+      if (!controller.signal.aborted) throw error;
+    }
   }
 
   async function refreshChildStacks(): Promise<void> {
@@ -163,6 +184,42 @@
     const stacks = await api.listStacks();
     app.send({ type: "STACKS_LOADED", stacks });
   }
+
+  // ── Child stacks ───────────────────────────────────────────────────────────
+  // Child stacks change with the stack bar's data (scope moves, creations,
+  // deletions, item counts) — not with the search query, which the list
+  // filters client-side, so typing doesn't refetch them.
+  let renderedChildStackScope: number | null | undefined;
+  let renderedChildStackBarVersion = 0;
+  $effect(() => {
+    const scope = ctx.currentStack;
+    const version = ctx.stackBarVersion;
+    if (scope === renderedChildStackScope && version === renderedChildStackBarVersion) return;
+    renderedChildStackScope = scope;
+    renderedChildStackBarVersion = version;
+    void refreshChildStacks();
+  });
+
+  // ── Search settle ──────────────────────────────────────────────────────────
+  // Typing updates the machine (and so the input and the stack bar's own
+  // client-side filter) immediately, but the two expensive reactions — the
+  // list fetch and the address-bar replace — wait for the query to settle:
+  // typing "radiohead" costs one request and one navigation, not one per
+  // keystroke.
+  $effect(() => {
+    const query = ctx.searchQuery;
+    if (query === settledSearch) return;
+    const timer = setTimeout(() => {
+      // Re-read at fire time: the query may have moved on, or another refresh
+      // path may already have fetched with this one.
+      if (ctx.searchQuery === settledSearch) return;
+      void refreshList();
+      if (listHref !== null && listHref !== syncedHref) {
+        navigateTo(listHref, { replace: true });
+      }
+    }, SEARCH_SETTLE_MS);
+    return () => clearTimeout(timer);
+  });
 
   // ── Stack selection & URL sync ─────────────────────────────────────────────
   //
@@ -230,10 +287,12 @@
 
   // Machine → URL: keep the address bar describing the current view. Filter,
   // search and sort changes replace the history entry so back doesn't have to
-  // step through every keystroke.
+  // step through every keystroke. A query still settling writes the address
+  // bar from the settle timer; everything else replaces it right away.
   $effect(() => {
     const href = listHref;
     if (href === null || href === syncedHref) return;
+    if (ctx.searchQuery !== settledSearch) return;
     navigateTo(href, { replace: true });
   });
 

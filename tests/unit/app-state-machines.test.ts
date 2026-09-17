@@ -681,11 +681,16 @@ describe("app machine — version counters", () => {
     expect(actor.getSnapshot().context.listVersion).toBe(v0 + 1);
   });
 
-  it("increments both versions on SEARCH_UPDATED", () => {
+  it("updates the query on SEARCH_UPDATED without bumping refresh versions", () => {
+    // The list fetch and address-bar write debounce behind the query settling
+    // (MainPage's search settle), so a keystroke bumps no refresh counter —
+    // and the stack bar filters client-side, so it has nothing to refetch.
     const actor = createActor(appMachine, { input: {} }).start();
     actor.send({ type: "SEARCH_UPDATED", query: "dub" });
-    expect(actor.getSnapshot().context.listVersion).toBe(1);
-    expect(actor.getSnapshot().context.stackBarVersion).toBe(1);
+    const ctx = actor.getSnapshot().context;
+    expect(ctx.searchQuery).toBe("dub");
+    expect(ctx.listVersion).toBe(0);
+    expect(ctx.stackBarVersion).toBe(0);
   });
 
   it("increments both versions on ITEM_CREATED when filter is to-listen", () => {
