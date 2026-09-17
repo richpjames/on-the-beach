@@ -3,6 +3,7 @@ import path from "node:path";
 import { drizzle, type BunSQLiteDatabase } from "drizzle-orm/bun-sqlite";
 import { migrate } from "drizzle-orm/bun-sqlite/migrator";
 import * as schema from "./schema";
+import { SEED_SOURCES } from "./seed-sources";
 
 type AppDatabase = BunSQLiteDatabase<typeof schema>;
 
@@ -20,22 +21,9 @@ function openDatabase(): AppDatabase {
   // so the path survives the SvelteKit server bundle.
   migrate(database, { migrationsFolder: path.resolve(process.cwd(), "drizzle") });
 
-  // Seed reference data (idempotent — onConflictDoNothing)
-  const SEED_SOURCES = [
-    { name: "bandcamp", displayName: "Bandcamp", urlPattern: "bandcamp.com" },
-    { name: "spotify", displayName: "Spotify", urlPattern: "open.spotify.com" },
-    { name: "soundcloud", displayName: "SoundCloud", urlPattern: "soundcloud.com" },
-    { name: "youtube", displayName: "YouTube", urlPattern: "youtube.com" },
-    { name: "apple_music", displayName: "Apple Music", urlPattern: "music.apple.com" },
-    { name: "discogs", displayName: "Discogs", urlPattern: "discogs.com" },
-    { name: "tidal", displayName: "Tidal", urlPattern: "tidal.com" },
-    { name: "deezer", displayName: "Deezer", urlPattern: "deezer.com" },
-    { name: "mixcloud", displayName: "Mixcloud", urlPattern: "mixcloud.com" },
-    { name: "nts", displayName: "NTS Radio", urlPattern: "nts.live" },
-    { name: "pitchfork", displayName: "Pitchfork", urlPattern: "pitchfork.com" },
-    { name: "physical", displayName: "Physical Media", urlPattern: null },
-  ] as const;
-
+  // Seed reference data (idempotent — onConflictDoNothing). The list, and each
+  // source's capabilities, live in ./seed-sources so this and `bun run db:seed`
+  // cannot drift apart.
   for (const source of SEED_SOURCES) {
     database
       .insert(schema.sources)

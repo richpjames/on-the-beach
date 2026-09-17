@@ -1,10 +1,24 @@
 import { sqliteTable, text, integer, unique, index, primaryKey } from "drizzle-orm/sqlite-core";
 
+// What a source lets you *do* with a record, as opposed to which service it is.
+// `SourceName` answers "who", these answer "what for": Pitchfork and Apple Music
+// are both places a release turns up, but only one of them plays it. The three
+// are independent rather than a single role, because the useful cases overlap —
+// Bandcamp both plays and sells, Discogs sells without playing.
+//
+// Defaults are all-false so a source added by a migration is inert until it is
+// classified, rather than silently claiming it can play.
 export const sources = sqliteTable("sources", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   name: text("name").notNull().unique(),
   displayName: text("display_name").notNull(),
   urlPattern: text("url_pattern"),
+  /** You can hear the recording here, in full or as a preview. */
+  canPlay: integer("can_play", { mode: "boolean" }).notNull().default(false),
+  /** You can acquire a copy here, digital or physical. */
+  canBuy: integer("can_buy", { mode: "boolean" }).notNull().default(false),
+  /** The page writes *about* the record rather than carrying it. */
+  isEditorial: integer("is_editorial", { mode: "boolean" }).notNull().default(false),
   createdAt: integer("created_at", { mode: "timestamp" })
     .notNull()
     .$defaultFn(() => new Date()),

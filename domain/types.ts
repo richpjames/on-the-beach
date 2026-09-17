@@ -28,8 +28,36 @@ export type SourceName =
   | "physical"
   | "unknown";
 
+/**
+ * What a source lets you do with a record, independent of which service it is.
+ *
+ * `SourceName` says *who* a link is with; this says *what for*. The three flags
+ * are independent rather than one role, because the cases overlap: Bandcamp
+ * plays and sells, Discogs sells without playing, Pitchfork does neither. All
+ * three false is meaningful — a physical copy, or a link to somewhere we don't
+ * model.
+ *
+ * Authoritative values live on the `sources` table (see `server/db/seed.ts`),
+ * so they can be corrected without a deploy.
+ */
+export interface SourceCapabilities {
+  /** You can hear the recording here, in full or as a preview. */
+  can_play: boolean;
+  /** You can acquire a copy here, digital or physical. */
+  can_buy: boolean;
+  /** The page writes *about* the record rather than carrying it. */
+  is_editorial: boolean;
+}
+
+/** What a link on a source we don't model can be assumed to offer: nothing. */
+export const NO_SOURCE_CAPABILITIES: SourceCapabilities = {
+  can_play: false,
+  can_buy: false,
+  is_editorial: false,
+};
+
 // Database entities
-export interface Source {
+export interface Source extends SourceCapabilities {
   id: number;
   name: SourceName;
   display_name: string;
@@ -90,13 +118,21 @@ export interface MusicItemFull extends MusicItem {
   primary_source: SourceName | null;
   primary_link_metadata: string | null;
   stacks: Array<{ id: number; name: string }>;
-  links: Array<{
-    id: number;
-    url: string;
-    source_name: string | null;
-    display_name: string | null;
-    is_primary: boolean;
-  }>;
+  links: MusicItemLink[];
+}
+
+/**
+ * A link on an item, carrying its source's capabilities so the UI can sort
+ * "listen here" from "read about it" without a second lookup. The flags are
+ * non-null even when `source_name` is — a link to somewhere unmodelled offers
+ * nothing we can promise, which is `NO_SOURCE_CAPABILITIES`.
+ */
+export interface MusicItemLink extends SourceCapabilities {
+  id: number;
+  url: string;
+  source_name: string | null;
+  display_name: string | null;
+  is_primary: boolean;
 }
 
 // Input types for create/update
