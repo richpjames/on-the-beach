@@ -1066,7 +1066,7 @@ private final class ComposeFormController: UIViewController, UITextViewDelegate 
     /// Add button so both are gated on the same condition.
     var canSubmit: Bool { hasContent && !isPosting }
 
-    private let urlLabel = UILabel()
+    private let statusLabel = UILabel()
     /// The shared photos, side by side in a horizontally scrolling filmstrip —
     /// one image fills the well as before, several become thumbnails you can
     /// swipe through to check what's about to be added.
@@ -1097,11 +1097,12 @@ private final class ComposeFormController: UIViewController, UITextViewDelegate 
         // Nothing to post until a URL is extracted.
         addButton.isEnabled = false
 
-        // The shared URL reads like a terminal line: mono type, navy on chrome.
-        urlLabel.font = OTBTheme.mono(11)
-        urlLabel.textColor = OTBTheme.navy
-        urlLabel.numberOfLines = 2
-        urlLabel.lineBreakMode = .byTruncatingMiddle
+        // The status line (errors, photo counts) reads like a terminal line:
+        // mono type, navy on chrome.
+        statusLabel.font = OTBTheme.mono(11)
+        statusLabel.textColor = OTBTheme.navy
+        statusLabel.numberOfLines = 2
+        statusLabel.lineBreakMode = .byTruncatingMiddle
 
         // Shared images get a sunken white well preview, seated inside the 2px
         // bevel like the note field. Hidden until an image is actually shared.
@@ -1149,7 +1150,7 @@ private final class ComposeFormController: UIViewController, UITextViewDelegate 
         let listRow = makeListRow()
         let scheduleRow = makeScheduleRow()
 
-        let stack = UIStackView(arrangedSubviews: [urlLabel, imageWell, noteField, listRow, scheduleRow, datePicker])
+        let stack = UIStackView(arrangedSubviews: [statusLabel, imageWell, noteField, listRow, scheduleRow, datePicker])
         stack.axis = .vertical
         stack.spacing = 12
         stack.translatesAutoresizingMaskIntoConstraints = false
@@ -1257,24 +1258,23 @@ private final class ComposeFormController: UIViewController, UITextViewDelegate 
 
     // MARK: - Updates from the container
 
+    /// Records the shared link and unlocks Add. The URL itself isn't shown —
+    /// the status line is kept for errors and photo counts.
     func setURL(_ url: URL?) {
-        urlLabel.text = url?.absoluteString
-        urlLabel.isHidden = url == nil
-        urlLabel.numberOfLines = 2
-        urlLabel.lineBreakMode = .byTruncatingMiddle
+        statusLabel.isHidden = true
         imageWell.isHidden = true
         setHasContent(url != nil)
     }
 
-    /// Explains, in the line the URL normally occupies, why there's nothing to
-    /// post — an image we couldn't read, or a share with nothing usable in it.
-    /// Add stays disabled either way; without this the sheet just showed an
-    /// empty form and left the user guessing.
+    /// Explains, on the status line, why there's nothing to post — an image we
+    /// couldn't read, or a share with nothing usable in it. Add stays disabled
+    /// either way; without this the sheet just showed an empty form and left
+    /// the user guessing.
     func setUnavailable(_ message: String) {
-        urlLabel.text = message
-        urlLabel.isHidden = false
-        urlLabel.numberOfLines = 0
-        urlLabel.lineBreakMode = .byWordWrapping
+        statusLabel.text = message
+        statusLabel.isHidden = false
+        statusLabel.numberOfLines = 0
+        statusLabel.lineBreakMode = .byWordWrapping
         imageWell.isHidden = true
         setHasContent(false)
     }
@@ -1283,9 +1283,9 @@ private final class ComposeFormController: UIViewController, UITextViewDelegate 
     /// instead of `setURL` when the share payload is photos rather than a link.
     ///
     /// One photo fills the well exactly as it always did. Several become
-    /// thumbnails in a swipeable filmstrip, with a count on the line the URL
-    /// normally occupies — so a multi-select share says how many are about to
-    /// be added even before you scroll through them.
+    /// thumbnails in a swipeable filmstrip, with a count on the status line —
+    /// so a multi-select share says how many are about to be added even before
+    /// you scroll through them.
     func setImages(_ images: [UIImage]) {
         for view in imageStrip.arrangedSubviews {
             view.removeFromSuperview()
@@ -1305,10 +1305,10 @@ private final class ComposeFormController: UIViewController, UITextViewDelegate 
         imageScroll.setContentOffset(.zero, animated: false)
         imageWell.isHidden = images.isEmpty
 
-        urlLabel.text = images.count > 1 ? "\(images.count) photos" : nil
-        urlLabel.isHidden = images.count < 2
-        urlLabel.numberOfLines = 1
-        urlLabel.lineBreakMode = .byTruncatingTail
+        statusLabel.text = images.count > 1 ? "\(images.count) photos" : nil
+        statusLabel.isHidden = images.count < 2
+        statusLabel.numberOfLines = 1
+        statusLabel.lineBreakMode = .byTruncatingTail
 
         setHasContent(!images.isEmpty)
     }
