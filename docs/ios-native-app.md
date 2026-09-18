@@ -66,8 +66,8 @@ for free by building the same targets with **Mac Catalyst** (see [Enable macOS
   nothing.
 - **Sharing images** works the same way. When the payload is photos rather than a
   link (e.g. record covers shared from Photos), the extension shows the same compose
-  form — with an image preview in place of the URL line — and the same note, list,
-  and reminder controls. Each image is downscaled to a 1024px JPEG and re-encoded at
+  form — with an image preview above the note — and the same note, list, and
+  reminder controls. Each image is downscaled to a 1024px JPEG and re-encoded at
   progressively lower quality/size until the base64 payload fits the upload budget
   (mirroring the web add-form's `encodeImageFile`, so a detailed sleeve compresses
   further instead of being rejected with a 413) and `POST`ed as base64 to
