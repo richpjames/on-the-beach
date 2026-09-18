@@ -22,6 +22,9 @@ import {
   createMusicItemFromUrl,
   createMusicItemDirect,
 } from "../music-item-creator";
+// Imported from the store, not the creator re-export, for the same
+// mock-isolation reason that module's header describes.
+import { DuplicateItemSelectionError } from "../music-item-store";
 import { hydrateItemStacks } from "../hydrate-item-stacks";
 import { scrapeAddedLink } from "../added-link-scrape";
 import { saveArtwork } from "../secondary-link-enrichment";
@@ -392,13 +395,19 @@ musicItemRoutes.post("/", async (c) => {
   }
 
   try {
+    // The web add form asks for duplicate warnings; everything else (ingest,
+    // share sheet, release alerts) adds silently, as before.
+    const duplicateCheck = {
+      warnOnDuplicate: input.warnOnDuplicate === true,
+      forceDuplicate: input.forceDuplicate === true,
+    };
     let result;
     if (input.url && isValidUrl(input.url)) {
-      result = await createMusicItemFromUrl(input.url, input);
+      result = await createMusicItemFromUrl(input.url, input, duplicateCheck);
     } else if (input.url) {
       return c.json({ error: "Invalid URL" }, 400);
     } else {
-      result = await createMusicItemDirect(input);
+      result = await createMusicItemDirect(input, duplicateCheck);
     }
     // Newly added non-Apple-Music releases get an Apple Music link backfilled in
     // the background, so a playable secondary link is ready by the time the
@@ -408,6 +417,10 @@ musicItemRoutes.post("/", async (c) => {
     }
     return c.json(result.item, 201);
   } catch (err) {
+    if (err instanceof DuplicateItemSelectionError) {
+      return c.json(err.payload, 409);
+    }
+
     if (err instanceof AmbiguousLinkSelectionError) {
       return c.json(err.payload, 409);
     }

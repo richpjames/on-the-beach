@@ -1,5 +1,9 @@
 import { afterEach, describe, expect, mock, spyOn, test } from "bun:test";
-import { AmbiguousLinkApiError, ApiClient } from "../../src/services/api-client";
+import {
+  AmbiguousLinkApiError,
+  ApiClient,
+  DuplicateItemApiError,
+} from "../../src/services/api-client";
 
 describe("ApiClient.createMusicItem", () => {
   afterEach(() => {
@@ -52,6 +56,47 @@ describe("ApiClient.createMusicItem", () => {
         },
       ],
     });
+  });
+  test("throws DuplicateItemApiError when the server returns duplicate items", async () => {
+    spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          kind: "duplicate_item",
+          url: "https://music.apple.com/gb/album/some-album/123",
+          message: "This looks like something already in your list.",
+          items: [
+            {
+              id: 7,
+              title: "Some Album",
+              artist_name: "Some Artist",
+              listen_status: "to-listen",
+            },
+          ],
+        }),
+        {
+          status: 409,
+          headers: { "content-type": "application/json" },
+        },
+      ),
+    );
+
+    const client = new ApiClient();
+
+    let thrown: unknown;
+    try {
+      await client.createMusicItem({
+        url: "https://music.apple.com/gb/album/some-album/123",
+        warnOnDuplicate: true,
+      });
+    } catch (error) {
+      thrown = error;
+    }
+
+    expect(thrown).toBeInstanceOf(DuplicateItemApiError);
+    const payload = (thrown as DuplicateItemApiError).payload;
+    expect(payload.kind).toBe("duplicate_item");
+    expect(payload.items).toHaveLength(1);
+    expect(payload.items[0]!.title).toBe("Some Album");
   });
 });
 

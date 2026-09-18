@@ -1,6 +1,7 @@
 import type {
   AmbiguousLinkPayload,
   CreateMusicItemInput,
+  DuplicateItemPayload,
   UpdateMusicItemInput,
   MusicItemFull,
   MusicItemFilters,
@@ -31,6 +32,16 @@ export class AmbiguousLinkApiError extends Error {
   constructor(payload: AmbiguousLinkPayload) {
     super(payload.message);
     this.name = "AmbiguousLinkApiError";
+    this.payload = payload;
+  }
+}
+
+export class DuplicateItemApiError extends Error {
+  payload: DuplicateItemPayload;
+
+  constructor(payload: DuplicateItemPayload) {
+    super(payload.message);
+    this.name = "DuplicateItemApiError";
     this.payload = payload;
   }
 }
@@ -124,13 +135,17 @@ export class ApiClient {
       withCsrf(this.jsonRequest("POST", input)),
     );
     if (response.status === 409) {
-      const body = (await response.json()) as Partial<AmbiguousLinkPayload>;
+      const body = (await response.json()) as Partial<AmbiguousLinkPayload> &
+        Partial<DuplicateItemPayload>;
       if (
         body.kind === "ambiguous_link" &&
         typeof body.url === "string" &&
         Array.isArray(body.candidates)
       ) {
         throw new AmbiguousLinkApiError(body as AmbiguousLinkPayload);
+      }
+      if (body.kind === "duplicate_item" && Array.isArray(body.items)) {
+        throw new DuplicateItemApiError(body as DuplicateItemPayload);
       }
     }
 

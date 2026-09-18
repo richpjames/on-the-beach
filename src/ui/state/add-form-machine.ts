@@ -1,10 +1,14 @@
 import { assign, fromCallback, fromPromise, sendTo, setup } from "xstate";
 
 export const RECORD_DURATION_MS = 15000;
-import type { LinkReleaseCandidate } from "../../../domain/types";
+import type { DuplicateItemPayload, LinkReleaseCandidate } from "../../../domain/types";
 import type { AddFormValues } from "../logic/add-form";
 import { buildCreateMusicItemInputFromValues } from "../logic/add-form";
-import { AmbiguousLinkApiError, type ApiClient } from "../../services/api-client";
+import {
+  AmbiguousLinkApiError,
+  DuplicateItemApiError,
+  type ApiClient,
+} from "../../services/api-client";
 
 type ScanResultData = {
   artist?: string;
@@ -35,6 +39,12 @@ export interface AddFormContext {
     selectedCandidateIds: string[];
     pendingValues: AddFormValuesInput;
   } | null;
+  duplicateWarning: DuplicateItemPayload | null;
+  /**
+   * Set only by "Add anyway" — the resubmit carries `forceDuplicate` so the
+   * server skips the check that just warned. Every fresh submit clears it.
+   */
+  forceDuplicate: boolean;
   pendingScanBase64: string | null;
   pendingAudioBase64: string | null;
   pendingAudioMimeType: string | null;
@@ -61,6 +71,8 @@ export type AddFormEvent =
   | { type: "ALL_CANDIDATES_SELECTED" }
   | { type: "CANDIDATE_SUBMITTED" }
   | { type: "LINK_PICKER_CANCELLED" }
+  | { type: "ADD_ANYWAY_CLICKED" }
+  | { type: "DUPLICATE_CANCELLED" }
   | { type: "ENTER_MANUALLY" }
   | { type: "CLEAR_CREATED_ITEM" }
   | { type: "FORM_RESET" }
@@ -205,7 +217,12 @@ export const addFormMachine = setup({
     ),
     submitItem: fromPromise<
       { itemId: number },
-      { api: ApiClient; valuesArray: AddFormValuesInput[]; selectedStackIds: number[] }
+      {
+        api: ApiClient;
+        valuesArray: AddFormValuesInput[];
+        selectedStackIds: number[];
+        forceDuplicate: boolean;
+      }
     >(async ({ input }) => {
       const { api, valuesArray, selectedStackIds } = input;
 
@@ -245,6 +262,10 @@ export const addFormMachine = setup({
           listenStatus: "to-listen",
           musicbrainzReleaseId,
           musicbrainzArtistId,
+          // The web form always wants to be warned; `forceDuplicate` is only
+          // true on the "Add anyway" resubmit.
+          warnOnDuplicate: true,
+          forceDuplicate: input.forceDuplicate,
         });
 
         if (selectedStackIds.length > 0) {
@@ -270,6 +291,8 @@ export const addFormMachine = setup({
     pendingValues: null,
     createdItemId: null,
     linkPicker: null,
+    duplicateWarning: null,
+    forceDuplicate: false,
     pendingScanBase64: null,
     pendingAudioBase64: null,
     pendingAudioMimeType: null,
@@ -319,6 +342,8 @@ export const addFormMachine = setup({
       actions: assign({
         showSecondaryFields: false,
         linkPicker: null,
+        duplicateWarning: null,
+        forceDuplicate: false,
         submitState: "idle" as const,
         pendingValues: null,
         createdItemId: null,
@@ -365,6 +390,7 @@ export const addFormMachine = setup({
             actions: assign(({ event }) => ({
               pendingValues: event.pendingValues ? [event.pendingValues] : null,
               submitState: "submitting" as const,
+              forceDuplicate: false,
             })),
           },
         ],
@@ -396,6 +422,7 @@ export const addFormMachine = setup({
           actions: assign(({ event }) => ({
             pendingValues: event.pendingValues ? [event.pendingValues] : null,
             submitState: "submitting" as const,
+            forceDuplicate: false,
           })),
         },
         LINK_PICKER_OPENED: {
@@ -458,6 +485,7 @@ export const addFormMachine = setup({
                     }))
                   : [base],
               submitState: "submitting" as const,
+              forceDuplicate: false,
               linkPicker: null,
             };
           }),
@@ -469,6 +497,25 @@ export const addFormMachine = setup({
         ENTER_MANUALLY: {
           target: "enteringManually",
           actions: assign({ showSecondaryFields: true, linkPicker: null }),
+        },
+      },
+    },
+    duplicateOpen: {
+      on: {
+        ADD_ANYWAY_CLICKED: {
+          target: "submitting",
+          actions: assign({
+            submitState: "submitting" as const,
+            forceDuplicate: true,
+            duplicateWarning: null,
+          }),
+        },
+        DUPLICATE_CANCELLED: {
+          target: "idle",
+          actions: assign({
+            submitState: "idle" as const,
+            duplicateWarning: null,
+          }),
         },
       },
     },
@@ -531,6 +578,7 @@ export const addFormMachine = setup({
           api: context.api,
           valuesArray: context.pendingValues!,
           selectedStackIds: context.selectedStackIds,
+          forceDuplicate: context.forceDuplicate,
         }),
         onDone: {
           target: "idle",
@@ -540,9 +588,18 @@ export const addFormMachine = setup({
             pendingValues: null,
             showSecondaryFields: false,
             selectedStackIds: [],
+            forceDuplicate: false,
           })),
         },
         onError: [
+          {
+            guard: ({ event }) => event.error instanceof DuplicateItemApiError,
+            target: "duplicateOpen",
+            actions: assign(({ event }) => ({
+              submitState: "idle" as const,
+              duplicateWarning: (event.error as DuplicateItemApiError).payload,
+            })),
+          },
           {
             guard: ({ event }) => event.error instanceof AmbiguousLinkApiError,
             target: "linkPickerOpen",
@@ -622,6 +679,7 @@ export const addFormMachine = setup({
                 pendingAudioBase64: null,
                 pendingAudioMimeType: null,
                 submitState: "submitting" as const,
+                forceDuplicate: false,
                 pendingValues: [
                   {
                     url: "",
