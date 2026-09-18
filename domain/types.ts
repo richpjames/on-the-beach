@@ -161,6 +161,14 @@ export interface CreateMusicItemInput {
    * release picker sends these. One item is created per resolved candidate.
    */
   selectedCandidateIds?: string[];
+  /**
+   * Ask the server to reject a would-be duplicate with a 409 `duplicate_item`
+   * payload instead of inserting (or silently returning the existing item).
+   * Set by the web add form; ingest paths leave it off.
+   */
+  warnOnDuplicate?: boolean;
+  /** Confirmed "add anyway" — insert even when it matches an existing item. */
+  forceDuplicate?: boolean;
 }
 
 export interface UpdateMusicItemInput {
@@ -253,6 +261,18 @@ export interface AmbiguousLinkPayload {
   url: string;
   message: string;
   candidates: LinkReleaseCandidate[];
+}
+
+/**
+ * The `409` a warn-mode create returns when the release matches something
+ * already in the list. `items` carries the matches so the client can show
+ * them; the user decides whether to add a second copy anyway.
+ */
+export interface DuplicateItemPayload {
+  kind: "duplicate_item";
+  url?: string;
+  message: string;
+  items: MusicItemFull[];
 }
 
 // Stacks

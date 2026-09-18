@@ -450,6 +450,121 @@ describe("add form machine — async submit flow", () => {
   });
 });
 
+describe("add form machine — duplicate warning flow", () => {
+  const pendingValues = {
+    url: "https://example.com",
+    title: "Test Album",
+    artist: "Test Artist",
+    itemType: "album",
+    label: "",
+    year: "",
+    country: "",
+    genre: "",
+    catalogueNumber: "",
+    notes: "",
+    artworkUrl: "",
+  };
+
+  function duplicatePayload() {
+    return {
+      kind: "duplicate_item" as const,
+      message: "This looks like something already in your list.",
+      items: [
+        {
+          id: 7,
+          title: "Test Album",
+          artist_name: "Test Artist",
+          listen_status: "to-listen",
+        },
+      ],
+    };
+  }
+
+  it("transitions to duplicateOpen on DuplicateItemApiError", async () => {
+    const { DuplicateItemApiError } = await import("../../src/services/api-client");
+    const api = makeMockApi({
+      createMusicItem: async () => {
+        throw new DuplicateItemApiError(duplicatePayload());
+      },
+    }) as any;
+    const actor = createActor(addFormMachine, { input: { api } }).start();
+
+    actor.send({ type: "SUBMIT_CLICKED", url: "https://example.com", pendingValues });
+    await waitFor(actor, (snapshot) => snapshot.value !== "submitting", { timeout: 5000 });
+
+    expect(actor.getSnapshot().value).toBe("duplicateOpen");
+    expect(actor.getSnapshot().context.submitState).toBe("idle");
+    expect(actor.getSnapshot().context.duplicateWarning?.items).toHaveLength(1);
+    expect(actor.getSnapshot().context.duplicateWarning?.items[0]?.title).toBe("Test Album");
+  });
+
+  it("add anyway resubmits with forceDuplicate, then a fresh submit is unforced", async () => {
+    const { DuplicateItemApiError } = await import("../../src/services/api-client");
+    const calls: Array<Record<string, unknown>> = [];
+    let call = 0;
+    const api = makeMockApi({
+      createMusicItem: async (input: Record<string, unknown>) => {
+        calls.push(input);
+        call += 1;
+        if (call === 1) {
+          throw new DuplicateItemApiError(duplicatePayload());
+        }
+        return {
+          id: 42 + call,
+          title: "Test Album",
+          artist: "Test Artist",
+          itemType: "album",
+          listenStatus: "to-listen",
+          createdAt: "",
+          updatedAt: "",
+        };
+      },
+    }) as any;
+    const actor = createActor(addFormMachine, { input: { api } }).start();
+
+    actor.send({ type: "SUBMIT_CLICKED", url: "https://example.com", pendingValues });
+    await waitFor(actor, (snapshot) => snapshot.value === "duplicateOpen", { timeout: 5000 });
+
+    actor.send({ type: "ADD_ANYWAY_CLICKED" });
+    expect(actor.getSnapshot().value).toBe("submitting");
+    await waitFor(actor, (snapshot) => snapshot.value === "idle", { timeout: 5000 });
+    expect(actor.getSnapshot().context.createdItemId).toBeGreaterThan(0);
+
+    // Every web submit asks for warnings; only the resubmit forces past one.
+    expect(calls[0]!.warnOnDuplicate).toBe(true);
+    expect(calls[0]!.forceDuplicate).toBe(false);
+    expect(calls[1]!.warnOnDuplicate).toBe(true);
+    expect(calls[1]!.forceDuplicate).toBe(true);
+
+    // A later, separate add must start from scratch — not still forced.
+    actor.send({ type: "SUBMIT_CLICKED", url: "https://example.com/other", pendingValues });
+    await waitFor(actor, (snapshot) => calls.length === 3 || snapshot.value === "idle", {
+      timeout: 5000,
+    });
+    expect(calls[2]!.forceDuplicate).toBe(false);
+  });
+
+  it("cancelling the warning returns to idle without creating anything", async () => {
+    const { DuplicateItemApiError } = await import("../../src/services/api-client");
+    let callCount = 0;
+    const api = makeMockApi({
+      createMusicItem: async () => {
+        callCount += 1;
+        throw new DuplicateItemApiError(duplicatePayload());
+      },
+    }) as any;
+    const actor = createActor(addFormMachine, { input: { api } }).start();
+
+    actor.send({ type: "SUBMIT_CLICKED", url: "https://example.com", pendingValues });
+    await waitFor(actor, (snapshot) => snapshot.value === "duplicateOpen", { timeout: 5000 });
+
+    actor.send({ type: "DUPLICATE_CANCELLED" });
+    expect(actor.getSnapshot().value).toBe("idle");
+    expect(actor.getSnapshot().context.duplicateWarning).toBeNull();
+    expect(callCount).toBe(1);
+  });
+});
+
 describe("add form machine — scan flow", () => {
   it("transitions to scanning state on SCAN_FILE_SELECTED", async () => {
     const api = makeMockApi({

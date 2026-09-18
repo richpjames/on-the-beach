@@ -2296,6 +2296,60 @@ a:hover {
   gap: var(--space-4);
 }
 
+/* Duplicate warning reuses the .link-picker dialog chrome; these rows are
+   read-only, so they're inset "field" cards rather than buttons. */
+.duplicate-warning__list-shell {
+  min-height: 0;
+}
+
+.duplicate-warning__item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-4);
+  background: #ffffff;
+  border-width: 2px;
+  border-style: solid;
+  border-color: var(--bevel-field);
+}
+
+.duplicate-warning__artwork {
+  flex: none;
+  width: 48px;
+  height: 48px;
+  object-fit: cover;
+  border: 1px solid var(--bevel-field);
+}
+
+.duplicate-warning__details {
+  display: grid;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.duplicate-warning__title {
+  font-size: var(--text-md);
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+.duplicate-warning__artist {
+  font-size: var(--text-base);
+}
+
+.duplicate-warning__meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+  font-size: var(--text-xs);
+  color: var(--chrome-darker);
+}
+
+.duplicate-warning__added {
+  font-style: italic;
+}
+
 /* ═══════════════════════════════════════════════════
    FOOTER — Status bar (inside window)
 ═══════════════════════════════════════════════════ */

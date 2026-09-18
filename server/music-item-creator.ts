@@ -11,11 +11,15 @@ import { pickPrimaryReleaseCandidate } from "./link-extractor";
 import { fullItemSelect } from "./queries/full-item-select";
 import {
   createMusicItemDirect as createMusicItemDirectInStore,
+  DuplicateItemSelectionError,
   fetchFullItem,
+  findDuplicateItems,
   getOrCreateArtist,
   queueSuggestionPrefetch,
+  DUPLICATE_MATCH_LIMIT,
   type CreateMusicItemDirectOptions,
   type CreateResult,
+  type DuplicateCheckOptions,
 } from "./music-item-store";
 import type {
   AmbiguousLinkPayload,
@@ -477,13 +481,21 @@ interface ScrapingMachineContext {
   existingItems: MusicItemFull[];
   results: CreateResult[];
   ambiguousPayload: AmbiguousLinkPayload | null;
+  duplicateItems: MusicItemFull[] | null;
+  warnOnDuplicate: boolean;
+  forceDuplicate: boolean;
   error: Error | null;
 }
 
 const scrapingMachine = setup({
   types: {} as {
     context: ScrapingMachineContext;
-    input: { url: string; overrides?: Partial<CreateMusicItemInput> };
+    input: {
+      url: string;
+      overrides?: Partial<CreateMusicItemInput>;
+      warnOnDuplicate?: boolean;
+      forceDuplicate?: boolean;
+    };
   },
   actors: {
     resolve: fromPromise<ResolveOutput, { url: string; overrides?: Partial<CreateMusicItemInput> }>(
@@ -492,6 +504,30 @@ const scrapingMachine = setup({
     checkDuplicates: fromPromise<MusicItemFull[], { urls: string[] }>(async ({ input }) =>
       fetchItemsByUrls(input.urls),
     ),
+    checkLibraryDuplicates: fromPromise<
+      MusicItemFull[],
+      {
+        candidates: ReleaseCandidateInput[];
+        existingItems: MusicItemFull[];
+        overrides?: Partial<CreateMusicItemInput>;
+      }
+    >(async ({ input }) => {
+      const { candidates, existingItems, overrides } = input;
+      // Items already filed under this URL are duplicates by the strongest
+      // signal there is, so they seed the set even when the resolved title has
+      // drifted from what's stored.
+      const byId = new Map<number, MusicItemFull>(existingItems.map((item) => [item.id, item]));
+      for (const candidate of candidates) {
+        if (byId.size >= DUPLICATE_MATCH_LIMIT) break;
+        const found = await findDuplicateItems(
+          candidate.artistName,
+          candidate.title,
+          overrides?.musicbrainzReleaseId,
+        );
+        for (const item of found) byId.set(item.id, item);
+      }
+      return [...byId.values()].slice(0, DUPLICATE_MATCH_LIMIT);
+    }),
     insert: fromPromise<
       CreateResult[],
       {
@@ -500,6 +536,7 @@ const scrapingMachine = setup({
         candidates: ReleaseCandidateInput[];
         existingItems: MusicItemFull[];
         overrides?: Partial<CreateMusicItemInput>;
+        forceDuplicate: boolean;
       }
     >(async ({ input }) => {
       const { normalizedUrl, source, candidates, existingItems: baseItems, overrides } = input;
@@ -507,7 +544,7 @@ const scrapingMachine = setup({
       const results: CreateResult[] = [];
 
       for (const candidate of candidates) {
-        const existing = matchExistingItem(existingItems, candidate);
+        const existing = input.forceDuplicate ? null : matchExistingItem(existingItems, candidate);
         if (existing) {
           results.push({ item: existing, created: false });
           continue;
@@ -531,6 +568,9 @@ const scrapingMachine = setup({
     existingItems: [],
     results: [],
     ambiguousPayload: null,
+    duplicateItems: null,
+    warnOnDuplicate: input.warnOnDuplicate === true,
+    forceDuplicate: input.forceDuplicate === true,
     error: null,
   }),
   initial: "resolving",
@@ -577,9 +617,20 @@ const scrapingMachine = setup({
         }),
         onDone: [
           {
+            // Warn mode: never short-circuit on a URL hit — re-adding a link
+            // that's already filed should warn too, not silently return the
+            // existing item.
+            guard: ({ context }) => context.warnOnDuplicate && !context.forceDuplicate,
+            target: "checkingLibraryDuplicates",
+            actions: assign(({ event }) => ({ existingItems: event.output })),
+          },
+          {
             // Known source with an existing item — return it without inserting.
+            // A forced add deliberately bypasses this to insert a second copy.
             guard: ({ context, event }) =>
-              context.resolvedSource !== "unknown" && event.output.length > 0,
+              context.resolvedSource !== "unknown" &&
+              event.output.length > 0 &&
+              !context.forceDuplicate,
             target: "done",
             actions: assign(({ event }) => ({
               results: [{ item: event.output[0]!, created: false }],
@@ -588,6 +639,32 @@ const scrapingMachine = setup({
           {
             target: "inserting",
             actions: assign(({ event }) => ({ existingItems: event.output })),
+          },
+        ],
+        onError: {
+          target: "failed",
+          actions: assign(({ event }) => ({
+            error: event.error instanceof Error ? event.error : new Error(String(event.error)),
+          })),
+        },
+      },
+    },
+    checkingLibraryDuplicates: {
+      invoke: {
+        src: "checkLibraryDuplicates",
+        input: ({ context }) => ({
+          candidates: context.candidates,
+          existingItems: context.existingItems,
+          overrides: context.overrides,
+        }),
+        onDone: [
+          {
+            guard: ({ event }) => event.output.length > 0,
+            target: "duplicate",
+            actions: assign(({ event }) => ({ duplicateItems: event.output })),
+          },
+          {
+            target: "inserting",
           },
         ],
         onError: {
@@ -607,6 +684,7 @@ const scrapingMachine = setup({
           candidates: context.candidates,
           existingItems: context.existingItems,
           overrides: context.overrides,
+          forceDuplicate: context.forceDuplicate,
         }),
         onDone: {
           target: "done",
@@ -622,6 +700,7 @@ const scrapingMachine = setup({
     },
     done: { type: "final" },
     ambiguous: { type: "final" },
+    duplicate: { type: "final" },
     failed: { type: "final" },
   },
 });
@@ -631,12 +710,15 @@ const scrapingMachine = setup({
  * artist resolution, and duplicate detection.
  *
  * Returns `{ created: false }` if the URL already exists in music_links.
+ * With `warnOnDuplicate` it instead throws `DuplicateItemSelectionError` for
+ * any match — URL or library-wide — unless `forceDuplicate` is also set.
  */
 export async function createMusicItemFromUrl(
   url: string,
   overrides?: Partial<CreateMusicItemInput>,
+  options?: DuplicateCheckOptions,
 ): Promise<CreateResult> {
-  const results = await createMusicItemsFromUrl(url, overrides);
+  const results = await createMusicItemsFromUrl(url, overrides, options);
   const preferred = results.find((result) => result.created) ?? results[0];
   if (!preferred) {
     throw new Error("Failed to create music item");
@@ -653,24 +735,45 @@ export async function createMusicItemFromUrl(
 export async function createMusicItemsFromUrl(
   url: string,
   overrides?: Partial<CreateMusicItemInput>,
+  options?: DuplicateCheckOptions,
 ): Promise<CreateResult[]> {
   if (!isValidUrl(url)) {
     throw new Error("Invalid URL");
   }
 
   const { normalizedUrl } = parseUrl(url);
-  const actor = createActor(scrapingMachine, { input: { url: normalizedUrl, overrides } });
+  const actor = createActor(scrapingMachine, {
+    input: {
+      url: normalizedUrl,
+      overrides,
+      warnOnDuplicate: options?.warnOnDuplicate === true,
+      forceDuplicate: options?.forceDuplicate === true,
+    },
+  });
   actor.start();
 
   const snapshot = await waitFor(
     actor,
-    (state) => state.matches("done") || state.matches("ambiguous") || state.matches("failed"),
+    (state) =>
+      state.matches("done") ||
+      state.matches("ambiguous") ||
+      state.matches("duplicate") ||
+      state.matches("failed"),
   );
 
   actor.stop();
 
   if (snapshot.matches("ambiguous")) {
     throw new AmbiguousLinkSelectionError(snapshot.context.ambiguousPayload!);
+  }
+
+  if (snapshot.matches("duplicate")) {
+    throw new DuplicateItemSelectionError({
+      kind: "duplicate_item",
+      url: normalizedUrl,
+      message: "This looks like something already in your list.",
+      items: snapshot.context.duplicateItems ?? [],
+    });
   }
 
   if (snapshot.matches("failed")) {

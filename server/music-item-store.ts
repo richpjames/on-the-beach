@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { and, eq, or } from "drizzle-orm";
 import { db } from "./db/index";
 import { musicItems, artists, musicLinks, sources, musicItemStacks, stacks } from "./db/schema";
 import { normalize, capitalize } from "./utils";
@@ -8,6 +8,7 @@ import { fullItemSelect } from "./queries/full-item-select";
 import {
   NO_SOURCE_CAPABILITIES,
   type CreateMusicItemInput,
+  type DuplicateItemPayload,
   type MusicItemFull,
   type MusicItemLink,
 } from "../domain/types";
@@ -23,6 +24,72 @@ import {
 // for one — import them from here instead. The creator re-exports them so
 // existing importers are unaffected.
 // ---------------------------------------------------------------------------
+
+/**
+ * Thrown by a warn-mode create when the release matches something already in
+ * the list. The route answers it with a `409 duplicate_item` payload so the
+ * client can offer "add anyway" — see `DuplicateItemPayload`.
+ */
+export class DuplicateItemSelectionError extends Error {
+  payload: DuplicateItemPayload;
+
+  constructor(payload: DuplicateItemPayload) {
+    super(payload.message);
+    this.name = "DuplicateItemSelectionError";
+    this.payload = payload;
+  }
+}
+
+/** Enough matches to list in the dialog — beyond this it's noise, not choice. */
+export const DUPLICATE_MATCH_LIMIT = 5;
+
+function isBlankOrUntitled(title: string): boolean {
+  const normalized = normalize(title);
+  return normalized === "" || normalized === normalize("Untitled");
+}
+
+/**
+ * Library-wide duplicate check — the one the URL-keyed checks can't do. An
+ * item matches when it shares the MusicBrainz release id, or when both the
+ * normalized title and the artist's normalized name agree. A title without an
+ * artist matches nothing: "Greatest Hits" alone is not a duplicate of
+ * anything. Returns at most `DUPLICATE_MATCH_LIMIT` full items.
+ */
+export async function findDuplicateItems(
+  artistName: string | undefined,
+  title: string,
+  musicbrainzReleaseId?: string,
+): Promise<MusicItemFull[]> {
+  const titleUsable = !isBlankOrUntitled(title);
+  if (!titleUsable && !musicbrainzReleaseId) return [];
+
+  const conditions = [];
+  if (musicbrainzReleaseId) {
+    conditions.push(eq(musicItems.musicbrainzReleaseId, musicbrainzReleaseId));
+  }
+  if (titleUsable && artistName?.trim()) {
+    const [artist] = await db
+      .select({ id: artists.id })
+      .from(artists)
+      .where(eq(artists.normalizedName, normalize(artistName)))
+      .limit(1);
+    if (artist) {
+      conditions.push(
+        and(eq(musicItems.normalizedTitle, normalize(title)), eq(musicItems.artistId, artist.id)),
+      );
+    }
+  }
+  if (conditions.length === 0) return [];
+
+  const rows = await db
+    .select({ id: musicItems.id })
+    .from(musicItems)
+    .where(or(...conditions))
+    .limit(DUPLICATE_MATCH_LIMIT);
+
+  const items = await Promise.all(rows.map((row) => fetchFullItem(row.id)));
+  return items.filter((item): item is MusicItemFull => item !== null);
+}
 
 /** Look up an existing artist by normalized name, or create a new one. */
 export async function getOrCreateArtist(name: string): Promise<number> {
@@ -124,7 +191,18 @@ export interface CreateResult {
  * Create a music item without a URL — no scraping, no link inserted.
  * Used for physical records or items known only from memory.
  */
-export interface CreateMusicItemDirectOptions {
+/** Duplicate-check behaviour shared by every creation path. */
+export interface DuplicateCheckOptions {
+  /**
+   * Reject a would-be duplicate with `DuplicateItemSelectionError` instead of
+   * inserting. The web add form sets this; ingest paths add silently.
+   */
+  warnOnDuplicate?: boolean;
+  /** Confirmed "add anyway" — skip the duplicate check and insert. */
+  forceDuplicate?: boolean;
+}
+
+export interface CreateMusicItemDirectOptions extends DuplicateCheckOptions {
   /**
    * Skip the secondary-link lookup. For a record that isn't released yet there
    * is nothing on the streaming services to find, and the lookup stamps
@@ -141,6 +219,17 @@ export async function createMusicItemDirect(
 ): Promise<CreateResult> {
   const title = overrides.title || "Untitled";
   const artistName = overrides.artistName;
+
+  if (options.warnOnDuplicate && !options.forceDuplicate) {
+    const duplicates = await findDuplicateItems(artistName, title, overrides.musicbrainzReleaseId);
+    if (duplicates.length > 0) {
+      throw new DuplicateItemSelectionError({
+        kind: "duplicate_item",
+        message: "This looks like something already in your list.",
+        items: duplicates,
+      });
+    }
+  }
 
   let artistId: number | null = null;
   if (artistName) {

@@ -29,6 +29,7 @@
   import AddForm from "./AddForm.svelte";
   import AddLoadingOverlay from "./AddLoadingOverlay.svelte";
   import BrowseControls from "./BrowseControls.svelte";
+  import DuplicateWarningModal from "./DuplicateWarningModal.svelte";
   import LinkPickerModal from "./LinkPickerModal.svelte";
   import MusicList from "./MusicList.svelte";
   import StackBar from "./StackBar.svelte";
@@ -507,6 +508,8 @@
     if (candidate) addFormComponent?.populateFromCandidate(candidate);
   }}
 />
+
+<DuplicateWarningModal {form} />
 
 <SuggestionPickerModal
   {suggestions}
