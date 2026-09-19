@@ -1,0 +1,506 @@
+import { and, count, desc, eq, inArray, ne } from "drizzle-orm";
+import type { ReleaseAlertDetailLink, ReleaseAlertDetailResult } from "../domain/types";
+import { db } from "../adapters/db/index";
+import {
+  artistReleases,
+  artists,
+  musicItemStacks,
+  musicItems,
+  releaseAlerts,
+  stacks,
+} from "../adapters/db/schema";
+// Deliberately not via ./music-item-creator: `ingest.test.ts` mocks that
+// module process-wide (see ./music-item-store.ts).
+import { createMusicItemDirect } from "./music-item-store";
+import {
+  checkReleaseLink,
+  persistReleaseLink,
+  type ReleaseLink,
+  type ReleaseLinkOutcome,
+  type ReleaseLinkQuery,
+} from "./release-link-check";
+import { LOOKUP_SERVICE_CONFIG } from "./secondary-link-enrichment";
+import { parseSecondaryTypes, type AlertReason } from "./artist-watch";
+import { isAnnouncedRelease, remindAtForReleaseDate } from "../domain/release-dates";
+import { getArtistWatchSettings, getNewReleasesStackId, setNewReleasesStackId } from "./settings";
+// Defined in ./musicbrainz so the release query layer can classify a search
+// result without importing this module and the database with it.
+import {
+  fetchReleaseGroupDetail,
+  itemTypeForReleaseGroup,
+  type MbReleaseGroupDetail,
+  type MbUrlRelation,
+} from "../adapters/musicbrainz/index";
+
+export { itemTypeForReleaseGroup };
+
+// ---------------------------------------------------------------------------
+// The alert queue: reading it, and the three things you can do with a card.
+//
+// Alerts aren't music items until accepted, which is why the queue is its own
+// table rather than a stack. Accepting one files a real item into the New
+// Releases stack; if the record isn't out yet it's scheduled to arrive in To
+// Listen on release day, by handing `remind_at` to the reminder cron that
+// already runs.
+// ---------------------------------------------------------------------------
+
+export const NEW_RELEASES_STACK_NAME = "New Releases";
+
+export type AlertStatus = "pending" | "seen" | "added" | "dismissed";
+
+export interface ReleaseAlertView {
+  id: number;
+  status: AlertStatus;
+  reason: AlertReason;
+  created_at: string;
+  resolved_at: string | null;
+  music_item_id: number | null;
+  artist_id: number;
+  artist_name: string;
+  musicbrainz_artist_id: string | null;
+  release_id: number;
+  mb_release_group_id: string;
+  title: string;
+  primary_type: string | null;
+  secondary_types: string[];
+  first_release_date: string | null;
+  first_release_year: number | null;
+}
+
+function toIso(value: Date | null): string | null {
+  return value instanceof Date ? value.toISOString() : null;
+}
+
+export async function listReleaseAlerts(
+  statuses: AlertStatus[] = ["pending"],
+): Promise<ReleaseAlertView[]> {
+  const rows = await db
+    .select({
+      id: releaseAlerts.id,
+      status: releaseAlerts.status,
+      reason: releaseAlerts.reason,
+      createdAt: releaseAlerts.createdAt,
+      resolvedAt: releaseAlerts.resolvedAt,
+      musicItemId: releaseAlerts.musicItemId,
+      artistId: artists.id,
+      artistName: artists.name,
+      musicbrainzArtistId: artists.musicbrainzArtistId,
+      releaseId: artistReleases.id,
+      mbReleaseGroupId: artistReleases.mbReleaseGroupId,
+      title: artistReleases.title,
+      primaryType: artistReleases.primaryType,
+      secondaryTypes: artistReleases.secondaryTypes,
+      firstReleaseDate: artistReleases.firstReleaseDate,
+      firstReleaseYear: artistReleases.firstReleaseYear,
+    })
+    .from(releaseAlerts)
+    .innerJoin(artistReleases, eq(artistReleases.id, releaseAlerts.artistReleaseId))
+    .innerJoin(artists, eq(artists.id, releaseAlerts.artistId))
+    .where(inArray(releaseAlerts.status, statuses))
+    .orderBy(desc(releaseAlerts.createdAt), desc(releaseAlerts.id));
+
+  return rows.map((row) => ({
+    id: row.id,
+    status: row.status as AlertStatus,
+    reason: row.reason as AlertReason,
+    created_at: toIso(row.createdAt) ?? new Date(0).toISOString(),
+    resolved_at: toIso(row.resolvedAt),
+    music_item_id: row.musicItemId,
+    artist_id: row.artistId,
+    artist_name: row.artistName,
+    musicbrainz_artist_id: row.musicbrainzArtistId,
+    release_id: row.releaseId,
+    mb_release_group_id: row.mbReleaseGroupId,
+    title: row.title,
+    primary_type: row.primaryType,
+    secondary_types: parseSecondaryTypes(row.secondaryTypes),
+    first_release_date: row.firstReleaseDate,
+    first_release_year: row.firstReleaseYear,
+  }));
+}
+
+// ---------------------------------------------------------------------------
+// Card detail
+//
+// The queue row is what the watcher needed to decide the record was new. A
+// person deciding whether to *file* it wants more than that — what the record
+// is, what's on it, and whether there's anywhere to hear it — so opening a card
+// asks MusicBrainz, once, for the rest.
+// ---------------------------------------------------------------------------
+
+/** Sites you can hear a record on, as opposed to read about it. */
+const LISTENABLE_RELATION_TYPES = new Set(["streaming", "free streaming", "download for free"]);
+
+const LINK_LABELS: ReadonlyArray<{ host: string; label: string; listenable: boolean }> = [
+  { host: "bandcamp.com", label: "Bandcamp", listenable: true },
+  { host: "music.apple.com", label: "Apple Music", listenable: true },
+  { host: "open.spotify.com", label: "Spotify", listenable: true },
+  { host: "soundcloud.com", label: "SoundCloud", listenable: true },
+  { host: "youtube.com", label: "YouTube", listenable: true },
+  { host: "youtu.be", label: "YouTube", listenable: true },
+  { host: "tidal.com", label: "Tidal", listenable: true },
+  { host: "deezer.com", label: "Deezer", listenable: true },
+  { host: "mixcloud.com", label: "Mixcloud", listenable: true },
+  { host: "discogs.com", label: "Discogs", listenable: false },
+  { host: "wikidata.org", label: "Wikidata", listenable: false },
+  { host: "wikipedia.org", label: "Wikipedia", listenable: false },
+  { host: "rateyourmusic.com", label: "RateYourMusic", listenable: false },
+];
+
+/** Strip the leading "www." so "www.discogs.com" reads as the site it is. */
+function hostLabel(hostname: string): string {
+  return hostname.replace(/^www\./, "");
+}
+
+function describeLink(relation: MbUrlRelation): ReleaseAlertDetailLink | null {
+  let hostname: string;
+  try {
+    hostname = new URL(relation.url).hostname.toLowerCase();
+  } catch {
+    // MB's url relations are editor-entered; an unparseable one is not a link.
+    return null;
+  }
+
+  const known = LINK_LABELS.find(
+    (entry) => hostname === entry.host || hostname.endsWith(`.${entry.host}`),
+  );
+
+  return {
+    url: relation.url,
+    label: known?.label ?? hostLabel(hostname),
+    kind: relation.type,
+    // The relationship type is the authority — MB marks a Bandcamp page that
+    // is download-only as such — and the host table only fills its silence.
+    listenable: relation.type
+      ? LISTENABLE_RELATION_TYPES.has(relation.type)
+      : (known?.listenable ?? false),
+  };
+}
+
+/** Listenable links first, then alphabetically — the useful ones lead. */
+function sortLinks(links: ReleaseAlertDetailLink[]): ReleaseAlertDetailLink[] {
+  return [...links].sort((a, b) => {
+    if (a.listenable !== b.listenable) return a.listenable ? -1 : 1;
+    return a.label.localeCompare(b.label);
+  });
+}
+
+/**
+ * The expanded view of one alert. Returns `null` when there's no such alert,
+ * and an `error` result when MusicBrainz couldn't be asked — a panel that says
+ * so is honest, where an empty tracklist would be a claim about the record.
+ */
+export async function getAlertDetail(alertId: number): Promise<ReleaseAlertDetailResult | null> {
+  const alert = await db
+    .select({
+      mbReleaseGroupId: artistReleases.mbReleaseGroupId,
+      primaryType: artistReleases.primaryType,
+      secondaryTypes: artistReleases.secondaryTypes,
+      firstReleaseDate: artistReleases.firstReleaseDate,
+      musicbrainzArtistId: artists.musicbrainzArtistId,
+    })
+    .from(releaseAlerts)
+    .innerJoin(artistReleases, eq(artistReleases.id, releaseAlerts.artistReleaseId))
+    .innerJoin(artists, eq(artists.id, releaseAlerts.artistId))
+    .where(eq(releaseAlerts.id, alertId))
+    .get();
+
+  if (!alert) return null;
+  if (process.env.OTB_DISABLE_EXTERNAL_LOOKUPS) {
+    return { detail: null, error: "Release lookups are switched off." };
+  }
+
+  let group: MbReleaseGroupDetail;
+  try {
+    group = await fetchReleaseGroupDetail(alert.mbReleaseGroupId);
+  } catch (err) {
+    console.warn(`[release-alerts] Detail lookup failed for alert ${alertId}:`, err);
+    return { detail: null, error: "Couldn't reach MusicBrainz for the details." };
+  }
+
+  return {
+    detail: {
+      musicbrainzUrl: `https://musicbrainz.org/release-group/${alert.mbReleaseGroupId}`,
+      artistMusicbrainzUrl: alert.musicbrainzArtistId
+        ? `https://musicbrainz.org/artist/${alert.musicbrainzArtistId}`
+        : null,
+      // Same wiring the card's thumbnail uses, one size up for the open panel.
+      coverArtUrl: `https://coverartarchive.org/release-group/${encodeURIComponent(alert.mbReleaseGroupId)}/front-500`,
+      disambiguation: group.disambiguation,
+      artistCredit: group.artistCredit,
+      // MusicBrainz is the newer word on all three: a date firms up from a
+      // year to a day, and a type is re-filed, long after the alert was raised.
+      firstReleaseDate: group.firstReleaseDate ?? alert.firstReleaseDate,
+      primaryType: group.primaryType ?? alert.primaryType,
+      secondaryTypes:
+        group.secondaryTypes.length > 0
+          ? group.secondaryTypes
+          : parseSecondaryTypes(alert.secondaryTypes),
+      links: sortLinks(group.links.flatMap((link) => describeLink(link) ?? [])),
+      tracks: group.tracks,
+      trackCount: group.trackCount,
+      totalLengthMs: group.totalLengthMs,
+      label: group.label,
+      country: group.country,
+      format: group.format,
+      releaseTitle: group.releaseTitle,
+      releaseDate: group.releaseDate,
+    },
+    error: null,
+  };
+}
+
+export async function countPendingAlerts(): Promise<number> {
+  // Aggregate rather than counting rows in JS: this runs on every taskbar
+  // navigation and every alert-list request.
+  const row = await db
+    .select({ value: count() })
+    .from(releaseAlerts)
+    .where(eq(releaseAlerts.status, "pending"))
+    .get();
+  return row?.value ?? 0;
+}
+
+/** Bulk `pending` → `seen`, so the taskbar badge clears without forcing a decision. */
+export async function markAlertsSeen(): Promise<number> {
+  const updated = await db
+    .update(releaseAlerts)
+    .set({ status: "seen" })
+    .where(eq(releaseAlerts.status, "pending"))
+    .returning({ id: releaseAlerts.id });
+  return updated.length;
+}
+
+export async function dismissAlert(alertId: number): Promise<boolean> {
+  const updated = await db
+    .update(releaseAlerts)
+    .set({ status: "dismissed", resolvedAt: new Date() })
+    .where(eq(releaseAlerts.id, alertId))
+    .returning({ id: releaseAlerts.id });
+  return updated.length > 0;
+}
+
+/**
+ * Mute an artist and clear the alerts already queued for them. Compilation
+ * credits and one-off features generate alerts nobody wants, and the only
+ * person who can tell is the user.
+ */
+export async function muteArtist(artistId: number): Promise<boolean> {
+  const now = new Date();
+  const updated = await db
+    .update(artists)
+    .set({ followState: "muted", nextPollAt: null, updatedAt: now })
+    .where(eq(artists.id, artistId))
+    .returning({ id: artists.id });
+  if (updated.length === 0) return false;
+
+  await db
+    .update(releaseAlerts)
+    .set({ status: "dismissed", resolvedAt: now })
+    .where(
+      and(eq(releaseAlerts.artistId, artistId), inArray(releaseAlerts.status, ["pending", "seen"])),
+    );
+
+  return true;
+}
+
+/**
+ * The stack accepted alerts are filed into, created on first accept and
+ * referenced by id in settings. `stacks.name` is unique and user-editable, so
+ * name-matching would silently create a duplicate the moment the user renames
+ * it — the id is recreated only when it no longer resolves.
+ */
+export async function ensureNewReleasesStack(): Promise<number> {
+  const storedId = await getNewReleasesStackId();
+  if (storedId !== null) {
+    const existing = await db
+      .select({ id: stacks.id })
+      .from(stacks)
+      .where(eq(stacks.id, storedId))
+      .get();
+    if (existing) return existing.id;
+  }
+
+  // A stack of that name may already exist from a previous install whose
+  // setting was lost — adopt it rather than colliding with the unique index.
+  const byName = await db
+    .select({ id: stacks.id })
+    .from(stacks)
+    .where(eq(stacks.name, NEW_RELEASES_STACK_NAME))
+    .get();
+  if (byName) {
+    await setNewReleasesStackId(byName.id);
+    return byName.id;
+  }
+
+  const [created] = await db
+    .insert(stacks)
+    .values({ name: NEW_RELEASES_STACK_NAME })
+    .returning({ id: stacks.id });
+  await setNewReleasesStackId(created.id);
+  return created.id;
+}
+
+/** The link that vouched for the release, as shown back to the user. */
+export interface AcceptedLink {
+  url: string;
+  /** "Apple Music", "Spotify" or "MusicBrainz". */
+  foundBy: string;
+  via: "provider" | "musicbrainz";
+}
+
+export type AcceptOutcome =
+  | { status: "added"; itemId: number; remindAt: Date | null; link: AcceptedLink | null }
+  /** No such alert, or another request accepted it first. */
+  | { status: "not-found" }
+  /** Neither the provider of choice nor MusicBrainz has a link for the record. */
+  | { status: "no-link"; serviceName: string }
+  /** The check didn't complete, so nothing is known either way — retryable. */
+  | { status: "check-failed"; message: string };
+
+/**
+ * Accept an alert: create the item with the MusicBrainz metadata prefilled,
+ * file it in the New Releases stack, and — when the record is still
+ * announced-only — hand its release date to the reminder cron via `remind_at`.
+ * `processReminders()` flips the item to To Listen on release day; until then
+ * it sits in Scheduled, already excluded from the To Listen feeds. No new
+ * scheduling code.
+ *
+ * Nothing is filed unless the release brings a link with it — the provider of
+ * choice carries it, or MusicBrainz's external links point somewhere. See
+ * ./release-link-check.ts for why, and for why a check that failed is not the
+ * same answer as a record nobody carries. The gate runs *before* the claim
+ * below, so a refused alert is left exactly as it was and can be tried again
+ * once the streaming services catch up.
+ *
+ * A record that is going to be *scheduled* is exempt: nobody carries a link to
+ * an album that isn't out, and refusing it would make the announced case — the
+ * one the watcher is most useful for — unaddable. Its check moves to release
+ * day instead, where `processReminders()` runs it before letting the item into
+ * To Listen. That is also why the gate isn't run here at all for those: the
+ * answer today says nothing about the answer on the day.
+ */
+export async function acceptAlert(
+  alertId: number,
+  now: Date = new Date(),
+  checkLink: (query: ReleaseLinkQuery) => Promise<ReleaseLinkOutcome> = checkReleaseLink,
+): Promise<AcceptOutcome> {
+  const alert = await db
+    .select({
+      id: releaseAlerts.id,
+      status: releaseAlerts.status,
+      artistName: artists.name,
+      title: artistReleases.title,
+      mbReleaseGroupId: artistReleases.mbReleaseGroupId,
+      primaryType: artistReleases.primaryType,
+      firstReleaseDate: artistReleases.firstReleaseDate,
+      firstReleaseYear: artistReleases.firstReleaseYear,
+    })
+    .from(releaseAlerts)
+    .innerJoin(artistReleases, eq(artistReleases.id, releaseAlerts.artistReleaseId))
+    .innerJoin(artists, eq(artists.id, releaseAlerts.artistId))
+    .where(eq(releaseAlerts.id, alertId))
+    .get();
+
+  if (!alert || alert.status === "added") return { status: "not-found" };
+
+  const settings = await getArtistWatchSettings();
+  const remindAt = settings.scheduleAnnouncedReleases
+    ? remindAtForReleaseDate(alert.firstReleaseDate, now)
+    : null;
+
+  let found: ReleaseLink | null = null;
+  if (remindAt === null) {
+    const linkCheck = await checkLink({
+      title: alert.title,
+      artistName: alert.artistName,
+      mbReleaseGroupId: alert.mbReleaseGroupId,
+    });
+
+    if (linkCheck.kind === "failed") {
+      return { status: "check-failed", message: linkCheck.message };
+    }
+    if (linkCheck.kind === "none") {
+      return {
+        status: "no-link",
+        serviceName: LOOKUP_SERVICE_CONFIG[linkCheck.service].displayName,
+      };
+    }
+    if (linkCheck.kind === "found") found = linkCheck.link;
+  }
+
+  // Claim the alert before creating anything. Reading the status and acting on
+  // it are two steps, so without a claim two concurrent accepts of the same
+  // alert both pass the check above and both create an item. Flipping the
+  // status under a `status != 'added'` predicate makes exactly one of them win;
+  // the loser sees zero rows and bails.
+  const claimed = await db
+    .update(releaseAlerts)
+    .set({ status: "added", resolvedAt: now })
+    .where(and(eq(releaseAlerts.id, alertId), ne(releaseAlerts.status, "added")))
+    .returning({ id: releaseAlerts.id });
+  if (claimed.length === 0) return { status: "not-found" };
+
+  try {
+    const { item } = await createMusicItemDirect(
+      {
+        title: alert.title,
+        artistName: alert.artistName,
+        itemType: itemTypeForReleaseGroup(alert.primaryType),
+        listenStatus: "to-listen",
+        year: alert.firstReleaseYear ?? undefined,
+      },
+      // Nothing to gain from the eager background lookup in either case: the
+      // gate has just asked the provider and its answer is written below, or
+      // the record isn't out, where a lookup would find nothing and stamp an
+      // attempt marker that would stop the item being re-queried once it
+      // actually is released. Release day re-checks it either way.
+      { skipLinkEnrichment: found !== null || remindAt !== null },
+    );
+
+    // Asked of the release date, not of `remindAt`: with scheduling switched
+    // off an announced record is filed straight into To Listen, and the
+    // provider's "no" about a record that isn't out must not be remembered.
+    if (found) {
+      await persistReleaseLink(item.id, found, {
+        released: !isAnnouncedRelease(alert.firstReleaseDate, now),
+      });
+    }
+
+    if (remindAt) {
+      await db
+        .update(musicItems)
+        .set({ remindAt, reminderPending: false, updatedAt: now })
+        .where(eq(musicItems.id, item.id));
+    }
+
+    // Items land in the stack *in addition* to normal status handling, so it
+    // accumulates as a running record of what the watcher has fed the library.
+    const stackId = await ensureNewReleasesStack();
+    await db
+      .insert(musicItemStacks)
+      .values({ musicItemId: item.id, stackId })
+      .onConflictDoNothing();
+
+    await db
+      .update(releaseAlerts)
+      .set({ musicItemId: item.id })
+      .where(eq(releaseAlerts.id, alertId));
+
+    return {
+      status: "added",
+      itemId: item.id,
+      remindAt,
+      link: found ? { url: found.url, foundBy: found.foundBy, via: found.via } : null,
+    };
+  } catch (err) {
+    // The claim is only good if the work behind it succeeded — otherwise the
+    // alert would sit as `added` with no item to show for it, unreachable from
+    // the queue and impossible to retry.
+    await db
+      .update(releaseAlerts)
+      .set({ status: alert.status, resolvedAt: null })
+      .where(eq(releaseAlerts.id, alertId));
+    throw err;
+  }
+}

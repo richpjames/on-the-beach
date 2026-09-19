@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, mock, spyOn, test } from "bun:test";
-import { extractReleaseInfo } from "../../server/vision";
+import { extractReleaseInfo } from "../../adapters/mistral/index";
 
 function mockChatCompletionResponse(
   content: string | Array<{ type: string; text: string }>,

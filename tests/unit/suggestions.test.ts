@@ -1,10 +1,10 @@
 import { describe, expect, mock, spyOn, test, afterEach, beforeEach } from "bun:test";
 import { eq } from "drizzle-orm";
-import * as musicbrainz from "../../server/musicbrainz";
-import { db } from "../../server/db/index";
-import { artists, itemSuggestions, musicItems } from "../../server/db/schema";
-import { VARIOUS_ARTISTS_MBID } from "../../server/artist-identity";
-import { normalize } from "../../server/utils";
+import * as musicbrainz from "../../adapters/musicbrainz/index";
+import { db } from "../../adapters/db/index";
+import { artists, itemSuggestions, musicItems } from "../../adapters/db/schema";
+import { VARIOUS_ARTISTS_MBID } from "../../app/artist-identity";
+import { normalize } from "../../domain/text";
 import {
   backfillSuggestionReleaseGroups,
   fetchAndStoreSuggestion,
@@ -13,7 +13,7 @@ import {
   ensureSuggestionsForToListenArtists,
   SUGGESTION_TARGET,
   __clearSuggestionSweepBackoff,
-} from "../../server/suggestions";
+} from "../../app/suggestions";
 
 async function createArtistWithItem(
   artistName: string,
@@ -381,7 +381,7 @@ describe("fetchAndStoreSuggestion", () => {
   });
 
   test("passes the stored release length preference to the lookup", async () => {
-    const { setReleaseLengthPreference } = await import("../../server/settings");
+    const { setReleaseLengthPreference } = await import("../../app/settings.ts");
     await setReleaseLengthPreference("shorter");
     const mbSpy = spyOn(musicbrainz, "findSuggestedReleases").mockResolvedValue([testSuggestion]);
     const { itemId } = await createArtistWithItem("Length Pref Band", "Length Album");

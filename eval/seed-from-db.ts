@@ -4,8 +4,8 @@
 import { readFileSync, writeFileSync, existsSync, copyFileSync, mkdirSync } from "node:fs";
 import { resolve, extname, basename } from "node:path";
 import { eq, isNotNull } from "drizzle-orm";
-import { db } from "../server/db/index";
-import { musicItems, artists } from "../server/db/schema";
+import { db } from "../adapters/db/index";
+import { musicItems, artists } from "../adapters/db/schema";
 import type { EvalManifest } from "./types";
 
 // ---------------------------------------------------------------------------

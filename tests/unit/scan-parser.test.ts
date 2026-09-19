@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { parseScanJson } from "../../server/scan-parser";
+import { parseScanJson } from "../../domain/scan-parser";
 
 describe("parseScanJson", () => {
   test("parses valid JSON with artist and title", () => {

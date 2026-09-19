@@ -1,6 +1,6 @@
 import { describe, test, expect, spyOn, mock, beforeEach, afterEach } from "bun:test";
-import { scrapeUrl } from "../../server/scraper";
-import { parseAppleMusicOg, searchAppleMusic } from "../../server/apple-music";
+import { scrapeUrl } from "../../app/scrape";
+import { parseAppleMusicOg, searchAppleMusic } from "../../adapters/apple-music/index";
 
 describe("parseAppleMusicOg", () => {
   test("extracts title and artist from description", () => {

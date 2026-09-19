@@ -7,8 +7,8 @@ import {
   listReleaseAlerts,
   markAlertsSeen,
   type AlertStatus,
-} from "../release-alerts";
-import { fetchFullItem } from "../music-item-store";
+} from "../../app/release-alerts";
+import { fetchFullItem } from "../../app/music-item-store";
 
 const ALERT_STATUSES: readonly AlertStatus[] = ["pending", "seen", "added", "dismissed"];
 

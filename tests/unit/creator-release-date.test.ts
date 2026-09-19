@@ -1,6 +1,6 @@
 import { afterAll, afterEach, beforeEach, describe, expect, mock, spyOn, test } from "bun:test";
-import { createMusicItemsFromUrl } from "../../server/music-item-creator";
-import { DEFAULT_ARTIST_WATCH_SETTINGS, setArtistWatchSettings } from "../../server/settings";
+import { createMusicItemsFromUrl } from "../../app/music-item-creator";
+import { DEFAULT_ARTIST_WATCH_SETTINGS, setArtistWatchSettings } from "../../app/settings";
 
 // Freshly created items kick off background lookups — keep them off the
 // network, and restore the flag afterwards so it doesn't leak into whichever

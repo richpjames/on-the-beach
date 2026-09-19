@@ -1,15 +1,15 @@
 import { error } from "@sveltejs/kit";
 import type { PageServerLoad } from "./$types";
-import { fetchFullItem } from "../../../../server/music-item-creator";
-import { getLookupService } from "../../../../server/settings";
-import { isAppleMusicConfigured } from "../../../../server/apple-music";
+import { fetchFullItem } from "../../../../app/music-item-creator";
+import { getLookupService } from "../../../../app/settings";
+import { isAppleMusicConfigured } from "../../../../adapters/apple-music/index";
+import { parseUrl } from "../../../../adapters/registry";
 import {
-  parseUrl,
   extractYouTubeVideoId,
   extractYouTubePlaylistId,
-} from "../../../../server/utils";
-import { mixcloudWidgetSrc } from "../../../../server/mixcloud";
-import { soundcloudWidgetSrc } from "../../../../server/soundcloud";
+} from "../../../../adapters/youtube/index";
+import { mixcloudWidgetSrc } from "../../../../adapters/mixcloud/index";
+import { soundcloudWidgetSrc } from "../../../../adapters/soundcloud/index";
 import { parseAppleMusicCatalogUrl, type AppleMusicResource } from "../../../../domain/apple-music";
 import { sanitizeListHref } from "../../../ui/logic/list-url";
 import type { MusicItemFull } from "../../../../domain/types";

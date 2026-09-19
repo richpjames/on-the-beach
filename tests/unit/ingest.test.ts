@@ -1,7 +1,7 @@
 import { describe, it, expect, mock, spyOn, beforeEach, afterEach, afterAll } from "bun:test";
 import { Hono } from "hono";
 // Imported before mock.module so the real exports can be passed through below.
-import * as realCreator from "../../server/music-item-creator";
+import * as realCreator from "../../app/music-item-creator";
 
 // Held before mock.module runs: it mutates the imported namespace in place, so
 // after mocking `realCreator.createMusicItemsFromUrl` *is* the stub. These are
@@ -28,7 +28,7 @@ const mockCountToListen = mock();
 // (this broke the main-page SSR tests on CI, where this file runs first).
 // Passing the real values through keeps other test files working regardless
 // of file execution order.
-mock.module("../../server/music-item-creator", () => ({
+mock.module("../../app/music-item-creator", () => ({
   ...realCreator,
   createMusicItemsFromUrl: mockCreateMany,
   createMusicItemDirect: mockCreateDirect,
@@ -39,7 +39,7 @@ mock.module("../../server/music-item-creator", () => ({
 // that drives the real creator (creator-page-source-notes.test.ts) would
 // otherwise get these stubs instead.
 afterAll(() => {
-  mock.module("../../server/music-item-creator", () => ({
+  mock.module("../../app/music-item-creator", () => ({
     ...realCreator,
     createMusicItemsFromUrl: realCreateMusicItemsFromUrl,
     createMusicItemDirect: realCreateMusicItemDirect,

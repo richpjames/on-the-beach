@@ -95,8 +95,17 @@
   }
 
   // ── Listen buttons ─────────────────────────────────────────────────────────
+  // On touch devices the floating player window doesn't suit the screen, so the
+  // buttons hand off to the service's own site instead. listenWord reads this
+  // same flag so the words never claim in-page playback that isn't going to
+  // happen. Set after mount (not at init) to keep SSR and hydration in sync.
+  let coarsePointer = $state(false);
+  onMount(() => {
+    coarsePointer = window.matchMedia("(pointer: coarse)").matches;
+  });
+
   function listen(embed: ListenEmbed): void {
-    if (window.matchMedia("(pointer: coarse)").matches && embed.href) {
+    if (coarsePointer && embed.href) {
       window.open(embed.href, "_blank", "noopener,noreferrer");
     } else {
       player.load(embed.src, item.title, item.artist_name ?? "", embed.playerType, item.id);
@@ -107,8 +116,7 @@
   // iframe. On touch devices, hand off to the native Apple Music app/site — the
   // same behaviour the other listen buttons use for coarse pointers.
   function listenAppleMusic(listenTarget: AppleMusicListen): void {
-    const coarse = window.matchMedia("(pointer: coarse)").matches;
-    if (listenTarget.mode === "musickit" && listenTarget.resource && !coarse) {
+    if (listenTarget.mode === "musickit" && listenTarget.resource && !coarsePointer) {
       player.loadAppleMusic(
         listenTarget.resource.kind,
         listenTarget.resource.id,
@@ -118,7 +126,7 @@
       );
       return;
     }
-    if (coarse) {
+    if (coarsePointer) {
       window.open(listenTarget.href, "_blank", "noopener,noreferrer");
       return;
     }
@@ -134,7 +142,7 @@
   // through MusicKit when it resolves to a playable catalogue resource.
   function listenLookupAppleMusic(url: string): void {
     const resource = parseAppleMusicCatalogUrl(url);
-    if (resource && !window.matchMedia("(pointer: coarse)").matches) {
+    if (resource && !coarsePointer) {
       player.loadAppleMusic(resource.kind, resource.id, item.title, item.artist_name ?? "", item.id);
     } else {
       window.open(url, "_blank", "noopener,noreferrer");
@@ -400,7 +408,9 @@
   // The play controls read as one sentence — "listen: here there" — instead of
   // as a rank of service names; the service each word hides behind is in its
   // tooltip and its accessible name. The joke only has two words in it, so a
-  // third option onwards is named plainly.
+  // third option onwards is named plainly. Touch devices get plain names for
+  // every option: their buttons open the service's own site, so "here" would
+  // promise the in-page player and not deliver it.
   type ListenTarget = {
     key: string;
     service: string;
@@ -471,8 +481,11 @@
     return targets;
   });
 
-  /** "here" and "there", then the service's own name once the words run out. */
+  /** "here" and "there", then the service's own name once the words run out —
+   *  or the service's name straight away on touch devices, where the button
+   *  leaves the page rather than playing here. */
   function listenWord(index: number, service: string): string {
+    if (coarsePointer) return service;
     return index === 0 ? "here" : index === 1 ? "there" : service;
   }
 

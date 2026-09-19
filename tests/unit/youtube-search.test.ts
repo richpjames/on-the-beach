@@ -3,7 +3,7 @@ import {
   judgeYouTubeCandidate,
   searchYouTube,
   type YouTubeCandidate,
-} from "../../server/youtube-search";
+} from "../../adapters/youtube/index";
 
 function candidate(title: string, channelTitle = "Some Uploader"): YouTubeCandidate {
   return { videoId: "abc123", title, channelTitle };

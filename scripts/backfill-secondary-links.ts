@@ -17,13 +17,13 @@
  *   --dry-run    List eligible items without querying the service or writing.
  */
 import { and, eq, isNull, sql } from "drizzle-orm";
-import { db } from "../server/db/index";
-import { musicItems, musicLinks, sources } from "../server/db/schema";
+import { db } from "../adapters/db/index";
+import { musicItems, musicLinks, sources } from "../adapters/db/schema";
 import {
   lookupSecondaryLinkForItem,
   LOOKUP_SERVICE_CONFIG,
-} from "../server/secondary-link-enrichment";
-import { getLookupService } from "../server/settings";
+} from "../app/secondary-link-enrichment";
+import { getLookupService } from "../app/settings";
 
 interface Args {
   limit: number | null;

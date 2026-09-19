@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, mock, test } from "bun:test";
 import {
   backfillAppleMusicLink,
   type AppleMusicBackfillDeps,
-} from "../../server/apple-music-backfill";
+} from "../../app/apple-music-backfill";
 
 const mockFetchItem = mock();
 const mockGetExistingLink = mock();

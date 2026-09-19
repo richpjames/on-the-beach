@@ -3,7 +3,7 @@ import {
   normalizeTitleForMatch,
   titlesMatchClosely,
   titleMatchesAny,
-} from "../../server/title-similarity";
+} from "../../domain/title-similarity";
 
 describe("normalizeTitleForMatch", () => {
   test("lowercases and collapses punctuation to spaces", () => {

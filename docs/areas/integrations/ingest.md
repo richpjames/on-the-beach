@@ -10,12 +10,12 @@
 ## Release dates
 
 - A page that names a release date dates the item it creates, and a date still to come schedules it: `remind_at` is set to release day, so a Bandcamp pre-order lands in Scheduled and arrives in To Listen when it's out, rather than sitting in To Listen with nothing to play.
-- Gated on the same "Schedule unreleased records to arrive in To Listen on release day" setting as an accepted release alert, and computed with the same `remindAtForReleaseDate` (`server/release-dates.ts`), so a record reaching the library by either route is scheduled for the same day.
+- Gated on the same "Schedule unreleased records to arrive in To Listen on release day" setting as an accepted release alert, and computed with the same `remindAtForReleaseDate` (`domain/release-dates.ts`), so a record reaching the library by either route is scheduled for the same day.
 - An explicit `remindAt` in the request is applied after creation and so overrides the scraped date — the user's own choice wins.
 
 ## URL extraction
 
-- `server/email-parser.ts` pulls links from HTML first, then falls back to plain text.
+- `app/email-parser.ts` pulls links from HTML first, then falls back to plain text.
 - Extracted URLs are normalized through `parseUrl()` so duplicate links collapse before creation.
 - Unknown sources can still be passed through when ingest opts into `includeUnknown`.
 

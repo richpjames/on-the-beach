@@ -2,8 +2,8 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { eq, inArray } from "drizzle-orm";
 import { Hono } from "hono";
 
-import { db } from "../../server/db/index";
-import { musicItems, musicLinks } from "../../server/db/schema";
+import { db } from "../../adapters/db/index";
+import { musicItems, musicLinks } from "../../adapters/db/schema";
 import { musicItemRoutes } from "../../server/routes/music-items";
 
 // A link added by hand on the release page never went through the scrape that

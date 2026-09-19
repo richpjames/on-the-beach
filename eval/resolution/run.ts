@@ -1,6 +1,6 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
-import { resolveRelease } from "../../server/release-resolver";
+import { resolveRelease } from "../../app/release-resolver";
 import type { EvalManifest } from "../types";
 import { scoreCase, summarise, type CaseScore, type ReturnedIds, type Summary } from "./score";
 import { strategies, type ResolutionStrategy } from "./strategies";

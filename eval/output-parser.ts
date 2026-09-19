@@ -1,4 +1,4 @@
-import { parseScanJson } from "../server/scan-parser";
+import { parseScanJson } from "../domain/scan-parser";
 import type { EvalModelKind } from "./types";
 
 interface ParsedOutput {

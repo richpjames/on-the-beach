@@ -19,9 +19,9 @@
  *   --dry-run    List eligible links without scraping or writing.
  */
 import { and, eq, isNull, like, or, sql } from "drizzle-orm";
-import { db } from "../server/db/index";
-import { musicLinks, sources } from "../server/db/schema";
-import { scrapeAddedLink } from "../server/added-link-scrape";
+import { db } from "../adapters/db/index";
+import { musicLinks, sources } from "../adapters/db/schema";
+import { scrapeAddedLink } from "../app/added-link-scrape";
 
 interface Args {
   limit: number | null;

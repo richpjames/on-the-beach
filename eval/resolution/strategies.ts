@@ -1,4 +1,4 @@
-import type { ResolverOptions } from "../../server/release-resolver";
+import type { ResolverOptions } from "../../app/release-resolver";
 
 /**
  * A strategy is a resolver configuration, not a separate implementation. The

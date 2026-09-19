@@ -3,7 +3,7 @@ import {
   extractPageLinks,
   matchReleaseUrls,
   type ExtractedReleaseCandidate,
-} from "../../server/link-extractor";
+} from "../../adapters/web/link-extractor";
 
 function candidate(
   title: string,

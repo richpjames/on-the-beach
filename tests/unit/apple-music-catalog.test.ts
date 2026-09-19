@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, describe, expect, mock, spyOn, test } from "bun:test";
 import crypto from "node:crypto";
-import { searchAppleMusicCatalog } from "../../server/apple-music/catalog";
-import { searchAppleMusic } from "../../server/apple-music";
-import { resetDeveloperTokenCache } from "../../server/apple-music";
+import { searchAppleMusicCatalog } from "../../adapters/apple-music/catalog";
+import { searchAppleMusic } from "../../adapters/apple-music/index";
+import { resetDeveloperTokenCache } from "../../adapters/apple-music/index";
 
 const { privateKey } = crypto.generateKeyPairSync("ec", { namedCurve: "P-256" });
 const privatePem = privateKey.export({ type: "pkcs8", format: "pem" }) as string;

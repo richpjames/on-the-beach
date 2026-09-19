@@ -9,7 +9,7 @@ import {
   scoreCandidate,
   similarity,
   stripCreditClause,
-} from "../../server/release-resolver";
+} from "../../app/release-resolver";
 
 describe("normalizeForMatch", () => {
   test("strips diacritics so a sleeve without accents matches a catalogue with them", () => {

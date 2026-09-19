@@ -1,7 +1,7 @@
 import { Mistral } from "@mistralai/mistralai";
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from "node:fs";
 import { resolve, dirname } from "node:path";
-import { parseScanJson } from "../server/scan-parser";
+import { parseScanJson } from "../domain/scan-parser";
 import { OCR_TEXT_PARSER_MODELS, getVisionModelConfigById } from "./models";
 import { parseBatchOutput, parseOcrTextBatchOutput } from "./output-parser";
 import { buildRawOcrReport } from "./raw-ocr-report";

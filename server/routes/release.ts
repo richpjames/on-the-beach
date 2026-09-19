@@ -1,19 +1,19 @@
 import { Hono } from "hono";
-import { extractReleaseInfo, extractReleaseInfoFromWebContext } from "../vision";
-import { getWebContext } from "../google-vision";
-import { lookupRelease } from "../musicbrainz";
-import { fetchAndSaveCoverArt } from "../cover-art-archive";
-import { createScanEnricher } from "../scan-enricher";
+import { extractReleaseInfo, extractReleaseInfoFromWebContext } from "../../adapters/mistral/index";
+import { getWebContext } from "../../adapters/google-vision/index";
+import { lookupRelease } from "../../adapters/musicbrainz/index";
+import { fetchAndSaveCoverArt } from "../../adapters/musicbrainz/cover-art-archive";
+import { createScanEnricher } from "../../app/scan-enricher";
 import type { ScanResult } from "../../domain/types";
-import type { MusicBrainzFields } from "../musicbrainz";
+import type { MusicBrainzFields } from "../../adapters/musicbrainz/index";
 import { saveImageFromBase64, validateImageBase64 } from "../uploads";
-import { db } from "../db/index";
-import { sources } from "../db/schema";
-import { recognizeAudio, isAcrCloudConfigured } from "../acrcloud";
+import { db } from "../../adapters/db/index";
+import { sources } from "../../adapters/db/schema";
+import { recognizeAudio, isAcrCloudConfigured } from "../../adapters/acrcloud/index";
 import {
   lookupSecondaryLinkForItem,
   type SecondaryLookupOutcome,
-} from "../secondary-link-enrichment";
+} from "../../app/secondary-link-enrichment";
 
 export type LookupSecondaryLinkFn = (itemId: number) => Promise<SecondaryLookupOutcome>;
 

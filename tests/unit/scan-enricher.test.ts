@@ -1,7 +1,7 @@
 import { describe, expect, mock, test } from "bun:test";
-import { createScanEnricher } from "../../server/scan-enricher";
+import { createScanEnricher } from "../../app/scan-enricher";
 import type { ScanResult } from "../../domain/types";
-import type { MusicBrainzFields } from "../../server/musicbrainz";
+import type { MusicBrainzFields } from "../../adapters/musicbrainz/index";
 
 describe("createScanEnricher", () => {
   const highConfidenceResult: ScanResult = {

@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { eq, and, count, asc } from "drizzle-orm";
-import { db } from "../db";
-import { stacks, musicItemStacks, stackParents } from "../db/schema";
+import { db } from "../../adapters/db/index";
+import { stacks, musicItemStacks, stackParents } from "../../adapters/db/schema";
 
 export const stackRoutes = new Hono();
 

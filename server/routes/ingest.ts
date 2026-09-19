@@ -1,22 +1,24 @@
 import { Hono } from "hono";
 import { asc, count, eq } from "drizzle-orm";
-import { extractMusicUrls } from "../email-parser";
+import { extractMusicUrls } from "../../app/email-parser";
 import {
   AmbiguousLinkSelectionError,
   createMusicItemDirect,
   createMusicItemsFromUrl,
   remindAtForScrapedRelease,
-} from "../music-item-creator";
-import { scheduleAppleMusicBackfill } from "../apple-music-backfill";
-import { scrapeUrl, sourceNamesReleaseDate } from "../scraper";
-import { isValidUrl, parseUrl } from "../utils";
+} from "../../app/music-item-creator";
+import { scheduleAppleMusicBackfill } from "../../app/apple-music-backfill";
+import { scrapeUrl } from "../../app/scrape";
+import { sourceNamesReleaseDate } from "../../adapters/registry";
+import { isValidUrl } from "../../domain/text";
+import { parseUrl } from "../../adapters/registry";
 import { saveImageFromBase64, validateImageBase64 } from "../uploads";
-import { createScanEnricher } from "../scan-enricher";
-import { extractReleaseInfo, extractReleaseInfoFromWebContext } from "../vision";
-import { getWebContext } from "../google-vision";
-import { lookupRelease } from "../musicbrainz";
-import { db } from "../db";
-import { stacks, musicItemStacks, musicItems } from "../db/schema";
+import { createScanEnricher } from "../../app/scan-enricher";
+import { extractReleaseInfo, extractReleaseInfoFromWebContext } from "../../adapters/mistral/index";
+import { getWebContext } from "../../adapters/google-vision/index";
+import { lookupRelease } from "../../adapters/musicbrainz/index";
+import { db } from "../../adapters/db/index";
+import { stacks, musicItemStacks, musicItems } from "../../adapters/db/schema";
 import type { CreateMusicItemInput, ScanResult, SourceName } from "../../domain/types";
 
 interface EmailEnvelope {

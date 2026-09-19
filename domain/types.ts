@@ -13,6 +13,13 @@ export type MusicItemSortDirection = "asc" | "desc";
 /** What a browse list is filtered down to — the statuses plus the two pseudo-filters. */
 export type FilterSelection = ListenStatus | "all" | "scheduled";
 
+/**
+ * Which release to prefer when MusicBrainz offers several lengths for the same
+ * record — an album and an extended edition, say. A preference, not a rule:
+ * the choice is the listener's, stored as a setting, defaulted to "longer".
+ */
+export type ReleaseLengthPreference = "longer" | "shorter";
+
 export type SourceName =
   | "bandcamp"
   | "spotify"

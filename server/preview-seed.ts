@@ -1,5 +1,5 @@
-import { db } from "./db/index";
-import { artists, musicItems, musicItemStacks, stacks } from "./db/schema";
+import { db } from "../adapters/db/index";
+import { artists, musicItems, musicItemStacks, stacks } from "../adapters/db/schema";
 
 /**
  * Demo content for preview deployments. Gated behind PREVIEW_SEED=1 and only

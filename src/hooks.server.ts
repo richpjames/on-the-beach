@@ -1,8 +1,8 @@
 import { json, type Handle } from "@sveltejs/kit";
 import { building } from "$app/environment";
-import { processReminders } from "../server/reminders";
-import { ensureSuggestionsForToListenArtists } from "../server/suggestions";
-import { sweepArtistReleases, SWEEP_INTERVAL_MS } from "../server/artist-watch";
+import { processReminders } from "../app/reminders";
+import { ensureSuggestionsForToListenArtists } from "../app/suggestions";
+import { sweepArtistReleases, SWEEP_INTERVAL_MS } from "../app/artist-watch";
 import {
   CSRF_COOKIE_NAME,
   CSRF_HEADER_NAME,

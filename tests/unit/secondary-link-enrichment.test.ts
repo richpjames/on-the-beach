@@ -5,8 +5,8 @@ import {
   lookupSecondaryLinkForItem,
   type ItemInfoForLookup,
   type SecondaryLookupDeps,
-} from "../../server/secondary-link-enrichment";
-import type { LookupService } from "../../server/settings";
+} from "../../app/secondary-link-enrichment";
+import type { LookupService } from "../../app/settings";
 
 const getService = mock();
 const fetchItem = mock();

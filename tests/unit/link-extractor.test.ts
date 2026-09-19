@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import {
   parseReleaseCandidatesJson,
   pickPrimaryReleaseCandidate,
-} from "../../server/link-extractor";
+} from "../../adapters/web/link-extractor";
 
 describe("parseReleaseCandidatesJson", () => {
   test("parses multiple releases from JSON", () => {

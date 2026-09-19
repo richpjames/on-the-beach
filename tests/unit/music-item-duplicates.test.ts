@@ -1,7 +1,7 @@
 import { afterEach, afterAll, describe, expect, mock, spyOn, test } from "bun:test";
 import { Hono } from "hono";
-import { createMusicItemsFromUrl } from "../../server/music-item-creator";
-import { createMusicItemDirect, DuplicateItemSelectionError } from "../../server/music-item-store";
+import { createMusicItemsFromUrl } from "../../app/music-item-creator";
+import { createMusicItemDirect, DuplicateItemSelectionError } from "../../app/music-item-store";
 import { musicItemRoutes } from "../../server/routes/music-items";
 
 // Same setup as creator-release-links.test.ts: the Mistral client reads its

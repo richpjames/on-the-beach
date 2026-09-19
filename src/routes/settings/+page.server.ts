@@ -5,10 +5,10 @@ import {
   getReleaseLengthPreference,
   RELEASE_LENGTH_PREFERENCES,
   getArtistWatchSettings,
-} from "../../../server/settings";
-import { listTrackedArtists } from "../../../server/artist-watch";
-import { LOOKUP_SERVICE_CONFIG } from "../../../server/secondary-link-enrichment";
-import { isAppleMusicConfigured, getStorefront } from "../../../server/apple-music";
+} from "../../../app/settings";
+import { listTrackedArtists } from "../../../app/artist-watch";
+import { LOOKUP_SERVICE_CONFIG } from "../../../app/secondary-link-enrichment";
+import { isAppleMusicConfigured, getStorefront } from "../../../adapters/apple-music/index";
 
 export const load: PageServerLoad = async () => {
   return {

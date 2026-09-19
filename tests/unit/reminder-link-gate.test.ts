@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
 import { and, eq } from "drizzle-orm";
-import { db } from "../../server/db/index";
+import { db } from "../../adapters/db/index";
 import {
   artistReleases,
   artists,
@@ -8,10 +8,10 @@ import {
   musicLinks,
   releaseAlerts,
   sources,
-} from "../../server/db/schema";
-import { normalize } from "../../server/utils";
-import { processReminders } from "../../server/reminders";
-import type { ReleaseLinkOutcome } from "../../server/release-link-check";
+} from "../../adapters/db/schema";
+import { normalize } from "../../domain/text";
+import { processReminders } from "../../app/reminders";
+import type { ReleaseLinkOutcome } from "../../app/release-link-check";
 
 // ---------------------------------------------------------------------------
 // Release day for a record filed from an alert: the link check the accept path

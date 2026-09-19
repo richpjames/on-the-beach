@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, spyOn, test, mock } from "bun:test";
-import { fetchAndSaveCoverArt } from "../../server/cover-art-archive";
+import { fetchAndSaveCoverArt } from "../../adapters/musicbrainz/cover-art-archive";
 
 describe("fetchAndSaveCoverArt", () => {
   afterEach(() => {

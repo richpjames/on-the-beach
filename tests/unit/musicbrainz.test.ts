@@ -11,8 +11,8 @@ import {
   escapeLucene,
   MusicBrainzHttpError,
   VARIOUS_ARTISTS_MBID,
-} from "../../server/musicbrainz";
-import type { SuggestedRelease } from "../../server/musicbrainz";
+} from "../../adapters/musicbrainz/index";
+import type { SuggestedRelease } from "../../adapters/musicbrainz/index";
 
 /** The single top pick, which is what most of these cases are about. */
 async function findSuggestedRelease(

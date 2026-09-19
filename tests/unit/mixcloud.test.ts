@@ -1,11 +1,11 @@
 import { describe, test, expect, spyOn, mock } from "bun:test";
-import { scrapeUrl } from "../../server/scraper";
+import { scrapeUrl } from "../../app/scrape";
 import {
   extractMixcloudEmbedUrl,
   mixcloudWidgetSrc,
   parseMixcloudJsonLd,
   parseMixcloudOg,
-} from "../../server/mixcloud";
+} from "../../adapters/mixcloud/index";
 
 describe("parseMixcloudOg", () => {
   test('splits "Title by Artist" format and strips Mixcloud suffixes', () => {

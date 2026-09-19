@@ -3,7 +3,7 @@ import { Hono } from "hono";
 import { createRssRoutes } from "../../server/routes/rss";
 import type { MusicItemFull } from "../../domain/types";
 import type { PrimaryFeedKey } from "../../domain/rss";
-import type { ReleaseAlertView } from "../../server/release-alerts";
+import type { ReleaseAlertView } from "../../app/release-alerts";
 
 type StackInfo = { id: number; name: string };
 

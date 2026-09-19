@@ -1,5 +1,5 @@
 import type { PageServerLoad } from "./$types";
-import { listReleaseAlerts } from "../../../server/release-alerts";
+import { listReleaseAlerts } from "../../../app/release-alerts";
 
 export const load: PageServerLoad = async () => {
   // `seen` alerts stay on the page: marking the view as viewed clears the
