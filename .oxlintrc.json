@@ -40,6 +40,47 @@
       }
     },
     {
+      // adapters/ are leaves: each one adapts one outside thing (a music
+      // source, the database, the web) to the contracts in ports/ and the types
+      // in domain/. They may import each other (a source that reads pages uses
+      // the web adapter's fetcher), but never the app's use cases, the HTTP
+      // host or the SvelteKit app — knowing about those is inverting the
+      // dependency the whole layout exists to create.
+      "files": ["adapters/**/*.ts"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "group": ["**/server/**", "**/src/**", "**/app/**"],
+                "message": "adapters/ adapt outsiders to ports/ and domain/; they must not import server/, src/ or app/."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      // app/ holds the use cases: it orchestrates domain/ and adapters/ into
+      // features, so it may import both — but never the HTTP host or the
+      // SvelteKit app. Those are driving adapters and drive app/ from outside.
+      "files": ["app/**/*.ts"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "group": ["**/server/**", "**/src/**"],
+                "message": "app/ is the core: it must not import the HTTP host (server/) or the SvelteKit app (src/)."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
       // server/ must not depend on the SvelteKit app. The reverse is correct
       // and deliberately unrestricted: route loaders driving the application
       // is what a driving adapter is for.

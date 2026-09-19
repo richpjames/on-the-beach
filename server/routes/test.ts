@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { eq } from "drizzle-orm";
-import { db } from "../db/index";
+import { db } from "../../adapters/db/index";
 import {
   musicItemStacks,
   musicLinks,
@@ -12,8 +12,8 @@ import {
   stackParents,
   musicItemOrder,
   itemSuggestions,
-} from "../db/schema";
-import { normalize } from "../utils";
+} from "../../adapters/db/schema";
+import { normalize } from "../../domain/text";
 
 export const testRoutes = new Hono();
 

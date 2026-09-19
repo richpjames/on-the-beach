@@ -18,8 +18,8 @@ const insertedItemIds: number[] = [];
 
 afterEach(async () => {
   if (insertedItemIds.length === 0) return;
-  const { db } = await import("../../server/db/index");
-  const { musicItems } = await import("../../server/db/schema");
+  const { db } = await import("../../adapters/db/index.ts");
+  const { musicItems } = await import("../../adapters/db/schema.ts");
   const { inArray } = await import("drizzle-orm");
   await db.delete(musicItems).where(inArray(musicItems.id, insertedItemIds));
   insertedItemIds.length = 0;
@@ -27,14 +27,14 @@ afterEach(async () => {
 
 describe("processReminders", () => {
   test("is a function", async () => {
-    const { processReminders } = await import("../../server/reminders");
+    const { processReminders } = await import("../../app/reminders.ts");
     expect(typeof processReminders).toBe("function");
   });
 
   test("bumps added_to_listen_at to now so the item sorts to the top of to-listen", async () => {
-    const { db } = await import("../../server/db/index");
-    const { musicItems } = await import("../../server/db/schema");
-    const { processReminders } = await import("../../server/reminders");
+    const { db } = await import("../../adapters/db/index.ts");
+    const { musicItems } = await import("../../adapters/db/schema.ts");
+    const { processReminders } = await import("../../app/reminders.ts");
     const { eq } = await import("drizzle-orm");
 
     const past = new Date("2020-01-01T00:00:00Z");
@@ -90,9 +90,9 @@ describe("processReminders", () => {
   // remind_at IS NOT NULL) and surfaces under "To Listen" (which excludes
   // remind_at IS NOT NULL).
   test("clears remind_at so a fired reminder no longer counts as scheduled", async () => {
-    const { db } = await import("../../server/db/index");
-    const { musicItems } = await import("../../server/db/schema");
-    const { processReminders } = await import("../../server/reminders");
+    const { db } = await import("../../adapters/db/index.ts");
+    const { musicItems } = await import("../../adapters/db/schema.ts");
+    const { processReminders } = await import("../../app/reminders.ts");
     const { eq } = await import("drizzle-orm");
 
     const past = new Date("2020-02-01T00:00:00Z");
@@ -125,9 +125,9 @@ describe("processReminders", () => {
   });
 
   test("does not touch items whose reminder is not yet due", async () => {
-    const { db } = await import("../../server/db/index");
-    const { musicItems } = await import("../../server/db/schema");
-    const { processReminders } = await import("../../server/reminders");
+    const { db } = await import("../../adapters/db/index.ts");
+    const { musicItems } = await import("../../adapters/db/schema.ts");
+    const { processReminders } = await import("../../app/reminders.ts");
     const { eq } = await import("drizzle-orm");
 
     const past = new Date("2020-06-01T00:00:00Z");
@@ -164,9 +164,9 @@ describe("processReminders", () => {
   // `remindAt` (e.g. user listened early but kept the future reminder) is
   // intentionally flipped back to "to-listen" so the reminder still surfaces it.
   test("flips a listened item back to to-listen when its reminder fires", async () => {
-    const { db } = await import("../../server/db/index");
-    const { musicItems } = await import("../../server/db/schema");
-    const { processReminders } = await import("../../server/reminders");
+    const { db } = await import("../../adapters/db/index.ts");
+    const { musicItems } = await import("../../adapters/db/schema.ts");
+    const { processReminders } = await import("../../app/reminders.ts");
     const { eq } = await import("drizzle-orm");
 
     const past = new Date("2020-03-01T00:00:00Z");

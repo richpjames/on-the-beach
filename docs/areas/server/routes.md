@@ -12,7 +12,7 @@
 
 ## Page data (SvelteKit)
 
-- `server/queries/main-page-data.ts` provides `fetchInitialItems`/`fetchInitialStacks` for the main and stack pages' `+page.server.ts` load functions.
+- `app/queries/main-page-data.ts` provides `fetchInitialItems`/`fetchInitialStacks` for the main and stack pages' `+page.server.ts` load functions.
 - `src/routes/r/[id]/+page.server.ts` loads a release via `fetchFullItem` and precomputes listen embeds (Bandcamp/YouTube/Apple Music/Mixcloud) server-side.
 
 ## Shared patterns

@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, mock, test } from "bun:test";
-import { scrapeAddedLink, type AddedLinkScrapeDeps } from "../../server/added-link-scrape";
+import { scrapeAddedLink, type AddedLinkScrapeDeps } from "../../app/added-link-scrape";
 
 const BANDCAMP_URL = "https://seekersinternational.bandcamp.com/album/thewherebetweenyou-me";
 const SPOTIFY_URL = "https://open.spotify.com/album/1A2B3C";

@@ -1,18 +1,17 @@
 import { Hono } from "hono";
 import { eq, and, inArray, isNotNull, isNull, sql, desc, asc } from "drizzle-orm";
-import { db } from "../db/index";
+import { db } from "../../adapters/db/index";
 import {
   musicItems,
   artists,
   musicItemStacks,
   stacks,
   musicItemOrder,
-  stackParents,
   musicLinks,
   sources,
   itemSuggestions,
-} from "../db/schema";
-import { isValidUrl, normalize } from "../utils";
+} from "../../adapters/db/schema";
+import { isValidUrl, normalize } from "../../domain/text";
 import { applyOrder, buildContextKey } from "../../domain/music-list-context";
 import {
   AmbiguousLinkSelectionError,
@@ -21,16 +20,17 @@ import {
   getOrCreateArtist,
   createMusicItemFromUrl,
   createMusicItemDirect,
-} from "../music-item-creator";
+} from "../../app/music-item-creator";
 // Imported from the store, not the creator re-export, for the same
 // mock-isolation reason that module's header describes.
-import { DuplicateItemSelectionError } from "../music-item-store";
-import { hydrateItemStacks } from "../hydrate-item-stacks";
-import { scrapeAddedLink } from "../added-link-scrape";
-import { saveArtwork } from "../secondary-link-enrichment";
-import { UnsupportedMusicLinkError } from "../scraper";
-import { ensureSuggestionsForItemNow, findPendingSuggestionsForItem } from "../suggestions";
-import { scheduleAppleMusicBackfill } from "../apple-music-backfill";
+import { DuplicateItemSelectionError } from "../../app/music-item-store";
+import { hydrateItemStacks } from "../../domain/hydrate-item-stacks";
+import { scrapeAddedLink } from "../../app/added-link-scrape";
+import { collectDescendantStackIds } from "../../app/queries/stack-tree";
+import { saveArtwork } from "../../app/secondary-link-enrichment";
+import { UnsupportedMusicLinkError } from "../../app/scrape";
+import { ensureSuggestionsForItemNow, findPendingSuggestionsForItem } from "../../app/suggestions";
+import { scheduleAppleMusicBackfill } from "../../app/apple-music-backfill";
 import {
   NO_SOURCE_CAPABILITIES,
   type CreateMusicItemInput,
@@ -73,43 +73,6 @@ const DIRECT_UPDATE_FIELDS: ReadonlyArray<
   "musicbrainzReleaseId",
   "musicbrainzArtistId",
 ];
-
-export async function collectDescendantStackIds(rootStackId: number): Promise<number[]> {
-  const links = await db
-    .select({
-      parentStackId: stackParents.parentStackId,
-      childStackId: stackParents.childStackId,
-    })
-    .from(stackParents);
-
-  const childrenByParent = new Map<number, number[]>();
-  for (const link of links) {
-    const children = childrenByParent.get(link.parentStackId) ?? [];
-    children.push(link.childStackId);
-    childrenByParent.set(link.parentStackId, children);
-  }
-
-  const descendants = new Set<number>([rootStackId]);
-  const queue = [rootStackId];
-  while (queue.length > 0) {
-    const current = queue.shift();
-    if (current === undefined) {
-      continue;
-    }
-
-    const children = childrenByParent.get(current) ?? [];
-    for (const child of children) {
-      if (descendants.has(child)) {
-        continue;
-      }
-
-      descendants.add(child);
-      queue.push(child);
-    }
-  }
-
-  return [...descendants];
-}
 
 function isValidArtworkUrl(value: string): boolean {
   return isValidUrl(value) || LOCAL_UPLOADS_PATTERN.test(value);

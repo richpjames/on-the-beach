@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { extractSoundcloudUrn, soundcloudWidgetSrc } from "../../server/soundcloud";
+import { extractSoundcloudUrn, soundcloudWidgetSrc } from "../../adapters/soundcloud/index";
 
 // Hydra-state fragments as SoundCloud actually serves them: the page's own
 // resource first, then whatever else the page names.

@@ -1,9 +1,9 @@
 import { afterEach, beforeEach, describe, expect, mock, spyOn, test } from "bun:test";
 import { and, eq } from "drizzle-orm";
-import * as musicbrainz from "../../server/musicbrainz";
-import { db } from "../../server/db/index";
-import { artistReleases, artists, musicItems, releaseAlerts } from "../../server/db/schema";
-import { normalize } from "../../server/utils";
+import * as musicbrainz from "../../adapters/musicbrainz/index";
+import { db } from "../../adapters/db/index";
+import { artistReleases, artists, musicItems, releaseAlerts } from "../../adapters/db/schema";
+import { normalize } from "../../domain/text";
 import {
   alertReasonFor,
   listTrackedArtists,
@@ -12,18 +12,18 @@ import {
   pollArtist,
   sweepArtistReleases,
   type TrackedArtistRow,
-} from "../../server/artist-watch";
+} from "../../app/artist-watch";
 import {
   earliestInstant,
   isAnnouncedRelease,
   parseReleaseYear,
   remindAtForReleaseDate,
-} from "../../server/release-dates";
+} from "../../domain/release-dates";
 import {
   DEFAULT_ARTIST_WATCH_SETTINGS,
   setArtistWatchSettings,
   type ArtistWatchSettings,
-} from "../../server/settings";
+} from "../../app/settings";
 
 const NOW = new Date("2026-07-31T00:00:00.000Z");
 

@@ -1,0 +1,1150 @@
+import type { ItemType, ReleaseLengthPreference } from "../../domain/types";
+import { titleMatchesAny } from "../../domain/title-similarity";
+
+const MB_API_BASE = "https://musicbrainz.org/ws/2";
+// MusicBrainz requires a User-Agent identifying the app with contact info —
+// placeholder/generic UAs get throttled or blocked (403/503).
+const USER_AGENT = "on-the-beach/1.0 (https://github.com/richpjames/on-the-beach)";
+
+/** A non-2xx response from MusicBrainz, carrying the status for backoff decisions. */
+export class MusicBrainzHttpError extends Error {
+  status: number;
+
+  constructor(status: number, message: string) {
+    super(message);
+    this.name = "MusicBrainzHttpError";
+    this.status = status;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Shared request gate
+//
+// MusicBrainz allows roughly one request per second per client. Two background
+// sweeps now compete for that budget (the suggestion prefetch and the artist
+// release watcher), and each sweep's own throttle only paces itself — run
+// concurrently they quietly double the rate and earn a 503. Every outbound MB
+// request passes through this single serialising gate so the process as a
+// whole stays inside the limit, whichever caller is asking.
+// ---------------------------------------------------------------------------
+
+function minRequestGapMs(): number {
+  const fromEnv = Number(process.env.OTB_MB_MIN_REQUEST_GAP_MS);
+  return Number.isFinite(fromEnv) && fromEnv >= 0 ? fromEnv : 1_100;
+}
+
+const sleep = (ms: number): Promise<void> =>
+  ms > 0 ? new Promise((resolve) => setTimeout(resolve, ms)) : Promise.resolve();
+
+let gateTail: Promise<void> = Promise.resolve();
+
+// A wedged MusicBrainz connection would otherwise hang callers indefinitely —
+// fetch has no default timeout — and, worse, hold the gate shut for everyone
+// queued behind it.
+const MB_FETCH_TIMEOUT_MS = 15_000;
+
+function mbFetch(url: string): Promise<Response> {
+  const gap = minRequestGapMs();
+  const turn = gateTail.then(() =>
+    fetch(url, {
+      headers: { "User-Agent": USER_AGENT, Accept: "application/json" },
+      signal: AbortSignal.timeout(MB_FETCH_TIMEOUT_MS),
+    }),
+  );
+  // The next caller waits for this request to finish plus the minimum gap.
+  // Failures must not wedge the queue, so the tail swallows them — the
+  // rejection is still delivered to the caller through `turn`.
+  gateTail = turn.then(
+    () => sleep(gap),
+    () => sleep(gap),
+  );
+  return turn;
+}
+
+export interface MusicBrainzFields {
+  year: number | null;
+  label: string | null;
+  country: string | null;
+  catalogueNumber: string | null;
+  musicbrainzReleaseId: string | null;
+  musicbrainzArtistId: string | null;
+}
+
+interface MbLabelInfo {
+  "catalog-number"?: unknown;
+  label?: { name?: unknown };
+}
+
+interface MbArtistCredit {
+  artist?: { id?: unknown };
+}
+
+interface MbRelease {
+  id?: unknown;
+  date?: unknown;
+  country?: unknown;
+  "label-info"?: unknown;
+  "artist-credit"?: unknown;
+}
+
+interface MbSearchResponse {
+  releases?: unknown[];
+}
+
+function parseYear(date: unknown): number | null {
+  if (typeof date !== "string" || date.length < 4) return null;
+  const year = parseInt(date.slice(0, 4), 10);
+  return Number.isFinite(year) ? year : null;
+}
+
+function parseLabelInfo(labelInfo: unknown): {
+  label: string | null;
+  catalogueNumber: string | null;
+} {
+  if (!Array.isArray(labelInfo) || labelInfo.length === 0) {
+    return { label: null, catalogueNumber: null };
+  }
+
+  const first = labelInfo[0] as MbLabelInfo;
+  const label = first.label && typeof first.label.name === "string" ? first.label.name : null;
+  const catalogueNumber =
+    typeof first["catalog-number"] === "string" ? first["catalog-number"] : null;
+
+  return { label, catalogueNumber };
+}
+
+export interface SuggestedRelease {
+  title: string;
+  itemType: string;
+  year: number | null;
+  musicbrainzReleaseId: string | null;
+  /**
+   * The release's parent release-group. Cover Art Archive coverage is far
+   * better at group level than for an individual pressing — most of an
+   * artist's releases are editions nobody uploaded a scan for — so this is
+   * what the suggestion prompt asks for artwork with.
+   */
+  musicbrainzReleaseGroupId: string | null;
+}
+
+interface MbReleaseGroupStub {
+  id?: unknown;
+  "primary-type"?: unknown;
+}
+
+interface MbArtistRelease {
+  id?: unknown;
+  title?: unknown;
+  date?: unknown;
+  "primary-type"?: unknown;
+  "release-group"?: MbReleaseGroupStub;
+  media?: unknown;
+}
+
+/** Total track count across a release's media, or null when MB has no data. */
+function parseTrackCount(media: unknown): number | null {
+  if (!Array.isArray(media) || media.length === 0) return null;
+  let total = 0;
+  let found = false;
+  for (const medium of media) {
+    const count = (medium as { "track-count"?: unknown })["track-count"];
+    if (typeof count === "number" && Number.isFinite(count)) {
+      total += count;
+      found = true;
+    }
+  }
+  return found ? total : null;
+}
+
+// Track-count buckets standing in for release length: MB's artist releases
+// don't carry durations or release-group primary types, so track count is the
+// best available proxy for album vs EP vs single.
+type LengthBucket = "long" | "medium" | "short" | "unknown";
+
+function lengthBucket(trackCount: number | null): LengthBucket {
+  if (trackCount === null) return "unknown";
+  if (trackCount >= 7) return "long";
+  if (trackCount >= 3) return "medium";
+  return "short";
+}
+
+/**
+ * Rank of a release's length bucket under the user's preference — lower is
+ * better. Unknown lengths always rank last so a release MB has no media data
+ * for never beats one we can actually size.
+ */
+function lengthRank(trackCount: number | null, preference: ReleaseLengthPreference): number {
+  const order: LengthBucket[] =
+    preference === "shorter"
+      ? ["short", "medium", "long", "unknown"]
+      : ["long", "medium", "short", "unknown"];
+  return order.indexOf(lengthBucket(trackCount));
+}
+
+/**
+ * How far a candidate release sits from the release that prompted the
+ * suggestion — lower is better. An undated candidate ranks below every dated
+ * one rather than being treated as a perfect match, which is what a distance
+ * of 0 would make it.
+ */
+export function yearDistance(year: number | null, sourceYear: number): number {
+  return year === null ? Number.MAX_SAFE_INTEGER : Math.abs(year - sourceYear);
+}
+
+interface MbArtistReleasesResponse {
+  releases?: unknown[];
+}
+
+interface MbArtistSearchResponse {
+  artists?: Array<{ id?: unknown }>;
+}
+
+async function fetchArtistMbid(artistName: string): Promise<string | null> {
+  const params = new URLSearchParams({ query: artistName, limit: "1", fmt: "json" });
+  const url = `${MB_API_BASE}/artist?${params}`;
+  const response = await mbFetch(url);
+  if (!response.ok) {
+    throw new MusicBrainzHttpError(
+      response.status,
+      `MusicBrainz artist search returned ${response.status} for "${artistName}"`,
+    );
+  }
+  const data = (await response.json()) as MbArtistSearchResponse;
+  const first = data.artists?.[0];
+  return typeof first?.id === "string" ? first.id : null;
+}
+
+async function fetchArtistReleases(mbid: string): Promise<MbArtistRelease[]> {
+  // `media` rides along so each release carries its track counts — the
+  // release-length preference needs them to rank candidates. `release-groups`
+  // nests each release's group inside it, which carries the group MBID (for
+  // Cover Art Archive lookups) and the real `primary-type` — releases have no
+  // primary type of their own, so without it every suggestion read as "album".
+  const params = new URLSearchParams({ inc: "releases+media+release-groups", fmt: "json" });
+  const url = `${MB_API_BASE}/artist/${mbid}?${params}`;
+  const response = await mbFetch(url);
+  if (!response.ok) {
+    throw new MusicBrainzHttpError(
+      response.status,
+      `MusicBrainz artist lookup returned ${response.status} for ${mbid}`,
+    );
+  }
+  const data = (await response.json()) as MbArtistReleasesResponse;
+  return Array.isArray(data.releases) ? (data.releases as MbArtistRelease[]) : [];
+}
+
+/**
+ * Find up to `limit` releases by the artist whose titles neither match nor are
+ * close to anything in `trackedTitles`. Candidates are ranked by year first —
+ * closest to `sourceYear`, or most recent when null — because a suggestion
+ * made off the back of a listen should come from the same period of the
+ * artist's work as the record that prompted it. Release length under
+ * `lengthPreference` (albums before EPs before singles by default, reversed
+ * for "shorter") breaks ties between releases that are equally close. The
+ * picks are distinct records, not editions of one — see the dedupe below.
+ *
+ * Returns an empty array when the artist can't be found or has no untracked
+ * releases. Network failures and non-2xx MusicBrainz responses THROW so callers
+ * can tell "nothing to suggest" apart from "the lookup failed" — swallowing
+ * them here made production failures (rate limiting, blocked UAs) invisible.
+ */
+export async function findSuggestedReleases(opts: {
+  mbArtistId: string | null;
+  artistName: string;
+  trackedTitles: Set<string>;
+  sourceYear: number | null;
+  lengthPreference?: ReleaseLengthPreference;
+  /** How many distinct releases to return. */
+  limit?: number;
+}): Promise<SuggestedRelease[]> {
+  const {
+    mbArtistId,
+    artistName,
+    trackedTitles,
+    sourceYear,
+    lengthPreference = "longer",
+    limit = 1,
+  } = opts;
+  const searchLog = { artistName, mbArtistId, sourceYear, lengthPreference, limit };
+
+  const mbid = mbArtistId ?? (await fetchArtistMbid(artistName));
+  if (!mbid) {
+    console.info("[musicbrainz] No artist match for suggestion lookup", searchLog);
+    return [];
+  }
+
+  const releases = await fetchArtistReleases(mbid);
+  const candidates = releases.filter((r) => {
+    if (typeof r.title !== "string" || !r.title) return false;
+    // Exact match on the normalized set first (cheap), then the fuzzy pass so
+    // "Amber (Deluxe Edition)" doesn't slip past a library that has "Amber".
+    if (trackedTitles.has(r.title.toLowerCase().trim())) return false;
+    return !titleMatchesAny(r.title, trackedTitles);
+  });
+
+  if (candidates.length === 0) {
+    console.info("[musicbrainz] No suggestible releases", {
+      ...searchLog,
+      mbid,
+      releaseCount: releases.length,
+      trackedCount: trackedTitles.size,
+    });
+    return [];
+  }
+
+  const ranked = candidates.map((r) => {
+    const group = r["release-group"];
+    // The group's primary type is the authoritative one; the release-level
+    // field is only ever present in hand-written fixtures.
+    const primaryType = group?.["primary-type"] ?? r["primary-type"];
+    return {
+      title: r.title as string,
+      year: parseYear(r.date),
+      trackCount: parseTrackCount(r.media),
+      musicbrainzReleaseId: typeof r.id === "string" ? r.id : null,
+      musicbrainzReleaseGroupId: typeof group?.id === "string" ? group.id : null,
+      itemType: typeof primaryType === "string" ? primaryType.toLowerCase() : "album",
+    };
+  });
+
+  const byYear = (a: { year: number | null }, b: { year: number | null }): number => {
+    if (sourceYear === null) {
+      // Most recent first; undated releases last.
+      return (b.year ?? -Infinity) - (a.year ?? -Infinity);
+    }
+    // Closest in year to the source release; undated releases last rather
+    // than treated as a perfect match.
+    return yearDistance(a.year, sourceYear) - yearDistance(b.year, sourceYear);
+  };
+
+  const byLength = (a: { trackCount: number | null }, b: { trackCount: number | null }): number =>
+    lengthRank(a.trackCount, lengthPreference) - lengthRank(b.trackCount, lengthPreference);
+
+  // Year leads when there's an original release date to stay near: the whole
+  // point of suggesting off the back of a listen is to land in the same era as
+  // the record just listened to, so a contemporaneous EP beats an album from
+  // two decades later. Length only separates releases that are equally close.
+  // With no source year there's nothing to be close to, so the length
+  // preference leads and recency breaks its ties.
+  ranked.sort(
+    sourceYear === null
+      ? (a, b) => byLength(a, b) || byYear(a, b)
+      : (a, b) => byYear(a, b) || byLength(a, b),
+  );
+
+  // MB lists every pressing of a record separately — a reissue, a Japanese
+  // edition and the original are three entries with the same title. Taking the
+  // top `limit` rows straight off the ranking would offer the same album three
+  // times, so a pick is skipped when its release-group, or a title close to it,
+  // is already on the list.
+  const picked: typeof ranked = [];
+  const pickedGroups = new Set<string>();
+  const pickedTitles: string[] = [];
+  for (const candidate of ranked) {
+    if (picked.length >= limit) break;
+    if (
+      candidate.musicbrainzReleaseGroupId &&
+      pickedGroups.has(candidate.musicbrainzReleaseGroupId)
+    )
+      continue;
+    if (titleMatchesAny(candidate.title, pickedTitles)) continue;
+
+    picked.push(candidate);
+    if (candidate.musicbrainzReleaseGroupId) pickedGroups.add(candidate.musicbrainzReleaseGroupId);
+    pickedTitles.push(candidate.title);
+  }
+
+  console.info("[musicbrainz] Suggestion lookup result", {
+    ...searchLog,
+    mbid,
+    releaseCount: releases.length,
+    candidateCount: candidates.length,
+    picked: picked.map((p) => ({ title: p.title, year: p.year, tracks: p.trackCount })),
+  });
+
+  return picked;
+}
+
+/**
+ * The release-group MBID a release belongs to. Used to backfill suggestions
+ * stored before the group id was captured, so their artwork lookups can move
+ * off the sparsely-covered per-release endpoint.
+ *
+ * Returns null when MB has no group for the release; throws on transport or
+ * non-2xx responses so the caller can leave the row alone and retry later.
+ */
+export async function fetchReleaseGroupIdForRelease(releaseId: string): Promise<string | null> {
+  const params = new URLSearchParams({ inc: "release-groups", fmt: "json" });
+  const response = await mbFetch(`${MB_API_BASE}/release/${releaseId}?${params}`);
+  if (!response.ok) {
+    throw new MusicBrainzHttpError(
+      response.status,
+      `MusicBrainz release lookup returned ${response.status} for ${releaseId}`,
+    );
+  }
+  const data = (await response.json()) as { "release-group"?: MbReleaseGroupStub };
+  const id = data["release-group"]?.id;
+  return typeof id === "string" ? id : null;
+}
+
+// ---------------------------------------------------------------------------
+// Release groups (artist watch)
+//
+// The suggestion path above browses *releases* because it needs `media` track
+// counts to size a record. The watcher needs the opposite grain: release
+// **groups** are the album-level entity, one per work, so a 2026 Japanese
+// repress of a 1974 album doesn't read as a new record. The two paths coexist.
+// ---------------------------------------------------------------------------
+
+export interface MbReleaseGroup {
+  id: string;
+  title: string;
+  primaryType: string | null;
+  secondaryTypes: string[];
+  /** MB's date verbatim: "1974", "1974-05" and "1974-05-01" are all possible. */
+  firstReleaseDate: string | null;
+}
+
+interface MbReleaseGroupResponse {
+  "release-groups"?: unknown[];
+  "release-group-count"?: unknown;
+}
+
+const RELEASE_GROUP_PAGE_SIZE = 100;
+// Even Sun Ra tops out well short of 1,000 release groups; the cap stops a
+// malformed count from looping the sweep forever.
+const RELEASE_GROUP_MAX_PAGES = 10;
+
+function parseReleaseGroup(raw: unknown): MbReleaseGroup | null {
+  if (!raw || typeof raw !== "object") return null;
+  const group = raw as Record<string, unknown>;
+  if (typeof group.id !== "string" || typeof group.title !== "string") return null;
+
+  const secondary = Array.isArray(group["secondary-types"])
+    ? group["secondary-types"].filter((t): t is string => typeof t === "string")
+    : [];
+
+  return {
+    id: group.id,
+    title: group.title,
+    primaryType: typeof group["primary-type"] === "string" ? group["primary-type"] : null,
+    secondaryTypes: secondary,
+    firstReleaseDate:
+      typeof group["first-release-date"] === "string" && group["first-release-date"].length > 0
+        ? group["first-release-date"]
+        : null,
+  };
+}
+
+/**
+ * Every release group credited to an artist. Paginates only when a page comes
+ * back full — one request covers all but the most prolific artists.
+ *
+ * Throws `MusicBrainzHttpError` on a non-2xx response and the underlying error
+ * on a network failure: the caller has to tell "no releases" apart from "the
+ * lookup failed", because writing a baseline from a partial fetch would make
+ * every missing group alert as new on the next successful poll.
+ */
+export async function fetchArtistReleaseGroups(mbid: string): Promise<MbReleaseGroup[]> {
+  const groups: MbReleaseGroup[] = [];
+
+  for (let page = 0; page < RELEASE_GROUP_MAX_PAGES; page += 1) {
+    const params = new URLSearchParams({
+      artist: mbid,
+      limit: String(RELEASE_GROUP_PAGE_SIZE),
+      offset: String(page * RELEASE_GROUP_PAGE_SIZE),
+      fmt: "json",
+    });
+    const response = await mbFetch(`${MB_API_BASE}/release-group?${params}`);
+    if (!response.ok) {
+      throw new MusicBrainzHttpError(
+        response.status,
+        `MusicBrainz release-group browse returned ${response.status} for ${mbid}`,
+      );
+    }
+
+    const data = (await response.json()) as MbReleaseGroupResponse;
+    const raw = Array.isArray(data["release-groups"]) ? data["release-groups"] : [];
+    for (const entry of raw) {
+      const parsed = parseReleaseGroup(entry);
+      if (parsed) groups.push(parsed);
+    }
+
+    if (raw.length < RELEASE_GROUP_PAGE_SIZE) break;
+  }
+
+  return groups;
+}
+
+// ---------------------------------------------------------------------------
+// Artist search (MBID resolution, last resort)
+// ---------------------------------------------------------------------------
+
+export interface MbArtistCandidate {
+  id: string;
+  name: string;
+  score: number;
+  /** MB's disambiguation comment — the thing that tells two Nirvanas apart. */
+  disambiguation: string | null;
+  country: string | null;
+  type: string | null;
+  lifeSpanBegin: string | null;
+  lifeSpanEnd: string | null;
+}
+
+interface MbArtistCandidateResponse {
+  artists?: unknown[];
+}
+
+/**
+ * Name-search an artist, returning the ranked candidates with the fields a
+ * human needs to disambiguate them. Scoring is left to the caller — see
+ * `pickArtistFromSearch` in server/artist-identity.ts.
+ */
+export async function searchArtistCandidates(
+  artistName: string,
+  limit = 5,
+): Promise<MbArtistCandidate[]> {
+  const params = new URLSearchParams({ query: artistName, limit: String(limit), fmt: "json" });
+  const response = await mbFetch(`${MB_API_BASE}/artist?${params}`);
+  if (!response.ok) {
+    throw new MusicBrainzHttpError(
+      response.status,
+      `MusicBrainz artist search returned ${response.status} for "${artistName}"`,
+    );
+  }
+
+  const data = (await response.json()) as MbArtistCandidateResponse;
+  const raw = Array.isArray(data.artists) ? data.artists : [];
+
+  return raw.flatMap((entry) => {
+    if (!entry || typeof entry !== "object") return [];
+    const artist = entry as Record<string, unknown>;
+    if (typeof artist.id !== "string" || typeof artist.name !== "string") return [];
+    const lifeSpan = (artist["life-span"] ?? {}) as Record<string, unknown>;
+
+    return [
+      {
+        id: artist.id,
+        name: artist.name,
+        score: typeof artist.score === "number" ? artist.score : 0,
+        disambiguation:
+          typeof artist.disambiguation === "string" && artist.disambiguation.length > 0
+            ? artist.disambiguation
+            : null,
+        country: typeof artist.country === "string" ? artist.country : null,
+        type: typeof artist.type === "string" ? artist.type : null,
+        lifeSpanBegin: typeof lifeSpan.begin === "string" ? lifeSpan.begin : null,
+        lifeSpanEnd: typeof lifeSpan.end === "string" ? lifeSpan.end : null,
+      },
+    ];
+  });
+}
+
+export async function lookupRelease(
+  artist: string,
+  title: string,
+  year?: string,
+): Promise<MusicBrainzFields | null> {
+  const queryParts = [`artist:${artist}`, `AND release:${title}`];
+  if (year) {
+    queryParts.push(`AND date:${year}`);
+  }
+  const query = queryParts.join(" ");
+  const params = new URLSearchParams({ query, limit: "1", fmt: "json" });
+  const url = `${MB_API_BASE}/release?${params}`;
+  const searchLog = {
+    artist,
+    title,
+    year: year ?? null,
+    query,
+  };
+
+  try {
+    console.info("[musicbrainz] Searching releases", searchLog);
+
+    const response = await mbFetch(url);
+
+    if (!response.ok) {
+      console.warn(`[musicbrainz] Search returned ${response.status}`, searchLog);
+      return null;
+    }
+
+    const data = (await response.json()) as MbSearchResponse;
+    const releaseCount = Array.isArray(data.releases) ? data.releases.length : 0;
+
+    if (releaseCount === 0) {
+      console.info("[musicbrainz] Search returned no releases", searchLog);
+      return null;
+    }
+
+    const release = data.releases![0] as MbRelease;
+    const { label, catalogueNumber } = parseLabelInfo(release["label-info"]);
+    const country = typeof release.country === "string" ? release.country : null;
+    const artistCredit = Array.isArray(release["artist-credit"]) ? release["artist-credit"] : [];
+    const firstCredit = artistCredit[0] as MbArtistCredit | undefined;
+
+    const result = {
+      year: parseYear(release.date),
+      label,
+      country,
+      catalogueNumber,
+      musicbrainzReleaseId: typeof release.id === "string" ? release.id : null,
+      musicbrainzArtistId:
+        firstCredit?.artist && typeof firstCredit.artist.id === "string"
+          ? firstCredit.artist.id
+          : null,
+    };
+
+    console.info("[musicbrainz] Search result", {
+      ...searchLog,
+      releaseCount,
+      result,
+    });
+
+    return result;
+  } catch (err) {
+    console.error("[musicbrainz] Lookup failed:", err);
+    return null;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Release search (identifier resolution)
+//
+// `lookupRelease` above answers "give me the fields for this record" and takes
+// MusicBrainz's top hit on faith. This answers "which records might this be?"
+// and leaves the judgement to the caller, because the provider's ranking cannot
+// be trusted — see the note on `score` below.
+// ---------------------------------------------------------------------------
+
+/** A candidate from a release search. Callers MUST verify before accepting. */
+/** MusicBrainz's Various Artists placeholder — never a real artist to track. */
+export const VARIOUS_ARTISTS_MBID = "89ad4ac3-39f7-470e-963a-56509c546377";
+
+export interface MbReleaseCandidate {
+  id: string;
+  title: string;
+  /** The joined artist credit, e.g. "Yellowman & Josey Wales". */
+  artistCredit: string;
+  /**
+   * The work-level identity, and what resolution should be scored on. A
+   * specific pressing is not the answer: MusicBrainz files regional retitlings
+   * under the original work, so "Un río de sangre" and "Canciones
+   * reencontradas en París" are one release-group and comparing release ids
+   * would call a correct answer a miss.
+   */
+  releaseGroupId: string | null;
+  artistId: string | null;
+  /** Verbatim: "1974", "1974-05" and "1974-05-01" are all possible. */
+  date: string | null;
+  country: string | null;
+  label: string | null;
+  catalogueNumber: string | null;
+  /**
+   * The release group's primary type, mapped onto our vocabulary. Used to break
+   * a dead heat between an album and a single of the same name.
+   */
+  itemType: ItemType;
+  /**
+   * MusicBrainz's own relevance score, 0–100.
+   *
+   * NOT a confidence signal. It measures how well the document matched the
+   * query, not whether the query described a real record — every false positive
+   * observed while resolving the eval fixtures scored 100, including J Balvin's
+   * "Mi gente" for "Kamac Pacha Inti — Mi Raza" and John Powell's "Face/Off"
+   * for "Baden Powell — Face au Public". Use it to order candidates, never to
+   * accept one.
+   */
+  score: number;
+}
+
+// Lucene reserves these; unescaped, a stray bracket or colon in a record title
+// turns a search into a syntax error or, worse, a silently different query.
+const LUCENE_SPECIAL = /([+\-!(){}[\]^"~*?:\\/]|&&|\|\|)/g;
+
+export function escapeLucene(value: string): string {
+  return value.replace(LUCENE_SPECIAL, "\\$&");
+}
+
+export interface MbReleaseSearchQuery {
+  artist: string;
+  title: string;
+  year?: number | null;
+  /**
+   * Quoted (default) searches the phrase; unquoted lets Lucene tokenise.
+   *
+   * The two fail in OPPOSITE directions and a resolver needs both in a
+   * cascade. Quoted misses records catalogued under a variant spelling and
+   * returns nothing — a visible failure. Unquoted ORs the loose terms together
+   * until something matches, which is how `artist:Kamac Pacha Inti AND
+   * release:Mi Raza` returned J Balvin. Its recall is real but every hit needs
+   * verifying.
+   */
+  quoted?: boolean;
+  /**
+   * Search the title against MusicBrainz's Various Artists placeholder instead
+   * of against `artist`.
+   *
+   * A compilation is filed under Various Artists, so a search for the act
+   * printed on the sleeve returns nothing at all — the "O Primeiro Amor"
+   * soundtrack is credited to the duo on its cover and to Various by both
+   * databases. `artist` is still used by the caller to verify whatever comes
+   * back; it is only kept out of the query.
+   */
+  variousArtists?: boolean;
+  limit?: number;
+}
+
+function buildReleaseQuery({
+  artist,
+  title,
+  year,
+  quoted = true,
+  variousArtists = false,
+}: MbReleaseSearchQuery): string {
+  const titleTerm = quoted ? `"${escapeLucene(title)}"` : escapeLucene(title);
+  // arid, not a name search: it pins the query to the one placeholder entity
+  // rather than to anything MusicBrainz happens to call "Various".
+  const artistTerm = variousArtists
+    ? `arid:${VARIOUS_ARTISTS_MBID}`
+    : `artist:${quoted ? `"${escapeLucene(artist)}"` : escapeLucene(artist)}`;
+  const parts = [artistTerm, `AND release:${titleTerm}`];
+  if (year) parts.push(`AND date:${year}`);
+  return parts.join(" ");
+}
+
+const ITEM_TYPES = new Set<ItemType>(["album", "ep", "single", "track", "mix", "compilation"]);
+
+/**
+ * MusicBrainz primary types map onto our item types where they overlap.
+ *
+ * Lives here rather than in `release-alerts` — which is where it started — so
+ * that parsing a search result does not drag the database module in with it.
+ */
+export function itemTypeForReleaseGroup(primaryType: string | null): ItemType {
+  const candidate = primaryType?.toLowerCase();
+  return candidate && ITEM_TYPES.has(candidate as ItemType) ? (candidate as ItemType) : "album";
+}
+
+interface MbSearchRelease {
+  id?: unknown;
+  title?: unknown;
+  date?: unknown;
+  country?: unknown;
+  score?: unknown;
+  "artist-credit"?: unknown;
+  "release-group"?: unknown;
+  "label-info"?: unknown;
+}
+
+function parseArtistCredit(credit: unknown): { name: string; id: string | null } {
+  if (!Array.isArray(credit)) return { name: "", id: null };
+  const names: string[] = [];
+  let id: string | null = null;
+  for (const entry of credit) {
+    const part = entry as { name?: unknown; joinphrase?: unknown; artist?: { id?: unknown } };
+    if (typeof part.name === "string") names.push(part.name);
+    if (typeof part.joinphrase === "string" && part.joinphrase) names.push(part.joinphrase);
+    if (id === null && typeof part.artist?.id === "string") id = part.artist.id;
+  }
+  return { name: names.join("").trim(), id };
+}
+
+function parseSearchCandidate(raw: unknown): MbReleaseCandidate | null {
+  if (!raw || typeof raw !== "object") return null;
+  const release = raw as MbSearchRelease;
+  if (typeof release.id !== "string") return null;
+
+  const { name, id: artistId } = parseArtistCredit(release["artist-credit"]);
+  const group = release["release-group"] as { id?: unknown; "primary-type"?: unknown } | undefined;
+  const { label, catalogueNumber } = parseLabelInfo(release["label-info"]);
+
+  return {
+    id: release.id,
+    title: typeof release.title === "string" ? release.title : "",
+    artistCredit: name,
+    releaseGroupId: typeof group?.id === "string" ? group.id : null,
+    artistId,
+    date: typeof release.date === "string" ? release.date : null,
+    country: typeof release.country === "string" ? release.country : null,
+    label,
+    catalogueNumber,
+    itemType: itemTypeForReleaseGroup(
+      typeof group?.["primary-type"] === "string" ? group["primary-type"] : null,
+    ),
+    score: typeof release.score === "number" ? release.score : 0,
+  };
+}
+
+/**
+ * Search releases, returning ranked candidates for the caller to verify.
+ *
+ * Release search documents already embed their `release-group`, so no `inc` is
+ * needed — and none is possible, search takes a fixed document shape.
+ *
+ * Throws `MusicBrainzHttpError` on a non-2xx response and the underlying error
+ * on a network failure, matching `fetchArtistReleaseGroups`. Callers have to
+ * tell "no such record" apart from "the lookup failed": treating a 503 as an
+ * empty result is how three fixtures were recorded as absent from MusicBrainz
+ * when the requests had merely been throttled.
+ */
+export async function searchReleaseCandidates(
+  query: MbReleaseSearchQuery,
+): Promise<MbReleaseCandidate[]> {
+  const params = new URLSearchParams({
+    query: buildReleaseQuery(query),
+    limit: String(query.limit ?? 5),
+    fmt: "json",
+  });
+  const response = await mbFetch(`${MB_API_BASE}/release?${params}`);
+
+  if (!response.ok) {
+    throw new MusicBrainzHttpError(
+      response.status,
+      `MusicBrainz release search returned ${response.status} for "${query.artist} — ${query.title}"`,
+    );
+  }
+
+  const data = (await response.json()) as { releases?: unknown[] };
+  const raw = Array.isArray(data.releases) ? data.releases : [];
+  return raw.flatMap((entry) => {
+    const parsed = parseSearchCandidate(entry);
+    return parsed ? [parsed] : [];
+  });
+}
+
+/**
+ * The distinct artist credits across a release's tracks.
+ *
+ * Needed to tell whether a compilation actually contains the act you were
+ * looking for. A search pinned to Various Artists matches on title alone, and
+ * compilation titles collide constantly — "Tanga" and "You Never Know" both
+ * matched unrelated compilations while looking for a Machito album and a
+ * Determine single. The release-level credit is just "Various Artists" and
+ * says nothing; the track credits are the actual evidence.
+ */
+export async function fetchReleaseTrackArtists(releaseId: string): Promise<string[]> {
+  const response = await mbFetch(
+    `${MB_API_BASE}/release/${releaseId}?inc=recordings+artist-credits&fmt=json`,
+  );
+  if (!response.ok) {
+    throw new MusicBrainzHttpError(
+      response.status,
+      `MusicBrainz release lookup returned ${response.status} for ${releaseId}`,
+    );
+  }
+
+  const data = (await response.json()) as { media?: unknown[] };
+  const names = new Set<string>();
+  for (const medium of Array.isArray(data.media) ? data.media : []) {
+    const tracks = (medium as { tracks?: unknown[] }).tracks;
+    for (const track of Array.isArray(tracks) ? tracks : []) {
+      const credit = (track as { "artist-credit"?: unknown })["artist-credit"];
+      for (const part of Array.isArray(credit) ? credit : []) {
+        const name = (part as { name?: unknown }).name;
+        if (typeof name === "string" && name) names.add(name);
+      }
+    }
+  }
+  return [...names];
+}
+
+// ---------------------------------------------------------------------------
+// External links (release group url-rels)
+//
+// The "External links" block on a MusicBrainz release-group page: the url
+// relationships editors have attached to the work — a Bandcamp page, an Apple
+// Music or Spotify album, a Discogs master, a Wikidata item. It is the second
+// of the two pieces of evidence the New Releases gate accepts that a record
+// exists somewhere you could actually go and hear it.
+// ---------------------------------------------------------------------------
+
+export interface MbUrlRelation {
+  /** MB's relationship type — "streaming", "free streaming", "discogs"… */
+  type: string | null;
+  url: string;
+}
+
+/**
+ * The url relationships attached to a release group.
+ *
+ * Throws `MusicBrainzHttpError` on a non-2xx response and the underlying error
+ * on a network failure: a caller gating on "are there any links" must not read
+ * a failed request as a confident "none".
+ */
+export async function fetchReleaseGroupUrlRelations(
+  releaseGroupId: string,
+): Promise<MbUrlRelation[]> {
+  const params = new URLSearchParams({ inc: "url-rels", fmt: "json" });
+  const response = await mbFetch(`${MB_API_BASE}/release-group/${releaseGroupId}?${params}`);
+  if (!response.ok) {
+    throw new MusicBrainzHttpError(
+      response.status,
+      `MusicBrainz release-group lookup returned ${response.status} for ${releaseGroupId}`,
+    );
+  }
+
+  const data = (await response.json()) as { relations?: unknown[] };
+  return parseUrlRelations(data.relations);
+}
+
+function parseUrlRelations(raw: unknown): MbUrlRelation[] {
+  const relations: MbUrlRelation[] = [];
+  for (const entry of Array.isArray(raw) ? raw : []) {
+    if (!entry || typeof entry !== "object") continue;
+    const relation = entry as Record<string, unknown>;
+    const target = relation.url;
+    const resource =
+      target && typeof target === "object" ? (target as Record<string, unknown>).resource : null;
+    if (typeof resource !== "string" || resource.length === 0) continue;
+    relations.push({
+      type: typeof relation.type === "string" ? relation.type : null,
+      url: resource,
+    });
+  }
+  return relations;
+}
+
+// ---------------------------------------------------------------------------
+// Release-group detail (the New Releases card, opened up)
+//
+// An alert row carries only what the watcher needed to decide it was new:
+// title, type, date. Everything a person wants before triaging the card — what
+// the record actually is, what's on it, where you could go and hear it — lives
+// on MusicBrainz and is fetched on demand, one card at a time.
+//
+// Two requests, and no more: the shared gate paces MusicBrainz at roughly one
+// per second, so a third would put a card open behind three seconds of waiting.
+// ---------------------------------------------------------------------------
+
+export interface MbTrack {
+  /** MB's track number verbatim — "1", "A2", "B1" on a vinyl tracklist. */
+  number: string | null;
+  title: string;
+  lengthMs: number | null;
+}
+
+export interface MbReleaseGroupDetail {
+  id: string;
+  title: string;
+  primaryType: string | null;
+  secondaryTypes: string[];
+  firstReleaseDate: string | null;
+  /** MB's disambiguation comment — what tells two records of a name apart. */
+  disambiguation: string | null;
+  /** The joined credit, e.g. "Yellowman & Josey Wales". */
+  artistCredit: string | null;
+  links: MbUrlRelation[];
+  /**
+   * The tracklist of one release standing in for the group. Editions differ —
+   * a reissue carries bonus tracks the original never had — so this is
+   * illustrative, which is why the release it came from is named alongside it.
+   */
+  tracks: MbTrack[];
+  trackCount: number | null;
+  /** Total playing time of `tracks`, when every track carries a length. */
+  totalLengthMs: number | null;
+  label: string | null;
+  country: string | null;
+  /** "12\" Vinyl", "CD", "Digital Media" — the format of the release below. */
+  format: string | null;
+  /** The release `tracks` was read from, so the panel can say whose it is. */
+  releaseId: string | null;
+  releaseTitle: string | null;
+  releaseDate: string | null;
+}
+
+function joinArtistCredit(raw: unknown): string | null {
+  if (!Array.isArray(raw) || raw.length === 0) return null;
+  let credit = "";
+  for (const entry of raw) {
+    if (!entry || typeof entry !== "object") continue;
+    const part = entry as Record<string, unknown>;
+    const name =
+      typeof part.name === "string"
+        ? part.name
+        : typeof (part.artist as Record<string, unknown> | undefined)?.name === "string"
+          ? ((part.artist as Record<string, unknown>).name as string)
+          : null;
+    if (!name) continue;
+    credit += name + (typeof part.joinphrase === "string" ? part.joinphrase : "");
+  }
+  return credit.length > 0 ? credit : null;
+}
+
+function parseTracks(media: unknown): MbTrack[] {
+  const tracks: MbTrack[] = [];
+  for (const medium of Array.isArray(media) ? media : []) {
+    const raw = (medium as { tracks?: unknown }).tracks;
+    for (const entry of Array.isArray(raw) ? raw : []) {
+      if (!entry || typeof entry !== "object") continue;
+      const track = entry as Record<string, unknown>;
+      const title =
+        typeof track.title === "string"
+          ? track.title
+          : typeof (track.recording as Record<string, unknown> | undefined)?.title === "string"
+            ? ((track.recording as Record<string, unknown>).title as string)
+            : null;
+      if (!title) continue;
+
+      // A track's own length is the edition's; the recording's is the work's.
+      // Either answers "how long is this", and MB routinely carries only one.
+      const length =
+        typeof track.length === "number"
+          ? track.length
+          : typeof (track.recording as Record<string, unknown> | undefined)?.length === "number"
+            ? ((track.recording as Record<string, unknown>).length as number)
+            : null;
+
+      tracks.push({
+        number: typeof track.number === "string" ? track.number : null,
+        title,
+        lengthMs: length !== null && Number.isFinite(length) && length > 0 ? length : null,
+      });
+    }
+  }
+  return tracks;
+}
+
+/**
+ * Score a release on how well it stands in for the whole group. A tracklist is
+ * the point of the request, so a release without one is never the answer; an
+ * official pressing beats a promo or a bootleg; and the earliest date wins the
+ * rest, since the first edition is the record people mean.
+ */
+function releaseStandInRank(release: Record<string, unknown>): [number, number, string] {
+  const media = Array.isArray(release.media) ? release.media : [];
+  const trackCount = parseTracks(media).length;
+  const status = typeof release.status === "string" ? release.status : null;
+  return [
+    trackCount > 0 ? 0 : 1,
+    status === "Official" ? 0 : 1,
+    // Undated editions sort last: "9999" is past any real release date.
+    typeof release.date === "string" && release.date.length > 0 ? release.date : "9999",
+  ];
+}
+
+function pickStandInRelease(releases: unknown[]): Record<string, unknown> | null {
+  let best: Record<string, unknown> | null = null;
+  let bestRank: [number, number, string] | null = null;
+
+  for (const entry of releases) {
+    if (!entry || typeof entry !== "object") continue;
+    const release = entry as Record<string, unknown>;
+    const rank = releaseStandInRank(release);
+    if (
+      bestRank === null ||
+      rank[0] < bestRank[0] ||
+      (rank[0] === bestRank[0] &&
+        (rank[1] < bestRank[1] || (rank[1] === bestRank[1] && rank[2] < bestRank[2])))
+    ) {
+      best = release;
+      bestRank = rank;
+    }
+  }
+  return best;
+}
+
+// Enough editions to find an official one with a tracklist, without pulling
+// every pressing of a record that has been reissued forty times.
+const STAND_IN_RELEASE_LIMIT = 10;
+
+async function fetchStandInRelease(
+  releaseGroupId: string,
+): Promise<Record<string, unknown> | null> {
+  const params = new URLSearchParams({
+    "release-group": releaseGroupId,
+    inc: "recordings+media+labels",
+    limit: String(STAND_IN_RELEASE_LIMIT),
+    fmt: "json",
+  });
+  const response = await mbFetch(`${MB_API_BASE}/release?${params}`);
+  if (!response.ok) {
+    throw new MusicBrainzHttpError(
+      response.status,
+      `MusicBrainz release browse returned ${response.status} for ${releaseGroupId}`,
+    );
+  }
+
+  const data = (await response.json()) as { releases?: unknown[] };
+  return pickStandInRelease(Array.isArray(data.releases) ? data.releases : []);
+}
+
+/**
+ * Everything worth showing about a release group: what MusicBrainz calls it,
+ * where its external links point, and the tracklist of a representative
+ * edition.
+ *
+ * Throws `MusicBrainzHttpError` on a non-2xx response and the underlying error
+ * on a network failure. The caller decides what a failure means to the user —
+ * here, a panel that says the details couldn't be loaded, rather than one that
+ * quietly claims the record has no tracks and nowhere to hear it.
+ */
+export async function fetchReleaseGroupDetail(
+  releaseGroupId: string,
+): Promise<MbReleaseGroupDetail> {
+  const params = new URLSearchParams({ inc: "url-rels+artist-credits", fmt: "json" });
+  const response = await mbFetch(`${MB_API_BASE}/release-group/${releaseGroupId}?${params}`);
+  if (!response.ok) {
+    throw new MusicBrainzHttpError(
+      response.status,
+      `MusicBrainz release-group lookup returned ${response.status} for ${releaseGroupId}`,
+    );
+  }
+
+  const group = (await response.json()) as Record<string, unknown>;
+
+  // The tracklist is the nice-to-have of the two: a group whose editions can't
+  // be browsed still has a type, a date and its external links, and a panel
+  // showing those beats one that refuses to open.
+  let standIn: Record<string, unknown> | null = null;
+  try {
+    standIn = await fetchStandInRelease(releaseGroupId);
+  } catch (err) {
+    console.warn(`[musicbrainz] Release browse failed for ${releaseGroupId}:`, err);
+  }
+
+  const tracks = standIn ? parseTracks(standIn.media) : [];
+  const everyTrackTimed = tracks.length > 0 && tracks.every((track) => track.lengthMs !== null);
+  const { label } = standIn
+    ? parseLabelInfo(standIn["label-info"])
+    : { label: null as string | null };
+
+  const media = standIn && Array.isArray(standIn.media) ? standIn.media : [];
+  const formats = media
+    .map((medium) => (medium as { format?: unknown }).format)
+    .filter((format): format is string => typeof format === "string" && format.length > 0);
+
+  return {
+    id: typeof group.id === "string" ? group.id : releaseGroupId,
+    title: typeof group.title === "string" ? group.title : "",
+    primaryType: typeof group["primary-type"] === "string" ? group["primary-type"] : null,
+    secondaryTypes: Array.isArray(group["secondary-types"])
+      ? group["secondary-types"].filter((type): type is string => typeof type === "string")
+      : [],
+    firstReleaseDate:
+      typeof group["first-release-date"] === "string" && group["first-release-date"].length > 0
+        ? group["first-release-date"]
+        : null,
+    disambiguation:
+      typeof group.disambiguation === "string" && group.disambiguation.length > 0
+        ? group.disambiguation
+        : null,
+    artistCredit: joinArtistCredit(group["artist-credit"]),
+    links: parseUrlRelations(group.relations),
+    tracks,
+    trackCount: tracks.length > 0 ? tracks.length : (parseTrackCount(media) ?? null),
+    totalLengthMs: everyTrackTimed
+      ? tracks.reduce((total, track) => total + (track.lengthMs ?? 0), 0)
+      : null,
+    label,
+    country: standIn && typeof standIn.country === "string" ? standIn.country : null,
+    // A double LP is one format, not two; distinct media (LP + CD) both show.
+    format: formats.length > 0 ? [...new Set(formats)].join(" + ") : null,
+    releaseId: standIn && typeof standIn.id === "string" ? standIn.id : null,
+    releaseTitle: standIn && typeof standIn.title === "string" ? standIn.title : null,
+    releaseDate:
+      standIn && typeof standIn.date === "string" && standIn.date.length > 0 ? standIn.date : null,
+  };
+}

@@ -1,9 +1,9 @@
 import { afterEach, describe, expect, mock, spyOn, test } from "bun:test";
 import { eq } from "drizzle-orm";
-import * as musicbrainz from "../../server/musicbrainz";
-import { db } from "../../server/db/index";
-import { artists, musicItems } from "../../server/db/schema";
-import { normalize } from "../../server/utils";
+import * as musicbrainz from "../../adapters/musicbrainz/index";
+import { db } from "../../adapters/db/index";
+import { artists, musicItems } from "../../adapters/db/schema";
+import { normalize } from "../../domain/text";
 import {
   backfillArtistMbidsFromItems,
   isVariousArtists,
@@ -12,7 +12,7 @@ import {
   resolveArtistMbid,
   setArtistMbid,
   VARIOUS_ARTISTS_MBID,
-} from "../../server/artist-identity";
+} from "../../app/artist-identity";
 
 function candidate(
   overrides: Partial<musicbrainz.MbArtistCandidate>,

@@ -1,11 +1,18 @@
 import { Hono } from "hono";
-import { db } from "../db/index";
-import { musicItems, artists, musicLinks, sources, stacks, musicItemStacks } from "../db/schema";
+import { db } from "../../adapters/db/index";
+import {
+  musicItems,
+  artists,
+  musicLinks,
+  sources,
+  stacks,
+  musicItemStacks,
+} from "../../adapters/db/schema";
 import { eq, and, inArray, isNull } from "drizzle-orm";
 import type { MusicItemFull } from "../../domain/types";
 import type { PrimaryFeedKey } from "../../domain/rss";
-import type { ReleaseAlertView } from "../release-alerts";
-import { listReleaseAlerts } from "../release-alerts";
+import type { ReleaseAlertView } from "../../app/release-alerts";
+import { listReleaseAlerts } from "../../app/release-alerts";
 
 type StackInfo = { id: number; name: string };
 type FeedInfo = { title: string; description: string };

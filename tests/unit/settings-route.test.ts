@@ -2,8 +2,8 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { eq } from "drizzle-orm";
 import { Hono } from "hono";
 import { createSettingsRoutes } from "../../server/routes/settings";
-import { db } from "../../server/db/index";
-import { appSettings, itemSuggestions, musicItems } from "../../server/db/schema";
+import { db } from "../../adapters/db/index";
+import { appSettings, itemSuggestions, musicItems } from "../../adapters/db/schema";
 import {
   getLookupService,
   setLookupService,
@@ -13,7 +13,7 @@ import {
   setArtistWatchSettings,
   DEFAULT_ARTIST_WATCH_SETTINGS,
   ARTIST_WATCH_KEYS,
-} from "../../server/settings";
+} from "../../app/settings";
 
 function makeApp(): Hono {
   const app = new Hono();

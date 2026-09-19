@@ -1,19 +1,19 @@
 import { describe, test, expect, spyOn, mock } from "bun:test";
 import {
   parseBandcampOg,
-  parseSoundcloudOg,
-  parseDefaultOg,
-  detectMusicRelatedHtml,
-  scrapeUrl,
-  UnsupportedMusicLinkError,
   extractBandcampEmbedMetadata,
   parseBandcampReleaseDate,
-  parseNtsOg,
-  parsePitchforkOg,
-  parsePitchforkJsonLd,
+} from "../../adapters/bandcamp/index";
+import { parseSoundcloudOg } from "../../adapters/soundcloud/index";
+import {
+  parseDefaultOg,
+  detectMusicRelatedHtml,
   parseCanonicalUrl,
-} from "../../server/scraper";
-import { parseOgTags, decodeHtmlEntities } from "../../server/html-metadata";
+} from "../../adapters/web/index";
+import { scrapeUrl, UnsupportedMusicLinkError } from "../../app/scrape";
+import { parseNtsOg } from "../../adapters/nts/index";
+import { parsePitchforkOg, parsePitchforkJsonLd } from "../../adapters/pitchfork/index";
+import { parseOgTags, decodeHtmlEntities } from "../../adapters/web/html-metadata";
 
 function mockChatCompletionResponse(
   content: string | Array<{ type: string; text: string }>,

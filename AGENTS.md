@@ -7,7 +7,7 @@ This project uses Bun, not node.
 - Ensure you have run all the tests locally 
 ### On pushing
 - Create a PR
-- check the the Github checks for the branch have passed. If they fail investigate and fix the error.
+- check the Github checks for the branch have passed. If they fail investigate and fix the error.
 
 - When making visual changes always consider how they will look on smaller screens (mobiles/tablets etc).
 
@@ -27,9 +27,17 @@ If CI fails or conflicts exist, fix or surface them rather than reporting the PR
 ### Plain terms over jargon
 Prefer the word the repo already uses for a concept over the textbook term (e.g. `--config ground-truth`, not `--config oracle`; the repo's word for a provider is "source" / `SourceName`). If a term needs a glossary entry to be understood, it probably needs renaming instead. Applies to identifiers, CLI flags, and prose in reports.
 
-### Hexagonal architecture direction
-As of 2026-08-28 the codebase is being reorganised toward hexagonal architecture: split by **role** at the top level (`domain/`, `ports/`, `app/`, `adapters/`, with `src/` as the driving adapter) and by **source** (Apple Music, Discogs, MusicBrainz…) only inside `adapters/`. The app stays **one package** — no separate package for the core.
+### Hexagonal architecture
+As of 2026-08-28 the codebase is split by **role** at the top level (`domain/`, `ports/`, `app/`, `adapters/`, with `src/` and `server/` as the driving adapters) and by **source** (Apple Music, Discogs, MusicBrainz…) only inside `adapters/`. The app stays **one package** — no separate package for the core.
 
-Landed: `shared/` renamed to `domain/`, `src/types/index.ts` moved to `domain/types.ts`, `server/` no longer imports from `src/`. Enforced by `no-restricted-imports` overrides in `.oxlintrc.json`; `tests/unit/layer-boundaries.test.ts` covers the `.svelte` gap oxlint can't parse.
+- `domain/` — pure core: types, parsing, date and similarity logic. Imports nothing from outside itself (enforced).
+- `ports/` — contracts the layers meet at (e.g. `ServiceSearch`). Types only, imports nothing (enforced).
+- `app/` — the use cases: item creation, reminders, suggestions, scraping orchestration, plus `app/queries/`. May import `domain/`, `ports/` and `adapters/`; never `server/` or `src/` (enforced).
+- `adapters/` — one folder per outside thing a source lives behind (`apple-music/`, `discogs/`, `musicbrainz/`, …) plus `db/`, `web/` and `mistral/`. May import `domain/`, `ports/` and each other; never `server/`, `src/` or `app/` (enforced).
+- `adapters/registry.ts` — where a source is wired in: URL classification, the scrape map, and the release-date capability flag.
+- `server/` — the HTTP host (Hono routes, uploads, CSRF) and nothing else.
+- `src/` — the SvelteKit app, the other driving adapter.
 
-When adding a new music source, expect it to become a folder under `adapters/` plus a registry entry — not an edit to a large shared file. Don't reintroduce imports from `server/` into `src/`-owned modules, or from `domain/` outward.
+Boundaries are enforced by `no-restricted-imports` overrides in `.oxlintrc.json`; `tests/unit/layer-boundaries.test.ts` covers the `.svelte` gap oxlint can't parse.
+
+When adding a new music source, it becomes a folder under `adapters/` plus a registry entry — not an edit to a large shared file. Don't reintroduce imports from `server/` into `src/`- or `app/`-owned modules, from `adapters/` into `server/`, `src/` or `app/`, or from `domain/` or `ports/` outward.

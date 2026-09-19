@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, mock, spyOn, test } from "bun:test";
 import { and, eq } from "drizzle-orm";
 import { Hono } from "hono";
-import { db } from "../../server/db/index";
+import { db } from "../../adapters/db/index";
 import {
   artistReleases,
   artists,
@@ -11,8 +11,8 @@ import {
   releaseAlerts,
   sources,
   stacks,
-} from "../../server/db/schema";
-import { normalize } from "../../server/utils";
+} from "../../adapters/db/schema";
+import { normalize } from "../../domain/text";
 import { createReleaseAlertRoutes } from "../../server/routes/release-alerts";
 import { createArtistRoutes } from "../../server/routes/artists";
 import {
@@ -20,9 +20,9 @@ import {
   ensureNewReleasesStack,
   itemTypeForReleaseGroup,
   NEW_RELEASES_STACK_NAME,
-} from "../../server/release-alerts";
-import type { ReleaseLinkOutcome } from "../../server/release-link-check";
-import { DEFAULT_ARTIST_WATCH_SETTINGS, setArtistWatchSettings } from "../../server/settings";
+} from "../../app/release-alerts";
+import type { ReleaseLinkOutcome } from "../../app/release-link-check";
+import { DEFAULT_ARTIST_WATCH_SETTINGS, setArtistWatchSettings } from "../../app/settings";
 
 function makeApp(): Hono {
   const app = new Hono();

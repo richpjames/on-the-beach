@@ -2,8 +2,8 @@ import { afterEach, describe, expect, test } from "bun:test";
 import { eq, inArray } from "drizzle-orm";
 import { Hono } from "hono";
 
-import { db } from "../../server/db/index";
-import { artists, musicItems } from "../../server/db/schema";
+import { db } from "../../adapters/db/index";
+import { artists, musicItems } from "../../adapters/db/schema";
 import { musicItemRoutes } from "../../server/routes/music-items";
 
 // A previous secondary-link lookup that came up empty stamps `lookupAttemptedAt`

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "bun:test";
-import { extractMusicUrls } from "../../server/email-parser";
+import { extractMusicUrls } from "../../app/email-parser";
 
 describe("extractMusicUrls", () => {
   it("extracts bandcamp URLs from HTML anchor tags", () => {

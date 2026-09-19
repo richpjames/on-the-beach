@@ -35,7 +35,7 @@ export const test = base.extend<{}, WorkerFixtures>({
       };
 
       clearDatabaseFiles(databasePath);
-      await runCommand(["server/db/seed.ts"], env);
+      await runCommand(["adapters/db/seed.ts"], env);
       const preferredPort =
         SERVER_BASE_PORT === null ? null : SERVER_BASE_PORT + workerInfo.workerIndex;
       const { port, server } = await startWorkerServer(env, preferredPort);

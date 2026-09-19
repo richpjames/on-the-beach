@@ -1,11 +1,11 @@
 import { Hono } from "hono";
 import { eq } from "drizzle-orm";
-import { db } from "../db/index";
-import { artists } from "../db/schema";
-import { listTrackedArtists, pollArtistNow } from "../artist-watch";
-import { muteArtist } from "../release-alerts";
-import { searchArtistCandidates } from "../musicbrainz";
-import { setArtistMbid } from "../artist-identity";
+import { db } from "../../adapters/db/index";
+import { artists } from "../../adapters/db/schema";
+import { listTrackedArtists, pollArtistNow } from "../../app/artist-watch";
+import { muteArtist } from "../../app/release-alerts";
+import { searchArtistCandidates } from "../../adapters/musicbrainz/index";
+import { setArtistMbid } from "../../app/artist-identity";
 
 const FOLLOW_STATES = ["auto", "always", "muted"] as const;
 type FollowState = (typeof FOLLOW_STATES)[number];

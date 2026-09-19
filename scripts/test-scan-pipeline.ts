@@ -3,10 +3,10 @@
 // Usage: MISTRAL_API_KEY=... GOOGLE_VISION_API_KEY=... bun run scripts/test-scan-pipeline.ts <image.jpg>
 
 import { readFileSync } from "node:fs";
-import { extractReleaseInfo, extractReleaseInfoFromWebContext } from "../server/vision";
-import { getWebContext } from "../server/google-vision";
-import { createScanEnricher } from "../server/scan-enricher";
-import { lookupRelease } from "../server/musicbrainz";
+import { extractReleaseInfo, extractReleaseInfoFromWebContext } from "../adapters/mistral/index";
+import { getWebContext } from "../adapters/google-vision/index";
+import { createScanEnricher } from "../app/scan-enricher";
+import { lookupRelease } from "../adapters/musicbrainz/index";
 
 const imagePath = process.argv[2];
 if (!imagePath) {

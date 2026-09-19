@@ -3,8 +3,8 @@ import {
   checkReleaseLink,
   pickExternalLink,
   type ReleaseLinkDeps,
-} from "../../server/release-link-check";
-import type { MbUrlRelation } from "../../server/musicbrainz";
+} from "../../app/release-link-check";
+import type { MbUrlRelation } from "../../adapters/musicbrainz/index";
 import type { ServiceSearchResult } from "../../ports/service-search";
 
 const QUERY = {

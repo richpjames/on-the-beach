@@ -3,9 +3,10 @@ import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join, resolve, dirname, relative } from "node:path";
 
 // The layer boundaries live in .oxlintrc.json, which covers every .ts file in
-// domain/, server/, src/lib and src/ui. It does not cover .svelte, because
-// oxlint doesn't parse it — a component with a server import inside <script>
-// lints clean. This closes that one gap; delete it if oxlint learns Svelte.
+// domain/, ports/, app/, adapters/, server/, src/lib and src/ui. It does not
+// cover .svelte, because oxlint doesn't parse it — a component with a server
+// import inside <script> lints clean. This closes that one gap; delete it if
+// oxlint learns Svelte.
 
 const repoRoot = resolve(import.meta.dir, "../..");
 

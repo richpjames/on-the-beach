@@ -1,5 +1,5 @@
 import { describe, test, expect, spyOn, mock, afterEach, afterAll } from "bun:test";
-import { createMusicItemsFromUrl, formatPageSourceNote } from "../../server/music-item-creator";
+import { createMusicItemsFromUrl, formatPageSourceNote } from "../../app/music-item-creator";
 
 // Unsupported pages go through the Mistral extractor, and freshly created items
 // kick off background lookups — keep both off the network. Set at module scope

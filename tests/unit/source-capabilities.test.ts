@@ -1,10 +1,10 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { eq, inArray } from "drizzle-orm";
 
-import { db } from "../../server/db/index";
-import { musicItems, musicLinks, sources } from "../../server/db/schema";
-import { SEED_SOURCES } from "../../server/db/seed-sources";
-import { fetchFullItem } from "../../server/music-item-store";
+import { db } from "../../adapters/db/index";
+import { musicItems, musicLinks, sources } from "../../adapters/db/schema";
+import { SEED_SOURCES } from "../../adapters/db/seed-sources";
+import { fetchFullItem } from "../../app/music-item-store";
 
 // What a source lets you *do* with a record — play it, buy it, or read about it
 // — as opposed to which service it is. The flags live on the `sources` table so

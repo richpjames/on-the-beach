@@ -12,8 +12,8 @@ import {
   setArtistWatchSettings,
   MAX_STAR_RATING,
   type ArtistWatchSettings,
-} from "../settings";
-import { ensureSuggestionsForToListenArtists } from "../suggestions";
+} from "../../app/settings";
+import { ensureSuggestionsForToListenArtists } from "../../app/suggestions";
 
 /**
  * Pick the artist-watch fields out of a settings payload, rejecting values of

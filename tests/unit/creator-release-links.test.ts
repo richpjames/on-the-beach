@@ -1,5 +1,5 @@
 import { describe, test, expect, spyOn, mock, afterEach, afterAll } from "bun:test";
-import { createMusicItemsFromUrl } from "../../server/music-item-creator";
+import { createMusicItemsFromUrl } from "../../app/music-item-creator";
 
 // Same setup as creator-page-source-notes.test.ts: the Mistral client reads its
 // key when this file's imports evaluate, so the env has to be set at module

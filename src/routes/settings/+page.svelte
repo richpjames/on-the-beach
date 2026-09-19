@@ -4,7 +4,7 @@
   import { musickit, authorize, unauthorize, ensureConfigured } from "$lib/musickit.svelte";
   import { api } from "$lib/api";
   import StarRating from "$lib/components/StarRating.svelte";
-  import type { LookupService, ReleaseLengthPreference } from "../../../server/settings";
+  import type { LookupService, ReleaseLengthPreference } from "../../../app/settings";
   import type { ArtistFollowState, MbArtistCandidateView, TrackedArtist } from "../../../domain/types";
 
   let { data } = $props();

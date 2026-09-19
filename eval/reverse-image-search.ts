@@ -1,7 +1,7 @@
 import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { resolve, dirname } from "node:path";
-import { extractReleaseInfo, extractReleaseInfoFromWebContext } from "../server/vision";
-import { getWebContext } from "../server/google-vision";
+import { extractReleaseInfo, extractReleaseInfoFromWebContext } from "../adapters/mistral/index";
+import { getWebContext } from "../adapters/google-vision/index";
 import { scoreResult } from "./scoring";
 import type { EvalManifest, EvalCase } from "./types";
 

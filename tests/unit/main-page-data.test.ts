@@ -15,7 +15,7 @@ for (const suffix of ["", "-shm", "-wal"]) {
   }
 }
 
-// `ingest.test.ts` calls `mock.module("../../server/music-item-creator", ...)`
+// `ingest.test.ts` calls `mock.module("../../app/music-item-creator", ...)`
 // to stub out helpers like `fullItemSelect`. bun's module mocks are
 // process-wide and persist across test files, so any module that imports
 // `music-item-creator` after that point gets stubs. The SSR data module
@@ -26,9 +26,9 @@ void mock;
 
 describe("main page SSR data: /", () => {
   test("returns only items with to-listen status", async () => {
-    const { db } = await import("../../server/db/index");
-    const { musicItems } = await import("../../server/db/schema");
-    const { fetchInitialItems } = await import("../../server/queries/main-page-data");
+    const { db } = await import("../../adapters/db/index.ts");
+    const { musicItems } = await import("../../adapters/db/schema.ts");
+    const { fetchInitialItems } = await import("../../app/queries/main-page-data.ts");
 
     const inserted = await db
       .insert(musicItems)
@@ -58,9 +58,9 @@ describe("main page SSR data: /", () => {
   });
 
   test("excludes scheduled items (remind_at set) from the to-listen view", async () => {
-    const { db } = await import("../../server/db/index");
-    const { musicItems } = await import("../../server/db/schema");
-    const { fetchInitialItems } = await import("../../server/queries/main-page-data");
+    const { db } = await import("../../adapters/db/index.ts");
+    const { musicItems } = await import("../../adapters/db/schema.ts");
+    const { fetchInitialItems } = await import("../../app/queries/main-page-data.ts");
 
     const inserted = await db
       .insert(musicItems)
@@ -99,9 +99,9 @@ describe("main page SSR data: /", () => {
 
 describe("main page SSR data: /s/:id/:name", () => {
   test("returns items in the stack regardless of listen status", async () => {
-    const { db } = await import("../../server/db/index");
-    const { musicItems, stacks, musicItemStacks } = await import("../../server/db/schema");
-    const { fetchInitialItems } = await import("../../server/queries/main-page-data");
+    const { db } = await import("../../adapters/db/index.ts");
+    const { musicItems, stacks, musicItemStacks } = await import("../../adapters/db/schema.ts");
+    const { fetchInitialItems } = await import("../../app/queries/main-page-data.ts");
 
     const [stack] = await db
       .insert(stacks)
@@ -155,9 +155,9 @@ describe("main page SSR data: /s/:id/:name", () => {
   });
 
   test("fetchInitialStacks includes parent ids and item counts", async () => {
-    const { db } = await import("../../server/db/index");
-    const { stacks, stackParents } = await import("../../server/db/schema");
-    const { fetchInitialStacks } = await import("../../server/queries/main-page-data");
+    const { db } = await import("../../adapters/db/index.ts");
+    const { stacks, stackParents } = await import("../../adapters/db/schema.ts");
+    const { fetchInitialStacks } = await import("../../app/queries/main-page-data.ts");
 
     const [parent] = await db
       .insert(stacks)

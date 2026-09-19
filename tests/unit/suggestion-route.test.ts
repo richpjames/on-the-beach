@@ -2,10 +2,10 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { eq } from "drizzle-orm";
 import { Hono } from "hono";
 
-import { db } from "../../server/db/index";
-import { artists, itemSuggestions, musicItems } from "../../server/db/schema";
+import { db } from "../../adapters/db/index";
+import { artists, itemSuggestions, musicItems } from "../../adapters/db/schema";
 import { musicItemRoutes } from "../../server/routes/music-items";
-import { normalize } from "../../server/utils";
+import { normalize } from "../../domain/text";
 
 // The prompt offers up to three releases, so the accept/dismiss endpoints have
 // to be told which one the user picked — "the artist's pending suggestion" is
