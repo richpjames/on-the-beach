@@ -133,6 +133,8 @@ export interface MusicItemLink extends SourceCapabilities {
   source_name: string | null;
   display_name: string | null;
   is_primary: boolean;
+  /** Embed ids scraped from the linked page (e.g. Bandcamp's album_id). */
+  metadata: string | null;
 }
 
 // Input types for create/update

@@ -12,10 +12,11 @@ import { parseUrl } from "./utils";
  * (a scanned cover, a hand-typed title) stayed pictureless even once a link to
  * its page was added. Scraping here puts both paths on the same footing.
  *
- * Bandcamp is the only source needing embed metadata: every other embed the
- * release page builds is derived from the URL itself. Cover art is worth
- * looking for on any source, but only when the release hasn't got one — a
- * scrape nobody needs is a page fetch nobody asked for.
+ * Bandcamp and SoundCloud need embed metadata (Bandcamp's `album_id`,
+ * SoundCloud's resource urn): every other embed the release page builds is
+ * derived from the URL itself. Cover art is worth looking for on any source,
+ * but only when the release hasn't got one — a scrape nobody needs is a page
+ * fetch nobody asked for.
  */
 export interface AddedLinkScrape {
   /** JSON to store in `music_links.metadata`, or null when there's nothing to store. */
@@ -61,7 +62,7 @@ export async function scrapeAddedLink(
   deps: AddedLinkScrapeDeps = defaultAddedLinkScrapeDeps,
 ): Promise<AddedLinkScrape> {
   const { source, normalizedUrl } = parseUrl(url);
-  const wantsEmbedMetadata = source === "bandcamp";
+  const wantsEmbedMetadata = source === "bandcamp" || source === "soundcloud";
 
   if (!wantsEmbedMetadata && !wantsArtwork) return NOTHING;
 

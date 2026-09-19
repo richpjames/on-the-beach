@@ -9,6 +9,7 @@ import {
   extractYouTubePlaylistId,
 } from "../../../../server/utils";
 import { mixcloudWidgetSrc } from "../../../../server/mixcloud";
+import { soundcloudWidgetSrc } from "../../../../server/soundcloud";
 import { parseAppleMusicCatalogUrl, type AppleMusicResource } from "../../../../domain/apple-music";
 import { sanitizeListHref } from "../../../ui/logic/list-url";
 import type { MusicItemFull } from "../../../../domain/types";
@@ -84,6 +85,37 @@ function bandcampEmbed(item: MusicItemFull): ListenEmbed | null {
     href: item.primary_url,
     playerType: "audio",
   };
+}
+
+/** The item's SoundCloud link and the resource urn its scrape stored. */
+function soundcloudLinkForItem(
+  item: MusicItemFull,
+): { url: string; urn: string | undefined } | null {
+  if (item.primary_url?.includes("soundcloud.com")) {
+    return {
+      url: item.primary_url,
+      urn: parseLinkMetadata(item.primary_link_metadata)?.soundcloud_urn,
+    };
+  }
+  const link = item.links.find(
+    (l) => !l.is_primary && (l.source_name === "soundcloud" || l.url.includes("soundcloud.com")),
+  );
+  return link ? { url: link.url, urn: parseLinkMetadata(link.metadata)?.soundcloud_urn } : null;
+}
+
+/**
+ * The SoundCloud listen word. The widget can't play the link's own URL — it
+ * wants the api resource the page's hydra state names — so this reads the urn
+ * the scrape stored, exactly as Bandcamp reads its album_id. Hunt order as
+ * Apple Music: primary link first, then the first SoundCloud secondary link.
+ * No stored urn (scrape failed, or SoundCloud changed its page) means no play
+ * word; the plain link out remains.
+ */
+function soundcloudEmbed(item: MusicItemFull): ListenEmbed | null {
+  const found = soundcloudLinkForItem(item);
+  if (!found?.urn) return null;
+  const src = soundcloudWidgetSrc(found.urn);
+  return src ? { src, href: found.url, playerType: "audio" } : null;
 }
 
 /**
@@ -186,6 +218,7 @@ export const load: PageServerLoad = async ({ params, url }) => {
     sourceLink,
     youtubeEmbed: youTubeEmbed(item),
     bandcampEmbed: bandcampEmbed(item),
+    soundcloudEmbed: soundcloudEmbed(item),
     appleMusicListen: appleMusicListen(item, appleMusicConfigured),
     appleMusicConfigured,
     mixcloudWidgetSrc: mixcloudWidgetSrc(

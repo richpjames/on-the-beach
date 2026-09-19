@@ -21,7 +21,7 @@ export interface PlayerEffects {
 }
 
 export interface PlayerContext extends PlayerEffects {
-  /** Source URL for iframe playback (Bandcamp / YouTube / Mixcloud / AM preview). */
+  /** Source URL for iframe playback (Bandcamp / YouTube / SoundCloud / Mixcloud / AM preview). */
   src: string | null;
   /** Target catalogue resource when playing through MusicKit. */
   apple: AppleMusicTarget | null;
