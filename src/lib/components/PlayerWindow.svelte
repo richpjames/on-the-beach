@@ -252,7 +252,11 @@
           allowfullscreen
         ></iframe>
       {:else}
-        <iframe src={player.src} title="Bandcamp player" seamless allow="autoplay; encrypted-media"
+        <iframe
+          src={player.src}
+          title="Audio player"
+          seamless
+          allow="autoplay; encrypted-media"
         ></iframe>
       {/if}
     {/if}

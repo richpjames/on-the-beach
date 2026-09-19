@@ -753,7 +753,12 @@ musicItemRoutes.post("/:id/links", async (c) => {
     .insert(musicLinks)
     .values({ musicItemId: id, sourceId: source.id, url, isPrimary, metadata: scraped.metadata })
     .onConflictDoNothing()
-    .returning({ id: musicLinks.id, url: musicLinks.url, isPrimary: musicLinks.isPrimary });
+    .returning({
+      id: musicLinks.id,
+      url: musicLinks.url,
+      isPrimary: musicLinks.isPrimary,
+      metadata: musicLinks.metadata,
+    });
 
   if (!link) {
     return c.json({ error: "Link already exists for this release" }, 409);
@@ -772,6 +777,7 @@ musicItemRoutes.post("/:id/links", async (c) => {
       source_name: source.name,
       display_name: source.displayName,
       is_primary: link.isPrimary,
+      metadata: link.metadata,
       can_play: source.canPlay,
       can_buy: source.canBuy,
       is_editorial: source.isEditorial,

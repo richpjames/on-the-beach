@@ -11,8 +11,8 @@
  * reactive facade the components bind to. See docs/areas/frontend/state-machines.md.
  *
  * Two playback modes:
- *  - "iframe": Bandcamp / YouTube / Mixcloud (and the Apple Music preview
- *    embed used as a fallback) render an <iframe> from `src`.
+ *  - "iframe": Bandcamp / YouTube / SoundCloud / Mixcloud (and the Apple Music
+ *    preview embed used as a fallback) render an <iframe> from `src`.
  *  - "apple_music": full-track playback driven by MusicKit (see musickit.svelte.ts).
  */
 import { browser } from "$app/environment";
@@ -77,7 +77,7 @@ export const player = {
     return !snapshot.matches("idle") && !snapshot.context.minimized;
   },
 
-  /** Play an iframe-embedded source (Bandcamp, YouTube, Mixcloud, AM preview). */
+  /** Play an iframe-embedded source (Bandcamp, YouTube, SoundCloud, Mixcloud, AM preview). */
   load(
     src: string,
     title: string,

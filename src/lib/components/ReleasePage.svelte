@@ -436,6 +436,17 @@
         play: () => listen(youtube),
       });
     }
+    const soundcloud = data.soundcloudEmbed;
+    if (soundcloud) {
+      targets.push({
+        key: "soundcloud",
+        service: "SoundCloud",
+        href: soundcloud.href ?? undefined,
+        src: soundcloud.src,
+        playerType: soundcloud.playerType,
+        play: () => listen(soundcloud),
+      });
+    }
     const appleMusic = data.appleMusicListen;
     if (appleMusic) {
       targets.push({
@@ -471,7 +482,12 @@
   // already links to the same YouTube page).
   const playHrefs = $derived(
     new Set(
-      [data.bandcampEmbed?.href, data.youtubeEmbed?.href, data.appleMusicListen?.href].filter(
+      [
+        data.bandcampEmbed?.href,
+        data.youtubeEmbed?.href,
+        data.soundcloudEmbed?.href,
+        data.appleMusicListen?.href,
+      ].filter(
         (href): href is string => !!href,
       ),
     ),

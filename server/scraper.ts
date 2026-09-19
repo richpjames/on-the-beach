@@ -35,6 +35,7 @@ import {
   mergeMixcloudPageMetadata,
   parseMixcloudOg,
 } from "./mixcloud";
+import { extractSoundcloudUrn } from "./soundcloud";
 import { parseReleaseYear } from "./release-dates";
 
 export type { OgData, ScrapedMetadata } from "./html-metadata";
@@ -579,15 +580,17 @@ export async function scrapeUrl(
 
     let html = "";
     const decoder = new TextDecoder();
-    // Bandcamp needs body content too (TralbumData JS is in the body)
-    const maxBytes =
-      source === "unknown" || source === "bandcamp" ? MAX_UNKNOWN_HTML_BYTES : MAX_HEAD_BYTES;
+    // Bandcamp and SoundCloud need body content too (Bandcamp's TralbumData and
+    // SoundCloud's hydra state — which holds the ids the players need — are in
+    // the body)
+    const readsBody = source === "unknown" || source === "bandcamp" || source === "soundcloud";
+    const maxBytes = readsBody ? MAX_UNKNOWN_HTML_BYTES : MAX_HEAD_BYTES;
 
     while (html.length < maxBytes) {
       const { done, value } = await reader.read();
       if (done) break;
       html += decoder.decode(value, { stream: true });
-      if (source === "unknown" || source === "bandcamp") {
+      if (readsBody) {
         if (html.includes("</body>")) break;
       } else if (html.includes("</head>")) {
         break;
@@ -657,6 +660,10 @@ export async function scrapeUrl(
         // one going — fill the item's year in from it.
         result.year ??= parseReleaseYear(releaseDate) ?? undefined;
       }
+    }
+    if (source === "soundcloud" && result) {
+      const urn = extractSoundcloudUrn(html);
+      if (urn) result.embedMetadata = { soundcloud_urn: urn };
     }
     return result;
   } catch (err) {
