@@ -19,7 +19,7 @@ for (const suffix of ["", "-shm", "-wal"]) {
 // to stub out helpers like `fullItemSelect`. bun's module mocks are
 // process-wide and persist across test files, so any module that imports
 // `music-item-creator` after that point gets stubs. The SSR data module
-// imports `fullItemSelect` from `server/queries/full-item-select.ts` directly
+// imports `fullItemSelect` from `app/queries/full-item-select.ts` directly
 // to sidestep that mock — we keep the `mock` import to make the dependency
 // explicit in case the module organization changes again.
 void mock;
