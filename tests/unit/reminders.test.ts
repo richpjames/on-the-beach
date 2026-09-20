@@ -2,7 +2,7 @@ import { afterEach, describe, expect, test } from "bun:test";
 import * as fs from "node:fs";
 
 // Attempt to isolate from the dev DB. Earlier test files in the run may already
-// have imported `server/db/index` with the default path, in which case this
+// have imported `adapters/db/index` with the default path, in which case this
 // assignment is ignored — so every test below also cleans up the rows it inserts.
 const TEST_DB = `/tmp/reminders-test-${Date.now()}-${Math.random().toString(36).slice(2)}.db`;
 process.env.DATABASE_PATH ??= TEST_DB;

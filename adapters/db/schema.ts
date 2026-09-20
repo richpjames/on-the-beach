@@ -108,7 +108,7 @@ export const musicItems = sqliteTable(
     // Timestamp of the last secondary-link lookup attempt against the active
     // streaming service. Set on both a hit and a miss so we don't re-query on
     // every page view for items with no match. Cleared for all items when the
-    // active service is switched (see server/settings.ts) so they're re-queried
+    // active service is switched (see app/settings.ts) so they're re-queried
     // against the new service. The column keeps its original name for migration
     // continuity; the field name is service-agnostic.
     lookupAttemptedAt: integer("apple_music_lookup_at", { mode: "timestamp" }),

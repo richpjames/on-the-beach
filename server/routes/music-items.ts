@@ -688,7 +688,7 @@ musicItemRoutes.post("/:id/links", async (c) => {
   // Upsert source — insert if new, reuse if existing. A source invented here
   // from a user-supplied name keeps the all-false capability defaults: we know
   // nothing about what it offers, so it promises nothing until classified in
-  // server/db/seed-sources.ts.
+  // adapters/db/seed-sources.ts.
   await db.insert(sources).values({ name, displayName }).onConflictDoNothing();
 
   const [source] = await db

@@ -44,7 +44,7 @@ export type SourceName =
  * three false is meaningful — a physical copy, or a link to somewhere we don't
  * model.
  *
- * Authoritative values live on the `sources` table (see `server/db/seed.ts`),
+ * Authoritative values live on the `sources` table (see `adapters/db/seed.ts`),
  * so they can be corrected without a deploy.
  */
 export interface SourceCapabilities {

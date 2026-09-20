@@ -23,7 +23,7 @@ const mockCountToListen = mock();
 // Mock the music-item-creator module before importing any route, overriding
 // only the functions the ingest routes call. bun's mock.module() persists
 // process-wide for the rest of the test run, and `fullItemSelect` is a
-// re-export from server/queries/full-item-select — replacing it with a bare
+// re-export from app/queries/full-item-select — replacing it with a bare
 // mock() can clobber the origin module's binding for every later importer
 // (this broke the main-page SSR tests on CI, where this file runs first).
 // Passing the real values through keeps other test files working regardless

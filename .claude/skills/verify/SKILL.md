@@ -15,7 +15,7 @@ bun run build                       # outputs build/index.js (adapter-node)
 
 # Seed an isolated DB in a temp dir, then boot the built server:
 export DATABASE_PATH=/path/to/tmp/verify.db NODE_ENV=test OTB_DISABLE_EXTERNAL_LOOKUPS=1
-bun server/db/seed.ts
+bun adapters/db/seed.ts
 PORT=4173 ORIGIN=http://127.0.0.1:4173 bun build/index.js
 ```
 
