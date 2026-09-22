@@ -248,11 +248,14 @@ export class ApiClient {
     return { item: result.item, suggestions };
   }
 
-  async acceptSuggestion(sourceItemId: number, suggestionId: number): Promise<MusicItemFull> {
-    return this.requestJson<MusicItemFull>(
+  async acceptSuggestions(
+    sourceItemId: number,
+    suggestionIds: number[],
+  ): Promise<{ items: MusicItemFull[]; failedTitles: string[] }> {
+    return this.requestJson<{ items: MusicItemFull[]; failedTitles: string[] }>(
       `/api/music-items/${sourceItemId}/suggestion/accept`,
-      "acceptSuggestion",
-      this.jsonRequest("POST", { suggestionId }),
+      "acceptSuggestions",
+      this.jsonRequest("POST", { suggestionIds }),
     );
   }
 

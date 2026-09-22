@@ -179,7 +179,7 @@ test("suggestion artwork falls back to the release when the group has none", asy
     .toBe(true);
 });
 
-test("the prompt offers every stored suggestion, and adds the one picked", async ({
+test("the prompt offers every stored suggestion, and adds every one picked", async ({
   page,
   request,
 }) => {
@@ -207,11 +207,19 @@ test("the prompt offers every stored suggestion, and adds the one picked", async
   const candidates = modal.locator(".link-picker__candidate");
   await expect(candidates).toHaveCount(3);
 
-  // The first is selected by default; picking another moves the selection.
+  // The first is selected by default; further rows toggle independently.
   await expect(candidates.first()).toHaveAttribute("aria-pressed", "true");
+  await expect(candidates.nth(1)).toHaveAttribute("aria-pressed", "false");
+  await candidates.nth(1).click();
+  await expect(candidates.first()).toHaveAttribute("aria-pressed", "true");
+  await expect(candidates.nth(1)).toHaveAttribute("aria-pressed", "true");
+  // Clicking again unticks the row.
+  await candidates.nth(1).click();
+  await expect(candidates.nth(1)).toHaveAttribute("aria-pressed", "false");
+
   await candidates.nth(2).click();
   await expect(candidates.nth(2)).toHaveAttribute("aria-pressed", "true");
-  await expect(candidates.first()).toHaveAttribute("aria-pressed", "false");
+  await expect(modal.locator("#suggestion-picker-accept")).toHaveText("Add 2 to list");
 
   const acceptResponse = page.waitForResponse(
     (response) =>
@@ -225,8 +233,9 @@ test("the prompt offers every stored suggestion, and adds the one picked", async
   const list = await (await request.get("/api/music-items?listenStatus=to-listen")).json();
   const items = Array.isArray(list) ? list : list.items;
   const titles = items.map((entry: { title: string }) => entry.title);
+  expect(titles).toContain("Tri Repetae");
   expect(titles).toContain("Confield");
-  expect(titles).not.toContain("Tri Repetae");
+  expect(titles).not.toContain("Chiastic Slide");
 });
 
 test("dismissing the prompt turns down every release it offered", async ({ page, request }) => {
