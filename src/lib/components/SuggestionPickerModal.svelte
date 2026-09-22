@@ -17,32 +17,46 @@
 
   const isOpen = $derived(suggestions.length > 0);
 
-  // The suggestion the "Add to list" button will take. Reset whenever the
-  // prompt opens with a different set, so a stale id can't carry over.
-  let selectedId = $state<number | null>(null);
+  // The suggestions the "Add to list" button will take. Reset whenever the
+  // prompt opens with a different set, so stale ids can't carry over. The
+  // first stays preselected: accepting straight away still adds the top pick.
+  let selectedIds = $state<Set<number>>(new Set());
   const suggestionsKey = $derived(suggestions.map((s) => s.id).join(","));
 
   $effect.pre(() => {
     void suggestionsKey;
-    selectedId = suggestions[0]?.id ?? null;
+    selectedIds = new Set(suggestions.slice(0, 1).map((s) => s.id));
   });
+
+  function toggle(suggestionId: number): void {
+    const next = new Set(selectedIds);
+    if (next.has(suggestionId)) {
+      next.delete(suggestionId);
+    } else {
+      next.add(suggestionId);
+    }
+    selectedIds = next;
+  }
 
   const artistNames = $derived([...new Set(suggestions.map((s) => s.artistName))]);
   const message = $derived.by(() => {
     if (suggestions.length === 0) return "";
     const by = artistNames.length === 1 ? `Also by ${artistNames[0]}` : "Also by artists you like";
-    return suggestions.length === 1 ? by : `${by} — pick one`;
+    return suggestions.length === 1 ? by : `${by} — pick any`;
   });
 
   async function accept(): Promise<void> {
-    if (sourceItemId === null || selectedId === null) return;
+    if (sourceItemId === null || selectedIds.size === 0) return;
     // Snapshot the ids: destructured $props() reads are live, and onClosed()
     // nulls the parent state these props are bound to.
     const itemId = sourceItemId;
-    const suggestionId = selectedId;
+    const suggestionIds = [...selectedIds];
     onClosed();
     try {
-      await api.acceptSuggestion(itemId, suggestionId);
+      const { failedTitles } = await api.acceptSuggestions(itemId, suggestionIds);
+      if (failedTitles.length > 0) {
+        alert(`Couldn't add: ${failedTitles.join(", ")}`);
+      }
     } catch {
       alert("Failed to add release.");
       return;
@@ -92,14 +106,14 @@
     </div>
     <div id="suggestion-picker-list" class="link-picker__list">
       {#each suggestions as suggestion (suggestion.id)}
-        {@const isSelected = suggestion.id === selectedId}
+        {@const isSelected = selectedIds.has(suggestion.id)}
         <button
           type="button"
           class="link-picker__candidate"
           class:is-selected={isSelected}
           data-suggestion-id={suggestion.id}
           aria-pressed={isSelected ? "true" : "false"}
-          onclick={() => (selectedId = suggestion.id)}
+          onclick={() => toggle(suggestion.id)}
         >
           <SuggestionArtwork {suggestion} />
           <span class="link-picker__candidate-main">
@@ -122,10 +136,10 @@
         type="button"
         id="suggestion-picker-accept"
         class="btn btn--primary"
-        disabled={selectedId === null}
+        disabled={selectedIds.size === 0}
         onclick={accept}
       >
-        Add to list
+        {selectedIds.size > 1 ? `Add ${selectedIds.size} to list` : "Add to list"}
       </button>
     </div>
   </div>

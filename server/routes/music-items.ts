@@ -38,6 +38,7 @@ import {
   type ListenStatus,
   type PurchaseIntent,
   type ItemType,
+  type MusicItemFull,
 } from "../../domain/types";
 
 export const musicItemRoutes = new Hono();
@@ -552,44 +553,73 @@ musicItemRoutes.post("/:id/suggestion/accept", async (c) => {
   const id = Number(c.req.param("id"));
   if (Number.isNaN(id)) return c.json({ error: "Invalid ID" }, 400);
 
-  // Which of the offered suggestions the user picked. Absent (older clients,
-  // which only ever saw one) means the first.
-  const body = (await c.req.json().catch(() => null)) as { suggestionId?: unknown } | null;
-  const suggestionId = typeof body?.suggestionId === "number" ? body.suggestionId : null;
+  // Which of the offered suggestions the user picked. `suggestionIds` is the
+  // list the multi-select prompt sends; `suggestionId` is the single pick from
+  // older clients, and its absence means the first.
+  const body = (await c.req.json().catch(() => null)) as {
+    suggestionId?: unknown;
+    suggestionIds?: unknown;
+  } | null;
+  const requestedIds = Array.isArray(body?.suggestionIds)
+    ? body.suggestionIds.filter((value: unknown): value is number => typeof value === "number")
+    : null;
+  const singleId = typeof body?.suggestionId === "number" ? body.suggestionId : null;
 
   const pending = await findPendingSuggestionsForItem(id);
-  const suggestion =
-    suggestionId === null ? pending[0] : pending.find((row) => row.id === suggestionId);
+  let picked: Awaited<ReturnType<typeof findPendingSuggestionsForItem>>;
+  if (requestedIds !== null) {
+    picked = pending.filter((row) => requestedIds.includes(row.id));
+  } else {
+    const single = singleId === null ? pending[0] : pending.find((row) => row.id === singleId);
+    picked = single ? [single] : [];
+  }
 
-  if (!suggestion) return c.json({ error: "No pending suggestion" }, 404);
+  if (picked.length === 0) return c.json({ error: "No pending suggestion" }, 404);
 
-  // Consume the suggestion before creating the item: creation triggers the
+  // Consume every pick before creating anything: creation triggers the
   // background prefetch of the artist's next suggestion, which skips artists
   // that still have a pending one.
   await db
     .update(itemSuggestions)
     .set({ status: "accepted" })
-    .where(eq(itemSuggestions.id, suggestion.id));
+    .where(
+      inArray(
+        itemSuggestions.id,
+        picked.map((row) => row.id),
+      ),
+    );
 
-  try {
-    const result = await createMusicItemDirect({
-      title: suggestion.title,
-      artistName: suggestion.artistName,
-      itemType: suggestion.itemType as ItemType,
-      listenStatus: "to-listen",
-      year: suggestion.year ?? undefined,
-      musicbrainzReleaseId: suggestion.musicbrainzReleaseId ?? undefined,
-    });
+  const created: MusicItemFull[] = [];
+  const failedTitles: string[] = [];
+  for (const suggestion of picked) {
+    try {
+      const result = await createMusicItemDirect({
+        title: suggestion.title,
+        artistName: suggestion.artistName,
+        itemType: suggestion.itemType as ItemType,
+        listenStatus: "to-listen",
+        year: suggestion.year ?? undefined,
+        musicbrainzReleaseId: suggestion.musicbrainzReleaseId ?? undefined,
+      });
+      created.push(result.item);
+    } catch (err) {
+      // Hand the failed one back so it can be offered again.
+      await db
+        .update(itemSuggestions)
+        .set({ status: "pending" })
+        .where(eq(itemSuggestions.id, suggestion.id));
+      failedTitles.push(suggestion.title);
+      console.error("[api] POST /suggestion/accept failed to create item:", err);
+    }
+  }
 
-    return c.json(result.item, 201);
-  } catch (err) {
-    await db
-      .update(itemSuggestions)
-      .set({ status: "pending" })
-      .where(eq(itemSuggestions.id, suggestion.id));
-    console.error("[api] POST /suggestion/accept failed to create item:", err);
+  if (created.length === 0) {
     return c.json({ error: "Failed to add suggested release" }, 500);
   }
+
+  // Older single-pick clients expect the bare created item.
+  if (requestedIds === null) return c.json(created[0], 201);
+  return c.json({ items: created, failedTitles }, 201);
 });
 
 // ---------------------------------------------------------------------------

@@ -131,6 +131,36 @@ describe("POST /:id/suggestion/accept", () => {
 
     expect(response.status).toBe(404);
   });
+
+  test("adds every release the user picked when sent a list of ids", async () => {
+    const [first, second, third] = await seedSuggestions([
+      "First Offer",
+      "Second Offer",
+      "Third Offer",
+    ]);
+
+    const response = await post("/suggestion/accept", { suggestionIds: [first, third] });
+
+    expect(response.status).toBe(201);
+    const result = (await response.json()) as {
+      items: Array<{ title: string }>;
+      failedTitles: string[];
+    };
+    expect(result.items.map((item) => item.title).sort()).toEqual(["First Offer", "Third Offer"]);
+    expect(result.failedTitles).toEqual([]);
+    expect(await statusOf(first)).toBe("accepted");
+    expect(await statusOf(third)).toBe("accepted");
+    // The one the user left unticked stays pending for next time.
+    expect(await statusOf(second)).toBe("pending");
+  });
+
+  test("404s when none of the listed ids are pending suggestions of the item", async () => {
+    await seedSuggestions(["First Offer"]);
+
+    const response = await post("/suggestion/accept", { suggestionIds: [-1] });
+
+    expect(response.status).toBe(404);
+  });
 });
 
 describe("POST /:id/suggestion/dismiss", () => {
