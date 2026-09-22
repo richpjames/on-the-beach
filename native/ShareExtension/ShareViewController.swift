@@ -2031,24 +2031,16 @@ enum OTBTheme {
         navigationBar.tintColor = .white
     }
 
-    /// The "Add" button shared by the compose form and both pickers: bold white
-    /// Verdana on the blue title bar.
+    /// The "Add" button shared by the compose form and both pickers: the web
+    /// app's `.btn`, a silver Windows 98 push button with a black Verdana label.
     ///
-    /// Deliberately `.plain` rather than `.done`. iOS draws a `.done` item as a
-    /// prominent *filled* bar button tinted by the inherited system tint, which
-    /// in the share extension painted Add as a red pill — nothing to do with the
-    /// app's chrome. Plain keeps it as text we colour ourselves. The bold face
-    /// (set per-item, since the bar's appearance styles plain buttons regular)
-    /// still marks it out as the primary action.
+    /// Styled bar items are a dead end here. A `.done` item is drawn as a filled
+    /// button tinted by the inherited system tint (which painted Add as a red
+    /// pill), and iOS 26 draws even a `.plain` title inside a glass capsule that
+    /// swallows the white label against the blue gradient — the washed-out pill
+    /// this replaced. Drawing our own button keeps the contrast ours to control.
     static func addBarButton(target: Any?, action: Selector) -> UIBarButtonItem {
-        let button = UIBarButtonItem(title: "Add", style: .plain, target: target, action: action)
-        button.setTitleTextAttributes(
-            [.font: ui(14, bold: true), .foregroundColor: UIColor.white], for: .normal
-        )
-        // Disabled keeps the same face but lets the system dim it, so a gated Add
-        // still reads as unavailable.
-        button.setTitleTextAttributes([.font: ui(14, bold: true)], for: .disabled)
-        return button
+        BeveledBarButtonItem(title: "Add", target: target, action: action)
     }
 }
 
@@ -2155,5 +2147,79 @@ final class PressableBeveledView: BeveledView {
 
     override func touchesCancelled(_ touches: Set<UITouch>, with event: UIEvent?) {
         style = restingStyle
+    }
+}
+
+/// A Windows 98 push button for the title bar: silver chrome fill, two-tone
+/// bevel and a black Verdana label — the web app's `.btn`. Raised at rest, the
+/// bevel inverted while pressed, and dimmed when disabled — the same three
+/// states the stylesheet gives `.btn`.
+final class Win98BarButton: UIControl {
+    private let bevel = BeveledView(style: .raised, fill: OTBTheme.chrome)
+    private let label = UILabel()
+
+    init(title: String) {
+        super.init(frame: .zero)
+        label.text = title
+        label.font = OTBTheme.ui(14, bold: true)
+        label.textColor = .black
+        bevel.translatesAutoresizingMaskIntoConstraints = false
+        label.translatesAutoresizingMaskIntoConstraints = false
+        addSubview(bevel)
+        addSubview(label)
+        NSLayoutConstraint.activate([
+            bevel.topAnchor.constraint(equalTo: topAnchor),
+            bevel.bottomAnchor.constraint(equalTo: bottomAnchor),
+            bevel.leadingAnchor.constraint(equalTo: leadingAnchor),
+            bevel.trailingAnchor.constraint(equalTo: trailingAnchor),
+            label.centerXAnchor.constraint(equalTo: centerXAnchor),
+            label.centerYAnchor.constraint(equalTo: centerYAnchor),
+            label.leadingAnchor.constraint(greaterThanOrEqualTo: leadingAnchor, constant: 12),
+            label.trailingAnchor.constraint(lessThanOrEqualTo: trailingAnchor, constant: -12),
+        ])
+
+        isAccessibilityElement = true
+        accessibilityTraits = .button
+        accessibilityLabel = title
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
+
+    override var isHighlighted: Bool {
+        didSet { bevel.style = isHighlighted ? .sunken : .raised }
+    }
+
+    /// The web's `.btn:disabled`: the same face dimmed, never a different colour.
+    override var isEnabled: Bool {
+        didSet { alpha = isEnabled ? 1 : 0.35 }
+    }
+
+    /// A bar button item sizes its custom view from this — the 12pt side padding
+    /// is what makes the chrome wide enough to tap without bloating the bar.
+    override var intrinsicContentSize: CGSize {
+        let text = label.intrinsicContentSize
+        return CGSize(width: text.width + 24, height: text.height + 10)
+    }
+}
+
+/// A bar item showing a `Win98BarButton` as its custom view. The item does the
+/// gating (`isEnabled`) and forwards it to the drawn button — a bar item dims
+/// styled titles itself but leaves custom views alone.
+final class BeveledBarButtonItem: UIBarButtonItem {
+    private let button: Win98BarButton
+
+    init(title: String, target: Any?, action: Selector) {
+        button = Win98BarButton(title: title)
+        super.init()
+        customView = button
+        button.addTarget(target, action: action, for: .touchUpInside)
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
+
+    override var isEnabled: Bool {
+        didSet { button.isEnabled = isEnabled }
     }
 }
