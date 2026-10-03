@@ -93,3 +93,74 @@ export async function callOpenAICompatible(
     return { content: "", error: String(err) };
   }
 }
+
+/**
+ * Calls an Anthropic-protocol /v1/messages endpoint.
+ *
+ * Z.AI's coding-plan entitlement only applies on its Anthropic gateway — the
+ * OpenAI-compatible paas/v4 endpoint answers the same key with "insufficient
+ * balance" — so GLM models come through here. Two shape differences from the
+ * other callers: the image is a base64 source block rather than a URI, and the
+ * reply is an array of typed blocks (thinking/text) whose text blocks must be
+ * joined. Thinking is disabled to keep 101 calls fast; without this every
+ * response arrives after a chain-of-thought preamble.
+ */
+export async function callAnthropic(
+  baseUrl: string,
+  apiKey: string,
+  prompt: string,
+  imageDataUri: string,
+  model: string,
+): Promise<ApiResponse> {
+  const url = `${baseUrl.replace(/\/$/, "")}/v1/messages`;
+  const imageMatch = /^data:(.+?);base64,(.*)$/s.exec(imageDataUri);
+  if (!imageMatch) {
+    return { content: "", error: "Could not parse image data URI" };
+  }
+  const [, mediaType, data] = imageMatch;
+
+  try {
+    const res = await fetch(url, {
+      method: "POST",
+      headers: {
+        "x-api-key": apiKey,
+        "anthropic-version": "2023-06-01",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model,
+        temperature: 0,
+        max_tokens: 4096,
+        thinking: { type: "disabled" },
+        messages: [
+          {
+            role: "user",
+            content: [
+              { type: "image", source: { type: "base64", media_type: mediaType, data } },
+              { type: "text", text: prompt },
+            ],
+          },
+        ],
+      }),
+    });
+
+    if (!res.ok) {
+      const body = await res.text();
+      return { content: "", error: `HTTP ${res.status}: ${body.slice(0, 300)}` };
+    }
+
+    const json = (await res.json()) as {
+      content?: { type: string; text?: string }[];
+    };
+    const text = (json.content ?? [])
+      .filter((block) => block.type === "text")
+      .map((block) => block.text ?? "")
+      .join("\n");
+    if (!text) {
+      return { content: "", error: "Unexpected response shape" };
+    }
+    return { content: text };
+  } catch (err) {
+    return { content: "", error: String(err) };
+  }
+}

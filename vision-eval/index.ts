@@ -1,7 +1,7 @@
 import { Mistral } from "@mistralai/mistralai";
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from "node:fs";
 import { resolve, dirname, extname } from "node:path";
-import { callMistral, callOpenAICompatible } from "./api";
+import { callAnthropic, callMistral, callOpenAICompatible } from "./api";
 import { strategies } from "./strategies";
 import { scoreResult } from "./score";
 import type { EvalManifest } from "../eval/types";
@@ -24,10 +24,13 @@ const provider = (getFlag("--provider") ?? "mistral").toLowerCase();
 
 // Known OpenAI-compatible endpoints, so common providers need only --provider.
 // Any other base URL can be passed with --base-url.
+// `zai` is the odd one out: it speaks the Anthropic protocol, not OpenAI's
+// (see callAnthropic for why).
 const PRESET_BASE_URLS: Record<string, string> = {
   qwen: "https://dashscope-intl.aliyuncs.com/compatible-mode/v1",
   "qwen-cn": "https://dashscope.aliyuncs.com/compatible-mode/v1",
   openrouter: "https://openrouter.ai/api/v1",
+  zai: "https://api.z.ai/api/anthropic",
 };
 
 // --- Setup ---
@@ -48,6 +51,14 @@ if (!API_KEY) {
 }
 
 const BASE_URL = getFlag("--base-url") ?? PRESET_BASE_URLS[provider];
+
+const callModel =
+  provider === "mistral"
+    ? (prompt: string, image: string) => callMistral(client, prompt, image, model)
+    : provider === "zai"
+      ? (prompt: string, image: string) => callAnthropic(BASE_URL, API_KEY, prompt, image, model)
+      : (prompt: string, image: string) =>
+          callOpenAICompatible(BASE_URL, API_KEY, prompt, image, model);
 
 const VISION_EVAL_DIR = dirname(import.meta.path);
 const FIXTURES_DIR = resolve(VISION_EVAL_DIR, "../eval/fixtures");
@@ -117,9 +128,7 @@ for (const c of cases) {
 {
   const probe = imageCache.get(cases[0]!.id)!;
   console.log(`Pre-flight: ${model} via ${provider}${BASE_URL ? ` (${BASE_URL})` : ""} ...`);
-  const { error } = await (provider === "mistral"
-    ? callMistral(client, "Reply with the word: ok", probe, model)
-    : callOpenAICompatible(BASE_URL!, API_KEY, "Reply with the word: ok", probe, model));
+  const { error } = await callModel("Reply with the word: ok", probe);
   if (error) {
     console.error(
       `\nPre-flight failed — aborting before spending ${cases.length} calls.\n${error}`,
@@ -138,10 +147,7 @@ for (const strategy of selectedStrategies) {
 
     process.stdout.write(`  ${testCase.id} ... `);
 
-    const { content, error } =
-      provider === "mistral"
-        ? await callMistral(client, strategy.prompt, dataUri, model)
-        : await callOpenAICompatible(BASE_URL!, API_KEY, strategy.prompt, dataUri, model);
+    const { content, error } = await callModel(strategy.prompt, dataUri);
 
     let result: ImageResult;
 

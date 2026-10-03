@@ -1,0 +1,1405 @@
+{
+  "run_at": "2026-10-03T17:01:28.651Z",
+  "model": "glm-5.3-flash",
+  "total_cases": 99,
+  "strategies": {
+    "A": {
+      "results": [
+        {
+          "id": "the-earons-land-of-hunger",
+          "ground_truth": {
+            "artist": "The Earons",
+            "title": "Land Of Hunger"
+          },
+          "raw_response": "Artist: The Earons | Title: Land Of Hunger",
+          "parsed": {
+            "artist": "The Earons",
+            "title": "Land Of Hunger"
+          },
+          "score": 2,
+          "match_type": "exact"
+        },
+        {
+          "id": "louis-chedid-ainsi-soit-il",
+          "ground_truth": {
+            "artist": "Louis Chedid",
+            "title": "Ainsi Soit-Il"
+          },
+          "raw_response": "This is an album by French singer Louis Chedid, with the title visible at the bottom of the cover: \"Ainsi soit-il.\"\n\nArtist: Louis Chedid | Title: Ainsi soit-il",
+          "parsed": {
+            "artist": "Louis Chedid",
+            "title": "Ainsi soit-il"
+          },
+          "score": 2,
+          "match_type": "exact"
+        },
+        {
+          "id": "ed-lincoln-ontem-hoje-sempre",
+          "ground_truth": {
+            "artist": "Ed Lincoln",
+            "title": "Ontem Hoje Sempre"
+          },
+          "raw_response": "Artist: Ed Lincoln | Title: Ontem Hoje Sempre",
+          "parsed": {
+            "artist": "Ed Lincoln",
+            "title": "Ontem Hoje Sempre"
+          },
+          "score": 2,
+          "match_type": "exact"
+        },
+        {
+          "id": "caetano-veloso-caetano-veloso",
+          "ground_truth": {
+            "artist": "Caetano Veloso",
+            "title": "Caetano Veloso"
+          },
+          "raw_response": "This is the self-titled debut album by Caetano Veloso (often called \"Caetano Veloso\" or \"Tropicália\"), originally released in 1968. The colorful psychedelic cover art with the woman and dragon is iconic, and the label card notes it's a 2007 reissue of the LP.\n\nArtist: Caetano Veloso | Title: Caetano Veloso",
+          "parsed": {
+            "artist": "Caetano Veloso",
+            "title": "Caetano Veloso"
+          },
+          "score": 2,
+          "match_type": "exact"
+        },
+        {
+          "id": "pipos-4-o-encontro-da-massa",
+          "ground_truth": {
+            "artist": "Pipo's 4",
+            "title": "O Encontro da Massa"
+          },
+          "raw_response": "This appears to be a vinyl release on Audiobass Records titled \"Pipo's 4 – O Encontro da Massa,\" a baile funk compilation series.\n\nArtist: Pipo's | Title: O Encontro da Massa",
+          "parsed": {
+            "artist": "Pipo's",
+            "title": "O Encontro da Massa"
+          },
+          "score": 1,
+          "match_type": "partial"
+        },
+        {
+          "id": "quarteto-em-cy-tamba-trio-som-definitivo",
+          "ground_truth": {
+            "artist": "Quarteto Em Cy & Tamba Trio",
+            "title": "Som Definitivo"
+          },
+          "raw_response": "This is a reissue (Shellac label) of the classic 1965 Brazilian bossa nova album \"Quarteto em Cy\" by the vocal group Quarteto em Cy, with the Tamba Trio. The cover title reads \"Som Definitivo.\"\n\nArtist: Quarteto Em Cy | Title: Som Definitivo",
+          "parsed": {
+            "artist": "Quarteto Em Cy",
+            "title": "Som Definitivo"
+          },
+          "score": 1,
+          "match_type": "partial"
+        },
+        {
+          "id": "esperanza-spalding-emilys-devolution",
+          "ground_truth": {
+            "artist": "Esperanza Spalding",
+            "title": "Emily's D+Evolution"
+          },
+          "raw_response": "This is a vinyl copy of **Emily's D+Evolution** by Esperanza Spalding — the cover shows her in the white suit with the distinctive feathered headdress, standing in a painted landscape.\n\nArtist: Esperanza Spalding | Title: Emily's D+Evolution",
+          "parsed": {
+            "artist": "Esperanza Spalding",
+            "title": "Emily's D+Evolution"
+          },
+          "score": 2,
+          "match_type": "exact"
+        },
+        {
+          "id": "machito-tanga",
+          "ground_truth": {
+            "artist": "Machito & His Afro-Cubans",
+            "title": "Tanga"
+          },
+          "raw_response": "The sleeve reads \"MACHITO and his Afro Cubans — Tanga.\"\n\nArtist: Machito | Title: Tanga",
+          "parsed": {
+            "artist": "Machito",
+            "title": "Tanga"
+          },
+          "score": 1,
+          "match_type": "partial"
+        },
+        {
+          "id": "orquesta-el-macabeo-salsa-bestial",
+          "ground_truth": {
+            "artist": "Orquesta El Macabeo",
+            "title": "Salsa Bestial"
+          },
+          "raw_response": "The visible releases include \"Salsa Bestial\" by Orquesta El Macabeo, and \"NYC Salsa 2\" (a compilation).\n\nArtist: Orquesta El Macabeo | Title: Salsa Bestial",
+          "parsed": {
+            "artist": "Orquesta El Macabeo",
+            "title": "Salsa Bestial"
+          },
+          "score": 2,
+          "match_type": "exact"
+        },
+        {
+          "id": "t-rex-t-rex",
+          "ground_truth": {
+            "artist": "T. Rex",
+            "title": "T. Rex"
+          },
+          "raw_response": "This appears to be a vinyl release by **T. Rex**, the glam rock band led by Marc Bolan, featuring a photo of the band members with the distinctive red \"T-REX\" title panel.\n\nArtist: T. Rex | Title: Tanx",
+          "parsed": {
+            "artist": "T. Rex",
+            "title": "Tanx"
+          },
+          "score": 1,
+          "match_type": "partial"
+        },
+        {
+          "id": "various-rico-rico",
+          "ground_truth": {
+            "artist": "Various",
+            "title": "Rico Rico - 50 Exitos Tropicales"
+          },
+          "raw_response": "This appears to be a compilation album \"Rico Rico – 50 Exitos Tropicales,\" a tropical music compilation featuring various artists (with medleys like Rio Samba, Caliente Mix, Disco Cha Cha, and Salsa Mega Mix).\n\nArtist: Rico Rico | Title: 50 Exitos Tropicales",
+          "parsed": {
+            "artist": "Rico Rico",
+            "title": "50 Exitos Tropicales"
+          },
+          "score": 0,
+          "match_type": "none"
+        },
+        {
+          "id": "various-seattle-the-dark-side",
+          "ground_truth": {
+            "artist": "Various",
+            "title": "Seattle... The Dark Side"
+          },
+          "raw_response": "This is a compilation album cover reading \"Seattle... The Dark Side,\" released on Rhyme Cartel Records, featuring the tagline \"No Grunge... Just Rap and R&B... Seattle Style.\"\n\nArtist: Various Artists | Title: Seattle... The Dark Side",
+          "parsed": {
+            "artist": "Various Artists",
+            "title": "Seattle... The Dark Side"
+          },
+          "score": 1,
+          "match_type": "partial"
+        },
+        {
+          "id": "determine-never-know",
+          "ground_truth": {
+            "artist": "Determine",
+            "title": "Never Know"
+          },
+          "raw_response": "This is a 7\" vinyl single on the Groove Music label. Side A is \"Never Know\" with \"Determine\" on the flip, by the artist Determine.\n\nArtist: Determine | Title: Never Know",
+          "parsed": {
+            "artist": "Determine",
+            "title": "Never Know"
+          },
+          "score": 2,
+          "match_type": "exact"
+        },
+        {
+          "id": "discotex-records-6am-wanna-be-down",
+          "ground_truth": {
+            "artist": "Dawna Lee",
+            "title": "Wanna Be Down"
+          },
+          "raw_response": "This is a vinyl 45 on Discotex Records (cat. no. DT55), B side. The artist credited is ID Lee (track \"5 A.M. (Remix)\"), with \"Wanna Be Down\" featuring Skallamooch, produced by P. Donegan for Progressive Sound Prods.\n\nArtist: ID Lee | Title: Wanna Be Down",
+          "parsed": {
+            "artist": "ID Lee",
+            "title": "Wanna Be Down"
+          },
+          "score": 1,
+          "match_type": "partial"
+        },
+        {
+          "id": "legends-of-the-dark-ground-cabra",
+          "ground_truth": {
+            "artist": "Legends Of The Underground",
+            "title": "Cafira (Seiji Re-Rinse)"
+          },
+          "raw_response": "This vinyl label shows \"CASPA (SELFI RE-RINSE)\" released on Dubs of the Round (Legend of the Round series, Dubs Peak Series DSP 017).\n\nArtist: Caspa | Title: Selfi (Re-Rinse)",
+          "parsed": {
+            "artist": "Caspa",
+            "title": "Selfi (Re-Rinse)"
+          },
+          "score": 0,
+          "match_type": "none"
+        },
+        {
+          "id": "wedding-hands-in-the-till",
+          "ground_truth": {
+            "artist": "Wedding",
+            "title": "Hands In The Till / A Little Love"
+          },
+          "raw_response": "The image shows a vinyl record sleeve for the band Wedding, a 7\" single featuring \"Hands in the Till\" backed with \"A Little Love.\"\n\nArtist: Wedding | Title: Hands in the Till / A Little Love",
+          "parsed": {
+            "artist": "Wedding",
+            "title": "Hands in the Till / A Little Love"
+          },
+          "score": 2,
+          "match_type": "exact"
+        },
+        {
+          "id": "olu-living-free",
+          "ground_truth": {
+            "artist": "Olu",
+            "title": "Living Free"
+          },
+          "raw_response": "This is a promotional vinyl record label for the track \"Living Free\" by OLU, released on TENXDJ Records (catalog number TENXDJ 411). The B-side features the \"Joi De Vivre Mix,\" produced by Paul Wirtz.\n\nArtist: Olu | Title: Living Free",
+          "parsed": {
+            "artist": "Olu",
+            "title": "Living Free"
+          },
+          "score": 2,
+          "match_type": "exact"
+        },
+        {
+          "id": "big-bub-i-dont-mind",
+          "ground_truth": {
+            "artist": "Big Bub",
+            "title": "I Don't Mind"
+          },
+          "raw_response": "This is a vinyl record on EastWest Records America. The label reads \"BIG BUB – I Don't Mind\" (Trimix), from the album \"Comin' At Cha\" (1992).\n\nArtist: Big Bub | Title: I Don't Mind",
+          "parsed": {
+            "artist": "Big Bub",
+            "title": "I Don't Mind"
+          },
+          "score": 2,
+          "match_type": "exact"
+        },
+        {
+          "id": "patrick-cowley-menergy",
+          "ground_truth": {
+            "artist": "Patrick Cowley",
+            "title": "Menergy"
+          },
+          "raw_response": "This is the vinyl label for Patrick Cowley's \"Menergy,\" released on Fusion Records (FPSF 003).\n\nArtist: Patrick Cowley | Title: Menergy",
+          "parsed": {
+            "artist": "Patrick Cowley",
+            "title": "Menergy"
+          },
+          "score": 2,
+          "match_type": "exact"
+        },
+        {
+          "id": "sleepy-brown-i-cant-wait",
+          "ground_truth": {
+            "artist": "Sleepy Brown feat. Outkast",
+            "title": "I Can't Wait"
+          },
+          "raw_response": "This is a vinyl single sticker sleeve for Sleepy Brown's \"I Can't Wait\" featuring OutKast, from the Barbershop 2 soundtrack.\n\nArtist: Sleepy Brown | Title: I Can't Wait",
+          "parsed": {
+            "artist": "Sleepy Brown",
+            "title": "I Can't Wait"
+          },
+          "score": 1,
+          "match_type": "partial"
+        },
+        {
+          "id": "mc-mell-o-first-chronicles",
+          "ground_truth": {
+            "artist": "MC Mell 'O'",
+            "title": "The First Chronicles of D.E.T.T."
+          },
+          "raw_response": "This is a vinyl record label for the album \"The First Chronicles of D.E.T.\" by UK rapper MC Mell 'O', released on the Natural Response label (RCA/BMG) in 1990. The tracklist shown includes \"Hear Voices,\" \"What Can I Do,\" \"Rek Dem Know,\" and \"Rhetik Delight.\"\n\nArtist: MC Mell 'O' | Title: The First Chronicles of D.E.T.",
+          "parsed": {
+            "artist": "MC Mell 'O'",
+            "title": "The First Chronicles of D.E.T."
+          },
+          "score": 1,
+          "match_type": "partial"
+        },
+        {
+          "id": "natural-black-early-on-before",
+          "ground_truth": {
+            "artist": "Natural Black",
+            "title": "Early On Before"
+          },
+          "raw_response": "This appears to be a 7\" vinyl single. The artist is Natural Black, a Jamaican reggae singer, and the title reads \"Early On Before\" on the record label.\n\nArtist: Natural Black | Title: Early On Before",
+          "parsed": {
+            "artist": "Natural Black",
+            "title": "Early On Before"
+          },
+          "score": 2,
+          "match_type": "exact"
+        },
+        {
+          "id": "young-peoples-records-all-aboard",
+          "ground_truth": {
+            "artist": "Young People's Records",
+            "title": "All Aboard! Train To The Zoo / Train To The Farm / Train To The Ranch"
+          },
+          "raw_response": "This is a children's record from Young People's Records, catalog number 10001, featuring \"All Aboard!\" with tracks like \"Train to the Zoo,\" \"Train to the Farm,\" and \"Train to the Ranch.\" The music was played by Frank Herzl and his Orchestra.\n\nArtist: Frank Herzl And His Orchestra | Title: All Aboard!",
+          "parsed": {
+            "artist": "Frank Herzl And His Orchestra",
+            "title": "All Aboard!"
+          },
+          "score": 0,
+          "match_type": "none"
+        },
+        {
+          "id": "mario-telles-mario-telles",
+          "ground_truth": {
+            "artist": "Mario Telles",
+            "title": "Mario Telles"
+          },
+          "raw_response": "This is a self-titled release by Brazilian guitarist Mario Telles, featuring a cover with seahorse-patterned tile imagery.\n\nArtist: Mario Telles | Title: Mario Telles",
+          "parsed": {
+            "artist": "Mario Telles",
+            "title": "Mario Telles"
+          },
+          "score": 2,
+          "match_type": "exact"
+        },
+        {
+          "id": "lecuona-plays-for-two",
+          "ground_truth": {
+            "artist": "Ernesto Lecuona",
+            "title": "Lecuona Plays For Two"
+          },
+          "raw_response": "This is a 1955 RCA Victor LP (LPM-1058) by the Cuban composer and pianist Ernesto Lecuona.\n\nArtist: Ernesto Lecuona | Title: Lecuona Plays for Two",
+          "parsed": {
+            "artist": "Ernesto Lecuona",
+            "title": "Lecuona Plays for Two"
+          },
+          "score": 2,
+          "match_type": "exact"
+        },
+        {
+          "id": "aeoliah-crystal-illumination",
+          "ground_truth": {
+            "artist": "Aeoliah",
+            "title": "Crystal Illumination"
+          },
+          "raw_response": "The CD shown is \"Crystal Illumination\" by Aeolah.\n\nArtist: Aeolah | Title: Crystal Illumination",
+          "parsed": {
+            "artist": "Aeolah",
+            "title": "Crystal Illumination"
+          },
+          "score": 1,
+          "match_type": "partial"
+        },
+        {
+          "id": "maggie-carles-luis-nodal-y-los-magneticos",
+          "ground_truth": {
+            "artist": "Maggie Carlés / Luis Nodal y los Magnéticos",
+            "title": "Maggie Carlés / Luis Nodal y los Magnéticos"
+          },
+          "raw_response": "This is an album cover featuring Maggie Carlés and Luis Nodal y los Magnéticos, released on the Areíto label (EGREM, Cuba).\n\nArtist: Maggie Carlés y Luis Nodal y los Magnéticos | Title: Maggie Carlés / Luis Nodal y los Magnéticos",
+          "parsed": {
+            "artist": "Maggie Carlés y Luis Nodal y los Magnéticos",
+            "title": "Maggie Carlés / Luis Nodal y los Magnéticos"
+          },
+          "score": 1,
+          "match_type": "partial"
+        },
+        {
+          "id": "lucho-gatica-antonio-machin",
+          "ground_truth": {
+            "artist": "Lucho Gatica / Antonio Machin",
+            "title": "Lucho Gatica / Antonio Machin"
+          },
+          "raw_response": "This appears to be a split release CD featuring two classic Latin/bolero singers, Lucho Gatica and Antonio Machín, with a torn-paper design splitting the cover between the two artists.\n\nArtist: Lucho Gatica / Antonio Machín | Title: Lucho Gatica / Antonio Machín (Split Release)",
+          "parsed": {
+            "artist": "Lucho Gatica / Antonio Machín",
+            "title": "Lucho Gatica / Antonio Machín (Split Release)"
+          },
+          "score": 0,
+          "match_type": "none"
+        },
+        {
+          "id": "cesaria-evora-cabo-verde",
+          "ground_truth": {
+            "artist": "Cesaria Evora",
+            "title": "Cabo Verde"
+          },
+          "raw_response": "This is a CD by **Cesária Évora**, the famous Cape Verdean singer known as the \"Barefoot Diva.\" The release title shown is **\"Cabo Verde\"** (1997).\n\nArtist: Cesária Évora | Title: Cabo Verde",
+          "parsed": {
+            "artist": "Cesária Évora",
+            "title": "Cabo Verde"
+          },
+          "score": 1,
+          "match_type": "partial"
+        },
+        {
+          "id": "melanie-golden-hour-of-melanie",
+          "ground_truth": {
+            "artist": "Melanie",
+            "title": "Golden Hour Of Melanie"
+          },
+          "raw_response": "This is a \"Golden Hour of Melanie\" compilation album by Melanie (Melanie Safka).\n\nArtist: Melanie | Title: Golden Hour of Melanie",
+          "parsed": {
+            "artist": "Melanie",
+            "title": "Golden Hour of Melanie"
+          },
+          "score": 2,
+          "match_type": "exact"
+        },
+        {
+          "id": "neil-young-after-the-gold-rush",
+          "ground_truth": {
+            "artist": "Neil Young",
+            "title": "After The Gold Rush"
+          },
+          "raw_response": "This is Neil Young's 1970 album *After the Gold Rush*, identifiable by the sepia-toned photo of Young walking past a fence.\n\nArtist: Neil Young | Title: After the Gold Rush",
+          "parsed": {
+            "artist": "Neil Young",
+            "title": "After the Gold Rush"
+          },
+          "score": 2,
+          "match_type": "exact"
+        },
+        {
+          "id": "steve-reich-sextet-six-marimbas",
+          "ground_truth": {
+            "artist": "Steve Reich",
+            "title": "Sextet / Six Marimbas"
+          },
+          "raw_response": "Artist: Steve Reich | Title: Sextet · Six Marimbas",
+          "parsed": {
+            "artist": "Steve Reich",
+            "title": "Sextet · Six Marimbas"
+          },
+          "score": 2,
+          "match_type": "exact"
+        },
+        {
+          "id": "gregory-isaacs-lovers-rock",
+          "ground_truth": {
+            "artist": "Gregory Isaacs",
+            "title": "Lovers' Rock"
+          },
+          "raw_response": "The album shown is **Lovers' Rock** by reggae artist **Gregory Isaacs**.\n\nArtist: Gregory Isaacs | Title: Lovers' Rock",
+          "parsed": {
+            "artist": "Gregory Isaacs",
+            "title": "Lovers' Rock"
+          },
+          "score": 2,
+          "match_type": "exact"
+        },
+        {
+          "id": "curtis-mayfield-curtis-live",
+          "ground_truth": {
+            "artist": "Curtis Mayfield",
+            "title": "Curtis/Live!"
+          },
+          "raw_response": "This is Curtis Mayfield's live double album \"Curtis/Live!\" from 1971.\n\nArtist: Curtis Mayfield | Title: Curtis/Live!",
+          "parsed": {
+            "artist": "Curtis Mayfield",
+            "title": "Curtis/Live!"
+          },
+          "score": 2,
+          "match_type": "exact"
+        },
+        {
+          "id": "j-dilla-donuts",
+          "ground_truth": {
+            "artist": "J Dilla",
+            "title": "Donuts"
+          },
+          "raw_response": "This is the vinyl cover of **Donuts** by **J Dilla** (J Dilla / Jay Dee), the landmark instrumental hip-hop album originally released in 2006.\n\nArtist: J Dilla | Title: Donuts",
+          "parsed": {
+            "artist": "J Dilla",
+            "title": "Donuts"
+          },
+          "score": 2,
+          "match_type": "exact"
+        },
+        {
+          "id": "hugo-jara-estado-de-animo",
+          "ground_truth": {
+            "artist": "Hugo Jasa",
+            "title": "Estados De Animo"
+          },
+          "raw_response": "This is a copy of a lesser-known Spanish-language record with embossed cover art and a purple/pink textured design. The title reads \"Estados de Ánimo\" with artist text beneath it, which matches the release by Suso Saiz.\n\nArtist: Suso Saiz | Title: Estados de Ánimo",
+          "parsed": {
+            "artist": "Suso Saiz",
+            "title": "Estados de Ánimo"
+          },
+          "score": 0,
+          "match_type": "none"
+        },
+        {
+          "id": "dorival-caymmi-caymmi",
+          "ground_truth": {
+            "artist": "Dorival Caymmi",
+            "title": "Caymmi"
+          },
+          "raw_response": "This appears to be a vinyl LP by the Brazilian composer/singer Dorival Caymmi, with a self-titled release — the cover shows an abstract painting with the bold text \"CAYMMI.\"\n\nArtist: Dorival Caymmi | Title: Caymmi",
+          "parsed": {
+            "artist": "Dorival Caymmi",
+            "title": "Caymmi"
+          },
+          "score": 2,
+          "match_type": "exact"
+        },
+        {
+          "id": "dorival-caymmi-caymmi-odeon",
+          "ground_truth": {
+            "artist": "Dorival Caymmi",
+            "title": "Eu Não Tenho Onde Morar"
+          },
+          "raw_response": "This is a Brazilian LP by **Dorival Caymmi** (the large sideways lettering spells \"Caymmi\"). The tracklist includes classic Caymmi compositions such as \"Vizinha do Lado,\" \"Dora,\" and \"Só Vizinha do Lado,\" released on the Odeon label. It appears to be his self-titled album.\n\nArtist: Dorival Caymmi | Title: Caymmi",
+          "parsed": {
+            "artist": "Dorival Caymmi",
+            "title": "Caymmi"
+          },
+          "score": 1,
+          "match_type": "partial"
+        },
+        {
+          "id": "stevie-wonder-hotter-than-july",
+          "ground_truth": {
+            "artist": "Stevie Wonder",
+            "title": "Hotter Than July"
+          },
+          "raw_response": "This is Stevie Wonder's 1976 album with the iconic portrait cover.\n\nArtist: Stevie Wonder | Title: Hotter Than July",
+          "parsed": {
+            "artist": "Stevie Wonder",
+            "title": "Hotter Than July"
+          },
+          "score": 2,
+          "match_type": "exact"
+        },
+        {
+          "id": "nite-jewel-no-sun",
+          "ground_truth": {
+            "artist": "Nite Jewel",
+            "title": "No Sun"
+          },
+          "raw_response": "This is a vinyl release featuring a warm orange/red close-up portrait. The spine text reads \"Nite Jewel No Sun.\"\n\nArtist: Nite Jewel | Title: No Sun",
+          "parsed": {
+            "artist": "Nite Jewel",
+            "title": "No Sun"
+          },
+          "score": 2,
+          "match_type": "exact"
+        },
+        {
+          "id": "horace-silver-and-the-jazz-messengers",
+          "ground_truth": {
+            "artist": "Horace Silver and the Jazz Messengers",
+            "title": "Horace Silver and the Jazz Messengers"
+          },
+          "raw_response": "This is the Blue Note LP cover with the photo of the musician's hands, text reading \"HORACE SILVER\" and \"AND THE JAZZ MESSENGERS.\"\n\nArtist: Horace Silver | Title: Horace Silver and the Jazz Messengers",
+          "parsed": {
+            "artist": "Horace Silver",
+            "title": "Horace Silver and the Jazz Messengers"
+          },
+          "score": 1,
+          "match_type": "partial"
+        },
+        {
+          "id": "max-romeo-revelation-time",
+          "ground_truth": {
+            "artist": "Max Romeo",
+            "title": "Revelation Time"
+          },
+          "raw_response": "Artist: Max Romeo | Title: Revelation Time",
+          "parsed": {
+            "artist": "Max Romeo",
+            "title": "Revelation Time"
+          },
+          "score": 2,
+          "match_type": "exact"
+        },
+        {
+          "id": "various-beat-girls-espanol",
+          "ground_truth": {
+            "artist": "Various",
+            "title": "Beat Girls Español!"
+          },
+          "raw_response": "This is a compilation album featuring 1960s Spanish she-pop artists like Marisol, Karina, Las Grecas, and Rocío Dúrcal.\n\nArtist: Various Artists | Title: Beat Girls Español! (1960s She-Pop from Spain)",
+          "parsed": {
+            "artist": "Various Artists",
+            "title": "Beat Girls Español! (1960s She-Pop from Spain)"
+          },
+          "score": 0,
+          "match_type": "none"
+        },
+        {
+          "id": "team-shadetek-pale-fire",
+          "ground_truth": {
+            "artist": "Team Shadetek",
+            "title": "Pale Fire"
+          },
+          "raw_response": "This is the album \"Pale Fire\" by Team Shadetek, an underground hip-hop release featuring artists like Juggernaut, Sage Francis, Alias, and others.\n\nArtist: Team Shadetek | Title: Pale Fire",
+          "parsed": {
+            "artist": "Team Shadetek",
+            "title": "Pale Fire"
+          },
+          "score": 2,
+          "match_type": "exact"
+        },
+        {
+          "id": "astrud-gilberto-compact-jazz",
+          "ground_truth": {
+            "artist": "Astrud Gilberto",
+            "title": "Compact Jazz: Astrud Gilberto"
+          },
+          "raw_response": "This is the Verve \"Compact Jazz\" series CD featuring Astrud Gilberto.\n\nArtist: Astrud Gilberto | Title: Compact Jazz",
+          "parsed": {
+            "artist": "Astrud Gilberto",
+            "title": "Compact Jazz"
+          },
+          "score": 1,
+          "match_type": "partial"
+        },
+        {
+          "id": "astrud-gilberto-beach-samba",
+          "ground_truth": {
+            "artist": "Astrud Gilberto",
+            "title": "Beach Samba"
+          },
+          "raw_response": "Artist: Astrud Gilberto | Title: Beach Samba",
+          "parsed": {
+            "artist": "Astrud Gilberto",
+            "title": "Beach Samba"
+          },
+          "score": 2,
+          "match_type": "exact"
+        },
+        {
+          "id": "various-campeones-xvii-concurso-cancion-asturiana",
+          "ground_truth": {
+            "artist": "Various",
+            "title": "Campeones XVII Concurso de Canción Asturiana"
+          },
+          "raw_response": "This is a compilation CD from a Asturian song contest: \"Campeones XVII Concurso de Canción Asturiana,\" released by the Asociación Cultural San Luis (La Nueva – Langreo). It features various traditional singers (cantantes de tonada) such as Álvaro García Suárez, Pablo Camo Rubiera, Lorena Campa López, and Odón García González, with gaita accompaniment by Valentín Fuente Álvarez.\n\nArtist: Various Artists | Title: Campeones XVII Concurso de Canción Asturiana",
+          "parsed": {
+            "artist": "Various Artists",
+            "title": "Campeones XVII Concurso de Canción Asturiana"
+          },
+          "score": 1,
+          "match_type": "partial"
+        },
+        {
+          "id": "paddy-mcaloon-i-trawl-the-megahertz",
+          "ground_truth": {
+            "artist": "Paddy McAloon",
+            "title": "I Trawl the Megahertz"
+          },
+          "raw_response": "This is a CD by Paddy McAloon (of Prefab Sprout) titled \"I Trawl the Megahertz.\"\n\nArtist: Paddy McAloon | Title: I Trawl the Megahertz",
+          "parsed": {
+            "artist": "Paddy McAloon",
+            "title": "I Trawl the Megahertz"
+          },
+          "score": 2,
+          "match_type": "exact"
+        },
+        {
+          "id": "maranata-maranata",
+          "ground_truth": {
+            "artist": "Maranata",
+            "title": "Maranata"
+          },
+          "raw_response": "This appears to be a release on the Latin Soul label titled **Maranata**, featuring a bird imagery cover. The artist name isn't clearly visible on the front cover shown, but this is the album \"Maranata.\"\n\nArtist: Unknown | Title: Maranata",
+          "parsed": {
+            "artist": "Unknown",
+            "title": "Maranata"
+          },
+          "score": 1,
+          "match_type": "partial"
+        },
+        {
+          "id": "antonio-carlos-jobim-tide",
+          "ground_truth": {
+            "artist": "Antonio Carlos Jobim",
+            "title": "Tide"
+          },
+          "raw_response": "This is the album \"Tide\" by Antônio Carlos Jobim, a 1970 A&M Records release featuring the painting-style cover of a figure by the sea.\n\nArtist: Antonio Carlos Jobim | Title: Tide",
+          "parsed": {
+            "artist": "Antonio Carlos Jobim",
+            "title": "Tide"
+          },
+          "score": 2,
+          "match_type": "exact"
+        },
+        {
+          "id": "refused-songs-to-fan-the-flames-of-discontent",
+          "ground_truth": {
+            "artist": "Refused",
+            "title": "Songs to Fan the Flames of Discontent"
+          },
+          "raw_response": "Artist: Refused | Title: Songs to Fan the Flames of Discontent",
+          "parsed": {
+            "artist": "Refused",
+            "title": "Songs to Fan the Flames of Discontent"
+          },
+          "score": 2,
+          "match_type": "exact"
+        },
+        {
+          "id": "collard-roge-satie-4-handed-piano",
+          "ground_truth": {
+            "artist": "Jean-Philippe Collard & Pascal Rogé",
+            "title": "Satie: The 4 Handed Piano"
+          },
+          "raw_response": "This is a Decca CD of Satie's piano four hands music, performed by Jean-Philippe Collard and Pascal Rogé.\n\nArtist: Jean-Philippe Collard & Pascal Rogé | Title: Satie: The 4-Handed Piano (Piano à 4 Mains)",
+          "parsed": {
+            "artist": "Jean-Philippe Collard & Pascal Rogé",
+            "title": "Satie: The 4-Handed Piano (Piano à 4 Mains)"
+          },
+          "score": 1,
+          "match_type": "partial"
+        },
+        {
+          "id": "oren-ambarchi-shebang",
+          "ground_truth": {
+            "artist": "Oren Ambarchi",
+            "title": "Shebang"
+          },
+          "raw_response": "This is Drew Ambarchi's \"Shebang\" — actually the artist is Oren Ambarchi, with the album cover showing a slice of rainbow layer cake with a pink birthday candle against a black background.\n\nArtist: Oren Ambarchi | Title: Shebang",
+          "parsed": {
+            "artist": "Oren Ambarchi",
+            "title": "Shebang"
+          },
+          "score": 2,
+          "match_type": "exact"
+        },
+        {
+          "id": "laurent-garnier-planet-house-ep",
+          "ground_truth": {
+            "artist": "Laurent Garnier",
+            "title": "Planet House EP"
+          },
+          "raw_response": "Artist: Laurent Garnier | Title: Planet House EP",
+          "parsed": {
+            "artist": "Laurent Garnier",
+            "title": "Planet House EP"
+          },
+          "score": 2,
+          "match_type": "exact"
+        },
+        {
+          "id": "various-trojan-reggae-party-volume-one",
+          "ground_truth": {
+            "artist": "Various",
+            "title": "Trojan Reggae Party Volume One"
+          },
+          "raw_response": "This is a Various Artists compilation released on the Trojan Records label.\n\nArtist: Various Artists | Title: Trojan Reggae Party Volume One – Recorded Live!",
+          "parsed": {
+            "artist": "Various Artists",
+            "title": "Trojan Reggae Party Volume One – Recorded Live!"
+          },
+          "score": 0,
+          "match_type": "none"
+        },
+        {
+          "id": "violeta-parra-un-rio-de-sangre",
+          "ground_truth": {
+            "artist": "Violeta Parra",
+            "title": "Un Rio de Sangre"
+          },
+          "raw_response": "This is the album \"Un Río de Sangre\" by Violeta Parra, a Chilean folk release (on the Antares label) featuring the voices of Isabel, Ángel Parra, and Los Calchakis.\n\nArtist: Violeta Parra | Title: Un Río de Sangre",
+          "parsed": {
+            "artist": "Violeta Parra",
+            "title": "Un Río de Sangre"
+          },
+          "score": 1,
+          "match_type": "partial"
+        },
+        {
+          "id": "bob-marley-and-the-wailers-uprising",
+          "ground_truth": {
+            "artist": "Bob Marley & The Wailers",
+            "title": "Uprising"
+          },
+          "raw_response": "This is the album cover for Bob Marley & The Wailers' 1980 album *Uprising*, featuring the iconic artwork of a rising sun with a figure with dreadlocks arms raised over mountains.\n\nArtist: Bob Marley & The Wailers | Title: Uprising",
+          "parsed": {
+            "artist": "Bob Marley & The Wailers",
+            "title": "Uprising"
+          },
+          "score": 2,
+          "match_type": "exact"
+        },
+        {
+          "id": "various-macondo-revisitado",
+          "ground_truth": {
+            "artist": "Various",
+            "title": "Macondo Revisitado"
+          },
+          "raw_response": "This is a compilation album: \"Macondo Revisitado – The Roots of Subtropical Music: Uruguay 1975–1979,\" released on the Macondo label.\n\nArtist: Various Artists | Title: Macondo Revisitado (The Roots of Subtropical Music: Uruguay 1975–1979)",
+          "parsed": {
+            "artist": "Various Artists",
+            "title": "Macondo Revisitado (The Roots of Subtropical Music: Uruguay 1975–1979)"
+          },
+          "score": 0,
+          "match_type": "none"
+        },
+        {
+          "id": "barry-brown-vibes-of-barry-brown",
+          "ground_truth": {
+            "artist": "Barry Brown",
+            "title": "Vibes of Barry Brown"
+          },
+          "raw_response": "The CD in the photo shows text reading \"VIBES OF BARRY BROWN\" on its cover, with a €3 price sticker.\n\nArtist: Barry Brown | Title: Vibes Of Barry Brown",
+          "parsed": {
+            "artist": "Barry Brown",
+            "title": "Vibes Of Barry Brown"
+          },
+          "score": 2,
+          "match_type": "exact"
+        },
+        {
+          "id": "los-llopis-los-llopis",
+          "ground_truth": {
+            "artist": "Los Llopis",
+            "title": "Versiones Originales"
+          },
+          "raw_response": "This is a vinyl EP by the Spanish band Los Llopis. The cover lists the tracks \"Estremécete,\" \"La Puerta Verde,\" and \"Hasta la vista, cocodrilo\" (\"See you later, alligator\").\n\nArtist: Los Llopis | Title: Estremécete",
+          "parsed": {
+            "artist": "Los Llopis",
+            "title": "Estremécete"
+          },
+          "score": 1,
+          "match_type": "partial"
+        },
+        {
+          "id": "jorge-negrete-jorge-negrete",
+          "ground_truth": {
+            "artist": "Jorge Negrete",
+            "title": "Mejicano Universal"
+          },
+          "raw_response": "This is a record sleeve reading \"Jorge Negrete\" in cursive script, with track titles like \"Cuando Quiere Un Mexicano\" visible — it appears to be a self-titled compilation by the Mexican mariachi singer.\n\nArtist: Jorge Negrete | Title: Jorge Negrete",
+          "parsed": {
+            "artist": "Jorge Negrete",
+            "title": "Jorge Negrete"
+          },
+          "score": 1,
+          "match_type": "partial"
+        },
+        {
+          "id": "baden-powell-estudos",
+          "ground_truth": {
+            "artist": "Baden Powell",
+            "title": "Estudos"
+          },
+          "raw_response": "This is a vinyl LP by Brazilian guitarist Baden Powell. The cover reads \"Baden Powell\" with the title \"Estudos\" in yellow lettering, an album of his guitar studies.\n\nArtist: Baden Powell | Title: Estudos",
+          "parsed": {
+            "artist": "Baden Powell",
+            "title": "Estudos"
+          },
+          "score": 2,
+          "match_type": "exact"
+        },
+        {
+          "id": "tipico-santa-rosa-tipico-santa-rosa",
+          "ground_truth": {
+            "artist": "Tipico Santa Rosa",
+            "title": "Tipico Santa Rosa"
+          },
+          "raw_response": "This photo shows a vinyl record sleeve by Tipico Santa Rosa, a Peruvian cumbia group. The cover shows the band standing outdoors with red lettering of the group name at the top.\n\nArtist: Tipico Santa Rosa | Title: Tipico Santa Rosa",
+          "parsed": {
+            "artist": "Tipico Santa Rosa",
+            "title": "Tipico Santa Rosa"
+          },
+          "score": 2,
+          "match_type": "exact"
+        },
+        {
+          "id": "antonio-carlos-e-jocafi-o-primeiro-amor",
+          "ground_truth": {
+            "artist": "Antonio Carlos e Jocafi",
+            "title": "O Primeiro Amor"
+          },
+          "raw_response": "This is the original soundtrack LP for the Brazilian telenovela \"O Primeiro Amor\" (Som Livre), with music by Antônio Carlos e Jocafi.\n\nArtist: Antônio Carlos e Jocafi | Title: O Primeiro Amor (Trilha Sonora Original)",
+          "parsed": {
+            "artist": "Antônio Carlos e Jocafi",
+            "title": "O Primeiro Amor (Trilha Sonora Original)"
+          },
+          "score": 0,
+          "match_type": "none"
+        },
+        {
+          "id": "jah-thomas-stop-yu-loafin",
+          "ground_truth": {
+            "artist": "Jah Thomas",
+            "title": "Stop Yu Loafin"
+          },
+          "raw_response": "This is the album cover for \"Stop Yu Loafin\" by Jah Thomas, a reggae/dancehall release featuring colorful comic-style illustrations of everyday scenes.\n\nArtist: Jah Thomas | Title: Stop Yu Loafin",
+          "parsed": {
+            "artist": "Jah Thomas",
+            "title": "Stop Yu Loafin"
+          },
+          "score": 2,
+          "match_type": "exact"
+        },
+        {
+          "id": "yellowman-josey-wales-two-giants-clash",
+          "ground_truth": {
+            "artist": "Yellowman & Josey Wales",
+            "title": "Two Giants Clash"
+          },
+          "raw_response": "This is the cover of the dancehall clash album featuring Yellowman versus Josey Wales, \"Two Giants Clash\" (1983, Greensleeves Records).\n\nArtist: Yellowman Vs. Josey Wales | Title: Two Giants Clash",
+          "parsed": {
+            "artist": "Yellowman Vs. Josey Wales",
+            "title": "Two Giants Clash"
+          },
+          "score": 1,
+          "match_type": "partial"
+        },
+        {
+          "id": "os-afonsinhos-do-condado-no-parque-mayer",
+          "ground_truth": {
+            "artist": "Os Afonsinhos do Condado",
+            "title": "No Parque Mayer"
+          },
+          "raw_response": "This is the Portuguese pop/rock release \"No Parque Mayer\" by Os Afsinhos do Condado.\n\nArtist: Os Afsinhos do Condado | Title: No Parque Mayer",
+          "parsed": {
+            "artist": "Os Afsinhos do Condado",
+            "title": "No Parque Mayer"
+          },
+          "score": 1,
+          "match_type": "partial"
+        },
+        {
+          "id": "aldemaro-romero-y-su-orquesta-de-salon-caracas-de-noche",
+          "ground_truth": {
+            "artist": "Aldemaro Romero y su Orquesta de Salón",
+            "title": "Caracas de Noche"
+          },
+          "raw_response": "This is a vinyl record by Venezuelan musician Aldemaro Romero y Su Orquesta de Salon, titled \"Caracas de Noche.\"\n\nArtist: Aldemaro Romero | Title: Caracas de Noche",
+          "parsed": {
+            "artist": "Aldemaro Romero",
+            "title": "Caracas de Noche"
+          },
+          "score": 1,
+          "match_type": "partial"
+        },
+        {
+          "id": "angela-carrasco-la-candela",
+          "ground_truth": {
+            "artist": "Angela Carrasco",
+            "title": "La Candela"
+          },
+          "raw_response": "This is the album \"La Candela\" by Angela Carrasa.\n\nArtist: Angela Carrasa | Title: La Candela",
+          "parsed": {
+            "artist": "Angela Carrasa",
+            "title": "La Candela"
+          },
+          "score": 1,
+          "match_type": "partial"
+        },
+        {
+          "id": "gran-orquesta-tipica-de-armando-zulueta-frenesi",
+          "ground_truth": {
+            "artist": "Gran Orquesta Típica de Armando Zulueta",
+            "title": "Frenesí"
+          },
+          "raw_response": "This is a Latin/tropical vinyl record by Gran Orquesta Típica de Armando Zulueta. The large stylized text on the cover reads \"Frenesí...\" — the release title, named after the opening track \"Frenesí\" (visible in the tracklist alongside \"Siboney,\" \"Guadalajara,\" \"Cielito Lindo,\" and other Latin standards). The label shown is Ekipo.\n\nArtist: Gran Orquesta Típica de Armando Zulueta | Title: Frenesí",
+          "parsed": {
+            "artist": "Gran Orquesta Típica de Armando Zulueta",
+            "title": "Frenesí"
+          },
+          "score": 2,
+          "match_type": "exact"
+        },
+        {
+          "id": "baden-powell-poema-on-guitar",
+          "ground_truth": {
+            "artist": "Baden Powell",
+            "title": "Poema on Guitar"
+          },
+          "raw_response": "This is a vinyl LP on the MPS label — the cover text reads \"Poema on Guitar\" by Baden Powell.\n\nArtist: Baden Powell | Title: Poema on Guitar",
+          "parsed": {
+            "artist": "Baden Powell",
+            "title": "Poema on Guitar"
+          },
+          "score": 2,
+          "match_type": "exact"
+        },
+        {
+          "id": "baden-powell-face-au-public",
+          "ground_truth": {
+            "artist": "Baden Powell",
+            "title": "Face au Public"
+          },
+          "raw_response": "This is a vinyl record by Brazilian guitarist Baden Powell, with the colorful title \"Face au Public\" (a live release).\n\nArtist: Baden Powell | Title: Face au Public",
+          "parsed": {
+            "artist": "Baden Powell",
+            "title": "Face au Public"
+          },
+          "score": 2,
+          "match_type": "exact"
+        },
+        {
+          "id": "baden-powell-ritmos-de-brasil",
+          "ground_truth": {
+            "artist": "Baden Powell",
+            "title": "Ritmos de Brasil"
+          },
+          "raw_response": "This is a vinyl LP by Brazilian guitarist Baden Powell. The cover reads \"Ritmos de Brasil\" with his name prominently displayed, showing him playing classical guitar in front of a studio microphone.\n\nArtist: Baden Powell | Title: Ritmos de Brasil",
+          "parsed": {
+            "artist": "Baden Powell",
+            "title": "Ritmos de Brasil"
+          },
+          "score": 2,
+          "match_type": "exact"
+        },
+        {
+          "id": "bana-eroticorythmotropicalomanie-vol-3",
+          "ground_truth": {
+            "artist": "Bana",
+            "title": "Eroticorythmotropicalomanie Vol. 3"
+          },
+          "raw_response": "This is an album cover for \"Eroticorythmotropicalomanie Vol. 3\" by Bana et son orchestre, released on EMI (Pathe label).\n\nArtist: Bana et son orchestre | Title: Eroticorythmotropicalomanie Vol. 3",
+          "parsed": {
+            "artist": "Bana et son orchestre",
+            "title": "Eroticorythmotropicalomanie Vol. 3"
+          },
+          "score": 1,
+          "match_type": "partial"
+        },
+        {
+          "id": "la-banda-del-caribe-movimiento-sexy",
+          "ground_truth": {
+            "artist": "La Banda del Caribe",
+            "title": "Movimiento Sexy"
+          },
+          "raw_response": "This appears to be a vinyl single on the Caribe/Caribeach label: **\"Movimiento Sexy\"** by **La Banda del Caribe**.\n\nArtist: La Banda del Caribe | Title: Movimiento Sexy",
+          "parsed": {
+            "artist": "La Banda del Caribe",
+            "title": "Movimiento Sexy"
+          },
+          "score": 2,
+          "match_type": "exact"
+        },
+        {
+          "id": "the-bhundu-boys-pamberi",
+          "ground_truth": {
+            "artist": "The Bhundu Boys",
+            "title": "Pamberi!"
+          },
+          "raw_response": "The Bhundu Boys – \"Pamberi!\"\n\nArtist: The Bhundu Boys | Title: Pamberi!",
+          "parsed": {
+            "artist": "The Bhundu Boys",
+            "title": "Pamberi!"
+          },
+          "score": 2,
+          "match_type": "exact"
+        },
+        {
+          "id": "celia-cruz-johnny-pacheco-de-nuevo",
+          "ground_truth": {
+            "artist": "Celia Cruz & Johnny Pacheco",
+            "title": "De Nuevo"
+          },
+          "raw_response": "This is a vinyl record of \"De Nuevo\" by Celia Cruz & Johnny Pacheco, a classic salsa collaboration album.\n\nArtist: Celia Cruz & Johnny Pacheco | Title: De Nuevo",
+          "parsed": {
+            "artist": "Celia Cruz & Johnny Pacheco",
+            "title": "De Nuevo"
+          },
+          "score": 2,
+          "match_type": "exact"
+        },
+        {
+          "id": "celia-cruz-y-la-sonora-matancera-feliz-encuentro-en-el-carnaval-de-tenerife",
+          "ground_truth": {
+            "artist": "Celia Cruz y La Sonora Matancera",
+            "title": "Feliz Encuentro en el Carnaval de Tenerife"
+          },
+          "raw_response": "This is a record by Celia Cruz with La Sonora Matancera — \"Los 12 grandes éxitos originales de Celia Cruz y La Sonora Matancera: Feliz Encuentro en el Carnaval de Tenerife.\"\n\nArtist: Celia Cruz | Title: Feliz Encuentro en el Carnaval de Tenerife",
+          "parsed": {
+            "artist": "Celia Cruz",
+            "title": "Feliz Encuentro en el Carnaval de Tenerife"
+          },
+          "score": 1,
+          "match_type": "partial"
+        },
+        {
+          "id": "celia-cruz-con-la-sonora-matancera-la-tierna-conmovedora-bamboleadora",
+          "ground_truth": {
+            "artist": "Celia Cruz con la Sonora Matancera",
+            "title": "La Tierna, Conmovedora, Bamboleadora"
+          },
+          "raw_response": "This is a Seeco Records LP (SCLP 9246) by Celia Cruz with la Sonora Matancera. The cover text reads \"la tierna, conmovedora, bamboleadora CELIA CRUZ con la Sonora Matancera.\"\n\nArtist: Celia Cruz | Title: La Tierna, Conmovedora, Bamboleadora Celia Cruz",
+          "parsed": {
+            "artist": "Celia Cruz",
+            "title": "La Tierna, Conmovedora, Bamboleadora Celia Cruz"
+          },
+          "score": 0,
+          "match_type": "none"
+        },
+        {
+          "id": "celia-cruz-a-todos-mis-amigos",
+          "ground_truth": {
+            "artist": "Celia Cruz",
+            "title": "A Todos Mis Amigos"
+          },
+          "raw_response": "This is a vinyl record by Celia Cruz, titled \"A Todos Mis Amigos.\"\n\nArtist: Celia Cruz | Title: A Todos Mis Amigos",
+          "parsed": {
+            "artist": "Celia Cruz",
+            "title": "A Todos Mis Amigos"
+          },
+          "score": 2,
+          "match_type": "exact"
+        },
+        {
+          "id": "el-combo-belga-y-sus-furiosos-rumberos-rompiendo-clave",
+          "ground_truth": {
+            "artist": "El Combo Belga y sus Furiosos Rumberos",
+            "title": "Rompiendo Clave"
+          },
+          "raw_response": "This is a vinyl record by El Combo Belga y Sus Furiosos Rumberos, titled \"Rompiendo Clave.\"\n\nArtist: El Combo Belga | Title: Rompiendo Clave",
+          "parsed": {
+            "artist": "El Combo Belga",
+            "title": "Rompiendo Clave"
+          },
+          "score": 1,
+          "match_type": "partial"
+        },
+        {
+          "id": "elba-ramalho-fruto",
+          "ground_truth": {
+            "artist": "Elba Ramalho",
+            "title": "Fruto"
+          },
+          "raw_response": "This is a vinyl record by Brazilian singer Elba Ramalho. The cover shows her name and the album title \"Fruto.\"\n\nArtist: Elba Ramalho | Title: Fruto",
+          "parsed": {
+            "artist": "Elba Ramalho",
+            "title": "Fruto"
+          },
+          "score": 2,
+          "match_type": "exact"
+        },
+        {
+          "id": "eydie-gorme-y-el-trio-los-panchos-cuatro-vidas",
+          "ground_truth": {
+            "artist": "Eydie Gorme y el Trío Los Panchos",
+            "title": "Cuatro Vidas"
+          },
+          "raw_response": "This is the album \"Cuatro Vidas\" by Eydie Gormé y el Trío Los Panchos — a Latin/bolero collaboration released in the 1960s.\n\nArtist: Eydie Gormé y el Trío Los Panchos | Title: Cuatro Vidas",
+          "parsed": {
+            "artist": "Eydie Gormé y el Trío Los Panchos",
+            "title": "Cuatro Vidas"
+          },
+          "score": 1,
+          "match_type": "partial"
+        },
+        {
+          "id": "jayme-marques-que-cosa-mas-linda",
+          "ground_truth": {
+            "artist": "Jayme Marques",
+            "title": "Que Cosa Mas Linda!"
+          },
+          "raw_response": "This is a vinyl LP by Brazilian musician Jayme Marques, titled \"¡Que Cosa Mas Linda!\"\n\nArtist: Jayme Marques | Title: ¡Que Cosa Mas Linda!",
+          "parsed": {
+            "artist": "Jayme Marques",
+            "title": "¡Que Cosa Mas Linda!"
+          },
+          "score": 2,
+          "match_type": "exact"
+        },
+        {
+          "id": "jayme-marques-sol-de-verano",
+          "ground_truth": {
+            "artist": "Jayme Marques",
+            "title": "Sol de Verano"
+          },
+          "raw_response": "This is a vinyl LP by Brazilian guitarist Jayme Marques. The cover text reads \"Jayme Marques\" and \"Sol de Verano.\"\n\nArtist: Jayme Marques | Title: Sol de Verano",
+          "parsed": {
+            "artist": "Jayme Marques",
+            "title": "Sol de Verano"
+          },
+          "score": 2,
+          "match_type": "exact"
+        },
+        {
+          "id": "juan-carlos-senante-chateaubriand-filete-y-salsa",
+          "ground_truth": {
+            "artist": "Juan Carlos Senante",
+            "title": "Chateaubriand (Filete y Salsa)"
+          },
+          "raw_response": "This is an album cover showing a hand-drawn illustration of a man with curly hair sitting at a table with a plate of steak. The artist is Carmelo Santiago (credited as \"Sam Carlitos\" partially visible at top), with \"SENANTE\" in red letters, and the title at bottom reads \"CHATEAUBRIAND (filete y salsa).\"\n\nArtist: Senante | Title: Chateaubriand (Filete y Salsa)",
+          "parsed": {
+            "artist": "Senante",
+            "title": "Chateaubriand (Filete y Salsa)"
+          },
+          "score": 1,
+          "match_type": "partial"
+        },
+        {
+          "id": "juan-luis-guerra-y-440-areito",
+          "ground_truth": {
+            "artist": "Juan Luis Guerra y 440",
+            "title": "Areito"
+          },
+          "raw_response": "This is the album \"Areito\" by Juan Luis Guerra (with 4.40), released in 1992.\n\nArtist: Juan Luis Guerra | Title: Areito",
+          "parsed": {
+            "artist": "Juan Luis Guerra",
+            "title": "Areito"
+          },
+          "score": 1,
+          "match_type": "partial"
+        },
+        {
+          "id": "juan-luis-guerra-y-440-el-original-440",
+          "ground_truth": {
+            "artist": "Juan Luis Guerra y 4.40",
+            "title": "El Original 4.40"
+          },
+          "raw_response": "This is the album \"El Original 4.40\" by Juan Luis Guerra y 4.40.\n\nArtist: Juan Luis Guerra y 4.40 | Title: El Original 4.40",
+          "parsed": {
+            "artist": "Juan Luis Guerra y 4.40",
+            "title": "El Original 4.40"
+          },
+          "score": 2,
+          "match_type": "exact"
+        },
+        {
+          "id": "kamac-pacha-inti-mi-raza",
+          "ground_truth": {
+            "artist": "Kamac Pacha Inti",
+            "title": "Mi Raza"
+          },
+          "raw_response": "The photo shows a vinyl LP by Kamac Pacha Inti, titled \"Mi Raza\" — a Peruvian Andean/psychedelic folk group's release on the Virrey label.\n\nArtist: Kamac Pacha Inti | Title: Mi Raza",
+          "parsed": {
+            "artist": "Kamac Pacha Inti",
+            "title": "Mi Raza"
+          },
+          "score": 2,
+          "match_type": "exact"
+        },
+        {
+          "id": "the-manhattan-transfer-brasil",
+          "ground_truth": {
+            "artist": "The Manhattan Transfer",
+            "title": "Brasil"
+          },
+          "raw_response": "This is the album \"Brasil\" by The Manhattan Transfer, released in 1987.\n\nArtist: The Manhattan Transfer | Title: Brasil",
+          "parsed": {
+            "artist": "The Manhattan Transfer",
+            "title": "Brasil"
+          },
+          "score": 2,
+          "match_type": "exact"
+        },
+        {
+          "id": "luis-kalaff-con-los-alegres-dominicanos-bailemos-merengue",
+          "ground_truth": {
+            "artist": "Luis Kalaff con Los Alegres Dominicanos",
+            "title": "Bailemos Merengue"
+          },
+          "raw_response": "This is a merengue album by Dominican singer Luis Kalaff with \"Los Alegres Dominicanos,\" released on the Seeco label. The album title, shown around the edges of the cover, is \"Merengue Bailemos.\"\n\nArtist: Luis Kalaff | Title: Merengue Bailemos",
+          "parsed": {
+            "artist": "Luis Kalaff",
+            "title": "Merengue Bailemos"
+          },
+          "score": 0,
+          "match_type": "none"
+        },
+        {
+          "id": "orquesta-encantada-sabroson",
+          "ground_truth": {
+            "artist": "Orquesta Encantada",
+            "title": "Sabrosón"
+          },
+          "raw_response": "This is a Latin/cumbia record. The cover reads \"Orquesta Encontrada\" (though it may be \"La Orquesta Encontrada\") with the title \"Sabroson\" below it.\n\nArtist: Orquesta Encontrada | Title: Sabroson",
+          "parsed": {
+            "artist": "Orquesta Encontrada",
+            "title": "Sabroson"
+          },
+          "score": 0,
+          "match_type": "none"
+        },
+        {
+          "id": "ranking-joe-weakheart-fadeaway",
+          "ground_truth": {
+            "artist": "Ranking Joe",
+            "title": "Weakheart Fadeaway"
+          },
+          "raw_response": "This is a reggae/dancehall album cover featuring Ranking Joe, the Jamaican deejay, depicted riding a motorcycle with his name on the headlamp and his image glowing like a deity against the painted lettering.\n\nArtist: Ranking Joe | Title: Saturday Night Jamdown Style",
+          "parsed": {
+            "artist": "Ranking Joe",
+            "title": "Saturday Night Jamdown Style"
+          },
+          "score": 1,
+          "match_type": "partial"
+        },
+        {
+          "id": "beth-carvalho-feliz",
+          "ground_truth": {
+            "artist": "Beth Carvalho",
+            "title": "Coração Feliz"
+          },
+          "raw_response": "This is a vinyl record sleeve showing Brazilian samba singer Beth Carvalho, with the title \"Feliz\" visible in the red heart logo.\n\nArtist: Beth Carvalho | Title: Feliz",
+          "parsed": {
+            "artist": "Beth Carvalho",
+            "title": "Feliz"
+          },
+          "score": 1,
+          "match_type": "partial"
+        },
+        {
+          "id": "billos-caracas-boys-la-rubia-y-la-triguena",
+          "ground_truth": {
+            "artist": "Billo's Caracas Boys",
+            "title": "La Rubia y la Trigueña"
+          },
+          "raw_response": "This is a vintage LP by the Venezuelan group Billo's Caracas Boys, on their Billo's label (BLP-529). The title is \"La Rubia y la Trigueña.\"\n\nArtist: Billo's Caracas Boys | Title: La Rubia y la Trigueña",
+          "parsed": {
+            "artist": "Billo's Caracas Boys",
+            "title": "La Rubia y la Trigueña"
+          },
+          "score": 2,
+          "match_type": "exact"
+        },
+        {
+          "id": "crispin-licuado",
+          "ground_truth": {
+            "artist": "Crispin",
+            "title": "Licuado"
+          },
+          "raw_response": "The album cover shows \"LICUADO\" as the main title, with \"CRISPIN\" at the bottom as the artist name.\n\nArtist: Crispin | Title: Licuado",
+          "parsed": {
+            "artist": "Crispin",
+            "title": "Licuado"
+          },
+          "score": 2,
+          "match_type": "exact"
+        },
+        {
+          "id": "aurelio-reinoso-don-reinoso",
+          "ground_truth": {
+            "artist": "Aurelio Reinoso",
+            "title": "Don Reinoso"
+          },
+          "raw_response": "This appears to be a self-titled record by Don Reinoso / Aurelio Reinoso, featuring two portrait photos of the artist on the cover.\n\nArtist: Don Reinoso | Title: Don Reinoso",
+          "parsed": {
+            "artist": "Don Reinoso",
+            "title": "Don Reinoso"
+          },
+          "score": 1,
+          "match_type": "partial"
+        },
+        {
+          "id": "grupo-guaco-guaco-76",
+          "ground_truth": {
+            "artist": "Grupo Guaco",
+            "title": "Guaco 76"
+          },
+          "raw_response": "This is a vinyl record sleeve featuring a red and black checkered/geometric design with \"GRUPO\" at top and \"GUACO\" at bottom — the Venezuelan salsa/gaita group Grupo Guaco. It appears to be a self-titled release on the Velvet label (catalog LPV-1730 visible on the right side).\n\nArtist: Grupo Guaco | Title: Grupo Guaco",
+          "parsed": {
+            "artist": "Grupo Guaco",
+            "title": "Grupo Guaco"
+          },
+          "score": 1,
+          "match_type": "partial"
+        },
+        {
+          "id": "pacho-via-libre-llego",
+          "ground_truth": {
+            "artist": "Pacho",
+            "title": "Via Libre Llego"
+          },
+          "raw_response": "The vinyl sleeve reads \"Vía Libre – Llegó Pacho.\"\n\nArtist: Via Libre | Title: Llego Pacho",
+          "parsed": {
+            "artist": "Via Libre",
+            "title": "Llego Pacho"
+          },
+          "score": 0,
+          "match_type": "none"
+        }
+      ],
+      "summary": {
+        "exact": 52,
+        "partial": 34,
+        "none": 13,
+        "parse_errors": 0,
+        "total_score": 138,
+        "max_score": 198
+      }
+    }
+  }
+}
