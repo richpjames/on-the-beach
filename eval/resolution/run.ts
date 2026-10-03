@@ -1,5 +1,5 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { dirname, resolve } from "node:path";
+import { basename, dirname, resolve } from "node:path";
 import { resolveRelease } from "../../app/release-resolver";
 import type { EvalManifest } from "../types";
 import { scoreCase, summarise, type CaseScore, type ReturnedIds, type Summary } from "./score";
@@ -172,17 +172,28 @@ interface VisionResults {
   >;
 }
 
+/** Which vision output an e2e run replayed, stamped into the result JSON. */
+interface VisionProvenance {
+  file: string;
+  model: string | null;
+  strategy: string;
+}
+
 /** What the resolver is fed for a fixture: verified truth, or a model's guess. */
-function buildInputs(): Map<string, { artist: string; title: string }> {
+function buildInputs(): {
+  inputs: Map<string, { artist: string; title: string }>;
+  vision: VisionProvenance | null;
+} {
   const inputs = new Map<string, { artist: string; title: string }>();
   if (config === "ground-truth") {
     for (const fixture of fixtures) {
       inputs.set(fixture.id, { artist: fixture.artist, title: fixture.title });
     }
-    return inputs;
+    return { inputs, vision: null };
   }
 
-  const vision = JSON.parse(readFileSync(resolve(visionResultsPath!), "utf-8")) as VisionResults;
+  const visionPath = resolve(visionResultsPath!);
+  const vision = JSON.parse(readFileSync(visionPath, "utf-8")) as VisionResults;
   const available = Object.keys(vision.strategies ?? {});
   const chosen = visionStrategyId ?? available[0];
   const results = vision.strategies?.[chosen]?.results;
@@ -200,10 +211,20 @@ function buildInputs(): Map<string, { artist: string; title: string }> {
     });
   }
   console.log(`Replaying vision output: ${vision.model ?? "unknown model"}, strategy ${chosen}`);
-  return inputs;
+  return {
+    inputs,
+    vision: {
+      // Without this the result JSON cannot say which vision model produced
+      // its inputs — three runs from September 2026 had to be re-attributed
+      // afterwards by diffing their inputs against every candidate file.
+      file: basename(visionPath),
+      model: vision.model ?? null,
+      strategy: chosen,
+    },
+  };
 }
 
-const inputs = buildInputs();
+const { inputs, vision } = buildInputs();
 
 const selected = strategies.filter((s) => !strategyFilter || strategyFilter.includes(s.id));
 if (selected.length === 0) {
@@ -316,7 +337,11 @@ mkdirSync(RESULTS_DIR, { recursive: true });
 const outputPath = resolve(RESULTS_DIR, `resolution-${config}-${runAt.replace(/[:.]/g, "-")}.json`);
 writeFileSync(
   outputPath,
-  JSON.stringify({ runAt, config, caseCount: fixtures.length, strategies: report }, null, 2),
+  JSON.stringify(
+    { runAt, config, vision, caseCount: fixtures.length, strategies: report },
+    null,
+    2,
+  ),
 );
 console.log(`\nWrote ${outputPath}`);
 console.log(`Requests: ${networkCalls} network, ${cacheHits} cached, ${retries} retried`);
