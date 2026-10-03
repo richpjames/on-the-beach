@@ -16,7 +16,7 @@ import { saveImageFromBase64, validateImageBase64 } from "../uploads";
 import { createScanEnricher } from "../../app/scan-enricher";
 import { extractReleaseInfo, extractReleaseInfoFromWebContext } from "../../adapters/mistral/index";
 import { getWebContext } from "../../adapters/google-vision/index";
-import { lookupRelease } from "../../adapters/musicbrainz/index";
+import { resolveRelease } from "../../app/release-resolver";
 import { db } from "../../adapters/db/index";
 import { stacks, musicItemStacks, musicItems } from "../../adapters/db/schema";
 import type { CreateMusicItemInput, ScanResult, SourceName } from "../../domain/types";
@@ -253,7 +253,7 @@ export function createIngestRoutes(deps: IngestRoutesDeps = {}): Hono {
     deps.scanPhoto ??
     createScanEnricher(
       extractReleaseInfo,
-      lookupRelease,
+      resolveRelease,
       getWebContext,
       extractReleaseInfoFromWebContext,
     );
@@ -623,7 +623,11 @@ export function createIngestRoutes(deps: IngestRoutesDeps = {}): Hono {
         country: scan?.country ?? undefined,
         catalogueNumber: scan?.catalogueNumber ?? undefined,
         musicbrainzReleaseId: scan?.musicbrainzReleaseId ?? undefined,
+        musicbrainzReleaseGroupId: scan?.musicbrainzReleaseGroupId ?? undefined,
         musicbrainzArtistId: scan?.musicbrainzArtistId ?? undefined,
+        discogsReleaseId: scan?.discogsReleaseId ?? undefined,
+        discogsMasterId: scan?.discogsMasterId ?? undefined,
+        resolutionStatus: scan?.resolutionStatus ?? undefined,
         notes: noteParts.length ? noteParts.join(" — ") : undefined,
       });
 

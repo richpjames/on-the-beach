@@ -61,34 +61,9 @@ function mbFetch(url: string): Promise<Response> {
   return turn;
 }
 
-export interface MusicBrainzFields {
-  year: number | null;
-  label: string | null;
-  country: string | null;
-  catalogueNumber: string | null;
-  musicbrainzReleaseId: string | null;
-  musicbrainzArtistId: string | null;
-}
-
 interface MbLabelInfo {
   "catalog-number"?: unknown;
   label?: { name?: unknown };
-}
-
-interface MbArtistCredit {
-  artist?: { id?: unknown };
-}
-
-interface MbRelease {
-  id?: unknown;
-  date?: unknown;
-  country?: unknown;
-  "label-info"?: unknown;
-  "artist-credit"?: unknown;
-}
-
-interface MbSearchResponse {
-  releases?: unknown[];
 }
 
 function parseYear(date: unknown): number | null {
@@ -541,81 +516,13 @@ export async function searchArtistCandidates(
   });
 }
 
-export async function lookupRelease(
-  artist: string,
-  title: string,
-  year?: string,
-): Promise<MusicBrainzFields | null> {
-  const queryParts = [`artist:${artist}`, `AND release:${title}`];
-  if (year) {
-    queryParts.push(`AND date:${year}`);
-  }
-  const query = queryParts.join(" ");
-  const params = new URLSearchParams({ query, limit: "1", fmt: "json" });
-  const url = `${MB_API_BASE}/release?${params}`;
-  const searchLog = {
-    artist,
-    title,
-    year: year ?? null,
-    query,
-  };
-
-  try {
-    console.info("[musicbrainz] Searching releases", searchLog);
-
-    const response = await mbFetch(url);
-
-    if (!response.ok) {
-      console.warn(`[musicbrainz] Search returned ${response.status}`, searchLog);
-      return null;
-    }
-
-    const data = (await response.json()) as MbSearchResponse;
-    const releaseCount = Array.isArray(data.releases) ? data.releases.length : 0;
-
-    if (releaseCount === 0) {
-      console.info("[musicbrainz] Search returned no releases", searchLog);
-      return null;
-    }
-
-    const release = data.releases![0] as MbRelease;
-    const { label, catalogueNumber } = parseLabelInfo(release["label-info"]);
-    const country = typeof release.country === "string" ? release.country : null;
-    const artistCredit = Array.isArray(release["artist-credit"]) ? release["artist-credit"] : [];
-    const firstCredit = artistCredit[0] as MbArtistCredit | undefined;
-
-    const result = {
-      year: parseYear(release.date),
-      label,
-      country,
-      catalogueNumber,
-      musicbrainzReleaseId: typeof release.id === "string" ? release.id : null,
-      musicbrainzArtistId:
-        firstCredit?.artist && typeof firstCredit.artist.id === "string"
-          ? firstCredit.artist.id
-          : null,
-    };
-
-    console.info("[musicbrainz] Search result", {
-      ...searchLog,
-      releaseCount,
-      result,
-    });
-
-    return result;
-  } catch (err) {
-    console.error("[musicbrainz] Lookup failed:", err);
-    return null;
-  }
-}
-
 // ---------------------------------------------------------------------------
 // Release search (identifier resolution)
 //
-// `lookupRelease` above answers "give me the fields for this record" and takes
-// MusicBrainz's top hit on faith. This answers "which records might this be?"
-// and leaves the judgement to the caller, because the provider's ranking cannot
-// be trusted — see the note on `score` below.
+// This answers "which records might this be?" and leaves the judgement to the
+// caller, because the provider's ranking cannot be trusted — see the note on
+// `score` below. The old take-the-top-hit-on-faith entry point was removed
+// once every caller moved to the verified resolver (`app/release-resolver.ts`).
 // ---------------------------------------------------------------------------
 
 /** A candidate from a release search. Callers MUST verify before accepting. */

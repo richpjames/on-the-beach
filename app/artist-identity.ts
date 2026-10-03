@@ -2,11 +2,11 @@ import { and, desc, eq, isNotNull, isNull, or, lt } from "drizzle-orm";
 import { db } from "../adapters/db/index";
 import { artists, musicItems } from "../adapters/db/schema";
 import {
-  lookupRelease,
   searchArtistCandidates,
   VARIOUS_ARTISTS_MBID,
   type MbArtistCandidate,
 } from "../adapters/musicbrainz/index";
+import { resolveRelease } from "./release-resolver";
 
 // ---------------------------------------------------------------------------
 // Artist MBID resolution
@@ -210,12 +210,12 @@ export async function resolveArtistMbid(artistId: number): Promise<ArtistResolut
 
   if (knownRelease?.title) {
     try {
-      const fields = await lookupRelease(
-        artist.name,
-        knownRelease.title,
-        knownRelease.year ? String(knownRelease.year) : undefined,
-      );
-      const mbid = fields?.musicbrainzArtistId ?? null;
+      const outcome = await resolveRelease({
+        artist: artist.name,
+        title: knownRelease.title,
+        year: knownRelease.year ?? null,
+      });
+      const mbid = outcome.ids?.musicbrainzArtistId ?? null;
       if (mbid && mbid !== VARIOUS_ARTISTS_MBID) {
         await storeResolution(artistId, { mbid, confidence: "confirmed" });
         return { mbid, confidence: "confirmed" };

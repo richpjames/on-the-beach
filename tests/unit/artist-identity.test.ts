@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, mock, spyOn, test } from "bun:test";
 import { eq } from "drizzle-orm";
 import * as musicbrainz from "../../adapters/musicbrainz/index";
+import * as releaseResolver from "../../app/release-resolver";
 import { db } from "../../adapters/db/index";
 import { artists, musicItems } from "../../adapters/db/schema";
 import { normalize } from "../../domain/text";
@@ -182,7 +183,7 @@ describe("resolveArtistMbid", () => {
   });
 
   test("prefers an MBID already on the artist's items over any lookup", async () => {
-    const releaseSpy = spyOn(musicbrainz, "lookupRelease");
+    const releaseSpy = spyOn(releaseResolver, "resolveRelease");
     const searchSpy = spyOn(musicbrainz, "searchArtistCandidates");
     const artistId = await makeArtist(`Ladder One ${Date.now()}`);
     await addItem(artistId, "Known", "mbid-from-item");
@@ -195,13 +196,21 @@ describe("resolveArtistMbid", () => {
   });
 
   test("falls back to a known release, which pins the artist through a record", async () => {
-    const releaseSpy = spyOn(musicbrainz, "lookupRelease").mockResolvedValue({
-      year: 1974,
-      label: null,
-      country: null,
-      catalogueNumber: null,
-      musicbrainzReleaseId: "release-id",
-      musicbrainzArtistId: "mbid-from-release",
+    const releaseSpy = spyOn(releaseResolver, "resolveRelease").mockResolvedValue({
+      status: "matched",
+      ids: {
+        musicbrainzReleaseId: "release-id",
+        musicbrainzReleaseGroupId: "group-id",
+        musicbrainzArtistId: "mbid-from-release",
+        discogsReleaseId: 123,
+        discogsMasterId: 456,
+        year: 1974,
+        label: null,
+        country: null,
+        catalogueNumber: null,
+        confidence: 0.95,
+      },
+      errors: [],
     });
     const searchSpy = spyOn(musicbrainz, "searchArtistCandidates");
     const artistId = await makeArtist(`Ladder Two ${Date.now()}`);
@@ -217,7 +226,11 @@ describe("resolveArtistMbid", () => {
   });
 
   test("falls through to the name search when the release lookup yields nothing", async () => {
-    spyOn(musicbrainz, "lookupRelease").mockResolvedValue(null);
+    spyOn(releaseResolver, "resolveRelease").mockResolvedValue({
+      status: "absent",
+      ids: null,
+      errors: [],
+    });
     spyOn(musicbrainz, "searchArtistCandidates").mockResolvedValue([
       candidate({ id: "mbid-from-search", score: 100 }),
     ]);
@@ -231,7 +244,11 @@ describe("resolveArtistMbid", () => {
   });
 
   test("stores unresolved — and the attempt time — when the search is ambiguous", async () => {
-    spyOn(musicbrainz, "lookupRelease").mockResolvedValue(null);
+    spyOn(releaseResolver, "resolveRelease").mockResolvedValue({
+      status: "absent",
+      ids: null,
+      errors: [],
+    });
     spyOn(musicbrainz, "searchArtistCandidates").mockResolvedValue([
       candidate({ id: "one", score: 100 }),
       candidate({ id: "two", score: 99 }),
@@ -250,7 +267,11 @@ describe("resolveArtistMbid", () => {
   });
 
   test("a failing search resolves to unresolved rather than throwing", async () => {
-    spyOn(musicbrainz, "lookupRelease").mockResolvedValue(null);
+    spyOn(releaseResolver, "resolveRelease").mockResolvedValue({
+      status: "absent",
+      ids: null,
+      errors: [],
+    });
     spyOn(musicbrainz, "searchArtistCandidates").mockRejectedValue(
       new musicbrainz.MusicBrainzHttpError(503, "rate limited"),
     );

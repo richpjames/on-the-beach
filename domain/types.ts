@@ -160,7 +160,12 @@ export interface CreateMusicItemInput {
   genre?: string;
   catalogueNumber?: string;
   musicbrainzReleaseId?: string;
+  musicbrainzReleaseGroupId?: string;
   musicbrainzArtistId?: string;
+  discogsReleaseId?: number;
+  discogsMasterId?: number;
+  /** Outcome of release resolution, when the item was created from a scan. */
+  resolutionStatus?: string;
   selectedCandidateId?: string;
   /**
    * Multi-select counterpart to `selectedCandidateId`, used when a page names
@@ -219,14 +224,21 @@ export interface ScanResult {
   title: string | null;
   artistConfidence: number;
   titleConfidence: number;
-  // Optional fields populated by MusicBrainz enrichment. genre is omitted
+  // Optional fields populated by release resolution. genre is omitted
   // intentionally — it requires a separate release-group lookup.
   year?: number | null;
   label?: string | null;
   country?: string | null;
   catalogueNumber?: string | null;
   musicbrainzReleaseId?: string | null;
+  musicbrainzReleaseGroupId?: string | null;
   musicbrainzArtistId?: string | null;
+  discogsReleaseId?: number | null;
+  discogsMasterId?: number | null;
+  /** `matched` / `partial` when resolution verified the release somewhere. */
+  resolutionStatus?: string | null;
+  /** The winning candidate's score from the resolver, 0–1. */
+  resolutionConfidence?: number | null;
 }
 
 export interface UploadImageResult {
@@ -239,7 +251,12 @@ export interface LookupReleaseResult {
   country?: string | null;
   catalogueNumber?: string | null;
   musicbrainzReleaseId?: string | null;
+  musicbrainzReleaseGroupId?: string | null;
   musicbrainzArtistId?: string | null;
+  discogsReleaseId?: number | null;
+  discogsMasterId?: number | null;
+  resolutionStatus?: string | null;
+  resolutionConfidence?: number | null;
   artworkUrl?: string;
 }
 

@@ -272,7 +272,13 @@ async function insertMusicItemWithLink(
       genre: overrides?.genre ?? candidate.genre ?? null,
       catalogueNumber: overrides?.catalogueNumber ?? null,
       musicbrainzReleaseId: overrides?.musicbrainzReleaseId ?? null,
+      musicbrainzReleaseGroupId: overrides?.musicbrainzReleaseGroupId ?? null,
       musicbrainzArtistId: overrides?.musicbrainzArtistId ?? null,
+      discogsReleaseId: overrides?.discogsReleaseId ?? null,
+      discogsMasterId: overrides?.discogsMasterId ?? null,
+      resolutionStatus: overrides?.resolutionStatus ?? null,
+      resolutionAttemptedAt:
+        overrides?.musicbrainzReleaseId || overrides?.discogsReleaseId ? new Date() : null,
       remindAt,
     })
     .returning({ id: musicItems.id });

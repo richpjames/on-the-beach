@@ -260,7 +260,15 @@ export async function createMusicItemDirect(
       genre: overrides.genre ?? null,
       catalogueNumber: overrides.catalogueNumber ?? null,
       musicbrainzReleaseId: overrides.musicbrainzReleaseId ?? null,
+      musicbrainzReleaseGroupId: overrides.musicbrainzReleaseGroupId ?? null,
       musicbrainzArtistId: overrides.musicbrainzArtistId ?? null,
+      discogsReleaseId: overrides.discogsReleaseId ?? null,
+      discogsMasterId: overrides.discogsMasterId ?? null,
+      resolutionStatus: overrides.resolutionStatus ?? null,
+      // The resolution that produced the ids above, if any — distinguishes
+      // "resolved today" from ids that predate the resolver.
+      resolutionAttemptedAt:
+        overrides.musicbrainzReleaseId || overrides.discogsReleaseId ? new Date() : null,
     })
     .returning({ id: musicItems.id });
 
