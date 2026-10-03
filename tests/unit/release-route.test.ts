@@ -4,7 +4,7 @@ import { createReleaseRoutes } from "../../server/routes/release";
 
 const mockExtractReleaseInfo = mock();
 const mockSaveImage = mock();
-const mockLookupRelease = mock();
+const mockResolveRelease = mock();
 const mockFetchCoverArt = mock();
 const mockLookupSecondaryLink = mock();
 
@@ -15,7 +15,7 @@ function makeApp(): Hono {
     createReleaseRoutes(
       mockExtractReleaseInfo,
       mockSaveImage,
-      mockLookupRelease,
+      mockResolveRelease,
       mockFetchCoverArt,
       mockLookupSecondaryLink,
     ),
@@ -28,7 +28,7 @@ describe("POST /api/release/scan", () => {
     mockExtractReleaseInfo.mockReset();
     mockSaveImage.mockReset();
     mockSaveImage.mockResolvedValue("/uploads/mock.jpg");
-    mockLookupRelease.mockReset();
+    mockResolveRelease.mockReset();
     mockFetchCoverArt.mockReset();
     mockFetchCoverArt.mockResolvedValue(null);
   });
@@ -138,7 +138,7 @@ describe("POST /api/release/image", () => {
     mockExtractReleaseInfo.mockReset();
     mockSaveImage.mockReset();
     mockSaveImage.mockResolvedValue("/uploads/mock.jpg");
-    mockLookupRelease.mockReset();
+    mockResolveRelease.mockReset();
     mockFetchCoverArt.mockReset();
     mockFetchCoverArt.mockResolvedValue(null);
   });
@@ -193,7 +193,7 @@ describe("POST /api/release/lookup", () => {
   beforeEach(() => {
     mockExtractReleaseInfo.mockReset();
     mockSaveImage.mockReset();
-    mockLookupRelease.mockReset();
+    mockResolveRelease.mockReset();
     mockFetchCoverArt.mockReset();
     mockFetchCoverArt.mockResolvedValue(null);
   });
@@ -218,8 +218,12 @@ describe("POST /api/release/lookup", () => {
     expect(res.status).toBe(400);
   });
 
-  test("returns empty object when lookup returns null", async () => {
-    mockLookupRelease.mockResolvedValueOnce(null);
+  function outcome(overrides: Record<string, unknown> = {}): Record<string, unknown> {
+    return { status: "matched", ids: null, errors: [], ...overrides };
+  }
+
+  test("returns empty object when the resolver finds nothing", async () => {
+    mockResolveRelease.mockResolvedValueOnce(outcome({ status: "absent" }));
     const app = makeApp();
     const res = await app.request("http://localhost/api/release/lookup", {
       method: "POST",
@@ -230,15 +234,23 @@ describe("POST /api/release/lookup", () => {
     expect(await res.json()).toEqual({});
   });
 
-  test("returns enriched fields on successful lookup", async () => {
-    mockLookupRelease.mockResolvedValueOnce({
-      year: 1997,
-      label: "Parlophone",
-      country: "GB",
-      catalogueNumber: "CDPUSH45",
-      musicbrainzReleaseId: "release-uuid",
-      musicbrainzArtistId: "artist-uuid",
-    });
+  test("returns enriched fields on a resolved release", async () => {
+    mockResolveRelease.mockResolvedValueOnce(
+      outcome({
+        ids: {
+          musicbrainzReleaseId: "release-uuid",
+          musicbrainzReleaseGroupId: "group-uuid",
+          musicbrainzArtistId: "artist-uuid",
+          discogsReleaseId: 12345,
+          discogsMasterId: 6789,
+          year: 1997,
+          label: "Parlophone",
+          country: "GB",
+          catalogueNumber: "CDPUSH45",
+          confidence: 0.93,
+        },
+      }),
+    );
     const app = makeApp();
     const res = await app.request("http://localhost/api/release/lookup", {
       method: "POST",
@@ -250,17 +262,29 @@ describe("POST /api/release/lookup", () => {
     expect(body.year).toBe(1997);
     expect(body.label).toBe("Parlophone");
     expect(body.musicbrainzReleaseId).toBe("release-uuid");
+    expect(body.musicbrainzReleaseGroupId).toBe("group-uuid");
+    expect(body.discogsMasterId).toBe(6789);
+    expect(body.resolutionStatus).toBe("matched");
+    expect(body.resolutionConfidence).toBe(0.93);
   });
 
   test("includes artworkUrl when cover art is found", async () => {
-    mockLookupRelease.mockResolvedValueOnce({
-      year: 2001,
-      label: null,
-      country: null,
-      catalogueNumber: null,
-      musicbrainzReleaseId: "release-uuid",
-      musicbrainzArtistId: null,
-    });
+    mockResolveRelease.mockResolvedValueOnce(
+      outcome({
+        ids: {
+          musicbrainzReleaseId: "release-uuid",
+          musicbrainzReleaseGroupId: null,
+          musicbrainzArtistId: null,
+          discogsReleaseId: null,
+          discogsMasterId: null,
+          year: 2001,
+          label: null,
+          country: null,
+          catalogueNumber: null,
+          confidence: 0.9,
+        },
+      }),
+    );
     mockFetchCoverArt.mockResolvedValueOnce("/uploads/cover.jpg");
     const app = makeApp();
     const res = await app.request("http://localhost/api/release/lookup", {
@@ -272,19 +296,40 @@ describe("POST /api/release/lookup", () => {
     expect(body.artworkUrl).toBe("/uploads/cover.jpg");
   });
 
-  test("passes year hint to lookupRelease when provided", async () => {
-    mockLookupRelease.mockResolvedValueOnce(null);
+  test("passes the query including a parsed year hint to the resolver", async () => {
+    mockResolveRelease.mockResolvedValueOnce(outcome({ status: "absent" }));
     const app = makeApp();
     await app.request("http://localhost/api/release/lookup", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ artist: "Radiohead", title: "OK Computer", year: "1997" }),
     });
-    expect(mockLookupRelease).toHaveBeenCalledWith("Radiohead", "OK Computer", "1997");
+    expect(mockResolveRelease).toHaveBeenCalledWith({
+      artist: "Radiohead",
+      title: "OK Computer",
+      year: 1997,
+    });
   });
 
-  test("returns empty object when lookup throws", async () => {
-    mockLookupRelease.mockRejectedValueOnce(new Error("timeout"));
+  test("returns empty object when resolution failed", async () => {
+    mockResolveRelease.mockResolvedValueOnce(
+      outcome({
+        status: "failed",
+        errors: [{ provider: "musicbrainz", message: "503" }],
+      }),
+    );
+    const app = makeApp();
+    const res = await app.request("http://localhost/api/release/lookup", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ artist: "Radiohead", title: "OK Computer" }),
+    });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({});
+  });
+
+  test("returns empty object when the resolver throws", async () => {
+    mockResolveRelease.mockRejectedValueOnce(new Error("timeout"));
     const app = makeApp();
     const res = await app.request("http://localhost/api/release/lookup", {
       method: "POST",
@@ -306,7 +351,7 @@ describe("POST /api/release/lookup", () => {
       });
       expect(res.status).toBe(200);
       expect(await res.json()).toEqual({});
-      expect(mockLookupRelease).not.toHaveBeenCalled();
+      expect(mockResolveRelease).not.toHaveBeenCalled();
       expect(mockFetchCoverArt).not.toHaveBeenCalled();
     } finally {
       delete process.env.OTB_DISABLE_EXTERNAL_LOOKUPS;

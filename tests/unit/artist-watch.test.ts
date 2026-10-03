@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, mock, spyOn, test } from "bun:test";
 import { and, eq } from "drizzle-orm";
 import * as musicbrainz from "../../adapters/musicbrainz/index";
+import * as releaseResolver from "../../app/release-resolver";
 import { db } from "../../adapters/db/index";
 import { artistReleases, artists, musicItems, releaseAlerts } from "../../adapters/db/schema";
 import { normalize } from "../../domain/text";
@@ -747,7 +748,11 @@ describe("sweepArtistReleases", () => {
       group({ id: "rg-sweep" }),
     ]);
     spyOn(musicbrainz, "searchArtistCandidates").mockResolvedValue([]);
-    spyOn(musicbrainz, "lookupRelease").mockResolvedValue(null);
+    spyOn(releaseResolver, "resolveRelease").mockResolvedValue({
+      status: "absent",
+      ids: null,
+      errors: [],
+    });
 
     const due = await makeTrackedArtist(`Sweep Due ${Date.now()}`, { mbid: "mbid-sweep-due" });
     const notDue = await makeTrackedArtist(`Sweep Later ${Date.now()}`, {

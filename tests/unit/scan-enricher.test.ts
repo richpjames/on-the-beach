@@ -1,7 +1,24 @@
-import { describe, expect, mock, test } from "bun:test";
+import { describe, expect, mock, spyOn, test } from "bun:test";
 import { createScanEnricher } from "../../app/scan-enricher";
 import type { ScanResult } from "../../domain/types";
-import type { MusicBrainzFields } from "../../adapters/musicbrainz/index";
+import type { ResolutionOutcome } from "../../app/release-resolver";
+
+function outcome(overrides: Partial<ResolutionOutcome> = {}): ResolutionOutcome {
+  return { status: "matched", ids: null, errors: [], ...overrides };
+}
+
+const resolvedIds = {
+  musicbrainzReleaseId: "mb-release-1",
+  musicbrainzReleaseGroupId: "mb-group-1",
+  musicbrainzArtistId: "mb-artist-1",
+  discogsReleaseId: 12345,
+  discogsMasterId: 6789,
+  year: 1997,
+  label: "Parlophone",
+  country: "GB",
+  catalogueNumber: "CDPUSH45",
+  confidence: 0.93,
+};
 
 describe("createScanEnricher", () => {
   const highConfidenceResult: ScanResult = {
@@ -16,21 +33,15 @@ describe("createScanEnricher", () => {
     artistConfidence: 0.5,
     titleConfidence: 0.5,
   };
-  const mbFields: MusicBrainzFields = {
-    year: 1997,
-    label: "Parlophone",
-    country: "GB",
-    catalogueNumber: "CDPUSH45",
-  };
 
-  test("returns merged result when both Mistral and MusicBrainz succeed (high confidence)", async () => {
+  test("returns merged result when both Mistral and the resolver succeed (high confidence)", async () => {
     const mockExtract = mock().mockResolvedValueOnce(highConfidenceResult);
-    const mockLookup = mock().mockResolvedValueOnce(mbFields);
+    const mockResolve = mock().mockResolvedValueOnce(outcome({ ids: resolvedIds }));
     const mockGetWebContext = mock();
     const mockExtractWithContext = mock();
     const enrich = createScanEnricher(
       mockExtract,
-      mockLookup,
+      mockResolve,
       mockGetWebContext,
       mockExtractWithContext,
     );
@@ -45,19 +56,26 @@ describe("createScanEnricher", () => {
       label: "Parlophone",
       country: "GB",
       catalogueNumber: "CDPUSH45",
+      musicbrainzReleaseId: "mb-release-1",
+      musicbrainzReleaseGroupId: "mb-group-1",
+      musicbrainzArtistId: "mb-artist-1",
+      discogsReleaseId: 12345,
+      discogsMasterId: 6789,
+      resolutionStatus: "matched",
+      resolutionConfidence: 0.93,
     });
-    expect(mockLookup).toHaveBeenCalledWith("Radiohead", "OK Computer");
+    expect(mockResolve).toHaveBeenCalledWith({ artist: "Radiohead", title: "OK Computer" });
     expect(mockGetWebContext).not.toHaveBeenCalled();
   });
 
   test("skips web context when confidence >= 0.8", async () => {
     const mockExtract = mock().mockResolvedValueOnce(highConfidenceResult);
-    const mockLookup = mock().mockResolvedValueOnce(null);
+    const mockResolve = mock().mockResolvedValueOnce(outcome({ status: "absent" }));
     const mockGetWebContext = mock();
     const mockExtractWithContext = mock();
     const enrich = createScanEnricher(
       mockExtract,
-      mockLookup,
+      mockResolve,
       mockGetWebContext,
       mockExtractWithContext,
     );
@@ -75,14 +93,14 @@ describe("createScanEnricher", () => {
       titleConfidence: 0.7,
     };
     const mockExtract = mock().mockResolvedValueOnce(lowConfidenceResult);
-    const mockLookup = mock().mockResolvedValueOnce(null);
+    const mockResolve = mock().mockResolvedValueOnce(outcome({ status: "absent" }));
     const mockGetWebContext = mock().mockResolvedValueOnce(
       "Best guess labels: Radiohead OK Computer",
     );
     const mockExtractWithContext = mock().mockResolvedValueOnce(secondPassResult);
     const enrich = createScanEnricher(
       mockExtract,
-      mockLookup,
+      mockResolve,
       mockGetWebContext,
       mockExtractWithContext,
     );
@@ -98,12 +116,12 @@ describe("createScanEnricher", () => {
 
   test("falls back to first pass result when web context is null", async () => {
     const mockExtract = mock().mockResolvedValueOnce(lowConfidenceResult);
-    const mockLookup = mock().mockResolvedValueOnce(null);
+    const mockResolve = mock().mockResolvedValueOnce(outcome({ status: "absent" }));
     const mockGetWebContext = mock().mockResolvedValueOnce(null);
     const mockExtractWithContext = mock();
     const enrich = createScanEnricher(
       mockExtract,
-      mockLookup,
+      mockResolve,
       mockGetWebContext,
       mockExtractWithContext,
     );
@@ -115,12 +133,12 @@ describe("createScanEnricher", () => {
 
   test("falls back to first pass result when second pass returns null", async () => {
     const mockExtract = mock().mockResolvedValueOnce(lowConfidenceResult);
-    const mockLookup = mock().mockResolvedValueOnce(null);
+    const mockResolve = mock().mockResolvedValueOnce(outcome({ status: "absent" }));
     const mockGetWebContext = mock().mockResolvedValueOnce("some context");
     const mockExtractWithContext = mock().mockResolvedValueOnce(null);
     const enrich = createScanEnricher(
       mockExtract,
-      mockLookup,
+      mockResolve,
       mockGetWebContext,
       mockExtractWithContext,
     );
@@ -129,14 +147,14 @@ describe("createScanEnricher", () => {
     expect(result).toEqual(lowConfidenceResult);
   });
 
-  test("returns Mistral-only result when MusicBrainz returns null", async () => {
+  test("returns Mistral-only result when the resolver finds nothing", async () => {
     const mockExtract = mock().mockResolvedValueOnce(highConfidenceResult);
-    const mockLookup = mock().mockResolvedValueOnce(null);
+    const mockResolve = mock().mockResolvedValueOnce(outcome({ status: "absent" }));
     const mockGetWebContext = mock();
     const mockExtractWithContext = mock();
     const enrich = createScanEnricher(
       mockExtract,
-      mockLookup,
+      mockResolve,
       mockGetWebContext,
       mockExtractWithContext,
     );
@@ -145,14 +163,38 @@ describe("createScanEnricher", () => {
     expect(result).toEqual(highConfidenceResult);
   });
 
-  test("returns Mistral-only result when MusicBrainz throws", async () => {
+  test("returns Mistral-only result when resolution failed (provider error)", async () => {
+    const warnSpy = spyOn(console, "warn").mockImplementation(() => {});
     const mockExtract = mock().mockResolvedValueOnce(highConfidenceResult);
-    const mockLookup = mock().mockRejectedValueOnce(new Error("timeout"));
+    const mockResolve = mock().mockResolvedValueOnce(
+      outcome({
+        status: "failed",
+        errors: [{ provider: "musicbrainz", message: "503 Service Unavailable" }],
+      }),
+    );
     const mockGetWebContext = mock();
     const mockExtractWithContext = mock();
     const enrich = createScanEnricher(
       mockExtract,
-      mockLookup,
+      mockResolve,
+      mockGetWebContext,
+      mockExtractWithContext,
+    );
+
+    const result = await enrich("base64data");
+    expect(result).toEqual(highConfidenceResult);
+    expect(warnSpy).toHaveBeenCalledWith("scan enrichment: musicbrainz: 503 Service Unavailable");
+    warnSpy.mockRestore();
+  });
+
+  test("returns Mistral-only result when the resolver throws", async () => {
+    const mockExtract = mock().mockResolvedValueOnce(highConfidenceResult);
+    const mockResolve = mock().mockRejectedValueOnce(new Error("timeout"));
+    const mockGetWebContext = mock();
+    const mockExtractWithContext = mock();
+    const enrich = createScanEnricher(
+      mockExtract,
+      mockResolve,
       mockGetWebContext,
       mockExtractWithContext,
     );
@@ -161,24 +203,24 @@ describe("createScanEnricher", () => {
     expect(result).toEqual(highConfidenceResult);
   });
 
-  test("returns null when Mistral returns null (does not call MusicBrainz)", async () => {
+  test("returns null when Mistral returns null (does not call the resolver)", async () => {
     const mockExtract = mock().mockResolvedValueOnce(null);
-    const mockLookup = mock();
+    const mockResolve = mock();
     const mockGetWebContext = mock();
     const mockExtractWithContext = mock();
     const enrich = createScanEnricher(
       mockExtract,
-      mockLookup,
+      mockResolve,
       mockGetWebContext,
       mockExtractWithContext,
     );
 
     const result = await enrich("base64data");
     expect(result).toBeNull();
-    expect(mockLookup).not.toHaveBeenCalled();
+    expect(mockResolve).not.toHaveBeenCalled();
   });
 
-  test("skips MusicBrainz lookup when artist is null", async () => {
+  test("skips resolution when artist is null", async () => {
     const noArtist: ScanResult = {
       artist: null,
       title: "Unknown",
@@ -186,22 +228,22 @@ describe("createScanEnricher", () => {
       titleConfidence: 0.9,
     };
     const mockExtract = mock().mockResolvedValueOnce(noArtist);
-    const mockLookup = mock();
+    const mockResolve = mock();
     const mockGetWebContext = mock();
     const mockExtractWithContext = mock();
     const enrich = createScanEnricher(
       mockExtract,
-      mockLookup,
+      mockResolve,
       mockGetWebContext,
       mockExtractWithContext,
     );
 
     const result = await enrich("base64data");
     expect(result).toEqual(noArtist);
-    expect(mockLookup).not.toHaveBeenCalled();
+    expect(mockResolve).not.toHaveBeenCalled();
   });
 
-  test("skips MusicBrainz lookup when title is null", async () => {
+  test("skips resolution when title is null", async () => {
     const noTitle: ScanResult = {
       artist: "Someone",
       title: null,
@@ -209,18 +251,18 @@ describe("createScanEnricher", () => {
       titleConfidence: 0.9,
     };
     const mockExtract = mock().mockResolvedValueOnce(noTitle);
-    const mockLookup = mock();
+    const mockResolve = mock();
     const mockGetWebContext = mock();
     const mockExtractWithContext = mock();
     const enrich = createScanEnricher(
       mockExtract,
-      mockLookup,
+      mockResolve,
       mockGetWebContext,
       mockExtractWithContext,
     );
 
     const result = await enrich("base64data");
     expect(result).toEqual(noTitle);
-    expect(mockLookup).not.toHaveBeenCalled();
+    expect(mockResolve).not.toHaveBeenCalled();
   });
 });

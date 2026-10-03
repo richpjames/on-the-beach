@@ -6,7 +6,7 @@ import { readFileSync } from "node:fs";
 import { extractReleaseInfo, extractReleaseInfoFromWebContext } from "../adapters/mistral/index";
 import { getWebContext } from "../adapters/google-vision/index";
 import { createScanEnricher } from "../app/scan-enricher";
-import { lookupRelease } from "../adapters/musicbrainz/index";
+import { resolveRelease } from "../app/release-resolver";
 
 const imagePath = process.argv[2];
 if (!imagePath) {
@@ -35,7 +35,7 @@ if (first && (first.artistConfidence < 0.8 || first.titleConfidence < 0.8)) {
 console.log("\n=== Full pipeline ===");
 const enrich = createScanEnricher(
   extractReleaseInfo,
-  lookupRelease,
+  resolveRelease,
   getWebContext,
   extractReleaseInfoFromWebContext,
 );

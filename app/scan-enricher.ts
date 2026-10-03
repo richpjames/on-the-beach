@@ -1,22 +1,46 @@
 import type { ScanResult } from "../domain/types";
-import type { MusicBrainzFields } from "../adapters/musicbrainz/index";
+import type { ReleaseQuery, ResolutionOutcome } from "./release-resolver";
 
 const CONFIDENCE_THRESHOLD = 0.8;
 
 type ExtractFn = (base64Image: string) => Promise<ScanResult | null>;
 type ExtractWithContextFn = (base64Image: string, webContext: string) => Promise<ScanResult | null>;
-type LookupFn = (artist: string, title: string) => Promise<MusicBrainzFields | null>;
+type ResolveFn = (query: ReleaseQuery) => Promise<ResolutionOutcome>;
 type GetWebContextFn = (base64Image: string) => Promise<string | null>;
 
-async function enrichWithMusicBrainz(result: ScanResult, lookup: LookupFn): Promise<ScanResult> {
+async function enrichWithResolution(result: ScanResult, resolve: ResolveFn): Promise<ScanResult> {
   if (!result.artist || !result.title) {
     return result;
   }
 
   try {
-    const mbFields = await lookup(result.artist, result.title);
-    if (!mbFields) return result;
-    return { ...result, ...mbFields };
+    const outcome = await resolve({ artist: result.artist, title: result.title });
+    if (!outcome.ids) {
+      // "absent" means no verified release anywhere — leave the scan as the
+      // vision read it, exactly like a null lookup did. "failed" is retryable,
+      // but nothing retries at this seam, so it degrades the same way; the warn
+      // keeps a throttled provider from looking like an unknown record.
+      for (const error of outcome.errors) {
+        console.warn(`scan enrichment: ${error.provider}: ${error.message}`);
+      }
+      return result;
+    }
+
+    const ids = outcome.ids;
+    return {
+      ...result,
+      year: ids.year,
+      label: ids.label,
+      country: ids.country,
+      catalogueNumber: ids.catalogueNumber,
+      musicbrainzReleaseId: ids.musicbrainzReleaseId,
+      musicbrainzReleaseGroupId: ids.musicbrainzReleaseGroupId,
+      musicbrainzArtistId: ids.musicbrainzArtistId,
+      discogsReleaseId: ids.discogsReleaseId,
+      discogsMasterId: ids.discogsMasterId,
+      resolutionStatus: outcome.status,
+      resolutionConfidence: ids.confidence,
+    };
   } catch {
     return result;
   }
@@ -24,7 +48,7 @@ async function enrichWithMusicBrainz(result: ScanResult, lookup: LookupFn): Prom
 
 export function createScanEnricher(
   extract: ExtractFn,
-  lookup: LookupFn,
+  resolve: ResolveFn,
   getWebContext: GetWebContextFn,
   extractWithContext: ExtractWithContextFn,
 ): (base64Image: string) => Promise<ScanResult | null> {
@@ -36,17 +60,17 @@ export function createScanEnricher(
       firstPass.artistConfidence >= CONFIDENCE_THRESHOLD &&
       firstPass.titleConfidence >= CONFIDENCE_THRESHOLD
     ) {
-      return enrichWithMusicBrainz(firstPass, lookup);
+      return enrichWithResolution(firstPass, resolve);
     }
 
     const webContext = await getWebContext(base64Image);
     if (!webContext) {
-      return enrichWithMusicBrainz(firstPass, lookup);
+      return enrichWithResolution(firstPass, resolve);
     }
 
     const secondPass = await extractWithContext(base64Image, webContext);
     const result = secondPass ?? firstPass;
 
-    return enrichWithMusicBrainz(result, lookup);
+    return enrichWithResolution(result, resolve);
   };
 }

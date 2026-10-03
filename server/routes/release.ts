@@ -1,11 +1,14 @@
 import { Hono } from "hono";
 import { extractReleaseInfo, extractReleaseInfoFromWebContext } from "../../adapters/mistral/index";
 import { getWebContext } from "../../adapters/google-vision/index";
-import { lookupRelease } from "../../adapters/musicbrainz/index";
 import { fetchAndSaveCoverArt } from "../../adapters/musicbrainz/cover-art-archive";
 import { createScanEnricher } from "../../app/scan-enricher";
+import {
+  resolveRelease,
+  type ReleaseQuery,
+  type ResolutionOutcome,
+} from "../../app/release-resolver";
 import type { ScanResult } from "../../domain/types";
-import type { MusicBrainzFields } from "../../adapters/musicbrainz/index";
 import { saveImageFromBase64, validateImageBase64 } from "../uploads";
 import { db } from "../../adapters/db/index";
 import { sources } from "../../adapters/db/schema";
@@ -23,11 +26,7 @@ interface ScanRequestBody {
 
 export type ExtractReleaseInfoFn = (base64Image: string) => Promise<ScanResult | null>;
 export type SaveReleaseImageFn = (base64Image: string) => Promise<string>;
-export type LookupReleaseFn = (
-  artist: string,
-  title: string,
-  year?: string,
-) => Promise<MusicBrainzFields | null>;
+export type ResolveReleaseFn = (query: ReleaseQuery) => Promise<ResolutionOutcome>;
 
 export type FetchCoverArtFn = (
   releaseId: string,
@@ -48,12 +47,12 @@ export const PLAYABLE_SOURCES = new Set([
 export function createReleaseRoutes(
   scanReleaseCover: ExtractReleaseInfoFn = createScanEnricher(
     extractReleaseInfo,
-    lookupRelease,
+    resolveRelease,
     getWebContext,
     extractReleaseInfoFromWebContext,
   ),
   saveImage: SaveReleaseImageFn = saveImageFromBase64,
-  lookupReleaseFn: LookupReleaseFn = lookupRelease,
+  resolveReleaseFn: ResolveReleaseFn = resolveRelease,
   fetchCoverArtFn: FetchCoverArtFn = fetchAndSaveCoverArt,
   lookupSecondaryLinkFn: LookupSecondaryLinkFn = lookupSecondaryLinkForItem,
 ): Hono {
@@ -137,21 +136,42 @@ export function createReleaseRoutes(
     const yearHint = typeof year === "string" && year.trim() ? year.trim() : undefined;
 
     // Enrichment is best-effort, so under OTB_DISABLE_EXTERNAL_LOOKUPS (tests)
-    // answer "nothing found" rather than reaching MusicBrainz/Cover Art Archive.
+    // answer "nothing found" rather than reaching the providers or Cover Art Archive.
     if (process.env.OTB_DISABLE_EXTERNAL_LOOKUPS) {
       return c.json({}, 200);
     }
 
     try {
-      const mbFields = await lookupReleaseFn(artist.trim(), title.trim(), yearHint);
-      if (!mbFields) {
+      const parsedYear = yearHint && /^\d{4}$/.test(yearHint) ? Number(yearHint) : undefined;
+      const outcome = await resolveReleaseFn({
+        artist: artist.trim(),
+        title: title.trim(),
+        year: parsedYear,
+      });
+      if (!outcome.ids) {
+        // Absent (nothing verified anywhere) and failed (request did not
+        // complete) both degrade to "nothing found" — same contract the
+        // add form has always had.
         return c.json({}, 200);
       }
 
-      const result: Record<string, unknown> = { ...mbFields };
+      const ids = outcome.ids;
+      const result: Record<string, unknown> = {
+        year: ids.year,
+        label: ids.label,
+        country: ids.country,
+        catalogueNumber: ids.catalogueNumber,
+        musicbrainzReleaseId: ids.musicbrainzReleaseId,
+        musicbrainzReleaseGroupId: ids.musicbrainzReleaseGroupId,
+        musicbrainzArtistId: ids.musicbrainzArtistId,
+        discogsReleaseId: ids.discogsReleaseId,
+        discogsMasterId: ids.discogsMasterId,
+        resolutionConfidence: ids.confidence,
+        resolutionStatus: outcome.status,
+      };
 
-      if (mbFields.musicbrainzReleaseId) {
-        const artworkUrl = await fetchCoverArtFn(mbFields.musicbrainzReleaseId, saveImage);
+      if (ids.musicbrainzReleaseId) {
+        const artworkUrl = await fetchCoverArtFn(ids.musicbrainzReleaseId, saveImage);
         if (artworkUrl) {
           result.artworkUrl = artworkUrl;
         }
