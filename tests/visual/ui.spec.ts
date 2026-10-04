@@ -154,6 +154,46 @@ test("captures main and release views", async ({ page }) => {
   await captureSnapshot(page, "release-page-view");
 });
 
+test("captures the listen row", async ({ page, request }) => {
+  // A release whose first link is a YouTube page, so "listen here" has a
+  // playable embed, plus a review and a database for the named ways out.
+  // Seeded straight into the database — the real creation path scrapes the
+  // pasted page, and a baseline can't depend on the live web.
+  const seeded = await request.post("/api/__test__/music-items", {
+    data: {
+      title: "Harbour Line",
+      artistName: "Tape Anchor",
+      links: [
+        { sourceName: "youtube", url: "https://www.youtube.com/watch?v=otb-harbour-line" },
+        {
+          sourceName: "pitchfork",
+          url: "https://pitchfork.com/reviews/albums/tape-anchor-harbour-line/",
+        },
+        { sourceName: "discogs", url: "https://www.discogs.com/release/12345-harbour-line" },
+      ],
+    },
+  });
+  expect(seeded.ok()).toBe(true);
+  const { id } = (await seeded.json()) as { id: number };
+
+  await page.goto(`/r/${id}`);
+  const row = page.locator(".release-page__actions");
+  await expect(row).toBeVisible();
+  await expect(row.getByText("Pitchfork")).toBeVisible();
+
+  // The play button exists only where the internal player does. On the mobile
+  // project's coarse pointer it vanishes once the page mounts, so that wait is
+  // also the hydration bar before the screenshot.
+  const listenButton = row.locator(".release-page__listen-btn");
+  if (test.info().project.name === "visual-mobile") {
+    await expect(listenButton).toBeHidden();
+  } else {
+    await expect(listenButton).toBeVisible();
+  }
+
+  await captureSnapshot(row, "release-page-listen-row", page);
+});
+
 test("captures add loading dialog", async ({ page }) => {
   await page.goto("/");
   await expect(page.getByPlaceholder("search or paste a link")).toBeVisible();
