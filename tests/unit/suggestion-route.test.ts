@@ -154,6 +154,16 @@ describe("POST /:id/suggestion/accept", () => {
     expect(await statusOf(second)).toBe("pending");
   });
 
+  test("stamps the accepted release as coming from a suggestion", async () => {
+    const [first] = await seedSuggestions(["Origin Offer"]);
+
+    const response = await post("/suggestion/accept", { suggestionId: first });
+
+    expect(response.status).toBe(201);
+    const created = (await response.json()) as { origin: string };
+    expect(created.origin).toBe("suggestion");
+  });
+
   test("404s when none of the listed ids are pending suggestions of the item", async () => {
     await seedSuggestions(["First Offer"]);
 

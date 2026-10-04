@@ -269,6 +269,9 @@ export async function createMusicItemDirect(
       // "resolved today" from ids that predate the resolver.
       resolutionAttemptedAt:
         overrides.musicbrainzReleaseId || overrides.discogsReleaseId ? new Date() : null,
+      // Set by the route that handled the entry; the column's default covers
+      // callers (and legacy paths) that don't stamp one.
+      origin: overrides.origin ?? "unknown",
     })
     .returning({ id: musicItems.id });
 

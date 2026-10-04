@@ -36,6 +36,26 @@ export type SourceName =
   | "unknown";
 
 /**
+ * How an item entered the list — the mechanism, not the person. `SourceName`
+ * says *where a link is*; this says *how the record got here*. Deliberately
+ * distinct from `SourceName` because the two cross-cut: an email can carry a
+ * Bandcamp link, a photo of a sleeve has no link at all.
+ *
+ * The human detail ("Via email from x@y", which page a round-up came from)
+ * stays in `notes`; origin carries just the mechanism. Never user-editable —
+ * each entry route stamps its own value.
+ */
+export type ItemOrigin =
+  | "manual" // hand-typed in the web form
+  | "link" // added from a URL — web form paste or the iOS share sheet
+  | "email" // email ingest
+  | "photo" // photo scan (share sheet / Shortcuts)
+  | "alert" // accepted new-release alert
+  | "suggestion" // accepted you-might-also-like suggestion
+  | "seed" // preview demo data
+  | "unknown"; // legacy rows, predating the stamp
+
+/**
  * What a source lets you do with a record, independent of which service it is.
  *
  * `SourceName` says *who* a link is with; this says *what for*. The three flags
@@ -107,6 +127,8 @@ export interface MusicItem {
   musicbrainz_artist_id: string | null;
   remind_at: string | null;
   reminder_pending: boolean;
+  /** How the item entered the list — see `ItemOrigin`. */
+  origin: ItemOrigin;
 }
 
 export interface MusicLink {
@@ -166,6 +188,12 @@ export interface CreateMusicItemInput {
   discogsMasterId?: number;
   /** Outcome of release resolution, when the item was created from a scan. */
   resolutionStatus?: string;
+  /**
+   * How the item entered the list. Stamped by the server on the route that
+   * handles the entry, never taken from the client's payload — a create
+   * request's own `origin` is overwritten.
+   */
+  origin?: ItemOrigin;
   selectedCandidateId?: string;
   /**
    * Multi-select counterpart to `selectedCandidateId`, used when a page names

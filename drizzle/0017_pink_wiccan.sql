@@ -1,0 +1,1 @@
+ALTER TABLE `music_items` ADD `origin` text DEFAULT 'unknown' NOT NULL;

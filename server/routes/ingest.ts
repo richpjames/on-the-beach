@@ -371,6 +371,7 @@ export function createIngestRoutes(deps: IngestRoutesDeps = {}): Hono {
       try {
         const results = await createMusicItemsFromUrl(url, {
           notes: `Via email from ${envelope.from}`,
+          origin: "email",
         });
 
         for (const result of results) {
@@ -629,6 +630,7 @@ export function createIngestRoutes(deps: IngestRoutesDeps = {}): Hono {
         discogsMasterId: scan?.discogsMasterId ?? undefined,
         resolutionStatus: scan?.resolutionStatus ?? undefined,
         notes: noteParts.length ? noteParts.join(" — ") : undefined,
+        origin: "photo",
       });
 
       // File the new item into every chosen list (creating any that are new),
