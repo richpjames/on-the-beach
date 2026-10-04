@@ -16,10 +16,12 @@ test("player persists when navigating back to the list", async ({ page }) => {
   // Navigate to the release page
   await page.locator(".music-card").first().locator("a.music-card__link").click();
   await expect(page).toHaveURL(/\/r\/\d+/, { timeout: 10_000 });
-  await expect(page.locator(".release-page__listen-btn")).toBeVisible({ timeout: 10_000 });
+  await expect(page.locator(".release-page__actions .release-page__listen-btn")).toBeVisible({
+    timeout: 10_000,
+  });
 
   // Start playback
-  await page.locator(".release-page__listen-btn").click();
+  await page.locator(".release-page__actions .release-page__listen-btn").click();
   await expect(page.locator("#now-playing-player")).toBeVisible();
   await expect(page.locator("#taskbar-np-btn")).toBeVisible();
 
@@ -40,8 +42,10 @@ test("taskbar button toggles player visibility", async ({ page }) => {
 
   await page.locator(".music-card").first().locator("a.music-card__link").click();
   await expect(page).toHaveURL(/\/r\/\d+/, { timeout: 10_000 });
-  await expect(page.locator(".release-page__listen-btn")).toBeVisible({ timeout: 10_000 });
-  await page.locator(".release-page__listen-btn").click();
+  await expect(page.locator(".release-page__actions .release-page__listen-btn")).toBeVisible({
+    timeout: 10_000,
+  });
+  await page.locator(".release-page__actions .release-page__listen-btn").click();
   await expect(page.locator("#now-playing-player")).toBeVisible();
 
   // Minimize via taskbar button
@@ -61,8 +65,10 @@ test("close button stops playback", async ({ page }) => {
 
   await page.locator(".music-card").first().locator("a.music-card__link").click();
   await expect(page).toHaveURL(/\/r\/\d+/, { timeout: 10_000 });
-  await expect(page.locator(".release-page__listen-btn")).toBeVisible({ timeout: 10_000 });
-  await page.locator(".release-page__listen-btn").click();
+  await expect(page.locator(".release-page__actions .release-page__listen-btn")).toBeVisible({
+    timeout: 10_000,
+  });
+  await page.locator(".release-page__actions .release-page__listen-btn").click();
   await expect(page.locator("#now-playing-player")).toBeVisible();
 
   await page.locator("#player-close").click();
@@ -79,8 +85,10 @@ test("player titlebar links back to the release being played", async ({ page }) 
   await page.locator(".music-card").first().locator("a.music-card__link").click();
   await expect(page).toHaveURL(/\/r\/\d+/, { timeout: 10_000 });
   const releaseUrl = page.url();
-  await expect(page.locator(".release-page__listen-btn")).toBeVisible({ timeout: 10_000 });
-  await page.locator(".release-page__listen-btn").click();
+  await expect(page.locator(".release-page__actions .release-page__listen-btn")).toBeVisible({
+    timeout: 10_000,
+  });
+  await page.locator(".release-page__actions .release-page__listen-btn").click();
   await expect(page.locator("#now-playing-player")).toBeVisible();
 
   // Leave the release, then use the titlebar to come back to it.
@@ -101,8 +109,10 @@ test("dragging the player titlebar does not navigate", async ({ page }) => {
 
   await page.locator(".music-card").first().locator("a.music-card__link").click();
   await expect(page).toHaveURL(/\/r\/\d+/, { timeout: 10_000 });
-  await expect(page.locator(".release-page__listen-btn")).toBeVisible({ timeout: 10_000 });
-  await page.locator(".release-page__listen-btn").click();
+  await expect(page.locator(".release-page__actions .release-page__listen-btn")).toBeVisible({
+    timeout: 10_000,
+  });
+  await page.locator(".release-page__actions .release-page__listen-btn").click();
   await expect(page.locator("#now-playing-player")).toBeVisible();
 
   await page.locator("a[href='/']").first().click();

@@ -67,3 +67,24 @@ export function linkService(
   if (sourceName && KNOWN_SOURCES.has(sourceName)) return sourceName as SourceName;
   return serviceFromUrl(url);
 }
+
+const DISPLAY_NAMES: Record<SourceName, string> = {
+  bandcamp: "Bandcamp",
+  spotify: "Spotify",
+  soundcloud: "SoundCloud",
+  youtube: "YouTube",
+  apple_music: "Apple Music",
+  discogs: "Discogs",
+  tidal: "Tidal",
+  deezer: "Deezer",
+  mixcloud: "Mixcloud",
+  nts: "NTS",
+  pitchfork: "Pitchfork",
+  physical: "Physical",
+  unknown: "Link",
+};
+
+/** The name shown for a link's service, e.g. "Apple Music" for apple_music. */
+export function sourceDisplayName(source: SourceName): string {
+  return DISPLAY_NAMES[source] ?? source;
+}
