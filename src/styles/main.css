@@ -3913,7 +3913,7 @@ a:hover {
 }
 
 .settings__badge {
-  font-family: var(--font-body);
+  font-family: var(--font-mono);
   font-size: var(--text-2xs);
   font-weight: bold;
   text-transform: uppercase;
