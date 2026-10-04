@@ -2,16 +2,16 @@
   import { goto, invalidateAll } from "$app/navigation";
   import { onMount } from "svelte";
   import type { PageData } from "../../routes/r/[id]/$types";
-  import type { AppleMusicListen, ListenEmbed } from "../../routes/r/[id]/+page.server";
-  import type { ItemSuggestion, ListenStatus } from "../../../domain/types";
-  import { parseAppleMusicCatalogUrl } from "../../../domain/apple-music";
+  import type { ListenEmbed } from "../../routes/r/[id]/+page.server";
+  import type { ItemSuggestion, ListenStatus, SourceName } from "../../../domain/types";
+  import { parseAppleMusicCatalogUrl, type AppleMusicResource } from "../../../domain/apple-music";
   import { api, apiFetch } from "../api";
   import { encodeImageFile } from "../encode-image";
   import { player } from "../player.svelte";
   import ServiceIcon from "./ServiceIcon.svelte";
   import StarRating from "./StarRating.svelte";
   import SuggestionPickerModal from "./SuggestionPickerModal.svelte";
-  import { linkService } from "../../ui/logic/link-service";
+  import { linkService, sourceDisplayName } from "../../ui/logic/link-service";
 
   // The page wraps this component in {#key item.id}, so all state below is
   // (re)initialised per release — the same lifecycle as the old full-page SSR.
@@ -94,60 +94,109 @@
     }
   }
 
-  // ── Listen buttons ─────────────────────────────────────────────────────────
-  // On touch devices the floating player window doesn't suit the screen, so the
-  // buttons hand off to the service's own site instead. listenWord reads this
-  // same flag so the words never claim in-page playback that isn't going to
-  // happen. Set after mount (not at init) to keep SSR and hydration in sync.
+  // ── Listen here ────────────────────────────────────────────────────────────
+  // "listen here" plays the release in the internal player. On touch devices
+  // the floating player window doesn't suit the screen, so the button (and the
+  // clickable artwork) don't render at all — the external links below are all
+  // a phone gets. Set after mount (not at init) to keep SSR and hydration in
+  // sync.
   let coarsePointer = $state(false);
   onMount(() => {
     coarsePointer = window.matchMedia("(pointer: coarse)").matches;
   });
 
   function listen(embed: ListenEmbed): void {
-    if (coarsePointer && embed.href) {
-      window.open(embed.href, "_blank", "noopener,noreferrer");
-    } else {
-      player.load(embed.src, item.title, item.artist_name ?? "", embed.playerType, item.id);
-    }
+    player.load(embed.src, item.title, item.artist_name ?? "", embed.playerType, item.id);
   }
 
-  // Full-track Apple Music playback (MusicKit) when configured, else the preview
-  // iframe. On touch devices, hand off to the native Apple Music app/site — the
-  // same behaviour the other listen buttons use for coarse pointers.
-  function listenAppleMusic(listenTarget: AppleMusicListen): void {
-    if (listenTarget.mode === "musickit" && listenTarget.resource && !coarsePointer) {
-      player.loadAppleMusic(
-        listenTarget.resource.kind,
-        listenTarget.resource.id,
-        item.title,
-        item.artist_name ?? "",
-        item.id,
-      );
-      return;
-    }
-    if (coarsePointer) {
-      window.open(listenTarget.href, "_blank", "noopener,noreferrer");
-      return;
-    }
-    // Unconfigured (preview) fallback.
-    if (listenTarget.src) {
-      player.load(listenTarget.src, item.title, item.artist_name ?? "", "audio", item.id);
-    } else {
-      window.open(listenTarget.href, "_blank", "noopener,noreferrer");
-    }
-  }
+  // The one source that wins the "listen here" button, by priority: the lookup
+  // streaming service when it can genuinely play in-app (Apple Music full-track
+  // via MusicKit — the store's own link first, then the on-view lookup), then
+  // the item's full-length embeds, and the 30-second Apple Music preview only
+  // when nothing better exists. Nothing playable at all means no button.
+  type HereTarget = {
+    key: string;
+    service: string;
+    href?: string;
+    src?: string;
+    playerType?: "audio" | "video";
+    amMode?: string;
+    play: () => void;
+  };
 
-  // Play a client-discovered Apple Music secondary link (the on-view lookup)
-  // through MusicKit when it resolves to a playable catalogue resource.
-  function listenLookupAppleMusic(url: string): void {
-    const resource = parseAppleMusicCatalogUrl(url);
-    if (resource && !coarsePointer) {
-      player.loadAppleMusic(resource.kind, resource.id, item.title, item.artist_name ?? "", item.id);
-    } else {
-      window.open(url, "_blank", "noopener,noreferrer");
+  const hereTarget = $derived.by<HereTarget | null>(() => {
+    const playAppleMusic = (kind: AppleMusicResource["kind"], id: string): void => {
+      player.loadAppleMusic(kind, id, item.title, item.artist_name ?? "", item.id);
+    };
+
+    const appleMusic = data.appleMusicListen;
+    if (appleMusic && appleMusic.mode === "musickit" && appleMusic.resource) {
+      const resource = appleMusic.resource;
+      return {
+        key: "apple-music",
+        service: "Apple Music",
+        href: appleMusic.href,
+        amMode: "musickit",
+        play: () => playAppleMusic(resource.kind, resource.id),
+      };
     }
-  }
+    const lookup = lookupLink;
+    if (lookup && lookupIsPlayableAppleMusic) {
+      const resource = parseAppleMusicCatalogUrl(lookup.url)!;
+      return {
+        key: "apple-music-lookup",
+        service: "Apple Music",
+        href: lookup.url,
+        amMode: "musickit",
+        play: () => playAppleMusic(resource.kind, resource.id),
+      };
+    }
+    const bandcamp = data.bandcampEmbed;
+    if (bandcamp) {
+      return {
+        key: "bandcamp",
+        service: "Bandcamp",
+        href: bandcamp.href ?? undefined,
+        src: bandcamp.src,
+        playerType: bandcamp.playerType,
+        play: () => listen(bandcamp),
+      };
+    }
+    const youtube = data.youtubeEmbed;
+    if (youtube) {
+      return {
+        key: "youtube",
+        service: "YouTube",
+        href: youtube.href ?? undefined,
+        src: youtube.src,
+        playerType: youtube.playerType,
+        play: () => listen(youtube),
+      };
+    }
+    const soundcloud = data.soundcloudEmbed;
+    if (soundcloud) {
+      return {
+        key: "soundcloud",
+        service: "SoundCloud",
+        href: soundcloud.href ?? undefined,
+        src: soundcloud.src,
+        playerType: soundcloud.playerType,
+        play: () => listen(soundcloud),
+      };
+    }
+    if (appleMusic?.src) {
+      return {
+        key: "apple-music-preview",
+        service: "Apple Music",
+        href: appleMusic.href,
+        src: appleMusic.src,
+        playerType: "audio",
+        amMode: "preview",
+        play: () => listen({ src: appleMusic.src!, href: appleMusic.href, playerType: "audio" }),
+      };
+    }
+    return null;
+  });
 
   // ── Edit mode ──────────────────────────────────────────────────────────────
   let editMode = $state(false);
@@ -404,109 +453,44 @@
   // the pair as one line for the same reason.
   const labelLine = $derived([item.label, item.catalogue_number].filter(Boolean).join(" · "));
 
-  // ── The listen row ─────────────────────────────────────────────────────────
-  // The play controls read as one sentence — "listen: here there" — instead of
-  // as a rank of service names; the service each word hides behind is in its
-  // tooltip and its accessible name. The joke only has two words in it, so a
-  // third option onwards is named plainly. Touch devices get plain names for
-  // every option: their buttons open the service's own site, so "here" would
-  // promise the in-page player and not deliver it.
-  type ListenTarget = {
+  // The "there" list: every way to reach this release away from the page,
+  // named plainly — the source it came from, the streaming-service lookup when
+  // it can't play in-app, and each hand-added link. The destination "listen
+  // here" is using is left out (it's already playing here), and a URL that
+  // shows up twice appears once.
+  type ExternalLink = {
     key: string;
-    service: string;
-    href?: string;
-    src?: string;
-    playerType?: "audio" | "video";
-    amMode?: string;
-    apple?: boolean;
-    play: () => void;
+    href: string;
+    label: string;
+    service: SourceName;
   };
 
-  const listenTargets = $derived.by<ListenTarget[]>(() => {
-    const targets: ListenTarget[] = [];
-    const bandcamp = data.bandcampEmbed;
-    if (bandcamp) {
-      targets.push({
-        key: "bandcamp",
-        service: "Bandcamp",
-        href: bandcamp.href ?? undefined,
-        src: bandcamp.src,
-        playerType: bandcamp.playerType,
-        play: () => listen(bandcamp),
-      });
+  const externalLinks = $derived.by<ExternalLink[]>(() => {
+    const links: ExternalLink[] = [];
+    const seen = new Set(hereTarget?.href ? [hereTarget.href] : []);
+    const push = (
+      key: string,
+      href: string | null | undefined,
+      label: string,
+      service: SourceName,
+    ): void => {
+      if (!href || seen.has(href)) return;
+      seen.add(href);
+      links.push({ key, href, label, service });
+    };
+
+    if (data.sourceLink) {
+      push("primary", data.sourceLink.href, data.sourceLink.label, data.sourceLink.source);
     }
-    const youtube = data.youtubeEmbed;
-    if (youtube) {
-      targets.push({
-        key: "youtube",
-        service: "YouTube",
-        href: youtube.href ?? undefined,
-        src: youtube.src,
-        playerType: youtube.playerType,
-        play: () => listen(youtube),
-      });
+    if (lookupLink && !lookupIsPlayableAppleMusic) {
+      push("lookup", lookupLink.url, lookupLink.label, linkService(lookupLink.url));
     }
-    const soundcloud = data.soundcloudEmbed;
-    if (soundcloud) {
-      targets.push({
-        key: "soundcloud",
-        service: "SoundCloud",
-        href: soundcloud.href ?? undefined,
-        src: soundcloud.src,
-        playerType: soundcloud.playerType,
-        play: () => listen(soundcloud),
-      });
+    for (const link of secondaryLinks) {
+      const service = linkService(link.url, link.source_name);
+      push(`link-${link.id}`, link.url, link.display_name || sourceDisplayName(service), service);
     }
-    const appleMusic = data.appleMusicListen;
-    if (appleMusic) {
-      targets.push({
-        key: "apple-music",
-        service: "Apple Music",
-        href: appleMusic.href,
-        amMode: appleMusic.mode,
-        apple: true,
-        play: () => listenAppleMusic(appleMusic),
-      });
-    }
-    const lookup = lookupLink;
-    if (lookup && lookupIsPlayableAppleMusic) {
-      targets.push({
-        key: "apple-music-lookup",
-        service: "Apple Music",
-        amMode: "musickit",
-        apple: true,
-        play: () => listenLookupAppleMusic(lookup.url),
-      });
-    }
-    return targets;
+    return links;
   });
-
-  /** "here" and "there", then the service's own name once the words run out —
-   *  or the service's name straight away on touch devices, where the button
-   *  leaves the page rather than playing here. */
-  function listenWord(index: number, service: string): string {
-    if (coarsePointer) return service;
-    return index === 0 ? "here" : index === 1 ? "there" : service;
-  }
-
-  // The primary-source link (e.g. "Spotify", "Discogs") is a plain external
-  // link. Hide it when a play button already targets the same URL — otherwise
-  // it just duplicates that button (e.g. the YouTube word in the listen row
-  // already links to the same YouTube page).
-  const playHrefs = $derived(
-    new Set(
-      [
-        data.bandcampEmbed?.href,
-        data.youtubeEmbed?.href,
-        data.soundcloudEmbed?.href,
-        data.appleMusicListen?.href,
-      ].filter(
-        (href): href is string => !!href,
-      ),
-    ),
-  );
-
-  const showSourceLink = $derived(!!data.sourceLink && !playHrefs.has(data.sourceLink.href));
 </script>
 
 <svelte:head>
@@ -521,15 +505,12 @@
 
     <div class="release-page__body">
       {#if data.artworkUrl}
-        {#if data.youtubeEmbed}
+        {#if !coarsePointer && hereTarget}
           <button
             class="release-page__artwork-play release-page__listen-btn"
-            data-src={data.youtubeEmbed.src}
-            data-title={item.title}
-            data-artist={item.artist_name ?? ""}
-            data-player-type="video"
-            data-href={data.youtubeEmbed.href}
-            onclick={() => listen(data.youtubeEmbed!)}
+            title={hereTarget.service}
+            aria-label={`Listen on ${hereTarget.service}`}
+            onclick={hereTarget.play}
           >
             <img class="release-page__artwork" src={data.artworkUrl} alt="Artwork for {item.title}" />
           </button>
@@ -592,59 +573,31 @@
             }}
           />
           <div class="release-page__actions">
-            {#if listenTargets.length}
-              <span class="release-page__listen-label">listen:</span>
-            {/if}
-            {#each listenTargets as target, i (target.key)}
+            {#if !coarsePointer && hereTarget}
               <button
                 class="release-page__listen-btn"
-                class:release-page__listen-btn--apple={target.apple}
-                data-src={target.src}
+                data-src={hereTarget.src}
                 data-title={item.title}
                 data-artist={item.artist_name ?? ""}
-                data-player-type={target.playerType}
-                data-am-mode={target.amMode}
-                data-href={target.href}
-                title={target.service}
-                aria-label={`Listen on ${target.service}`}
-                onclick={target.play}>{listenWord(i, target.service)}</button
+                data-player-type={hereTarget.playerType}
+                data-am-mode={hereTarget.amMode}
+                data-href={hereTarget.href}
+                title={hereTarget.service}
+                aria-label={`Listen on ${hereTarget.service}`}
+                onclick={hereTarget.play}>listen here</button
               >
-            {/each}
-            {#if showSourceLink}
-              <a
-                class="release-page__link-btn"
-                href={data.sourceLink!.href}
-                target="_blank"
-                rel="noopener noreferrer"
-                title={data.sourceLink!.label}
-                aria-label={data.sourceLink!.label}
-              >
-                <ServiceIcon service={data.sourceLink!.source} />
-              </a>
             {/if}
-            {#if lookupLink && !lookupIsPlayableAppleMusic}
+            {#each externalLinks as link (link.key)}
               <a
                 class="release-page__link-btn"
-                href={lookupLink.url}
+                href={link.href}
                 target="_blank"
                 rel="noopener noreferrer"
-                title={lookupLink.label}
-                aria-label={lookupLink.label}
+                title={link.label}
+                aria-label={link.label}
               >
-                <ServiceIcon service={linkService(lookupLink.url)} />
-              </a>
-            {/if}
-            {#each secondaryLinks as link (link.id)}
-              {@const label = link.display_name ?? link.source_name ?? "Link"}
-              <a
-                class="release-page__link-btn"
-                href={link.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                title={label}
-                aria-label={label}
-              >
-                <ServiceIcon service={linkService(link.url, link.source_name)} />
+                <ServiceIcon service={link.service} />
+                {link.label}
               </a>
             {/each}
           </div>

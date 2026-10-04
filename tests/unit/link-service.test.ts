@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { linkService, serviceFromUrl } from "../../src/ui/logic/link-service";
+import { linkService, serviceFromUrl, sourceDisplayName } from "../../src/ui/logic/link-service";
 
 describe("serviceFromUrl", () => {
   test("recognises the services a release can link to", () => {
@@ -50,5 +50,15 @@ describe("linkService", () => {
     expect(linkService("https://open.spotify.com/album/1234", "unknown")).toBe("spotify");
     expect(linkService("https://open.spotify.com/album/1234", null)).toBe("spotify");
     expect(linkService("https://open.spotify.com/album/1234", "some-new-source")).toBe("spotify");
+  });
+});
+
+describe("sourceDisplayName", () => {
+  test("reads as the service spells itself", () => {
+    expect(sourceDisplayName("apple_music")).toBe("Apple Music");
+    expect(sourceDisplayName("soundcloud")).toBe("SoundCloud");
+    expect(sourceDisplayName("youtube")).toBe("YouTube");
+    expect(sourceDisplayName("nts")).toBe("NTS");
+    expect(sourceDisplayName("bandcamp")).toBe("Bandcamp");
   });
 });

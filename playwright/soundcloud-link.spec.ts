@@ -34,10 +34,13 @@ test("a SoundCloud link plays in the embedded player", async ({ page }) => {
   });
   await page.locator("#cancel-btn").click();
 
-  // The scrape stored the track's urn, so the listen word carries the widget
-  // URL and stands in for the plain source link — nothing else in the actions
-  // row should point at the SoundCloud page.
-  const listen = page.getByRole("button", { name: "Listen on SoundCloud" });
+  // The scrape stored the track's urn, so "listen here" carries the widget
+  // URL, and the SoundCloud page stays out of the "there" list — the release
+  // is already playing here, so nothing else in the actions row should point
+  // at it.
+  const listen = page
+    .locator(".release-page__actions")
+    .getByRole("button", { name: "Listen on SoundCloud" });
   await expect(listen).toHaveCount(1, { timeout: 15_000 });
   await expect(listen).toHaveAttribute("data-src", WIDGET_SRC);
   await expect(listen).toHaveAttribute("data-href", SOUNDCLOUD_URL);
