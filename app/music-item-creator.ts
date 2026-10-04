@@ -279,6 +279,9 @@ async function insertMusicItemWithLink(
       resolutionStatus: overrides?.resolutionStatus ?? null,
       resolutionAttemptedAt:
         overrides?.musicbrainzReleaseId || overrides?.discogsReleaseId ? new Date() : null,
+      // Everything through this function came in as a URL, so "link" is the
+      // honest default; the email ingest overrides it with "email".
+      origin: overrides?.origin ?? "link",
       remindAt,
     })
     .returning({ id: musicItems.id });

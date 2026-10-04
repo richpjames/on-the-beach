@@ -75,6 +75,7 @@ export async function seedPreviewData(): Promise<void> {
         remindAt: item.remindAt ?? null,
         genre: item.genre ?? null,
         year: item.year ?? null,
+        origin: "seed",
       })),
     )
     .returning({ id: musicItems.id });

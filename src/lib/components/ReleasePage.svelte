@@ -3,7 +3,7 @@
   import { onMount } from "svelte";
   import type { PageData } from "../../routes/r/[id]/$types";
   import type { ListenEmbed } from "../../routes/r/[id]/+page.server";
-  import type { ItemSuggestion, ListenStatus, SourceName } from "../../../domain/types";
+  import type { ItemOrigin, ItemSuggestion, ListenStatus, SourceName } from "../../../domain/types";
   import { parseAppleMusicCatalogUrl, type AppleMusicResource } from "../../../domain/apple-music";
   import { api, apiFetch } from "../api";
   import { encodeImageFile } from "../encode-image";
@@ -453,6 +453,22 @@
   // the pair as one line for the same reason.
   const labelLine = $derived([item.label, item.catalogue_number].filter(Boolean).join(" · "));
 
+  // How the release entered the list, stamped by the server on the way in.
+  // Shown as a line of provenance under the label; hidden for `unknown` — the
+  // default on rows that predate the stamp — because "added somehow" says
+  // nothing worth a line.
+  const originLabels: Record<ItemOrigin, string> = {
+    manual: "Added by hand",
+    link: "Added from a link",
+    email: "Added via email",
+    photo: "Added from a photo",
+    alert: "From a new-release alert",
+    suggestion: "From a suggestion",
+    seed: "Demo data",
+    unknown: "",
+  };
+  const originLine = $derived(originLabels[item.origin] || null);
+
   // The "there" list: every way to reach this release away from the page,
   // named plainly — the source it came from, the streaming-service lookup when
   // it can't play in-app, and each hand-added link. The destination "listen
@@ -530,6 +546,9 @@
           {/if}
           {#if labelLine}
             <p class="release-page__label">{labelLine}</p>
+          {/if}
+          {#if originLine}
+            <p class="release-page__origin">{originLine}</p>
           {/if}
           <div class="release-page__notes-section">
             {#if notesState === "editing" || notesState === "saving"}

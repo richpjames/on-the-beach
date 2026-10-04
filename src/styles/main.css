@@ -3075,6 +3075,14 @@ a:hover {
   font-size: var(--text-base);
 }
 
+/* Provenance: how the release entered the list ("Added via email"). Kept in
+   the same voice as the meta and label lines — a quiet grey fact, not a badge. */
+.release-page__origin {
+  color: var(--chrome-darker);
+  font-size: var(--text-base);
+  font-style: italic;
+}
+
 .release-page__notes {
   color: var(--chrome-black);
   font-size: var(--text-md);

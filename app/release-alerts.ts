@@ -449,6 +449,7 @@ export async function acceptAlert(
         itemType: itemTypeForReleaseGroup(alert.primaryType),
         listenStatus: "to-listen",
         year: alert.firstReleaseYear ?? undefined,
+        origin: "alert",
       },
       // Nothing to gain from the eager background lookup in either case: the
       // gate has just asked the provider and its answer is written below, or

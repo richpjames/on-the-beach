@@ -44,6 +44,7 @@ export function fullItemSelect() {
       primary_link_metadata: musicLinks.metadata,
       remind_at: musicItems.remindAt,
       reminder_pending: musicItems.reminderPending,
+      origin: musicItems.origin,
     })
     .from(musicItems)
     .leftJoin(artists, eq(musicItems.artistId, artists.id))

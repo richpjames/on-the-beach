@@ -114,6 +114,13 @@ export const musicItems = sqliteTable(
     lookupAttemptedAt: integer("apple_music_lookup_at", { mode: "timestamp" }),
     remindAt: integer("remind_at", { mode: "timestamp" }),
     reminderPending: integer("reminder_pending", { mode: "boolean" }).notNull().default(false),
+    // How the item entered the list: 'manual' | 'link' | 'email' | 'photo' |
+    // 'alert' | 'suggestion' | 'seed' | 'unknown'. Stamped by the route that
+    // handled the entry, never by the client; 'unknown' is the default for rows
+    // that predate the column. Plain text, no CHECK — a future value (an
+    // artist-watch automated add, say) is a one-line addition, and the human
+    // detail of provenance stays in `notes`.
+    origin: text("origin").notNull().default("unknown"),
   },
   (table) => [
     index("idx_music_items_listen_status").on(table.listenStatus),

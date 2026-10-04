@@ -120,6 +120,13 @@
       "when": 1788161174188,
       "tag": "0016_great_sandman",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "6",
+      "when": 1791135998491,
+      "tag": "0017_pink_wiccan",
+      "breakpoints": true
     }
   ]
 }

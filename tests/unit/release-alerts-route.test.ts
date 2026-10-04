@@ -265,6 +265,7 @@ describe("POST /api/release-alerts/:id/add", () => {
 
     const body = await res.json();
     expect(body.item.title).toBe("Accepted Record");
+    expect(body.item.origin).toBe("alert");
     // Already out, so nothing to schedule.
     expect(body.remindAt).toBeNull();
 

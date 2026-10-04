@@ -366,12 +366,19 @@ musicItemRoutes.post("/", async (c) => {
       forceDuplicate: input.forceDuplicate === true,
     };
     let result;
+    // Origin is a system stamp: the route decides it from how the item is
+    // arriving — a pasted URL or a hand-typed form — overwriting whatever the
+    // request body claimed.
     if (input.url && isValidUrl(input.url)) {
-      result = await createMusicItemFromUrl(input.url, input, duplicateCheck);
+      result = await createMusicItemFromUrl(
+        input.url,
+        { ...input, origin: "link" },
+        duplicateCheck,
+      );
     } else if (input.url) {
       return c.json({ error: "Invalid URL" }, 400);
     } else {
-      result = await createMusicItemDirect(input, duplicateCheck);
+      result = await createMusicItemDirect({ ...input, origin: "manual" }, duplicateCheck);
     }
     // Newly added non-Apple-Music releases get an Apple Music link backfilled in
     // the background, so a playable secondary link is ready by the time the
@@ -600,6 +607,7 @@ musicItemRoutes.post("/:id/suggestion/accept", async (c) => {
         listenStatus: "to-listen",
         year: suggestion.year ?? undefined,
         musicbrainzReleaseId: suggestion.musicbrainzReleaseId ?? undefined,
+        origin: "suggestion",
       });
       created.push(result.item);
     } catch (err) {

@@ -932,6 +932,7 @@ describe("POST /api/ingest/email", () => {
     expect(body.items[0].title).toBe("Cool Release");
     expect(mockCreateMany).toHaveBeenCalledWith("https://artist.bandcamp.com/album/cool-album", {
       notes: "Via email from noreply@bandcamp.com",
+      origin: "email",
     });
   });
 
@@ -1208,6 +1209,7 @@ describe("POST /api/ingest/photo", () => {
         label: "Warp",
         country: "GB",
         catalogueNumber: "WARP101",
+        origin: "photo",
       }),
     );
   });
