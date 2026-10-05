@@ -95,16 +95,7 @@
   }
 
   // ── Listen here ────────────────────────────────────────────────────────────
-  // "listen here" plays the release in the internal player. On touch devices
-  // the floating player window doesn't suit the screen, so the button (and the
-  // clickable artwork) don't render at all — the external links below are all
-  // a phone gets. Set after mount (not at init) to keep SSR and hydration in
-  // sync.
-  let coarsePointer = $state(false);
-  onMount(() => {
-    coarsePointer = window.matchMedia("(pointer: coarse)").matches;
-  });
-
+  // "listen here" plays the release in the internal player.
   function listen(embed: ListenEmbed): void {
     player.load(embed.src, item.title, item.artist_name ?? "", embed.playerType, item.id);
   }
@@ -521,7 +512,7 @@
 
     <div class="release-page__body">
       {#if data.artworkUrl}
-        {#if !coarsePointer && hereTarget}
+        {#if hereTarget}
           <button
             class="release-page__artwork-play release-page__listen-btn"
             title={hereTarget.service}
@@ -592,7 +583,7 @@
             }}
           />
           <div class="release-page__actions">
-            {#if !coarsePointer && hereTarget}
+            {#if hereTarget}
               <button
                 class="release-page__listen-btn"
                 data-src={hereTarget.src}
