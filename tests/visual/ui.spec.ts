@@ -181,15 +181,10 @@ test("captures the listen row", async ({ page, request }) => {
   await expect(row).toBeVisible();
   await expect(row.getByText("Pitchfork")).toBeVisible();
 
-  // The play button exists only where the internal player does. On the mobile
-  // project's coarse pointer it vanishes once the page mounts, so that wait is
-  // also the hydration bar before the screenshot.
+  // "listen here" renders wherever something can play, phones included — the
+  // wait doubles as the stability bar before the screenshot.
   const listenButton = row.locator(".release-page__listen-btn");
-  if (test.info().project.name === "visual-mobile") {
-    await expect(listenButton).toBeHidden();
-  } else {
-    await expect(listenButton).toBeVisible();
-  }
+  await expect(listenButton).toBeVisible();
 
   await captureSnapshot(row, "release-page-listen-row", page);
 });
