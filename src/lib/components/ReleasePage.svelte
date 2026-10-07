@@ -95,7 +95,16 @@
   }
 
   // ── Listen here ────────────────────────────────────────────────────────────
-  // "listen here" plays the release in the internal player.
+  // "listen here" plays the release in the internal player. On touch devices
+  // the floating player window doesn't suit the screen, so the button (and the
+  // clickable artwork) don't render at all — instead this destination becomes
+  // the first of the external links below, which are all a phone gets. Set
+  // after mount (not at init) to keep SSR and hydration in sync.
+  let coarsePointer = $state(false);
+  onMount(() => {
+    coarsePointer = window.matchMedia("(pointer: coarse)").matches;
+  });
+
   function listen(embed: ListenEmbed): void {
     player.load(embed.src, item.title, item.artist_name ?? "", embed.playerType, item.id);
   }
@@ -108,6 +117,7 @@
   type HereTarget = {
     key: string;
     service: string;
+    source: SourceName;
     href?: string;
     src?: string;
     playerType?: "audio" | "video";
@@ -126,6 +136,7 @@
       return {
         key: "apple-music",
         service: "Apple Music",
+        source: "apple_music",
         href: appleMusic.href,
         amMode: "musickit",
         play: () => playAppleMusic(resource.kind, resource.id),
@@ -137,6 +148,7 @@
       return {
         key: "apple-music-lookup",
         service: "Apple Music",
+        source: "apple_music",
         href: lookup.url,
         amMode: "musickit",
         play: () => playAppleMusic(resource.kind, resource.id),
@@ -147,6 +159,7 @@
       return {
         key: "bandcamp",
         service: "Bandcamp",
+        source: "bandcamp",
         href: bandcamp.href ?? undefined,
         src: bandcamp.src,
         playerType: bandcamp.playerType,
@@ -158,6 +171,7 @@
       return {
         key: "youtube",
         service: "YouTube",
+        source: "youtube",
         href: youtube.href ?? undefined,
         src: youtube.src,
         playerType: youtube.playerType,
@@ -169,6 +183,7 @@
       return {
         key: "soundcloud",
         service: "SoundCloud",
+        source: "soundcloud",
         href: soundcloud.href ?? undefined,
         src: soundcloud.src,
         playerType: soundcloud.playerType,
@@ -179,6 +194,7 @@
       return {
         key: "apple-music-preview",
         service: "Apple Music",
+        source: "apple_music",
         href: appleMusic.href,
         src: appleMusic.src,
         playerType: "audio",
@@ -463,8 +479,10 @@
   // The "there" list: every way to reach this release away from the page,
   // named plainly — the source it came from, the streaming-service lookup when
   // it can't play in-app, and each hand-added link. The destination "listen
-  // here" is using is left out (it's already playing here), and a URL that
-  // shows up twice appears once.
+  // here" is using is left out (it's already playing here) — except on touch
+  // devices, where no "listen here" renders, so its destination leads the list
+  // instead of vanishing with the button. A URL that shows up twice appears
+  // once.
   type ExternalLink = {
     key: string;
     href: string;
@@ -474,7 +492,7 @@
 
   const externalLinks = $derived.by<ExternalLink[]>(() => {
     const links: ExternalLink[] = [];
-    const seen = new Set(hereTarget?.href ? [hereTarget.href] : []);
+    const seen = new Set<string>();
     const push = (
       key: string,
       href: string | null | undefined,
@@ -485,6 +503,12 @@
       seen.add(href);
       links.push({ key, href, label, service });
     };
+
+    if (coarsePointer && hereTarget?.href) {
+      push("listen-here", hereTarget.href, hereTarget.service, hereTarget.source);
+    } else if (hereTarget?.href) {
+      seen.add(hereTarget.href);
+    }
 
     if (data.sourceLink) {
       push("primary", data.sourceLink.href, data.sourceLink.label, data.sourceLink.source);
@@ -512,7 +536,7 @@
 
     <div class="release-page__body">
       {#if data.artworkUrl}
-        {#if hereTarget}
+        {#if !coarsePointer && hereTarget}
           <button
             class="release-page__artwork-play release-page__listen-btn"
             title={hereTarget.service}
@@ -583,7 +607,7 @@
             }}
           />
           <div class="release-page__actions">
-            {#if hereTarget}
+            {#if !coarsePointer && hereTarget}
               <button
                 class="release-page__listen-btn"
                 data-src={hereTarget.src}
