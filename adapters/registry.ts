@@ -12,6 +12,9 @@
  *    date (see `ScrapedMetadata.releaseDate`). Asking is what saves a page
  *    fetch: a client wanting nothing but the date has no reason to scrape a
  *    Spotify link that will never carry one.
+ * 4. `sourceNamesRealArtist` — whether the artist a link on the source names
+ *    is a real act, which the artist watch and the suggestion lookup both
+ *    depend on (see `NON_ARTIST_SOURCES`).
  *
  * Adding a source is a new folder plus an entry here — never an edit to a
  * shared file. Sources without a scrape of their own (Tidal, Deezer, physical)
@@ -169,4 +172,19 @@ export const SOURCE_SCRAPERS: Partial<Record<SourceName, SourceScrape>> = {
 /** Whether a source's pages state a release date worth scraping for. */
 export function sourceNamesReleaseDate(source: SourceName): boolean {
   return source === "bandcamp";
+}
+
+/**
+ * Sources where the "artist" on a link is a show or an uploader's handle
+ * rather than an act. A Mixcloud cloudcast is filed under the account that
+ * uploaded it and an NTS episode under its show, and those names — "andrew",
+ * "Steam Radio" — match strangers on MusicBrainz. Items from these sources
+ * are no evidence for the artist watch or the suggestion lookup: following a
+ * handle means watching whatever unrelated discography the name resolves to.
+ */
+export const NON_ARTIST_SOURCES: ReadonlySet<SourceName> = new Set(["mixcloud", "nts"]);
+
+/** Whether the artist a link on this source names is a real act. */
+export function sourceNamesRealArtist(source: SourceName): boolean {
+  return !NON_ARTIST_SOURCES.has(source);
 }
