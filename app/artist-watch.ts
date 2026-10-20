@@ -1,6 +1,14 @@
 import { and, asc, eq, inArray, isNull, isNotNull, or, lte, sql } from "drizzle-orm";
 import { db } from "../adapters/db/index";
-import { artistReleases, artists, musicItems, releaseAlerts } from "../adapters/db/schema";
+import {
+  artistReleases,
+  artists,
+  musicItems,
+  musicLinks,
+  releaseAlerts,
+  sources,
+} from "../adapters/db/schema";
+import { NON_ARTIST_SOURCES } from "../adapters/registry";
 import {
   fetchArtistReleaseGroups,
   MusicBrainzHttpError,
@@ -162,6 +170,15 @@ export interface TrackedArtistRow {
  * precisely because you haven't formed that opinion yet. Listening is the
  * signal, and this predicate is the one place to widen it.
  *
+ * Except that not every listen is evidence either. A Mixcloud show or an NTS
+ * episode is filed under an uploader or a show name — a handle, not an act —
+ * and listening to one says nothing about wanting "their" releases: run it
+ * through MusicBrainz and the name resolves to a stranger whose discography
+ * then alerts forever. A listened item only vouches for an artist when its
+ * primary link isn't on one of those sources (see `NON_ARTIST_SOURCES`); an
+ * item with no link at all — hand-typed, emailed, scanned — still counts,
+ * because somebody wrote that artist's name down on purpose.
+ *
  * With `min_artist_rating` set, the auto rule also demands a release rated at
  * or above the bar — having merely listened stops being enough. The rated item
  * needn't be the listened one; any release good enough to earn the rating
@@ -169,10 +186,22 @@ export interface TrackedArtistRow {
  * bar, exactly as it bypasses the listened-item rule.
  */
 function trackedArtistPredicate(minArtistRating: number) {
+  const curatorPrimaryLink = sql`EXISTS (
+    SELECT 1 FROM ${musicLinks}
+    INNER JOIN ${sources} ON ${sources.id} = ${musicLinks.sourceId}
+    WHERE ${musicLinks.musicItemId} = ${musicItems.id}
+      AND ${musicLinks.isPrimary}
+      AND ${sources.name} IN (${sql.join(
+        [...NON_ARTIST_SOURCES].map((name) => sql`${name}`),
+        sql`, `,
+      )})
+  )`;
+
   const hasListenedItem = sql`EXISTS (
     SELECT 1 FROM ${musicItems}
     WHERE ${musicItems.artistId} = ${artists.id}
       AND ${musicItems.listenStatus} = 'listened'
+      AND NOT ${curatorPrimaryLink}
   )`;
 
   const hasQualifyingRating = sql`EXISTS (

@@ -127,6 +127,13 @@
       "when": 1791135998491,
       "tag": "0017_pink_wiccan",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "6",
+      "when": 1792508723077,
+      "tag": "0018_unfollow_curator_sources",
+      "breakpoints": true
     }
   ]
 }

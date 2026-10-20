@@ -34,7 +34,7 @@ As of 2026-08-28 the codebase is split by **role** at the top level (`domain/`, 
 - `ports/` — contracts the layers meet at (e.g. `ServiceSearch`). Types only, imports nothing (enforced).
 - `app/` — the use cases: item creation, reminders, suggestions, scraping orchestration, plus `app/queries/`. May import `domain/`, `ports/` and `adapters/`; never `server/` or `src/` (enforced).
 - `adapters/` — one folder per outside thing a source lives behind (`apple-music/`, `discogs/`, `musicbrainz/`, …) plus `db/`, `web/` and `mistral/`. May import `domain/`, `ports/` and each other; never `server/`, `src/` or `app/` (enforced).
-- `adapters/registry.ts` — where a source is wired in: URL classification, the scrape map, and the release-date capability flag.
+- `adapters/registry.ts` — where a source is wired in: URL classification, the scrape map, the release-date capability flag, and the real-artist flag (`NON_ARTIST_SOURCES` — sources, like Mixcloud and NTS, whose "artist" is a show or an uploader's handle rather than an act; the artist watch and suggestions discount their items).
 - `server/` — the HTTP host (Hono routes, uploads, CSRF) and nothing else.
 - `src/` — the SvelteKit app, the other driving adapter.
 
