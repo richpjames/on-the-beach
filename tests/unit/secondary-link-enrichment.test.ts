@@ -3,9 +3,11 @@ import {
   enrichSecondaryLink,
   enrichSecondaryLinkInBackground,
   lookupSecondaryLinkForItem,
+  pickBandcampReleaseUrl,
   type ItemInfoForLookup,
   type SecondaryLookupDeps,
 } from "../../app/secondary-link-enrichment";
+import type { MbUrlRelation } from "../../adapters/musicbrainz/index";
 import type { LookupService } from "../../app/settings";
 
 const getService = mock();
@@ -13,6 +15,7 @@ const fetchItem = mock();
 const getExisting = mock();
 const search = mock();
 const searchFallback = mock();
+const findBandcampLink = mock();
 const save = mock();
 const saveArtwork = mock();
 const stamp = mock();
@@ -23,6 +26,7 @@ const deps: SecondaryLookupDeps = {
   getExisting,
   search,
   searchFallback,
+  findBandcampLink,
   save,
   saveArtwork,
   stamp,
@@ -36,6 +40,8 @@ function item(overrides: Partial<ItemInfoForLookup> = {}): ItemInfoForLookup {
     primaryUrl: null,
     artworkUrl: null,
     lookupAttemptedAt: null,
+    musicbrainzReleaseId: null,
+    musicbrainzReleaseGroupId: null,
     ...overrides,
   };
 }
@@ -51,12 +57,14 @@ beforeEach(() => {
   getExisting.mockReset();
   search.mockReset();
   searchFallback.mockReset();
+  findBandcampLink.mockReset();
   save.mockReset();
   saveArtwork.mockReset();
   stamp.mockReset();
   getService.mockResolvedValue("apple_music" as LookupService);
   getExisting.mockResolvedValue(null);
   searchFallback.mockResolvedValue(null);
+  findBandcampLink.mockResolvedValue(null);
   save.mockResolvedValue(undefined);
   saveArtwork.mockResolvedValue(undefined);
   stamp.mockResolvedValue(undefined);
@@ -287,6 +295,145 @@ describe("YouTube fallback", () => {
 
     expect(outcome).toMatchObject({ service: "spotify", url: video, via: "fallback" });
     expect(save).toHaveBeenCalledWith(8, video, "youtube");
+  });
+});
+
+describe("Bandcamp fallback", () => {
+  const bandcampUrl = "https://gavsborg.bandcamp.com/album/1-hour-service";
+
+  test("saves a Bandcamp hit when the active service has nothing, before YouTube", async () => {
+    fetchItem.mockResolvedValue(
+      item({ musicbrainzReleaseGroupId: "dc850e6a-81e5-4f34-bbcd-16349b4cc618" }),
+    );
+    search.mockResolvedValue(null);
+    findBandcampLink.mockResolvedValue(hit(bandcampUrl, "https://bandcamp/cover.jpg"));
+
+    const outcome = await lookupSecondaryLinkForItem(7, deps);
+
+    expect(outcome).toEqual({
+      kind: "result",
+      service: "apple_music",
+      serviceDisplayName: "Bandcamp",
+      url: bandcampUrl,
+      via: "fallback",
+    });
+    expect(findBandcampLink).toHaveBeenCalledWith(
+      expect.objectContaining({
+        musicbrainzReleaseGroupId: "dc850e6a-81e5-4f34-bbcd-16349b4cc618",
+      }),
+    );
+    expect(save).toHaveBeenCalledWith(7, bandcampUrl, "bandcamp");
+    expect(searchFallback).not.toHaveBeenCalled();
+    expect(stamp).toHaveBeenCalledWith(7);
+  });
+
+  test("a Bandcamp hit may fill the item's artwork — its cover is the release's own", async () => {
+    fetchItem.mockResolvedValue(item({ artworkUrl: null }));
+    search.mockResolvedValue(null);
+    findBandcampLink.mockResolvedValue(hit(bandcampUrl, "https://bandcamp/cover.jpg"));
+
+    await lookupSecondaryLinkForItem(7, deps);
+
+    expect(saveArtwork).toHaveBeenCalledWith(7, "https://bandcamp/cover.jpg");
+  });
+
+  test("does not overwrite artwork the item already has", async () => {
+    fetchItem.mockResolvedValue(item({ artworkUrl: "https://existing/cover.jpg" }));
+    search.mockResolvedValue(null);
+    findBandcampLink.mockResolvedValue(hit(bandcampUrl, "https://bandcamp/cover.jpg"));
+
+    await lookupSecondaryLinkForItem(7, deps);
+
+    expect(saveArtwork).not.toHaveBeenCalled();
+  });
+
+  test("saves the link even when the page carried no artwork", async () => {
+    fetchItem.mockResolvedValue(item());
+    search.mockResolvedValue(null);
+    findBandcampLink.mockResolvedValue(hit(bandcampUrl, null));
+
+    const outcome = await lookupSecondaryLinkForItem(7, deps);
+
+    expect(outcome).toMatchObject({ url: bandcampUrl, serviceDisplayName: "Bandcamp" });
+    expect(saveArtwork).not.toHaveBeenCalled();
+  });
+
+  test("skips Bandcamp for an item that is already a Bandcamp link", async () => {
+    fetchItem.mockResolvedValue(item({ primarySource: "bandcamp", primaryUrl: bandcampUrl }));
+    search.mockResolvedValue(null);
+
+    await lookupSecondaryLinkForItem(7, deps);
+
+    expect(findBandcampLink).not.toHaveBeenCalled();
+  });
+
+  test("skips Bandcamp when the item already carries a Bandcamp link", async () => {
+    fetchItem.mockResolvedValue(item());
+    search.mockResolvedValue(null);
+    getExisting.mockImplementation(async (_id: number, source: string) =>
+      source === "bandcamp" ? bandcampUrl : null,
+    );
+
+    await lookupSecondaryLinkForItem(7, deps);
+
+    expect(findBandcampLink).not.toHaveBeenCalled();
+  });
+
+  test("falls through to YouTube when MusicBrainz names no Bandcamp page", async () => {
+    const video = "https://www.youtube.com/watch?v=abc123";
+    fetchItem.mockResolvedValue(item());
+    search.mockResolvedValue(null);
+    findBandcampLink.mockResolvedValue(null);
+    searchFallback.mockResolvedValue(hit(video));
+
+    const outcome = await lookupSecondaryLinkForItem(7, deps);
+
+    expect(outcome).toMatchObject({ url: video, serviceDisplayName: "YouTube", via: "fallback" });
+    expect(save).toHaveBeenCalledWith(7, video, "youtube");
+  });
+
+  test("on a hit: never consults the Bandcamp fallback", async () => {
+    fetchItem.mockResolvedValue(item());
+    search.mockResolvedValue(hit("https://music.apple.com/gb/album/blue-lines/456"));
+
+    await lookupSecondaryLinkForItem(5, deps);
+
+    expect(findBandcampLink).not.toHaveBeenCalled();
+  });
+});
+
+describe("pickBandcampReleaseUrl", () => {
+  test("ranks a free-streaming relation above purchase for download", () => {
+    const relations: MbUrlRelation[] = [
+      { type: "purchase for download", url: "https://gavsborg.bandcamp.com/album/purchase-page" },
+      { type: "free streaming", url: "https://gavsborg.bandcamp.com/album/stream-page" },
+    ];
+    expect(pickBandcampReleaseUrl(relations)).toBe(
+      "https://gavsborg.bandcamp.com/album/stream-page",
+    );
+  });
+
+  test("ignores Bandcamp homepages — the artist's page is not this record", () => {
+    const relations: MbUrlRelation[] = [
+      { type: "discography", url: "https://gavsborg.bandcamp.com/music" },
+      { type: null, url: "https://gavsborg.bandcamp.com" },
+    ];
+    expect(pickBandcampReleaseUrl(relations)).toBeNull();
+  });
+
+  test("ignores non-Bandcamp relations", () => {
+    const relations: MbUrlRelation[] = [
+      { type: "free streaming", url: "https://open.spotify.com/album/xyz" },
+      { type: "purchase for download", url: "https://store.label.com/record" },
+    ];
+    expect(pickBandcampReleaseUrl(relations)).toBeNull();
+  });
+
+  test("accepts a track page when that is all the group carries", () => {
+    const relations: MbUrlRelation[] = [
+      { type: null, url: "https://gavsborg.bandcamp.com/track/one-song" },
+    ];
+    expect(pickBandcampReleaseUrl(relations)).toBe("https://gavsborg.bandcamp.com/track/one-song");
   });
 });
 

@@ -60,8 +60,9 @@ function toResult(resource: CatalogResource): ServiceSearchResult | null {
  * Search the Apple Music catalogue for a release by title and artist, returning
  * the best-matching catalogue URL together with its cover artwork, or null when
  * unconfigured, on error, or when nothing matches confidently. Mirrors the
- * three-pass matching used for the iTunes search (exact title+artist, compatible
- * title+artist, artist-only).
+ * two-pass matching used for the iTunes search (exact title+artist, compatible
+ * title+artist) — an artist-only match deliberately doesn't count, for the
+ * reasons the iTunes search's docstring spells out.
  */
 export async function searchAppleMusicCatalog(
   title: string,
@@ -137,13 +138,6 @@ export async function searchAppleMusicCatalog(
     for (const c of candidates) {
       const name = getString(c.attributes?.name);
       if (!name || !titlesCompatible(name)) continue;
-      if (!artistMatches(getString(c.attributes?.artistName))) continue;
-      const result = toResult(c);
-      if (result) return result;
-    }
-
-    // Pass 3: first artist-matching result (the query is already specific).
-    for (const c of candidates) {
       if (!artistMatches(getString(c.attributes?.artistName))) continue;
       const result = toResult(c);
       if (result) return result;

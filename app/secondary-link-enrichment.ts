@@ -6,6 +6,12 @@ import type { ServiceSearchResult } from "../ports/service-search";
 import { searchAppleMusic } from "../adapters/apple-music/index";
 import { searchSpotify } from "../adapters/spotify/index";
 import { searchYouTube } from "../adapters/youtube/index";
+import {
+  fetchReleaseGroupIdForRelease,
+  fetchReleaseGroupUrlRelations,
+  type MbUrlRelation,
+} from "../adapters/musicbrainz/index";
+import { scrapeBandcamp } from "../adapters/bandcamp/index";
 import { getLookupService, type LookupService } from "./settings";
 
 // ---------------------------------------------------------------------------
@@ -21,8 +27,12 @@ import { getLookupService, type LookupService } from "./settings";
 //   3. In bulk, via the one-off backfill script for pre-existing items.
 //
 // When the active service has no match — common for small-label and
-// out-of-print records — a second lookup runs against YouTube, which only
-// yields a link when the match is unambiguous (see server/youtube-search.ts).
+// out-of-print records — two fallbacks run in order. First the item's
+// MusicBrainz release group is checked for a Bandcamp page among its url
+// relations: editors attach those links to the release itself, so no fuzzy
+// matching is involved, and the page supplies the release's own cover art.
+// Then a YouTube search, which only yields a link when the match is
+// unambiguous (see server/youtube-search.ts).
 // ---------------------------------------------------------------------------
 
 export interface ServiceConfig {
@@ -55,6 +65,12 @@ export const FALLBACK_SERVICE = {
   displayName: "YouTube",
 } as const;
 
+/** The service consulted between the active one and the YouTube fallback. */
+export const BANDCAMP_FALLBACK_SERVICE = {
+  sourceName: "bandcamp",
+  displayName: "Bandcamp",
+} as const;
+
 export interface ItemInfoForLookup {
   title: string;
   artistName: string | null;
@@ -64,6 +80,12 @@ export interface ItemInfoForLookup {
   artworkUrl: string | null;
   /** Set once a lookup has been attempted (hit or miss); used to avoid re-querying. */
   lookupAttemptedAt: Date | null;
+  /**
+   * The item's MusicBrainz ids, when a suggestion or the resolver captured
+   * them — the Bandcamp fallback's way in to the release group's url relations.
+   */
+  musicbrainzReleaseId: string | null;
+  musicbrainzReleaseGroupId: string | null;
 }
 
 export type GetLookupServiceFn = () => Promise<LookupService>;
@@ -79,6 +101,8 @@ export type SearchFallbackFn = (
   title: string,
   artist: string | null,
 ) => Promise<ServiceSearchResult | null>;
+/** Resolves the release's Bandcamp page via its MusicBrainz release group. */
+export type FindBandcampLinkFn = (item: ItemInfoForLookup) => Promise<ServiceSearchResult | null>;
 export type SaveLinkFn = (itemId: number, url: string, sourceName: string) => Promise<void>;
 export type SaveArtworkFn = (itemId: number, artworkUrl: string) => Promise<void>;
 export type StampLookupFn = (itemId: number) => Promise<void>;
@@ -92,6 +116,8 @@ export async function fetchItemForLookup(id: number): Promise<ItemInfoForLookup 
       primaryUrl: musicLinks.url,
       artworkUrl: musicItems.artworkUrl,
       lookupAttemptedAt: musicItems.lookupAttemptedAt,
+      musicbrainzReleaseId: musicItems.musicbrainzReleaseId,
+      musicbrainzReleaseGroupId: musicItems.musicbrainzReleaseGroupId,
     })
     .from(musicItems)
     .leftJoin(artists, eq(musicItems.artistId, artists.id))
@@ -113,6 +139,8 @@ export async function fetchItemForLookup(id: number): Promise<ItemInfoForLookup 
     primaryUrl: row.primaryUrl ?? null,
     artworkUrl: row.artworkUrl ?? null,
     lookupAttemptedAt: row.lookupAttemptedAt ?? null,
+    musicbrainzReleaseId: row.musicbrainzReleaseId ?? null,
+    musicbrainzReleaseGroupId: row.musicbrainzReleaseGroupId ?? null,
   };
 }
 
@@ -184,6 +212,7 @@ export interface SecondaryLookupDeps {
   getExisting: GetExistingLinkFn;
   search: SearchServiceFn;
   searchFallback: SearchFallbackFn;
+  findBandcampLink: FindBandcampLinkFn;
   save: SaveLinkFn;
   saveArtwork: SaveArtworkFn;
   stamp: StampLookupFn;
@@ -195,6 +224,7 @@ export const defaultSecondaryLookupDeps: SecondaryLookupDeps = {
   getExisting: getExistingLink,
   search: defaultSearch,
   searchFallback: (title, artist) => searchYouTube(title, artist),
+  findBandcampLink: defaultFindBandcampLink,
   save: saveLink,
   saveArtwork,
   stamp: stampLookup,
@@ -210,7 +240,7 @@ export type SecondaryLookupOutcome =
       /** Display name of the service `url` points at — the fallback's when it supplied the hit. */
       serviceDisplayName: string;
       url: string | null;
-      /** Present only when `url` came from the YouTube fallback rather than the active service. */
+      /** Present only when `url` came from a fallback rather than the active service. */
       via?: "fallback";
     };
 
@@ -228,6 +258,122 @@ function primaryIsFallbackService(item: ItemInfoForLookup): boolean {
   if (item.primarySource === FALLBACK_SERVICE.sourceName) return true;
   if (!item.primaryUrl) return false;
   return parseUrl(item.primaryUrl).source === FALLBACK_SERVICE.sourceName;
+}
+
+/**
+ * True when the item is already a Bandcamp link — the Bandcamp fallback has
+ * nothing to add.
+ */
+function primaryIsBandcamp(item: ItemInfoForLookup): boolean {
+  if (item.primarySource === BANDCAMP_FALLBACK_SERVICE.sourceName) return true;
+  if (!item.primaryUrl) return false;
+  return parseUrl(item.primaryUrl).source === BANDCAMP_FALLBACK_SERVICE.sourceName;
+}
+
+/** True for a Bandcamp URL that names a release (an album or track page). */
+function isBandcampReleaseUrl(url: string): boolean {
+  try {
+    return /^\/(album|track)\//.test(new URL(url).pathname);
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * MB relation types that point at a Bandcamp page the release can be heard on,
+ * most useful first. Anything else ("discography" and friends) tends to name
+ * the artist's homepage rather than this record.
+ */
+const BANDCAMP_RELATION_TYPE_RANK: Record<string, number> = {
+  "free streaming": 0,
+  streaming: 1,
+  "purchase for download": 2,
+};
+
+/**
+ * The Bandcamp release page among a release group's url relations, or null.
+ * Only album/track URLs qualify — a relation to the artist's Bandcamp homepage
+ * is not a link to this record. Ties keep MusicBrainz's own ordering.
+ */
+export function pickBandcampReleaseUrl(relations: MbUrlRelation[]): string | null {
+  const candidates = relations.filter(
+    (relation) =>
+      parseUrl(relation.url).source === BANDCAMP_FALLBACK_SERVICE.sourceName &&
+      isBandcampReleaseUrl(relation.url),
+  );
+  const rank = (relation: MbUrlRelation) =>
+    BANDCAMP_RELATION_TYPE_RANK[relation.type ?? ""] ?? Number.MAX_SAFE_INTEGER;
+  const ranked = [...candidates].sort((a, b) => rank(a) - rank(b));
+  return ranked[0]?.url ?? null;
+}
+
+/**
+ * Resolve the release's Bandcamp page through MusicBrainz: the release group's
+ * url relations often name it, attached there by MB editors, so unlike the
+ * catalogue searches there is no fuzzy matching to get wrong. The page is
+ * scraped for its cover art — a Bandcamp cover *is* the release's artwork, so
+ * unlike the YouTube fallback this hit may carry some.
+ *
+ * Failures return null (logged) rather than throwing: this runs inside
+ * background enrichment, where the YouTube fallback is still worth a try.
+ */
+async function defaultFindBandcampLink(
+  item: ItemInfoForLookup,
+): Promise<ServiceSearchResult | null> {
+  if (process.env.OTB_DISABLE_EXTERNAL_LOOKUPS) return null;
+
+  const groupId =
+    item.musicbrainzReleaseGroupId ??
+    (item.musicbrainzReleaseId ? await resolveReleaseGroupId(item.musicbrainzReleaseId) : null);
+  if (!groupId) return null;
+
+  let relations: MbUrlRelation[];
+  try {
+    relations = await fetchReleaseGroupUrlRelations(groupId);
+  } catch (err) {
+    console.error("[secondary-link] MusicBrainz url-rels lookup failed:", err);
+    return null;
+  }
+
+  const url = pickBandcampReleaseUrl(relations);
+  if (!url) return null;
+
+  const scraped = await scrapeBandcamp(url, 8000).catch(() => null);
+  return { url, artworkUrl: scraped?.imageUrl ?? null };
+}
+
+async function resolveReleaseGroupId(releaseId: string): Promise<string | null> {
+  try {
+    return await fetchReleaseGroupIdForRelease(releaseId);
+  } catch (err) {
+    console.error("[secondary-link] MusicBrainz release lookup failed:", err);
+    return null;
+  }
+}
+
+/**
+ * Bandcamp fallback for a release the active service doesn't carry: resolve
+ * the release's Bandcamp page via MusicBrainz and save it, with its cover art
+ * when the item has none of its own.
+ */
+async function lookupBandcampLink(
+  itemId: number,
+  item: ItemInfoForLookup,
+  deps: SecondaryLookupDeps,
+): Promise<ServiceSearchResult | null> {
+  // Already a Bandcamp link, or already carries one — the release page shows
+  // it among the item's own links either way.
+  if (primaryIsBandcamp(item)) return null;
+  if (await deps.getExisting(itemId, BANDCAMP_FALLBACK_SERVICE.sourceName)) return null;
+
+  const hit = await deps.findBandcampLink(item);
+  if (!hit) return null;
+
+  await deps.save(itemId, hit.url, BANDCAMP_FALLBACK_SERVICE.sourceName);
+  if (hit.artworkUrl && !item.artworkUrl) {
+    await deps.saveArtwork(itemId, hit.artworkUrl);
+  }
+  return hit;
 }
 
 /**
@@ -259,8 +405,10 @@ async function lookupFallbackLink(
  * service for an item that isn't already on that service, persisting a hit and
  * stamping the lookup marker on both a hit and a miss.
  *
- * When the active service has nothing, a YouTube search runs as a fallback and
- * its (high-confidence only) hit is saved as a YouTube secondary link instead.
+ * When the active service has nothing, the MusicBrainz url relations are
+ * checked for a Bandcamp page for the release, and failing that a YouTube
+ * search runs — its (high-confidence only) hit is saved as a YouTube
+ * secondary link instead.
  */
 export async function lookupSecondaryLinkForItem(
   itemId: number,
@@ -290,6 +438,16 @@ export async function lookupSecondaryLinkForItem(
   await deps.stamp(itemId);
 
   if (!result) {
+    const bandcamp = await lookupBandcampLink(itemId, item, deps);
+    if (bandcamp) {
+      return {
+        kind: "result",
+        service,
+        serviceDisplayName: BANDCAMP_FALLBACK_SERVICE.displayName,
+        url: bandcamp.url,
+        via: "fallback",
+      };
+    }
     const fallbackUrl = await lookupFallbackLink(itemId, item, deps);
     if (fallbackUrl) {
       return {

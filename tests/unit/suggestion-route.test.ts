@@ -164,6 +164,37 @@ describe("POST /:id/suggestion/accept", () => {
     expect(created.origin).toBe("suggestion");
   });
 
+  test("carries the suggestion's MusicBrainz ids onto the created release", async () => {
+    // The release-group id is what the release group's url relations — and so
+    // the Bandcamp fallback in the secondary-link enrichment — hang off.
+    const [suggestion] = await db
+      .insert(itemSuggestions)
+      .values({
+        sourceItemId,
+        title: "1 Hour Service",
+        artistName: ARTIST,
+        itemType: "album",
+        status: "pending",
+        musicbrainzReleaseId: "8619473f-051d-4072-acbf-a009349ffab0",
+        musicbrainzReleaseGroupId: "dc850e6a-81e5-4f34-bbcd-16349b4cc618",
+      })
+      .returning({ id: itemSuggestions.id });
+
+    const response = await post("/suggestion/accept", { suggestionId: suggestion.id });
+
+    expect(response.status).toBe(201);
+    const created = await db
+      .select({
+        releaseId: musicItems.musicbrainzReleaseId,
+        groupId: musicItems.musicbrainzReleaseGroupId,
+      })
+      .from(musicItems)
+      .where(eq(musicItems.title, "1 Hour Service"))
+      .get();
+    expect(created?.releaseId).toBe("8619473f-051d-4072-acbf-a009349ffab0");
+    expect(created?.groupId).toBe("dc850e6a-81e5-4f34-bbcd-16349b4cc618");
+  });
+
   test("404s when none of the listed ids are pending suggestions of the item", async () => {
     await seedSuggestions(["First Offer"]);
 
