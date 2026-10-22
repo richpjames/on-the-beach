@@ -649,6 +649,49 @@ describe("ensureNewReleasesStack", () => {
 });
 
 describe("PUT /api/artists/:id/follow", () => {
+  test("following an artist starts the watch on the next sweep", async () => {
+    const { alertId, artistId } = await makeAlert();
+    // A due time left over from an earlier spell of following must not hold
+    // the newly followed artist back.
+    await db
+      .update(artists)
+      .set({ nextPollAt: new Date("2027-01-01T00:00:00.000Z") })
+      .where(eq(artists.id, artistId));
+    const app = makeApp();
+
+    const res = await app.request(`http://localhost/api/artists/${artistId}/follow`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ followState: "always" }),
+    });
+    expect(res.status).toBe(200);
+
+    const artist = await db.select().from(artists).where(eq(artists.id, artistId)).get();
+    expect(artist?.followState).toBe("always");
+    expect(artist?.nextPollAt).toBeNull();
+    // Following leaves the queue alone — the alerts are the point.
+    const alert = await db.select().from(releaseAlerts).where(eq(releaseAlerts.id, alertId)).get();
+    expect(alert?.status).toBe("pending");
+  });
+
+  test("unfollowing an artist clears the alerts already queued for them", async () => {
+    const { alertId, artistId } = await makeAlert();
+    const app = makeApp();
+
+    const res = await app.request(`http://localhost/api/artists/${artistId}/follow`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ followState: "auto" }),
+    });
+    expect(res.status).toBe(200);
+
+    const artist = await db.select().from(artists).where(eq(artists.id, artistId)).get();
+    expect(artist?.followState).toBe("auto");
+    expect(artist?.nextPollAt).toBeNull();
+    const alert = await db.select().from(releaseAlerts).where(eq(releaseAlerts.id, alertId)).get();
+    expect(alert?.status).toBe("dismissed");
+  });
+
   test("muting an artist also clears the alerts already queued for them", async () => {
     const { alertId, artistId } = await makeAlert();
     const app = makeApp();

@@ -510,7 +510,7 @@ export function createRssRoutes(
     const xml = renderRss(
       {
         title: "On the Beach — New Releases",
-        description: "New releases by artists you've listened to",
+        description: "New releases by the artists you follow",
       },
       alerts.map((alert) => alertToEntry(alert, baseUrl)),
     );

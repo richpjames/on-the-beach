@@ -7,9 +7,7 @@ import {
   artistReleases,
   artists,
   musicItems,
-  musicLinks,
   releaseAlerts,
-  sources,
 } from "../../adapters/db/schema";
 import { normalize } from "../../domain/text";
 import {
@@ -50,7 +48,7 @@ function group(overrides: Partial<musicbrainz.MbReleaseGroup> = {}): musicbrainz
   };
 }
 
-/** An artist with one listened item — the derived tracking rule's happy path. */
+/** A followed artist with one item — the watch's only way in. */
 async function makeTrackedArtist(
   name: string,
   options: {
@@ -67,7 +65,7 @@ async function makeTrackedArtist(
       normalizedName: normalize(name),
       musicbrainzArtistId: options.mbid ?? `mbid-${normalize(name).replace(/\W+/g, "-")}`,
       mbidConfidence: "confirmed",
-      followState: options.followState ?? "auto",
+      followState: options.followState ?? "always",
     })
     .returning({ id: artists.id });
 
@@ -99,17 +97,6 @@ async function makeTrackedArtist(
       .get())!,
     itemId: item.id,
   };
-}
-
-/** The item's primary link, filed under the given source as a scrape would. */
-async function attachPrimarySource(itemId: number, sourceName: string, url: string): Promise<void> {
-  const [source] = await db
-    .select({ id: sources.id })
-    .from(sources)
-    .where(eq(sources.name, sourceName));
-  await db
-    .insert(musicLinks)
-    .values({ musicItemId: itemId, sourceId: source.id, url, isPrimary: true });
 }
 
 async function reload(artistId: number): Promise<TrackedArtistRow> {
@@ -668,68 +655,27 @@ describe("date drift reconciliation", () => {
 // ---------------------------------------------------------------------------
 
 describe("tracked artists", () => {
-  test("a listened artist is tracked; a to-listen-only artist is not", async () => {
-    const listened = await makeTrackedArtist(`Listened Only ${Date.now()}`);
-    const queued = await makeTrackedArtist(`Queued Only ${Date.now()}`, {
-      listenStatus: "to-listen",
+  test("listening is not following: an artist nobody followed stays out", async () => {
+    // However much evidence the library holds about them — listened items,
+    // five-star ratings — none of it opts an artist into the watch. Handles a
+    // link was filed under (a Mixcloud uploader, an NTS show) used to become
+    // watched "artists" this way, and their names resolve to strangers on
+    // MusicBrainz.
+    const listened = await makeTrackedArtist(`Listened Only ${Date.now()}`, {
+      followState: "auto",
+    });
+    const loved = await makeTrackedArtist(`Loved Only ${Date.now()}`, {
+      followState: "auto",
+      rating: 5,
     });
 
     const tracked = (await listTrackedArtists()).map((artist) => artist.id);
 
-    expect(tracked).toContain(listened.id);
-    expect(tracked).not.toContain(queued.id);
+    expect(tracked).not.toContain(listened.id);
+    expect(tracked).not.toContain(loved.id);
   });
 
-  // A Mixcloud show or an NTS episode is filed under an uploader or a show
-  // name — a handle, not an act. Listening to one is not evidence about any
-  // artist's discography: the handle resolves to a stranger on MusicBrainz and
-  // their releases alert forever. Those items are discounted entirely.
-  test("a listened Mixcloud show doesn't track its uploader", async () => {
-    const curator = await makeTrackedArtist(`Curator Handle ${Date.now()}`);
-    await attachPrimarySource(
-      curator.itemId,
-      "mixcloud",
-      "https://www.mixcloud.com/curator-handle/some-show/",
-    );
-
-    expect((await listTrackedArtists()).map((artist) => artist.id)).not.toContain(curator.id);
-  });
-
-  test("a listened NTS episode doesn't track its show either", async () => {
-    const show = await makeTrackedArtist(`NTS Show ${Date.now()}`);
-    await attachPrimarySource(show.itemId, "nts", "https://nts.live/shows/nts-show/episodes/1");
-
-    expect((await listTrackedArtists()).map((artist) => artist.id)).not.toContain(show.id);
-  });
-
-  test("a listened release on an artist-naming source still tracks", async () => {
-    const band = await makeTrackedArtist(`Bandcamp Band ${Date.now()}`);
-    await attachPrimarySource(
-      band.itemId,
-      "bandcamp",
-      "https://bandcampband.bandcamp.com/album/lp",
-    );
-
-    expect((await listTrackedArtists()).map((artist) => artist.id)).toContain(band.id);
-  });
-
-  test("a curator-sourced listen alongside real evidence leaves the artist tracked", async () => {
-    const artist = await makeTrackedArtist(`Mixed Evidence ${Date.now()}`);
-    const [mix] = await db
-      .insert(musicItems)
-      .values({
-        title: "The Mix",
-        normalizedTitle: "the mix",
-        artistId: artist.id,
-        listenStatus: "listened",
-      })
-      .returning({ id: musicItems.id });
-    await attachPrimarySource(mix.id, "mixcloud", "https://www.mixcloud.com/mixed-evidence/mix/");
-
-    expect((await listTrackedArtists()).map((artist) => artist.id)).toContain(artist.id);
-  });
-
-  test("follow_state 'always' tracks an artist with nothing listened", async () => {
+  test("a followed artist is tracked with nothing listened", async () => {
     const forced = await makeTrackedArtist(`Always Followed ${Date.now()}`, {
       listenStatus: "to-listen",
       followState: "always",
@@ -742,43 +688,6 @@ describe("tracked artists", () => {
     const muted = await makeTrackedArtist(`Muted Band ${Date.now()}`, { followState: "muted" });
 
     expect((await listTrackedArtists()).map((a) => a.id)).not.toContain(muted.id);
-  });
-
-  test("the rating bar drops listened artists whose releases fall below it", async () => {
-    const loved = await makeTrackedArtist(`Loved Band ${Date.now()}`, { rating: 4.5 });
-    const middling = await makeTrackedArtist(`Middling Band ${Date.now()}`, { rating: 2 });
-    const unrated = await makeTrackedArtist(`Unrated Band ${Date.now()}`);
-
-    const gated = (await listTrackedArtists(settings({ minArtistRating: 4 }))).map((a) => a.id);
-    expect(gated).toContain(loved.id);
-    expect(gated).not.toContain(middling.id);
-    expect(gated).not.toContain(unrated.id);
-
-    // With the bar off (the default), having listened is still enough.
-    const open = (await listTrackedArtists(settings())).map((a) => a.id);
-    expect(open).toContain(loved.id);
-    expect(open).toContain(middling.id);
-    expect(open).toContain(unrated.id);
-  });
-
-  test("a rating alone doesn't track an artist nothing was listened to by", async () => {
-    // The bar narrows the listened rule; it doesn't replace it.
-    const ratedButQueued = await makeTrackedArtist(`Rated Queue ${Date.now()}`, {
-      listenStatus: "to-listen",
-      rating: 5,
-    });
-
-    const tracked = (await listTrackedArtists(settings({ minArtistRating: 4 }))).map((a) => a.id);
-    expect(tracked).not.toContain(ratedButQueued.id);
-  });
-
-  test("follow_state 'always' bypasses the rating bar", async () => {
-    const forced = await makeTrackedArtist(`Always Unrated ${Date.now()}`, {
-      followState: "always",
-    });
-
-    const tracked = (await listTrackedArtists(settings({ minArtistRating: 5 }))).map((a) => a.id);
-    expect(tracked).toContain(forced.id);
   });
 });
 
@@ -841,27 +750,5 @@ describe("sweepArtistReleases", () => {
     expect(mbSpy).toHaveBeenCalledWith("mbid-sweep-due");
     expect(mbSpy).not.toHaveBeenCalledWith("mbid-sweep-later");
     expect((await reload(due.id)).lastPolledAt).not.toBeNull();
-  });
-
-  test("the rating bar keeps below-bar artists out of the poll queue", async () => {
-    await setArtistWatchSettings({ minArtistRating: 4 });
-    const mbSpy = spyOn(musicbrainz, "fetchArtistReleaseGroups").mockResolvedValue([
-      group({ id: "rg-rated-sweep" }),
-    ]);
-    spyOn(musicbrainz, "searchArtistCandidates").mockResolvedValue([]);
-
-    await makeTrackedArtist(`Sweep Loved ${Date.now()}`, {
-      mbid: "mbid-sweep-loved",
-      rating: 4.5,
-    });
-    await makeTrackedArtist(`Sweep Middling ${Date.now()}`, {
-      mbid: "mbid-sweep-middling",
-      rating: 2,
-    });
-
-    await sweepArtistReleases(NOW);
-
-    expect(mbSpy).toHaveBeenCalledWith("mbid-sweep-loved");
-    expect(mbSpy).not.toHaveBeenCalledWith("mbid-sweep-middling");
   });
 });

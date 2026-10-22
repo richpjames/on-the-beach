@@ -1,9 +1,7 @@
 import { and, desc, eq, isNotNull, isNull } from "drizzle-orm";
 import { isVariousArtists } from "./artist-identity";
 import { db } from "../adapters/db/index";
-import { artists, itemSuggestions, musicItems, musicLinks, sources } from "../adapters/db/schema";
-import { sourceNamesRealArtist } from "../adapters/registry";
-import type { SourceName } from "../domain/types";
+import { musicItems, artists, itemSuggestions } from "../adapters/db/schema";
 import {
   fetchReleaseGroupIdForRelease,
   findSuggestedReleases,
@@ -135,9 +133,8 @@ export type SuggestionFetchOutcome =
   // The lookup failed (network, rate limit, blocked UA); retried on the
   // next sweep or creation — transient failures must not back off for 24h.
   | "error"
-  // No artist name, a compilation rather than a real artist, an item whose
-  // "artist" is a show or an uploader's handle, or the artist is inside its
-  // no-candidates backoff window.
+  // No artist name, a compilation rather than a real artist, or the artist is
+  // inside its no-candidates backoff window.
   | "skipped";
 
 // Artists whose last lookup found nothing suggestible — don't hammer
@@ -153,20 +150,6 @@ const EMPTY_LOOKUP_BACKOFF_MS = 24 * 60 * 60 * 1000;
 const inFlightByArtist = new Map<string, Promise<SuggestionFetchOutcome>>();
 
 /**
- * The source of an item's primary link — where the item actually came from,
- * as opposed to wherever a secondary lookup later found the same record.
- */
-async function primarySourceForItem(itemId: number): Promise<SourceName | null> {
-  const [row] = await db
-    .select({ name: sources.name })
-    .from(musicLinks)
-    .innerJoin(sources, eq(sources.id, musicLinks.sourceId))
-    .where(and(eq(musicLinks.musicItemId, itemId), eq(musicLinks.isPrimary, true)))
-    .limit(1);
-  return (row?.name as SourceName | undefined) ?? null;
-}
-
-/**
  * Look up extra releases by the item's artist on MusicBrainz and store them as
  * pending suggestions, topping the artist up to SUGGESTION_TARGET. Skips
  * artists that already have a full set and never re-suggests a release that is
@@ -178,11 +161,6 @@ export async function fetchAndStoreSuggestion(item: ItemSummary): Promise<Sugges
   // "Various Artists" is a placeholder, not an artist: its "discography" is
   // every compilation ever pressed, so suggesting from it is noise.
   if (isVariousArtists(artistName, item.musicbrainz_artist_id)) return "skipped";
-  // Nor is a show or an uploader's handle an artist. "Other releases by" a
-  // Mixcloud show or an NTS episode means releases by whoever MusicBrainz
-  // matches on the handle — a stranger — so those items never look up.
-  const source = await primarySourceForItem(item.id);
-  if (source !== null && !sourceNamesRealArtist(source)) return "skipped";
 
   const artistKey = normalize(artistName);
   const inFlight = inFlightByArtist.get(artistKey);

@@ -1,14 +1,6 @@
 import { and, asc, eq, inArray, isNull, isNotNull, or, lte, sql } from "drizzle-orm";
 import { db } from "../adapters/db/index";
-import {
-  artistReleases,
-  artists,
-  musicItems,
-  musicLinks,
-  releaseAlerts,
-  sources,
-} from "../adapters/db/schema";
-import { NON_ARTIST_SOURCES } from "../adapters/registry";
+import { artistReleases, artists, musicItems, releaseAlerts } from "../adapters/db/schema";
 import {
   fetchArtistReleaseGroups,
   MusicBrainzHttpError,
@@ -164,65 +156,28 @@ export interface TrackedArtistRow {
 }
 
 /**
- * An artist is tracked when `follow_state` is `always`, or when it is `auto`
- * and they have at least one listened item. `to-listen` is not evidence of
- * wanting an artist's whole future output — a record sits in To Listen
- * precisely because you haven't formed that opinion yet. Listening is the
- * signal, and this predicate is the one place to widen it.
+ * An artist is tracked when, and only when, the user follows them —
+ * `follow_state` is `always`. Nothing is inferred: listening to a record,
+ * rating it, queueing it in To Listen — none of it opts an artist in.
  *
- * Except that not every listen is evidence either. A Mixcloud show or an NTS
- * episode is filed under an uploader or a show name — a handle, not an act —
- * and listening to one says nothing about wanting "their" releases: run it
- * through MusicBrainz and the name resolves to a stranger whose discography
- * then alerts forever. A listened item only vouches for an artist when its
- * primary link isn't on one of those sources (see `NON_ARTIST_SOURCES`); an
- * item with no link at all — hand-typed, emailed, scanned — still counts,
- * because somebody wrote that artist's name down on purpose.
+ * It used to. Tracking was derived from having listened, with `follow_state`
+ * as an override, and that meant every handle a link was filed under became a
+ * watched "artist": a Mixcloud uploader, an NTS show, a radio station. Run
+ * those names through MusicBrainz and they resolve to strangers whose
+ * discographies then alert forever. Guessing which sources name real acts was
+ * tried and is the wrong fix — the user is the only one who knows which
+ * artists they want to hear more from, so following is their call, made from
+ * the record's page.
  *
- * With `min_artist_rating` set, the auto rule also demands a release rated at
- * or above the bar — having merely listened stops being enough. The rated item
- * needn't be the listened one; any release good enough to earn the rating
- * vouches for the artist. `always` is an explicit user choice and bypasses the
- * bar, exactly as it bypasses the listened-item rule.
+ * `muted` is kept distinct from the default `auto`: both are "not followed",
+ * but muting is a deliberate "no" (see `muteArtist`), and the alert queue
+ * treats it as one.
  */
-function trackedArtistPredicate(minArtistRating: number) {
-  const curatorPrimaryLink = sql`EXISTS (
-    SELECT 1 FROM ${musicLinks}
-    INNER JOIN ${sources} ON ${sources.id} = ${musicLinks.sourceId}
-    WHERE ${musicLinks.musicItemId} = ${musicItems.id}
-      AND ${musicLinks.isPrimary}
-      AND ${sources.name} IN (${sql.join(
-        [...NON_ARTIST_SOURCES].map((name) => sql`${name}`),
-        sql`, `,
-      )})
-  )`;
-
-  const hasListenedItem = sql`EXISTS (
-    SELECT 1 FROM ${musicItems}
-    WHERE ${musicItems.artistId} = ${artists.id}
-      AND ${musicItems.listenStatus} = 'listened'
-      AND NOT ${curatorPrimaryLink}
-  )`;
-
-  const hasQualifyingRating = sql`EXISTS (
-    SELECT 1 FROM ${musicItems}
-    WHERE ${musicItems.artistId} = ${artists.id}
-      AND ${musicItems.rating} >= ${minArtistRating}
-  )`;
-
-  const autoTracked =
-    minArtistRating > 0 ? and(hasListenedItem, hasQualifyingRating) : hasListenedItem;
-
-  return and(
-    sql`${artists.followState} != 'muted'`,
-    or(eq(artists.followState, "always"), autoTracked),
-  );
+function trackedArtistPredicate() {
+  return eq(artists.followState, "always");
 }
 
-export async function listTrackedArtists(
-  settings?: ArtistWatchSettings,
-): Promise<TrackedArtistRow[]> {
-  const { minArtistRating } = settings ?? (await getArtistWatchSettings());
+export async function listTrackedArtists(): Promise<TrackedArtistRow[]> {
   return db
     .select({
       id: artists.id,
@@ -235,16 +190,12 @@ export async function listTrackedArtists(
       pollFailureCount: artists.pollFailureCount,
     })
     .from(artists)
-    .where(trackedArtistPredicate(minArtistRating))
+    .where(trackedArtistPredicate())
     .orderBy(asc(artists.name));
 }
 
 /** Tracked, identified artists whose `next_poll_at` has come round. */
-async function artistsDueForPoll(
-  now: Date,
-  limit: number,
-  minArtistRating: number,
-): Promise<TrackedArtistRow[]> {
+async function artistsDueForPoll(now: Date, limit: number): Promise<TrackedArtistRow[]> {
   return (
     db
       .select({
@@ -260,7 +211,7 @@ async function artistsDueForPoll(
       .from(artists)
       .where(
         and(
-          trackedArtistPredicate(minArtistRating),
+          trackedArtistPredicate(),
           isNotNull(artists.musicbrainzArtistId),
           sql`${artists.musicbrainzArtistId} != ${VARIOUS_ARTISTS_MBID}`,
           inArray(artists.mbidConfidence, ["confirmed", "probable"]),
@@ -602,7 +553,7 @@ export async function sweepArtistReleases(now: Date = new Date()): Promise<Sweep
 
   // Tracked artists we still can't identify get a network resolution attempt,
   // at most once every 30 days each, sharing the sweep's request budget.
-  const trackedIds = new Set((await listTrackedArtists(settings)).map((artist) => artist.id));
+  const trackedIds = new Set((await listTrackedArtists()).map((artist) => artist.id));
   const resolutionQueue = (await artistsDueForResolution(now)).filter((id) => trackedIds.has(id));
 
   for (const artistId of resolutionQueue) {
@@ -618,11 +569,7 @@ export async function sweepArtistReleases(now: Date = new Date()): Promise<Sweep
     }
   }
 
-  const due = await artistsDueForPoll(
-    now,
-    MAX_ARTISTS_PER_SWEEP - requests,
-    settings.minArtistRating,
-  );
+  const due = await artistsDueForPoll(now, MAX_ARTISTS_PER_SWEEP - requests);
 
   for (const artist of due) {
     if (requests >= MAX_ARTISTS_PER_SWEEP) break;

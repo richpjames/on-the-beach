@@ -3,7 +3,13 @@
   import { onMount } from "svelte";
   import type { PageData } from "../../routes/r/[id]/$types";
   import type { ListenEmbed } from "../../routes/r/[id]/+page.server";
-  import type { ItemOrigin, ItemSuggestion, ListenStatus, SourceName } from "../../../domain/types";
+  import type {
+    ArtistFollowState,
+    ItemOrigin,
+    ItemSuggestion,
+    ListenStatus,
+    SourceName,
+  } from "../../../domain/types";
   import { parseAppleMusicCatalogUrl, type AppleMusicResource } from "../../../domain/apple-music";
   import { api, apiFetch } from "../api";
   import { encodeImageFile } from "../encode-image";
@@ -91,6 +97,29 @@
     if (newStatus === "listened" && result?.suggestions.length) {
       suggestions = result.suggestions;
       suggestionSourceId = item.id;
+    }
+  }
+
+  // ── Follow artist ──────────────────────────────────────────────────────────
+  // Following is the only way an artist joins the new-release watch, and the
+  // button beside their name is where it happens. A muted artist reads as not
+  // followed here; following them again is how a mute is undone.
+  // svelte-ignore state_referenced_locally
+  let followState = $state<ArtistFollowState | null>(data.artistFollowState);
+  let followBusy = $state(false);
+  const following = $derived(followState === "always");
+
+  async function toggleFollow(): Promise<void> {
+    if (item.artist_id === null || followBusy) return;
+    const next: ArtistFollowState = following ? "auto" : "always";
+    followBusy = true;
+    try {
+      await api.setArtistFollowState(item.artist_id, next);
+      followState = next;
+    } catch {
+      alert(following ? "Failed to unfollow artist." : "Failed to follow artist.");
+    } finally {
+      followBusy = false;
     }
   }
 
@@ -554,7 +583,22 @@
         <div id="view-mode" hidden={editMode}>
           <h2 class="release-page__title">{item.title}</h2>
           {#if item.artist_name}
-            <p class="release-page__artist">{item.artist_name}</p>
+            <div class="release-page__artist-row">
+              <p class="release-page__artist">{item.artist_name}</p>
+              {#if item.artist_id !== null}
+                <button
+                  type="button"
+                  class="btn release-page__follow-btn"
+                  class:release-page__follow-btn--following={following}
+                  id="follow-artist-btn"
+                  disabled={followBusy}
+                  title={following
+                    ? "Stop watching for new releases by this artist"
+                    : "Watch for new releases by this artist"}
+                  onclick={toggleFollow}>{following ? "Following ✓" : "Follow"}</button
+                >
+              {/if}
+            </div>
           {/if}
           {#if metaFields}
             <p class="release-page__meta">{metaFields}</p>
