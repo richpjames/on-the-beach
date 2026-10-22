@@ -3,12 +3,18 @@ import { eq } from "drizzle-orm";
 import { db } from "../../adapters/db/index";
 import { artists } from "../../adapters/db/schema";
 import { listTrackedArtists, pollArtistNow } from "../../app/artist-watch";
-import { muteArtist } from "../../app/release-alerts";
+import { followArtist, muteArtist, unfollowArtist } from "../../app/artist-follow";
 import { searchArtistCandidates } from "../../adapters/musicbrainz/index";
 import { setArtistMbid } from "../../app/artist-identity";
 
 const FOLLOW_STATES = ["auto", "always", "muted"] as const;
 type FollowState = (typeof FOLLOW_STATES)[number];
+
+const FOLLOW_TRANSITIONS: Record<FollowState, (artistId: number) => Promise<boolean>> = {
+  always: followArtist,
+  auto: unfollowArtist,
+  muted: muteArtist,
+};
 
 const MBID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -20,8 +26,8 @@ function parseId(value: string): number | null {
 export function createArtistRoutes(): Hono {
   const routes = new Hono();
 
-  // GET /tracked — the artist-management panel: follow state, MBID confidence,
-  // last poll.
+  // GET /tracked — the artists being followed, for the settings panel: MBID
+  // confidence and last poll alongside the name.
   routes.get("/tracked", async (c) => {
     const tracked = await listTrackedArtists();
     return c.json({
@@ -62,7 +68,8 @@ export function createArtistRoutes(): Hono {
     }
   });
 
-  // PUT /:id/follow — auto | always | muted.
+  // PUT /:id/follow — always (follow) | auto (unfollow) | muted. Each is a
+  // different transition, not just a column write: see app/artist-follow.ts.
   routes.put("/:id/follow", async (c) => {
     const id = parseId(c.req.param("id"));
     if (id === null) return c.json({ error: "Invalid ID" }, 400);
@@ -79,20 +86,8 @@ export function createArtistRoutes(): Hono {
       return c.json({ error: `followState must be one of: ${FOLLOW_STATES.join(", ")}` }, 400);
     }
 
-    if (followState === "muted") {
-      // Muting also clears the alerts already queued for that artist.
-      const muted = await muteArtist(id);
-      return muted ? c.json({ followState }) : c.json({ error: "Artist not found" }, 404);
-    }
-
-    const updated = await db
-      .update(artists)
-      .set({ followState: followState as FollowState, updatedAt: new Date() })
-      .where(eq(artists.id, id))
-      .returning({ id: artists.id });
-    if (updated.length === 0) return c.json({ error: "Artist not found" }, 404);
-
-    return c.json({ followState });
+    const updated = await FOLLOW_TRANSITIONS[followState as FollowState](id);
+    return updated ? c.json({ followState }) : c.json({ error: "Artist not found" }, 404);
   });
 
   // PUT /:id/mbid — confirm an MBID from the disambiguation dialog.

@@ -1,6 +1,7 @@
 import { error } from "@sveltejs/kit";
 import type { PageServerLoad } from "./$types";
 import { fetchFullItem } from "../../../../app/music-item-creator";
+import { getArtistFollowState } from "../../../../app/artist-follow";
 import { getLookupService } from "../../../../app/settings";
 import { isAppleMusicConfigured } from "../../../../adapters/apple-music/index";
 import { parseUrl } from "../../../../adapters/registry";
@@ -210,6 +211,10 @@ export const load: PageServerLoad = async ({ params, url }) => {
 
   return {
     item,
+    // Whether the record's artist is followed, for the button beside their
+    // name. Null when the item has no artist to follow.
+    artistFollowState:
+      item.artist_id !== null ? await getArtistFollowState(item.artist_id) : null,
     // Where the back button goes. List pages carry their browsing state in the
     // URL and pass it along as `from`, so back returns to the exact view the
     // release was opened from instead of dumping the user on the home list.

@@ -281,30 +281,6 @@ export async function dismissAlert(alertId: number): Promise<boolean> {
 }
 
 /**
- * Mute an artist and clear the alerts already queued for them. Compilation
- * credits and one-off features generate alerts nobody wants, and the only
- * person who can tell is the user.
- */
-export async function muteArtist(artistId: number): Promise<boolean> {
-  const now = new Date();
-  const updated = await db
-    .update(artists)
-    .set({ followState: "muted", nextPollAt: null, updatedAt: now })
-    .where(eq(artists.id, artistId))
-    .returning({ id: artists.id });
-  if (updated.length === 0) return false;
-
-  await db
-    .update(releaseAlerts)
-    .set({ status: "dismissed", resolvedAt: now })
-    .where(
-      and(eq(releaseAlerts.artistId, artistId), inArray(releaseAlerts.status, ["pending", "seen"])),
-    );
-
-  return true;
-}
-
-/**
  * The stack accepted alerts are filed into, created on first accept and
  * referenced by id in settings. `stacks.name` is unique and user-editable, so
  * name-matching would silently create a duplicate the moment the user renames

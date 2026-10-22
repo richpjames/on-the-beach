@@ -3,9 +3,8 @@
   import { apiFetch } from "$lib/api";
   import { musickit, authorize, unauthorize, ensureConfigured } from "$lib/musickit.svelte";
   import { api } from "$lib/api";
-  import StarRating from "$lib/components/StarRating.svelte";
   import type { LookupService, ReleaseLengthPreference } from "../../../app/settings";
-  import type { ArtistFollowState, MbArtistCandidateView, TrackedArtist } from "../../../domain/types";
+  import type { MbArtistCandidateView, TrackedArtist } from "../../../domain/types";
 
   let { data } = $props();
 
@@ -123,15 +122,6 @@
   let watch = $state({ ...data.artistWatch });
   let watchStatusMessage = $state("");
 
-  // The stars can't paint 0 — the control's own "off" is null — so the bar's
-  // value is spelled out beside them. It also carries the only cue for how to
-  // get back to off, which is the same gesture as clearing a record's rating.
-  const minArtistRatingLabel = $derived(
-    watch.minArtistRating > 0
-      ? `${watch.minArtistRating} star${watch.minArtistRating === 1 ? "" : "s"} (click again to clear)`
-      : "no bar — any artist you've listened to"
-  );
-
   async function saveWatch(update: Record<string, unknown>): Promise<void> {
     watchStatusMessage = "Saving…";
     try {
@@ -153,7 +143,7 @@
     }
   }
 
-  // ── Tracked artists ─────────────────────────────────────────────────────────
+  // ── Followed artists ────────────────────────────────────────────────────────
   // svelte-ignore state_referenced_locally
   let trackedArtists = $state<TrackedArtist[]>(data.trackedArtists as TrackedArtist[]);
   let artistStatusMessage = $state("");
@@ -175,23 +165,13 @@
     })}`;
   }
 
-  async function setFollowState(
-    artist: TrackedArtist,
-    followState: ArtistFollowState,
-  ): Promise<void> {
+  /** Unfollowing is the only way off this list: an artist is here because they're followed. */
+  async function unfollow(artist: TrackedArtist): Promise<void> {
     artistStatusMessage = "Saving…";
     try {
-      await api.setArtistFollowState(artist.id, followState);
-      if (followState === "muted") {
-        // Muted artists drop out of the tracked list entirely.
-        trackedArtists = trackedArtists.filter((row) => row.id !== artist.id);
-        artistStatusMessage = `Muted ${artist.name}.`;
-        return;
-      }
-      trackedArtists = trackedArtists.map((row) =>
-        row.id === artist.id ? { ...row, follow_state: followState } : row,
-      );
-      artistStatusMessage = "Saved.";
+      await api.setArtistFollowState(artist.id, "auto");
+      trackedArtists = trackedArtists.filter((row) => row.id !== artist.id);
+      artistStatusMessage = `Unfollowed ${artist.name}.`;
     } catch {
       artistStatusMessage = "Failed to save.";
     }
@@ -326,7 +306,7 @@
     <section class="settings__section" id="artist-watch-settings">
       <h2 class="settings__heading">New release alerts</h2>
       <p class="settings__hint">
-        Watch MusicBrainz for records by artists you've listened to. <a href="/new-releases"
+        Watch MusicBrainz for records by the artists you follow. <a href="/new-releases"
           >Open the queue</a
         >
         or subscribe to <a href="/feed/new-releases.rss">the RSS feed</a>.
@@ -380,17 +360,6 @@
           />
           <span>months</span>
         </label>
-        <div class="settings__option settings__option--field settings__option--stars">
-          <span>Only watch artists with a release rated at least</span>
-          <StarRating
-            rating={watch.minArtistRating > 0 ? watch.minArtistRating : null}
-            label="Minimum artist rating"
-            onRate={(next) => saveWatch({ alertMinArtistRating: next ?? 0 })}
-          />
-          <span class="settings__value" data-min-artist-rating={watch.minArtistRating}>
-            {minArtistRatingLabel}
-          </span>
-        </div>
       </form>
       <p id="artist-watch-status" class="settings__status" role="status" aria-live="polite">
         {watchStatusMessage}
@@ -398,16 +367,17 @@
     </section>
 
     <section class="settings__section" id="tracked-artists-settings">
-      <h2 class="settings__heading">Tracked artists</h2>
+      <h2 class="settings__heading">Followed artists</h2>
       <p class="settings__hint">
-        Artists you've listened to, and whose releases are watched. Muting one stops its alerts for
-        good. An artist marked <em>Unidentified</em> is one MusicBrainz couldn't pin down without
-        guessing — pick the right one and it starts being polled.
+        The artists you follow, whose releases are watched. Follow one from its record's page;
+        unfollowing here stops its alerts. An artist marked <em>Unidentified</em> is one
+        MusicBrainz couldn't pin down without guessing — pick the right one and it starts being
+        polled.
       </p>
 
       {#if trackedArtists.length === 0}
         <p class="settings__hint">
-          Nothing tracked yet. Mark a record as listened and its artist joins the list.
+          Nothing followed yet. Open a record and press Follow beside the artist's name.
         </p>
       {:else}
         <ul class="artist-list" id="tracked-artists-list">
@@ -446,8 +416,8 @@
                 <button
                   type="button"
                   class="btn btn--ghost"
-                  data-artist-action="mute"
-                  onclick={() => setFollowState(artist, "muted")}>Mute</button
+                  data-artist-action="unfollow"
+                  onclick={() => unfollow(artist)}>Unfollow</button
                 >
               </div>
 

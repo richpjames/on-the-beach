@@ -144,6 +144,16 @@ worse.
 
 ## Which artists get tracked
 
+> **Revised 2026-10-20 — following is opt-in.** The derived rule below is no
+> longer how tracking works. Every handle a link was filed under (a Mixcloud
+> uploader, an NTS show) became a tracked "artist" this way, and their names
+> resolve to strangers on MusicBrainz whose discographies then alerted forever.
+> An artist is now tracked when, and only when, `follow_state` is `always`,
+> which the user sets from the record's page (`Follow` beside the artist's
+> name); `auto` and `muted` both mean not followed. The `min_artist_rating`
+> setting is gone with the rule it narrowed. Migration `0019` treats every
+> artist still on `auto` as unfollowed.
+
 Derived, with an explicit override — no separate "follow" action to remember.
 
 An artist is **tracked** when they have at least one item with `listen_status = 'listened'`.

@@ -134,6 +134,13 @@
       "when": 1792508723077,
       "tag": "0018_unfollow_curator_sources",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "6",
+      "when": 1792604578465,
+      "tag": "0019_opt_in_following",
+      "breakpoints": true
     }
   ]
 }

@@ -209,7 +209,7 @@
     <section class="alerts__header">
       <h2 class="alerts__heading">📻 New Releases</h2>
       <p class="alerts__hint">
-        Records by artists you've listened to that we haven't seen before. Click a card for the
+        Records by the artists you follow that we haven't seen before. Click a card for the
         tracklist and where to hear it. Adding one files it in the New Releases stack, as long as
         there's a link to it; anything not out yet is scheduled and checked again on release day.
       </p>

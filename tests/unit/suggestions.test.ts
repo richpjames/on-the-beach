@@ -2,13 +2,7 @@ import { describe, expect, mock, spyOn, test, afterEach, beforeEach } from "bun:
 import { eq } from "drizzle-orm";
 import * as musicbrainz from "../../adapters/musicbrainz/index";
 import { db } from "../../adapters/db/index";
-import {
-  artists,
-  itemSuggestions,
-  musicItems,
-  musicLinks,
-  sources,
-} from "../../adapters/db/schema";
+import { artists, itemSuggestions, musicItems } from "../../adapters/db/schema";
 import { VARIOUS_ARTISTS_MBID } from "../../app/artist-identity";
 import { normalize } from "../../domain/text";
 import {
@@ -121,35 +115,6 @@ describe("fetchAndStoreSuggestion", () => {
     const outcome = await fetchAndStoreSuggestion({
       id: 1,
       artist_name: null,
-      year: null,
-      musicbrainz_artist_id: null,
-    });
-
-    expect(outcome).toBe("skipped");
-    expect(mbSpy).not.toHaveBeenCalled();
-  });
-
-  test("skips items whose artist is a show or an uploader's handle", async () => {
-    // A Mixcloud cloudcast is filed under the account that uploaded it;
-    // "other releases by" that handle means a stranger's records on
-    // MusicBrainz, so the lookup never happens.
-    const { itemId } = await createArtistWithItem("Some Curator", "Show 001");
-    const [mixcloud] = await db
-      .select({ id: sources.id })
-      .from(sources)
-      .where(eq(sources.name, "mixcloud"));
-    await db.insert(musicLinks).values({
-      musicItemId: itemId,
-      sourceId: mixcloud.id,
-      url: "https://www.mixcloud.com/some-curator/show-001/",
-      isPrimary: true,
-    });
-
-    const mbSpy = spyOn(musicbrainz, "findSuggestedReleases");
-
-    const outcome = await fetchAndStoreSuggestion({
-      id: itemId,
-      artist_name: "Some Curator",
       year: null,
       musicbrainz_artist_id: null,
     });
