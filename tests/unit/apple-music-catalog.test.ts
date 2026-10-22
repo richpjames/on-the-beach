@@ -177,8 +177,24 @@ describe("searchAppleMusicCatalog", () => {
       ]),
     );
     const result = await searchAppleMusicCatalog("Blue Lines", "Massive Attack");
-    // Pass 3 falls back to the first artist-matching result; there is none here,
-    // and the title matches but the artist does not, so passes 1/2 also skip it.
+    // The title matches but the artist does not, so both passes skip it.
+    expect(result).toBeNull();
+  });
+
+  test("returns null when only the artist matches — the artist's other release is not this one", async () => {
+    configure();
+    spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      catalogResponse([
+        {
+          name: "Black Roses - EP",
+          artistName: "Gavsborg & Pele Fyah",
+          url: "https://music.apple.com/gb/album/black-roses-ep/6818613948",
+        },
+      ]),
+    );
+    // The catalogue carries the duo, but not this record — an artist-only hit
+    // must count as not found rather than link their other release.
+    const result = await searchAppleMusicCatalog("1 Hour Service", "Gavsborg & Pele Fyah");
     expect(result).toBeNull();
   });
 

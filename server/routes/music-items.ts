@@ -607,6 +607,9 @@ musicItemRoutes.post("/:id/suggestion/accept", async (c) => {
         listenStatus: "to-listen",
         year: suggestion.year ?? undefined,
         musicbrainzReleaseId: suggestion.musicbrainzReleaseId ?? undefined,
+        // The group id is what the release group's url relations — and so the
+        // Bandcamp fallback in the secondary-link enrichment — hang off.
+        musicbrainzReleaseGroupId: suggestion.musicbrainzReleaseGroupId ?? undefined,
         origin: "suggestion",
       });
       created.push(result.item);

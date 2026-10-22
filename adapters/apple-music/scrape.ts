@@ -323,7 +323,14 @@ export async function searchAppleMusic(
  *  1. Exact title + artist match
  *  2. Partial match — one title is a prefix/substring of the other (handles
  *     Wikipedia-style disambiguators like "Foo (1981 album)" vs "Foo")
- *  3. First result whose artist matches (search query is already specific)
+ *
+ * A result whose title agrees with the query in neither of those ways counts
+ * as "not on Apple Music" even when the artist matches exactly. Apple's search
+ * falls back to matching on the artist alone when it carries no record titled
+ * like the query, so an artist-only hit is just as often the artist's *other*
+ * release — and a wrong link is worse than no link. The secondary-link
+ * enrichment has its own fallbacks for the gap (Bandcamp via MusicBrainz,
+ * then YouTube).
  */
 export async function searchAppleMusicViaItunes(
   title: string,
@@ -416,14 +423,6 @@ export async function searchAppleMusicViaItunes(
         getString(result.trackName),
       );
       if (!resultTitle || !titlesCompatible(resultTitle)) continue;
-      if (!artistMatches(getString(result.artistName))) continue;
-      const match = toResult(result);
-      if (match) return match;
-    }
-
-    // Pass 3: first result whose artist matches (search query is already scoped)
-    for (const result of data.results) {
-      if (!isRecord(result)) continue;
       if (!artistMatches(getString(result.artistName))) continue;
       const match = toResult(result);
       if (match) return match;

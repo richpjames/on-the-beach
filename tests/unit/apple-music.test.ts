@@ -121,7 +121,11 @@ describe("searchAppleMusic", () => {
     mock.restore();
   });
 
-  test("falls back to first artist-matching result when title does not match", async () => {
+  test("returns null when only the artist matches — the artist's other release is not this one", async () => {
+    // Apple's search matches on the artist alone when it carries no record
+    // titled like the query, so the top hit can be the artist's *other*
+    // release (exactly how "1 Hour Service" once got a "Black Roses - EP"
+    // link). An artist-only match must count as not found.
     spyOn(globalThis, "fetch").mockResolvedValueOnce(
       mockItunesResponse([
         {
@@ -132,7 +136,7 @@ describe("searchAppleMusic", () => {
       ]),
     );
     const result = await searchAppleMusic("Music Has the Right to Children", "Boards of Canada");
-    expect(result?.url).toBe("https://music.apple.com/album/boc/789");
+    expect(result).toBeNull();
     mock.restore();
   });
 
