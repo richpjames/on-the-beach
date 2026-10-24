@@ -192,6 +192,24 @@ test("captures the listen row", async ({ page, request }) => {
     await expect(listenButton).toBeVisible();
   }
 
+  // A link button keeps its control styling under the pointer. The generic
+  // link hover rule is held to element specificity ("a:where(:hover)") so it
+  // can't out-rank the class — at plain specificity it won, and on touch,
+  // where :hover sticks after a tap, a tapped link stayed washed-out blue
+  // with an underline. The pointer moves away afterwards so the baseline
+  // captures the resting chrome, not the hover background.
+  const firstLink = row.locator(".release-page__link-btn").first();
+  await firstLink.hover();
+  await expect
+    .poll(() =>
+      firstLink.evaluate((el) => {
+        const cs = getComputedStyle(el);
+        return `${cs.color} ${cs.textDecorationLine}`;
+      }),
+    )
+    .toBe("rgb(0, 0, 0) none");
+  await page.mouse.move(0, 0);
+
   await captureSnapshot(row, "release-page-listen-row", page);
 });
 

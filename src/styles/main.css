@@ -1892,7 +1892,12 @@ a {
   text-decoration: underline;
 }
 
-a:hover {
+/* :where() holds the hover rule to an element's specificity. A control styled
+   with a class ("a.btn", the release page's link buttons) then keeps its own
+   colour on hover: at plain specificity this rule beat any single class, and
+   on touch devices — where :hover sticks after a tap — a tapped link stayed
+   washed-out blue with an underline instead of reading as its control. */
+a:where(:hover) {
   color: #aaccff;
   text-decoration: underline;
 }
