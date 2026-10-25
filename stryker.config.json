@@ -11,7 +11,8 @@
     "server/**/*.ts",
     "src/**/*.ts",
     "eval/**/*.ts",
-    "scripts/**/*.ts"
+    "scripts/**/*.ts",
+    "!scripts/stryker-bun/**"
   ],
   "ignorePatterns": [
     "build",
