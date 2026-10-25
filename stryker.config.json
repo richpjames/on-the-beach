@@ -1,0 +1,33 @@
+{
+  "$schema": "node_modules/@stryker-mutator/core/schema/stryker-schema.json",
+  "testRunner": "bun",
+  "plugins": ["./scripts/stryker-bun/bun-test-runner.mjs"],
+  "coverageAnalysis": "perTest",
+  "mutate": [
+    "domain/**/*.ts",
+    "ports/**/*.ts",
+    "app/**/*.ts",
+    "adapters/**/*.ts",
+    "server/**/*.ts",
+    "src/**/*.ts",
+    "eval/**/*.ts",
+    "scripts/**/*.ts"
+  ],
+  "ignorePatterns": [
+    "build",
+    "dist",
+    "ios",
+    "playwright-report",
+    "test-results",
+    ".playwright-mcp",
+    ".worktrees",
+    "/uploads",
+    ".mimosa",
+    ".zcode",
+    ".claude"
+  ],
+  "reporters": ["clear-text", "progress", "html"],
+  "timeoutMS": 6000,
+  "timeoutFactor": 2,
+  "incremental": true
+}

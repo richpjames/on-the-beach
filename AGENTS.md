@@ -38,6 +38,6 @@ As of 2026-08-28 the codebase is split by **role** at the top level (`domain/`, 
 - `server/` — the HTTP host (Hono routes, uploads, CSRF) and nothing else.
 - `src/` — the SvelteKit app, the other driving adapter.
 
-Boundaries are enforced by `no-restricted-imports` overrides in `.oxlintrc.json`; `tests/unit/layer-boundaries.test.ts` covers the `.svelte` gap oxlint can't parse.
+Boundaries are enforced by `no-restricted-imports` overrides in `.oxlintrc.json`; `tests/unit/layer-boundaries.test.ts` covers the `.svelte` gap oxlint can't parse. The same enforcement keeps `scripts/stryker-bun/` (the Stryker↔Bun mutation-testing runner) self-contained: it must never import app code.
 
 When adding a new music source, it becomes a folder under `adapters/` plus a registry entry — not an edit to a large shared file. Don't reintroduce imports from `server/` into `src/`- or `app/`-owned modules, from `adapters/` into `server/`, `src/` or `app/`, or from `domain/` or `ports/` outward.

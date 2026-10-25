@@ -100,6 +100,33 @@
       }
     },
     {
+      // scripts/stryker-bun/ is the Stryker↔Bun test-runner integration: pure
+      // tooling, not a layer. It may import node:/bun: builtins,
+      // @stryker-mutator and files from its own folder — never app code, tests
+      // or any other script. The folder is flat, so any relative import
+      // leaving it starts with "../" (same trick as domain/).
+      // tests/unit/layer-boundaries.test.ts guards the same rule for file
+      // types oxlint does not lint (.mjs).
+      "files": ["scripts/stryker-bun/**/*.ts", "scripts/stryker-bun/*.mjs"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "group": ["../**"],
+                "message": "The Stryker↔Bun integration is self-contained tooling and must not import anything outside scripts/stryker-bun/."
+              },
+              {
+                "group": ["$lib/**", "$app/**", "$env/**"],
+                "message": "The Stryker↔Bun integration is self-contained tooling and must not import app code."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
       // Browser-side code must not pull in server modules. src/routes and
       // src/hooks.server.ts are excluded: running on the server is their job.
       "files": ["src/lib/**/*.ts", "src/ui/**/*.ts"],
