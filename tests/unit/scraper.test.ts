@@ -2,6 +2,7 @@ import { describe, test, expect, spyOn, mock } from "bun:test";
 import {
   parseBandcampOg,
   extractBandcampEmbedMetadata,
+  parseBandcampLabel,
   parseBandcampReleaseDate,
 } from "../../adapters/bandcamp/index";
 import { parseSoundcloudOg } from "../../adapters/soundcloud/index";
@@ -576,6 +577,25 @@ describe("scrapeUrl", () => {
         },
       ),
     );
+    // Complete oEmbed still pays for the iTunes lookup — the copyright line is
+    // the only cheap source of the label. The page itself stays unfetched.
+    fetchSpy.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          resultCount: 1,
+          results: [
+            {
+              collectionName: "It's a Beautiful Place",
+              artistName: "Water From Your Eyes",
+              copyright: "℗ 2025 Great Ghost Records",
+            },
+          ],
+        }),
+        {
+          headers: { "content-type": "application/json; charset=utf-8" },
+        },
+      ),
+    );
 
     const result = await scrapeUrl(
       "https://music.apple.com/es/album/its-a-beautiful-place/1811583108?l=en-GB",
@@ -587,10 +607,12 @@ describe("scrapeUrl", () => {
     expect(result!.imageUrl).toBe(
       "https://is1-ssl.mzstatic.com/image/thumb/Music211/v4/example/1200x1200bb.jpg",
     );
-    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    expect(result!.label).toBe("Great Ghost Records");
+    expect(fetchSpy).toHaveBeenCalledTimes(2);
     expect(fetchSpy.mock.calls[0]?.[0]).toBe(
       "https://music.apple.com/api/oembed?url=https%3A%2F%2Fmusic.apple.com%2Fes%2Falbum%2Fits-a-beautiful-place%2F1811583108%3Fl%3Den-GB",
     );
+    expect(fetchSpy.mock.calls[1]?.[0]).toBe("https://itunes.apple.com/lookup?id=1811583108");
     mock.restore();
   });
 
@@ -731,6 +753,62 @@ describe("parseBandcampReleaseDate", () => {
   });
 });
 
+describe("parseBandcampLabel", () => {
+  // Reuse the release-date fixture's page shape: the credits div as Bandcamp
+  // renders it under the tracklist.
+  function creditsPage(line: string): string {
+    return `<html><head><meta property="og:title" content="Album, by Artist" /></head><body>
+      <div class="tralbumData tralbum-credits"> ${line} </div>
+    </body></html>`;
+  }
+
+  test("reads the label from a phonogram line with one year", () => {
+    expect(
+      parseBandcampLabel(creditsPage("released 14 March 2024<br>© ℗ 2024 Blue Note Records")),
+    ).toBe("Blue Note Records");
+  });
+
+  test("reads a lone copyright symbol with a year", () => {
+    expect(parseBandcampLabel(creditsPage("© 2024 Hyperdub"))).toBe("Hyperdub");
+  });
+
+  test("reads through the markup Bandcamp wraps the label link in", () => {
+    const html = `<div class="tralbumData tralbum-credits">
+      released March 14, 2024
+      <br><br>
+      © ℗ 2024 <a href="https://bluenote.bandcamp.com" class="tralbum-credits-label-links">Blue Note Records</a>
+    </div>`;
+    expect(parseBandcampLabel(html)).toBe("Blue Note Records");
+  });
+
+  test("keeps a label that itself begins with digits", () => {
+    expect(parseBandcampLabel(creditsPage("© 2024 4AD"))).toBe("4AD");
+  });
+
+  test("keeps a label named after the artist — self-released is still released by them", () => {
+    expect(parseBandcampLabel(creditsPage("released March 2024<br>© 2024 The Artist"))).toBe(
+      "The Artist",
+    );
+  });
+
+  test("decodes HTML entities in the label name", () => {
+    expect(parseBandcampLabel(creditsPage("© 2024 Yves &amp; Tanya"))).toBe("Yves & Tanya");
+  });
+
+  test("returns undefined when the credits name no copyright line", () => {
+    expect(parseBandcampLabel(creditsPage("released 14 March 2024"))).toBeUndefined();
+  });
+
+  test("returns undefined for a page with no credits block", () => {
+    const html = `<html><body><footer>© 2026 Bandcamp</footer></body></html>`;
+    expect(parseBandcampLabel(html)).toBeUndefined();
+  });
+
+  test("returns undefined when the copyright line names only a year", () => {
+    expect(parseBandcampLabel(creditsPage("© ℗ 2024"))).toBeUndefined();
+  });
+});
+
 describe("scrapeUrl bandcamp release date", () => {
   test("carries the release date and its year off an album page", async () => {
     const html = `<html><head>
@@ -745,6 +823,21 @@ describe("scrapeUrl bandcamp release date", () => {
     const result = await scrapeUrl("https://artist.bandcamp.com/album/my-album", "bandcamp");
     expect(result?.releaseDate).toBe("2024-03-14");
     expect(result?.year).toBe(2024);
+    mock.restore();
+  });
+
+  test("carries the label off a label release's album page", async () => {
+    const html = `<html><head>
+      <meta property="og:title" content="My Album, by Artist" />
+    </head><body>
+      <div class="tralbumData tralbum-credits">released 14 March 2024<br>© ℗ 2024 Blue Note Records</div>
+    </body></html>`;
+    spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      new Response(html, { headers: { "content-type": "text/html" } }),
+    );
+
+    const result = await scrapeUrl("https://artist.bandcamp.com/album/my-album", "bandcamp");
+    expect(result?.label).toBe("Blue Note Records");
     mock.restore();
   });
 

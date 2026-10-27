@@ -4,8 +4,8 @@
  * Bandcamp has no API to speak of, so everything is read off the page: the OG
  * title names artist and release ("Release Title, by Artist Name"), the
  * `TralbumData` JSON in the body carries the `album_id` the embedded player
- * needs, and the credits state the release date. All three need the page body,
- * not just the head.
+ * needs, and the credits state the release date and, on label releases, the
+ * label. All of it needs the page body, not just the head.
  */
 import {
   decodeHtmlEntities,
@@ -158,7 +158,42 @@ export function parseBandcampReleaseDate(html: string): string | undefined {
   return undefined;
 }
 
-/** Scrape a Bandcamp album or track page: OG tags, embed id and release date. */
+/**
+ * The label the credits name, when they name one. Label releases print a
+ * copyright line under the release date — "© ℗ 2024 Blue Note Records", the
+ * name sometimes hyperlinked to the label's own page — and the label is
+ * whatever follows the symbols and year(s). Self-released records print no
+ * such line, so no match means no label rather than a missed one.
+ */
+function matchCreditsLabel(fragment: string): string | undefined {
+  // `stripHtmlForAnalysis` flattens the fragment to one line, so the label
+  // runs from the copyright line to the end of the credits text: find the
+  // first symbol, then strip symbols and year(s) off the front of the rest.
+  const text = stripHtmlForAnalysis(fragment);
+  const at = text.search(/[©℗]/);
+  if (at < 0) return undefined;
+  const name = text
+    .slice(at)
+    .replace(/^[©℗&\s]+/, "")
+    .replace(/^(?:\d{4}(?:\s*,\s*\d{4})*)[\s,·-]*/, "")
+    .trim();
+  return name.length > 0 ? name : undefined;
+}
+
+/**
+ * The label a Bandcamp album or track page names, from the credits under the
+ * tracklist — the same block `parseBandcampReleaseDate` reads. Searched only
+ * inside that block: the page's own footer copyright names Bandcamp or the
+ * host, not this record's label.
+ */
+export function parseBandcampLabel(html: string): string | undefined {
+  const credits = html.match(
+    /<[^>]*class=["'][^"']*tralbum-credits[^"']*["'][^>]*>([\s\S]*?)<\/div>/i,
+  );
+  return credits ? matchCreditsLabel(credits[1]) : undefined;
+}
+
+/** Scrape a Bandcamp album or track page: OG tags, embed id, release date and label. */
 export async function scrapeBandcamp(
   url: string,
   timeoutMs: number,
@@ -175,5 +210,7 @@ export async function scrapeBandcamp(
     // one going — fill the item's year in from it.
     result.year ??= parseReleaseYear(releaseDate) ?? undefined;
   }
+  const label = parseBandcampLabel(html);
+  if (label) result.label = label;
   return result;
 }

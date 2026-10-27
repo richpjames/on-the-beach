@@ -70,9 +70,25 @@ function mergeAppleMusicMetadata(
     potentialArtist: firstDefined(...entries.map((entry) => entry?.potentialArtist)),
     potentialTitle: firstDefined(...entries.map((entry) => entry?.potentialTitle)),
     imageUrl: firstDefined(...entries.map((entry) => entry?.imageUrl)),
+    label: firstDefined(...entries.map((entry) => entry?.label)),
   };
 
   return hasScrapedMetadata(merged) ? merged : null;
+}
+
+/**
+ * The label name inside an iTunes `copyright` string. Apple ships the imprint
+ * as "℗ 2024 Bronze", "© & ℗ 2024 XL Recordings" and the like — the symbols
+ * and year(s) prefix everything, the rest is the label.
+ */
+export function parseItunesCopyright(value: unknown): string | undefined {
+  const raw = getString(value);
+  if (!raw) return undefined;
+  const name = raw
+    .replace(/^[©℗&\s]+/, "")
+    .replace(/^(?:\d{4}(?:\s*,\s*\d{4})*)[\s,·-]*/, "")
+    .trim();
+  return name.length > 0 ? name : undefined;
 }
 async function scrapeAppleMusicOEmbed(
   url: string,
@@ -199,8 +215,9 @@ async function scrapeAppleMusicLookup(
     const imageUrl = normalizeAppleMusicImageUrl(
       firstDefined(getString(primary.artworkUrl100), getString(primary.artworkUrl60)),
     );
+    const label = parseItunesCopyright(primary.copyright);
 
-    if (!potentialTitle && !potentialArtist && !imageUrl) {
+    if (!potentialTitle && !potentialArtist && !imageUrl && !label) {
       return null;
     }
 
@@ -208,6 +225,7 @@ async function scrapeAppleMusicLookup(
       potentialTitle,
       potentialArtist,
       imageUrl,
+      ...(label !== undefined ? { label } : {}),
     };
   } catch {
     return null;
@@ -239,7 +257,11 @@ export const NO_APPLE_MUSIC_API_METADATA: AppleMusicApiMetadata = {
 
 /**
  * Walk Apple's JSON APIs for a catalogue URL, cheapest first, stopping as soon
- * as the answer is complete.
+ * as the answer is complete — except the label: oEmbed never names it, so the
+ * iTunes lookup runs whenever its `copyright` line is the only source left,
+ * even after a complete oEmbed answer. It is one unauthenticated GET against a
+ * user-initiated add, a fair price for labels that don't depend on which door
+ * happened to be complete.
  *
  * oEmbed alone is usually enough for albums; singles and deep-linked tracks
  * tend to need the iTunes lookup to name the artist. When the result is
@@ -252,7 +274,11 @@ export async function fetchAppleMusicApiMetadata(
   const oEmbed = await scrapeAppleMusicOEmbed(url, timeoutMs);
   const fromOEmbed = mergeAppleMusicMetadata(oEmbed);
   if (isCompleteAppleMusicMetadata(fromOEmbed)) {
-    return { oEmbed, lookup: null, merged: fromOEmbed };
+    if (fromOEmbed.label || !extractAppleMusicLookupId(url)) {
+      return { oEmbed, lookup: null, merged: fromOEmbed };
+    }
+    const lookup = await scrapeAppleMusicLookup(url, timeoutMs);
+    return { oEmbed, lookup, merged: mergeAppleMusicMetadata(oEmbed, lookup) };
   }
 
   const lookup = await scrapeAppleMusicLookup(url, timeoutMs);
@@ -399,7 +425,7 @@ export async function searchAppleMusicViaItunes(
         normalizeAppleMusicImageUrl(
           firstDefined(getString(result.artworkUrl100), getString(result.artworkUrl60)),
         ) ?? null;
-      return { url, artworkUrl };
+      return { url, artworkUrl, label: parseItunesCopyright(result.copyright) ?? null };
     }
 
     // Pass 1: exact title + artist

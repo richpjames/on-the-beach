@@ -27,7 +27,7 @@ import { DuplicateItemSelectionError } from "../../app/music-item-store";
 import { hydrateItemStacks } from "../../domain/hydrate-item-stacks";
 import { scrapeAddedLink } from "../../app/added-link-scrape";
 import { collectDescendantStackIds } from "../../app/queries/stack-tree";
-import { saveArtwork } from "../../app/secondary-link-enrichment";
+import { saveArtwork, saveLabel } from "../../app/secondary-link-enrichment";
 import { UnsupportedMusicLinkError } from "../../app/scrape";
 import { ensureSuggestionsForItemNow, findPendingSuggestionsForItem } from "../../app/suggestions";
 import { scheduleAppleMusicBackfill } from "../../app/apple-music-backfill";
@@ -755,7 +755,7 @@ musicItemRoutes.post("/:id/links", async (c) => {
   const isPrimary = existing.length === 0;
 
   const [item] = await db
-    .select({ artworkUrl: musicItems.artworkUrl })
+    .select({ artworkUrl: musicItems.artworkUrl, label: musicItems.label })
     .from(musicItems)
     .where(eq(musicItems.id, id))
     .limit(1);
@@ -763,8 +763,12 @@ musicItemRoutes.post("/:id/links", async (c) => {
   // Scraped here rather than at creation time, because this link never went
   // through the creation path — without it a hand-added Bandcamp link can't
   // produce a player, and a release with no picture of its own never gets one
-  // from the page just linked to it.
-  const scraped = await scrapeAddedLink(url, !item?.artworkUrl);
+  // from the page just linked to it. The label rides the same scrape, from
+  // the sources that name one.
+  const scraped = await scrapeAddedLink(url, {
+    artwork: !item?.artworkUrl,
+    label: !item?.label,
+  });
 
   const [link] = await db
     .insert(musicLinks)
@@ -782,9 +786,13 @@ musicItemRoutes.post("/:id/links", async (c) => {
   }
 
   // Only fills the gap: the `IS NULL` guard inside means an artwork set while
-  // the scrape was in flight is never clobbered.
+  // the scrape was in flight is never clobbered. The label is guarded the
+  // same way.
   if (scraped.imageUrl) {
     await saveArtwork(id, scraped.imageUrl);
+  }
+  if (scraped.label) {
+    await saveLabel(id, scraped.label);
   }
 
   return c.json(
@@ -799,6 +807,7 @@ musicItemRoutes.post("/:id/links", async (c) => {
       can_buy: source.canBuy,
       is_editorial: source.isEditorial,
       artwork_url: item?.artworkUrl ?? scraped.imageUrl,
+      label: item?.label ?? scraped.label,
     },
     201,
   );

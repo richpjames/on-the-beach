@@ -30,9 +30,9 @@ import { getLookupService, type LookupService } from "./settings";
 // out-of-print records — two fallbacks run in order. First the item's
 // MusicBrainz release group is checked for a Bandcamp page among its url
 // relations: editors attach those links to the release itself, so no fuzzy
-// matching is involved, and the page supplies the release's own cover art.
-// Then a YouTube search, which only yields a link when the match is
-// unambiguous (see server/youtube-search.ts).
+// matching is involved, and the page supplies the release's own cover art
+// and record label. Then a YouTube search, which only yields a link when the
+// match is unambiguous (see server/youtube-search.ts).
 // ---------------------------------------------------------------------------
 
 export interface ServiceConfig {
@@ -78,6 +78,8 @@ export interface ItemInfoForLookup {
   primaryUrl: string | null;
   /** The item's current cover art, if any — a lookup only fills a gap, never overwrites. */
   artworkUrl: string | null;
+  /** The item's current record label, if any — filled the same gap-only way. */
+  label: string | null;
   /** Set once a lookup has been attempted (hit or miss); used to avoid re-querying. */
   lookupAttemptedAt: Date | null;
   /**
@@ -105,6 +107,7 @@ export type SearchFallbackFn = (
 export type FindBandcampLinkFn = (item: ItemInfoForLookup) => Promise<ServiceSearchResult | null>;
 export type SaveLinkFn = (itemId: number, url: string, sourceName: string) => Promise<void>;
 export type SaveArtworkFn = (itemId: number, artworkUrl: string) => Promise<void>;
+export type SaveLabelFn = (itemId: number, label: string) => Promise<void>;
 export type StampLookupFn = (itemId: number) => Promise<void>;
 
 export async function fetchItemForLookup(id: number): Promise<ItemInfoForLookup | null> {
@@ -115,6 +118,7 @@ export async function fetchItemForLookup(id: number): Promise<ItemInfoForLookup 
       primarySource: sources.name,
       primaryUrl: musicLinks.url,
       artworkUrl: musicItems.artworkUrl,
+      label: musicItems.label,
       lookupAttemptedAt: musicItems.lookupAttemptedAt,
       musicbrainzReleaseId: musicItems.musicbrainzReleaseId,
       musicbrainzReleaseGroupId: musicItems.musicbrainzReleaseGroupId,
@@ -138,6 +142,7 @@ export async function fetchItemForLookup(id: number): Promise<ItemInfoForLookup 
     primarySource: row.primarySource ?? null,
     primaryUrl: row.primaryUrl ?? null,
     artworkUrl: row.artworkUrl ?? null,
+    label: row.label ?? null,
     lookupAttemptedAt: row.lookupAttemptedAt ?? null,
     musicbrainzReleaseId: row.musicbrainzReleaseId ?? null,
     musicbrainzReleaseGroupId: row.musicbrainzReleaseGroupId ?? null,
@@ -203,6 +208,18 @@ export async function saveArtwork(itemId: number, artworkUrl: string): Promise<v
     .where(and(eq(musicItems.id, itemId), isNull(musicItems.artworkUrl)));
 }
 
+/**
+ * Persist the record label a lookup surfaced, under the same terms as the
+ * artwork above: only into an empty `label` column, never over a label the
+ * user set or another source supplied.
+ */
+export async function saveLabel(itemId: number, label: string): Promise<void> {
+  await db
+    .update(musicItems)
+    .set({ label })
+    .where(and(eq(musicItems.id, itemId), isNull(musicItems.label)));
+}
+
 const defaultSearch: SearchServiceFn = (title, artist, service) =>
   LOOKUP_SERVICE_CONFIG[service].search(title, artist);
 
@@ -215,6 +232,7 @@ export interface SecondaryLookupDeps {
   findBandcampLink: FindBandcampLinkFn;
   save: SaveLinkFn;
   saveArtwork: SaveArtworkFn;
+  saveLabel: SaveLabelFn;
   stamp: StampLookupFn;
 }
 
@@ -227,6 +245,7 @@ export const defaultSecondaryLookupDeps: SecondaryLookupDeps = {
   findBandcampLink: defaultFindBandcampLink,
   save: saveLink,
   saveArtwork,
+  saveLabel,
   stamp: stampLookup,
 };
 
@@ -311,8 +330,9 @@ export function pickBandcampReleaseUrl(relations: MbUrlRelation[]): string | nul
  * Resolve the release's Bandcamp page through MusicBrainz: the release group's
  * url relations often name it, attached there by MB editors, so unlike the
  * catalogue searches there is no fuzzy matching to get wrong. The page is
- * scraped for its cover art — a Bandcamp cover *is* the release's artwork, so
- * unlike the YouTube fallback this hit may carry some.
+ * scraped for its cover art and label — a Bandcamp page *is* the release's
+ * own account of itself, so unlike the YouTube fallback this hit may carry
+ * both.
  *
  * Failures return null (logged) rather than throwing: this runs inside
  * background enrichment, where the YouTube fallback is still worth a try.
@@ -339,7 +359,11 @@ async function defaultFindBandcampLink(
   if (!url) return null;
 
   const scraped = await scrapeBandcamp(url, 8000).catch(() => null);
-  return { url, artworkUrl: scraped?.imageUrl ?? null };
+  return {
+    url,
+    artworkUrl: scraped?.imageUrl ?? null,
+    label: scraped?.label ?? null,
+  };
 }
 
 async function resolveReleaseGroupId(releaseId: string): Promise<string | null> {
@@ -372,6 +396,11 @@ async function lookupBandcampLink(
   await deps.save(itemId, hit.url, BANDCAMP_FALLBACK_SERVICE.sourceName);
   if (hit.artworkUrl && !item.artworkUrl) {
     await deps.saveArtwork(itemId, hit.artworkUrl);
+  }
+  // The credits' copyright line names the label the same way the page's image
+  // is the cover — a Bandcamp page *is* the release's own account of itself.
+  if (hit.label && !item.label) {
+    await deps.saveLabel(itemId, hit.label);
   }
   return hit;
 }
@@ -463,9 +492,13 @@ export async function lookupSecondaryLinkForItem(
 
   await deps.save(itemId, result.url, cfg.sourceName);
 
-  // Backfill cover art from the same lookup when the item has none of its own.
+  // Backfill cover art and the record label from the same lookup when the item
+  // has neither of its own.
   if (result.artworkUrl && !item.artworkUrl) {
     await deps.saveArtwork(itemId, result.artworkUrl);
+  }
+  if (result.label && !item.label) {
+    await deps.saveLabel(itemId, result.label);
   }
 
   return { kind: "result", service, serviceDisplayName: cfg.displayName, url: result.url };
