@@ -10,9 +10,11 @@ test("start menu opens, runs an action, and closes", async ({ page }) => {
   await startBtn.click();
   await expect(menu).toBeVisible();
   await expect(startBtn).toHaveAttribute("aria-expanded", "true");
-  // Add, Pick One, Search, Manage stacks, New releases, Settings, RSS feed
-  await expect(menu.locator(".start-menu__item")).toHaveCount(7);
+  // Add, Pick One, Search, Manage stacks, New releases, Settings, RSS feed,
+  // Design system
+  await expect(menu.locator(".start-menu__item")).toHaveCount(8);
   await expect(menu.locator('.start-menu__item[href="/settings"]')).toBeVisible();
+  await expect(menu.locator('.start-menu__item[href="/design-system"]')).toBeVisible();
 
   // "Add a release" focuses the add input and closes the menu
   await menu.locator('[data-start-action="add"]').click();
