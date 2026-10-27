@@ -1,4 +1,5 @@
 <script lang="ts">
+  import "../styles/design-system.css";
   import "../styles/main.css";
   import { page } from "$app/state";
   import PlayerWindow from "$lib/components/PlayerWindow.svelte";
