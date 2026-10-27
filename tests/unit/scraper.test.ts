@@ -785,6 +785,16 @@ describe("parseBandcampLabel", () => {
     expect(parseBandcampLabel(creditsPage("© 2024 4AD"))).toBe("4AD");
   });
 
+  test("stops at the end of the copyright line — later credits are not the label", () => {
+    expect(
+      parseBandcampLabel(
+        creditsPage(
+          "released 14 March 2024<br><br>© ℗ 2024 Blue Note Records<br>Distributed by Somebody",
+        ),
+      ),
+    ).toBe("Blue Note Records");
+  });
+
   test("keeps a label named after the artist — self-released is still released by them", () => {
     expect(parseBandcampLabel(creditsPage("released March 2024<br>© 2024 The Artist"))).toBe(
       "The Artist",

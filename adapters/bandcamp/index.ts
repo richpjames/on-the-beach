@@ -15,6 +15,7 @@ import {
 } from "../web/html-metadata";
 import { fetchPageHtml, MAX_BODY_BYTES } from "../web/fetch-page";
 import { stripHtmlForAnalysis } from "../web";
+import { labelNameFromCopyrightLine } from "../../domain/label";
 import { parseReleaseYear } from "../../domain/release-dates";
 
 export function parseBandcampOg(og: OgData): ScrapedMetadata {
@@ -166,18 +167,14 @@ export function parseBandcampReleaseDate(html: string): string | undefined {
  * such line, so no match means no label rather than a missed one.
  */
 function matchCreditsLabel(fragment: string): string | undefined {
-  // `stripHtmlForAnalysis` flattens the fragment to one line, so the label
-  // runs from the copyright line to the end of the credits text: find the
-  // first symbol, then strip symbols and year(s) off the front of the rest.
-  const text = stripHtmlForAnalysis(fragment);
-  const at = text.search(/[©℗]/);
+  // The copyright line is one `<br>`-separated line of the credits, and the
+  // label ends with it: anything printed after the break is more credits
+  // (distribution notes and the like), not a longer name. Strip the markup
+  // only after the line is cut, then hand it to the shared copyright parser.
+  const at = fragment.search(/[©℗]/);
   if (at < 0) return undefined;
-  const name = text
-    .slice(at)
-    .replace(/^[©℗&\s]+/, "")
-    .replace(/^(?:\d{4}(?:\s*,\s*\d{4})*)[\s,·-]*/, "")
-    .trim();
-  return name.length > 0 ? name : undefined;
+  const line = fragment.slice(at).split(/<br\s*\/?>/i)[0];
+  return labelNameFromCopyrightLine(stripHtmlForAnalysis(line));
 }
 
 /**
