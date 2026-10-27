@@ -219,6 +219,18 @@
         play: () => listen(soundcloud),
       };
     }
+    const mixcloud = data.mixcloudEmbed;
+    if (mixcloud) {
+      return {
+        key: "mixcloud",
+        service: "Mixcloud",
+        source: "mixcloud",
+        href: mixcloud.href ?? undefined,
+        src: mixcloud.src,
+        playerType: mixcloud.playerType,
+        play: () => listen(mixcloud),
+      };
+    }
     if (appleMusic?.src) {
       return {
         key: "apple-music-preview",
@@ -681,15 +693,6 @@
               </a>
             {/each}
           </div>
-          {#if data.mixcloudWidgetSrc}
-            <iframe
-              class="release-page__mixcloud-embed"
-              src={data.mixcloudWidgetSrc}
-              style="border:0;width:100%;height:60px;"
-              title="Mixcloud player"
-              allow="autoplay"
-            ></iframe>
-          {/if}
         </div>
 
         <div id="edit-mode" hidden={!editMode}>

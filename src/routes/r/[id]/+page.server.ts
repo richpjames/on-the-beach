@@ -120,6 +120,35 @@ function soundcloudEmbed(item: MusicItemFull): ListenEmbed | null {
   return src ? { src, href: found.url, playerType: "audio" } : null;
 }
 
+/** The first Mixcloud URL on the item (primary link preferred). */
+function mixcloudUrlForItem(item: MusicItemFull): string | null {
+  if (item.primary_url?.includes("mixcloud.com")) return item.primary_url;
+  const link = item.links.find(
+    (l) => !l.is_primary && (l.source_name === "mixcloud" || l.url.includes("mixcloud.com")),
+  );
+  return link ? link.url : null;
+}
+
+/**
+ * The Mixcloud listen word. The widget takes the show's own URL — no scraped
+ * id to wait for, as Bandcamp and SoundCloud have — so any Mixcloud link
+ * plays. A release whose primary page isn't Mixcloud at all but embeds its
+ * widget (a radio show's own site, say) falls back to the widget URL the
+ * scrape recorded there; that case used to render as a fixed iframe below
+ * the actions and now plays in the player window like everything else. The
+ * fallback carries no href: the page it came from stays in the "there" list,
+ * so it remains reachable.
+ */
+function mixcloudEmbed(item: MusicItemFull): ListenEmbed | null {
+  const url = mixcloudUrlForItem(item);
+  if (url) {
+    const src = mixcloudWidgetSrc(url);
+    if (src) return { src, href: url, playerType: "audio" };
+  }
+  const embedded = mixcloudWidgetSrc(parseLinkMetadata(item.primary_link_metadata)?.mixcloud_url);
+  return embedded ? { src: embedded, href: null, playerType: "audio" } : null;
+}
+
 /**
  * How to listen to a release on Apple Music.
  *  - "musickit": full-track playback via the browser MusicKit SDK, using the
@@ -213,8 +242,7 @@ export const load: PageServerLoad = async ({ params, url }) => {
     item,
     // Whether the record's artist is followed, for the button beside their
     // name. Null when the item has no artist to follow.
-    artistFollowState:
-      item.artist_id !== null ? await getArtistFollowState(item.artist_id) : null,
+    artistFollowState: item.artist_id !== null ? await getArtistFollowState(item.artist_id) : null,
     // Where the back button goes. List pages carry their browsing state in the
     // URL and pass it along as `from`, so back returns to the exact view the
     // release was opened from instead of dumping the user on the home list.
@@ -227,9 +255,7 @@ export const load: PageServerLoad = async ({ params, url }) => {
     soundcloudEmbed: soundcloudEmbed(item),
     appleMusicListen: appleMusicListen(item, appleMusicConfigured),
     appleMusicConfigured,
-    mixcloudWidgetSrc: mixcloudWidgetSrc(
-      parseLinkMetadata(item.primary_link_metadata)?.mixcloud_url,
-    ),
+    mixcloudEmbed: mixcloudEmbed(item),
     lookupService: await getLookupService(),
   };
 };
