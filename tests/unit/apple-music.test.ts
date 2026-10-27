@@ -49,6 +49,11 @@ describe("parseItunesCopyright", () => {
     expect(parseItunesCopyright("℗ 2023, 2024 Warp")).toBe("Warp");
   });
 
+  test("strips a year range joined by a dash", () => {
+    expect(parseItunesCopyright("℗ 2023-2024 Warp")).toBe("Warp");
+    expect(parseItunesCopyright("℗ 2023-2024")).toBeUndefined();
+  });
+
   test("keeps a label that itself begins with digits", () => {
     expect(parseItunesCopyright("© 2024 4AD")).toBe("4AD");
   });

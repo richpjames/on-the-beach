@@ -22,6 +22,7 @@ import {
   type ScrapedMetadata,
 } from "../web/html-metadata";
 import { fetchPageHtml, MAX_HEAD_BYTES } from "../web/fetch-page";
+import { labelNameFromCopyrightLine } from "../../domain/label";
 import { searchAppleMusicCatalog } from "./catalog";
 import { normalizeForMatch } from "./match";
 
@@ -78,17 +79,12 @@ function mergeAppleMusicMetadata(
 
 /**
  * The label name inside an iTunes `copyright` string. Apple ships the imprint
- * as "℗ 2024 Bronze", "© & ℗ 2024 XL Recordings" and the like — the symbols
- * and year(s) prefix everything, the rest is the label.
+ * as "℗ 2024 Bronze", "© & ℗ 2024 XL Recordings" and the like — the stripping
+ * itself lives in `domain/label.ts`, shared with the Bandcamp credits line.
  */
 export function parseItunesCopyright(value: unknown): string | undefined {
   const raw = getString(value);
-  if (!raw) return undefined;
-  const name = raw
-    .replace(/^[©℗&\s]+/, "")
-    .replace(/^(?:\d{4}(?:\s*,\s*\d{4})*)[\s,·-]*/, "")
-    .trim();
-  return name.length > 0 ? name : undefined;
+  return raw ? labelNameFromCopyrightLine(raw) : undefined;
 }
 async function scrapeAppleMusicOEmbed(
   url: string,
