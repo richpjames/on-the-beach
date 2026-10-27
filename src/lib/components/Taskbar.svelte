@@ -249,6 +249,9 @@
         <a class="start-menu__item" role="menuitem" href="/feed/to-listen.rss" onclick={closeStartMenu}>
           <span class="start-menu__icon" aria-hidden="true">📡</span>RSS feed
         </a>
+        <a class="start-menu__item" role="menuitem" href="/design-system" onclick={closeStartMenu}>
+          <span class="start-menu__icon" aria-hidden="true">🎨</span>Design system
+        </a>
       </div>
     </div>
     <button
