@@ -29,6 +29,7 @@ interface CatalogItem {
   artistName: string;
   url: string;
   artwork?: { url: string; width?: number; height?: number };
+  recordLabel?: string;
 }
 
 function catalogResponse(albums: CatalogItem[], songs: CatalogItem[] = []): Response {
@@ -120,7 +121,24 @@ describe("searchAppleMusicCatalog", () => {
     expect(result).toEqual({
       url: "https://music.apple.com/gb/album/blue-lines/123",
       artworkUrl: "https://is1-ssl.mzstatic.com/image/thumb/abc/1200x1200bb.jpg",
+      label: null,
     });
+  });
+
+  test("returns the record label the catalogue names", async () => {
+    configure();
+    spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      catalogResponse([
+        {
+          name: "Blue Lines",
+          artistName: "Massive Attack",
+          url: "https://music.apple.com/gb/album/blue-lines/123",
+          recordLabel: "Wild Bunch Records",
+        },
+      ]),
+    );
+    const result = await searchAppleMusicCatalog("Blue Lines", "Massive Attack");
+    expect(result?.label).toBe("Wild Bunch Records");
   });
 
   test("returns a null artworkUrl when the resource has no artwork", async () => {
@@ -138,6 +156,7 @@ describe("searchAppleMusicCatalog", () => {
     expect(result).toEqual({
       url: "https://music.apple.com/gb/album/blue-lines/123",
       artworkUrl: null,
+      label: null,
     });
   });
 

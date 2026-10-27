@@ -18,6 +18,7 @@ const searchFallback = mock();
 const findBandcampLink = mock();
 const save = mock();
 const saveArtwork = mock();
+const saveLabel = mock();
 const stamp = mock();
 
 const deps: SecondaryLookupDeps = {
@@ -29,6 +30,7 @@ const deps: SecondaryLookupDeps = {
   findBandcampLink,
   save,
   saveArtwork,
+  saveLabel,
   stamp,
 };
 
@@ -39,6 +41,7 @@ function item(overrides: Partial<ItemInfoForLookup> = {}): ItemInfoForLookup {
     primarySource: null,
     primaryUrl: null,
     artworkUrl: null,
+    label: null,
     lookupAttemptedAt: null,
     musicbrainzReleaseId: null,
     musicbrainzReleaseGroupId: null,
@@ -46,9 +49,9 @@ function item(overrides: Partial<ItemInfoForLookup> = {}): ItemInfoForLookup {
   };
 }
 
-/** A search hit for the given URL, with optional cover artwork. */
-function hit(url: string, artworkUrl: string | null = null) {
-  return { url, artworkUrl };
+/** A search hit for the given URL, with optional cover artwork and label. */
+function hit(url: string, artworkUrl: string | null = null, label: string | null = null) {
+  return { url, artworkUrl, label };
 }
 
 beforeEach(() => {
@@ -60,6 +63,7 @@ beforeEach(() => {
   findBandcampLink.mockReset();
   save.mockReset();
   saveArtwork.mockReset();
+  saveLabel.mockReset();
   stamp.mockReset();
   getService.mockResolvedValue("apple_music" as LookupService);
   getExisting.mockResolvedValue(null);
@@ -67,6 +71,7 @@ beforeEach(() => {
   findBandcampLink.mockResolvedValue(null);
   save.mockResolvedValue(undefined);
   saveArtwork.mockResolvedValue(undefined);
+  saveLabel.mockResolvedValue(undefined);
   stamp.mockResolvedValue(undefined);
 });
 
@@ -173,6 +178,31 @@ describe("lookupSecondaryLinkForItem", () => {
     search.mockResolvedValue(hit("https://music.apple.com/gb/album/blue-lines/456", null));
     await lookupSecondaryLinkForItem(5, deps);
     expect(saveArtwork).not.toHaveBeenCalled();
+  });
+
+  test("on a hit with a label: backfills the item's label when it has none", async () => {
+    fetchItem.mockResolvedValue(item({ label: null }));
+    search.mockResolvedValue(
+      hit("https://music.apple.com/gb/album/blue-lines/456", null, "Wild Bunch Records"),
+    );
+    await lookupSecondaryLinkForItem(5, deps);
+    expect(saveLabel).toHaveBeenCalledWith(5, "Wild Bunch Records");
+  });
+
+  test("does not overwrite a label the item already has", async () => {
+    fetchItem.mockResolvedValue(item({ label: "Wild Bunch" }));
+    search.mockResolvedValue(
+      hit("https://music.apple.com/gb/album/blue-lines/456", null, "Virgin"),
+    );
+    await lookupSecondaryLinkForItem(5, deps);
+    expect(saveLabel).not.toHaveBeenCalled();
+  });
+
+  test("saves no label when the hit carries none", async () => {
+    fetchItem.mockResolvedValue(item({ label: null }));
+    search.mockResolvedValue(hit("https://music.apple.com/gb/album/blue-lines/456"));
+    await lookupSecondaryLinkForItem(5, deps);
+    expect(saveLabel).not.toHaveBeenCalled();
   });
 
   test("on a miss: stamps the marker but saves nothing", async () => {
@@ -335,6 +365,18 @@ describe("Bandcamp fallback", () => {
     await lookupSecondaryLinkForItem(7, deps);
 
     expect(saveArtwork).toHaveBeenCalledWith(7, "https://bandcamp/cover.jpg");
+  });
+
+  test("a Bandcamp hit may fill the item's label — the credits name the imprint", async () => {
+    fetchItem.mockResolvedValue(item({ label: null }));
+    search.mockResolvedValue(null);
+    findBandcampLink.mockResolvedValue(
+      hit(bandcampUrl, "https://bandcamp/cover.jpg", "Ostinato Records"),
+    );
+
+    await lookupSecondaryLinkForItem(7, deps);
+
+    expect(saveLabel).toHaveBeenCalledWith(7, "Ostinato Records");
   });
 
   test("does not overwrite artwork the item already has", async () => {

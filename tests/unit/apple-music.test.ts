@@ -1,6 +1,10 @@
 import { describe, test, expect, spyOn, mock, beforeEach, afterEach } from "bun:test";
 import { scrapeUrl } from "../../app/scrape";
-import { parseAppleMusicOg, searchAppleMusic } from "../../adapters/apple-music/index";
+import {
+  parseAppleMusicOg,
+  parseItunesCopyright,
+  searchAppleMusic,
+} from "../../adapters/apple-music/index";
 
 describe("parseAppleMusicOg", () => {
   test("extracts title and artist from description", () => {
@@ -29,6 +33,39 @@ describe("parseAppleMusicOg", () => {
     });
     expect(result.potentialTitle).toBe("Some Album");
     expect(result.potentialArtist).toBeUndefined();
+  });
+});
+
+describe("parseItunesCopyright", () => {
+  test("strips the phonogram symbol and year", () => {
+    expect(parseItunesCopyright("℗ 2024 Bronze")).toBe("Bronze");
+  });
+
+  test("strips doubled copyright symbols and the year", () => {
+    expect(parseItunesCopyright("© & ℗ 2024 XL Recordings")).toBe("XL Recordings");
+  });
+
+  test("strips a comma-separated run of years", () => {
+    expect(parseItunesCopyright("℗ 2023, 2024 Warp")).toBe("Warp");
+  });
+
+  test("keeps a label that itself begins with digits", () => {
+    expect(parseItunesCopyright("© 2024 4AD")).toBe("4AD");
+  });
+
+  test("keeps the name when there is no year", () => {
+    expect(parseItunesCopyright("℗ Hyperdub")).toBe("Hyperdub");
+  });
+
+  test("returns undefined when only symbols and a year remain", () => {
+    expect(parseItunesCopyright("℗ 2024")).toBeUndefined();
+    expect(parseItunesCopyright("© ℗ 2024")).toBeUndefined();
+  });
+
+  test("returns undefined for non-strings and blanks", () => {
+    expect(parseItunesCopyright(undefined)).toBeUndefined();
+    expect(parseItunesCopyright(2024)).toBeUndefined();
+    expect(parseItunesCopyright("  ")).toBeUndefined();
   });
 });
 
@@ -86,7 +123,24 @@ describe("searchAppleMusic", () => {
     expect(result).toEqual({
       url: "https://music.apple.com/gb/album/blue-lines/123",
       artworkUrl: "https://is1-ssl.mzstatic.com/image/thumb/Music/abc/1200x1200bb.jpg",
+      label: null,
     });
+    mock.restore();
+  });
+
+  test("returns the label parsed out of the copyright line", async () => {
+    spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      mockItunesResponse([
+        {
+          collectionName: "Blue Lines",
+          artistName: "Massive Attack",
+          collectionViewUrl: "https://music.apple.com/gb/album/blue-lines/123",
+          copyright: "℗ 1991 Wild Bunch Records",
+        },
+      ]),
+    );
+    const result = await searchAppleMusic("Blue Lines", "Massive Attack");
+    expect(result?.label).toBe("Wild Bunch Records");
     mock.restore();
   });
 
@@ -226,9 +280,11 @@ describe("scrapeUrl: apple_music", () => {
     });
   }
 
-  test("returns oEmbed metadata alone when it is already complete", async () => {
-    // Complete = artist + title + image. The ladder should stop here and never
-    // reach for the lookup or the page.
+  test("runs the lookup for the label even when oEmbed is already complete", async () => {
+    // Complete = artist + title + image, and that still holds the page fetch
+    // at bay. But oEmbed never names the label — the lookup's copyright line
+    // is the only cheap source — so the ladder pays for it: two fetches, with
+    // the merge still favouring oEmbed on every field it supplied.
     const fetchSpy = spyOn(globalThis, "fetch");
     fetchSpy.mockResolvedValueOnce(
       oEmbedResponse({
@@ -236,6 +292,16 @@ describe("scrapeUrl: apple_music", () => {
         author_name: "Daft Punk",
         thumbnail_url: "https://is1-ssl.mzstatic.com/image/600x600bb.jpg",
       }),
+    );
+    fetchSpy.mockResolvedValueOnce(
+      lookupResponse([
+        {
+          collectionName: "Random Access Memories (Deluxe)",
+          artistName: "Daft Punk",
+          artworkUrl100: "https://is1-ssl.mzstatic.com/image/100x100bb.jpg",
+          copyright: "℗ 2013 Columbia Records",
+        },
+      ]),
     );
 
     const result = await scrapeUrl(URL, "apple_music");
@@ -245,7 +311,28 @@ describe("scrapeUrl: apple_music", () => {
     expect(result!.potentialArtist).toBe("Daft Punk");
     // Artwork is upscaled on the way through.
     expect(result!.imageUrl).toBe("https://is1-ssl.mzstatic.com/image/1200x1200bb.jpg");
+    expect(result!.label).toBe("Columbia Records");
+    expect(fetchSpy).toHaveBeenCalledTimes(2);
+    mock.restore();
+  });
+
+  test("skips the label lookup when the URL has no numeric id", async () => {
+    // Nothing for the lookup to key on, so a complete oEmbed answer stands
+    // alone — one fetch, no label.
+    const fetchSpy = spyOn(globalThis, "fetch");
+    fetchSpy.mockResolvedValueOnce(
+      oEmbedResponse({
+        title: "Random Access Memories",
+        author_name: "Daft Punk",
+        thumbnail_url: "https://is1-ssl.mzstatic.com/image/600x600bb.jpg",
+      }),
+    );
+
+    const result = await scrapeUrl("https://music.apple.com/gb/artist/daft-punk", "apple_music");
+
     expect(fetchSpy).toHaveBeenCalledTimes(1);
+    expect(result!.potentialArtist).toBe("Daft Punk");
+    expect(result!.label).toBeUndefined();
     mock.restore();
   });
 
@@ -265,6 +352,7 @@ describe("scrapeUrl: apple_music", () => {
           collectionName: "Random Access Memories (Deluxe)",
           artistName: "Daft Punk",
           artworkUrl100: "https://is1-ssl.mzstatic.com/image/100x100bb.jpg",
+          copyright: "℗ 2013 Columbia Records",
         },
       ]),
     );
@@ -282,6 +370,8 @@ describe("scrapeUrl: apple_music", () => {
     // *album* via collectionName while oEmbed returns the song's own title.
     expect(result!.potentialTitle).toBe("Random Access Memories");
     expect(result!.imageUrl).toBe("https://is1-ssl.mzstatic.com/image/1200x1200bb.jpg");
+    // The label has one source only, so it survives any merge order.
+    expect(result!.label).toBe("Columbia Records");
     mock.restore();
   });
 });

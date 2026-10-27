@@ -17,7 +17,9 @@ const BANDCAMP_HTML = `<html><head>
 <meta property="og:title" content="Where Between You &amp; Me, by Seekersinternational">
 <meta property="og:image" content="https://f4.bcbits.com/img/a998877_10.jpg">
 <meta name="bc-page-properties" content='{"item_type":"album","item_id":998877}'>
-</head><body></body></html>`;
+</head><body>
+<div class="tralbumData tralbum-credits">released 1 March 2024<br>© ℗ 2024 Ostinato Records</div>
+</body></html>`;
 
 const insertedItemIds: number[] = [];
 const realFetch = globalThis.fetch;
@@ -29,7 +31,10 @@ function makeApp(): Hono {
   return app;
 }
 
-async function insertItem(artworkUrl: string | null = null): Promise<number> {
+async function insertItem(
+  artworkUrl: string | null = null,
+  label: string | null = null,
+): Promise<number> {
   const [inserted] = await db
     .insert(musicItems)
     .values({
@@ -37,6 +42,7 @@ async function insertItem(artworkUrl: string | null = null): Promise<number> {
       normalizedTitle: "where between you & me",
       listenStatus: "to-listen",
       artworkUrl,
+      label,
     })
     .returning({ id: musicItems.id });
 
@@ -51,6 +57,15 @@ async function readArtwork(id: number): Promise<string | null> {
     .where(eq(musicItems.id, id));
 
   return item?.artworkUrl ?? null;
+}
+
+async function readLabel(id: number): Promise<string | null> {
+  const [item] = await db
+    .select({ label: musicItems.label })
+    .from(musicItems)
+    .where(eq(musicItems.id, id));
+
+  return item?.label ?? null;
 }
 
 function addLink(id: number, body: Record<string, unknown>) {
@@ -123,8 +138,8 @@ describe("POST /api/music-items/:id/links", () => {
     expect(link.metadata).toBeNull();
   });
 
-  test("scrapes nothing when the release needs neither player ids nor a picture", async () => {
-    const id = await insertItem("/uploads/scanned-sleeve.jpg");
+  test("scrapes nothing when the release needs neither player ids, a picture, nor a label", async () => {
+    const id = await insertItem("/uploads/scanned-sleeve.jpg", "Ostinato Records");
 
     await addLink(id, { sourceName: "Spotify", url: "https://open.spotify.com/album/1A2B3C4D5E" });
 
@@ -149,6 +164,24 @@ describe("POST /api/music-items/:id/links", () => {
     await addLink(id, { sourceName: "Bandcamp", url: BANDCAMP_URL });
 
     expect(await readArtwork(id)).toBe("/uploads/scanned-sleeve.jpg");
+  });
+
+  test("gives a release with no label the one from the page just linked to it", async () => {
+    const id = await insertItem("/uploads/scanned-sleeve.jpg");
+
+    const res = await addLink(id, { sourceName: "Bandcamp", url: BANDCAMP_URL });
+
+    expect(res.status).toBe(201);
+    expect(await res.json()).toMatchObject({ label: "Ostinato Records" });
+    expect(await readLabel(id)).toBe("Ostinato Records");
+  });
+
+  test("leaves the label a release already has alone", async () => {
+    const id = await insertItem("/uploads/scanned-sleeve.jpg", "The Artist's Own Label");
+
+    await addLink(id, { sourceName: "Bandcamp", url: BANDCAMP_URL });
+
+    expect(await readLabel(id)).toBe("The Artist's Own Label");
   });
 
   test("rejects a second copy of a link the release already has", async () => {

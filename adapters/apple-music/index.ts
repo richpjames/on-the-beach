@@ -13,6 +13,7 @@ export {
   mergeAppleMusicPageMetadata,
   NO_APPLE_MUSIC_API_METADATA,
   parseAppleMusicOg,
+  parseItunesCopyright,
   scrapeAppleMusic,
   searchAppleMusic,
   searchAppleMusicViaItunes,

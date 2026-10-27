@@ -23,6 +23,7 @@ interface CatalogResource {
     artistName?: unknown;
     url?: unknown;
     artwork?: unknown;
+    recordLabel?: unknown;
   };
 }
 
@@ -53,7 +54,11 @@ function resolveCatalogArtworkUrl(artwork: unknown): string | null {
 function toResult(resource: CatalogResource): ServiceSearchResult | null {
   const url = getString(resource.attributes?.url);
   if (!url) return null;
-  return { url, artworkUrl: resolveCatalogArtworkUrl(resource.attributes?.artwork) };
+  return {
+    url,
+    artworkUrl: resolveCatalogArtworkUrl(resource.attributes?.artwork),
+    label: getString(resource.attributes?.recordLabel) ?? null,
+  };
 }
 
 /**

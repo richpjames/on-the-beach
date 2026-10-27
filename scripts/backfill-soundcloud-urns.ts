@@ -118,9 +118,9 @@ async function main() {
   for (let i = 0; i < rows.length; i++) {
     const row = rows[i];
     try {
-      // Artwork isn't the backfill's business — the release page fills gaps of
-      // its own; here only the player id is wanted.
-      const scraped = await scrapeAddedLink(row.url, false);
+      // Artwork and label aren't the backfill's business — the release page
+      // fills gaps of its own; here only the player id is wanted.
+      const scraped = await scrapeAddedLink(row.url, { artwork: false, label: false });
       const embed = scraped.metadata ? parseMetadata(scraped.metadata) : {};
       const urn = embed.soundcloud_urn;
 

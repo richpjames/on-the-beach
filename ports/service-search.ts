@@ -10,12 +10,15 @@
  */
 
 /**
- * The result of resolving a release on a streaming service: its catalogue URL
- * plus, when the service exposes one, a ready-to-use cover artwork URL.
+ * The result of resolving a release on a streaming service: its catalogue URL,
+ * plus, when the service exposes one, a ready-to-use cover artwork URL and the
+ * record label (`recordLabel` in Apple's catalogue, `copyright` on the open
+ * iTunes API — null when the service names none).
  */
 export interface ServiceSearchResult {
   url: string;
   artworkUrl: string | null;
+  label?: string | null;
 }
 
 /**
