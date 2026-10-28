@@ -47,6 +47,9 @@ test("a Mixcloud link plays in the internal player", async ({ page }) => {
   await expect(listen).toHaveCount(1, { timeout: 15_000 });
   await expect(listen).toHaveAttribute("data-src", WIDGET_SRC);
   await expect(listen).toHaveAttribute("data-href", MIXCLOUD_URL);
+  // The widget is a fixed-height bar, so the player window shrink-wraps it
+  // instead of stretching gray void below it.
+  await expect(listen).toHaveAttribute("data-player-type", "bar");
   await expect(page.locator(`.release-page__link-btn[href="${MIXCLOUD_URL}"]`)).toHaveCount(0);
   await expect(page.locator(".release-page__mixcloud-embed")).toHaveCount(0);
 

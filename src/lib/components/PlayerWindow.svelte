@@ -90,6 +90,7 @@
   id="now-playing-player"
   class="player-window"
   class:player-window--video={player.playerType === "video"}
+  class:player-window--bar={player.playerType === "bar"}
   class:player-window--apple-music={player.isAppleMusic}
   bind:this={windowEl}
   hidden={!player.windowVisible}

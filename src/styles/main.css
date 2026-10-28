@@ -2948,6 +2948,20 @@ a:where(:hover) {
   height: 292px;
 }
 
+/* A fixed-height play bar (Mixcloud's widget). The widget's page paints its
+   own background under the bar whatever height it's given, so the window
+   shrink-wraps the bar instead of stretching a gray void below it. 60px is
+   the bar's own height — the height the release page's old inline embed used. */
+.player-window--bar {
+  height: auto;
+  min-height: 0;
+  resize: none;
+}
+
+.player-window--bar .player-window__body iframe {
+  height: 60px;
+}
+
 /* ─── Release Permalink Page ────────────────────────────────────────────── */
 
 /* Blurred artwork backdrop — sits behind the app window on the "desktop" */

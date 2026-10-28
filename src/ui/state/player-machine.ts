@@ -1,7 +1,14 @@
 import { assign, setup } from "xstate";
 import type { AppleMusicKind } from "../../../domain/apple-music";
 
-export type PlayerType = "audio" | "video";
+/**
+ * The shape of the thing playing, which decides how the window is sized:
+ * "audio" and "video" embeds fill whatever height they're given, while
+ * "bar" is a fixed-height play bar (Mixcloud's widget) that paints its own
+ * background under itself — the window must shrink to the bar, not stretch
+ * the bar's page.
+ */
+export type PlayerType = "audio" | "video" | "bar";
 
 export interface AppleMusicTarget {
   kind: AppleMusicKind;
