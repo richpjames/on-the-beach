@@ -57,12 +57,15 @@ testRoutes.post("/suggestions", async (c) => {
 // Seed a release with its links directly, standing in for the creation path
 // (which scrapes the pasted page — live-web state a visual baseline can't
 // depend on). The first link becomes the primary one, exactly as a release
-// whose first link is a playable page plays "here".
+// whose first link is a playable page plays "here". A link's `metadata` is
+// what its scrape would have stored (Bandcamp's album_id, SoundCloud's urn),
+// so a playable embed can be seeded without the live web.
 testRoutes.post("/music-items", async (c) => {
   const body = await c.req.json();
   const title: string = body.title;
   const artistName: string | undefined = body.artistName;
-  const links: Array<{ sourceName: string; url: string }> = body.links ?? [];
+  const links: Array<{ sourceName: string; url: string; metadata?: Record<string, string> }> =
+    body.links ?? [];
 
   let artistId: number | null = null;
   if (artistName) {
@@ -101,6 +104,7 @@ testRoutes.post("/music-items", async (c) => {
       sourceId: source.id,
       url: link.url,
       isPrimary: index === 0,
+      metadata: link.metadata ? JSON.stringify(link.metadata) : null,
     });
   }
 

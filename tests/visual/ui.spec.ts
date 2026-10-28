@@ -213,6 +213,131 @@ test("captures the listen row", async ({ page, request }) => {
   await captureSnapshot(row, "release-page-listen-row", page);
 });
 
+// ---------------------------------------------------------------------------
+// The player window — one baseline per player
+// ---------------------------------------------------------------------------
+
+// Every source that plays in the internal player gets its own baseline: the
+// window around the embed is ours (size, titlebar, buttons), and each source
+// fills its frame differently. The widgets themselves are third parties the
+// test machine may or may not reach, so each is stood in for by a flat page
+// that fills the frame the same way the real one does — a solid block for
+// the players that stretch, and for Mixcloud a 60px bar over the page's own
+// gray, so a wrongly-sized window leaves the same void in the baseline it
+// would leave on screen.
+type PlayerWindowCase = {
+  name: string;
+  listenLabel: string;
+  seedLinks: Array<{ sourceName: string; url: string; metadata?: Record<string, string> }>;
+  iframeSrc: RegExp;
+  widgetPattern: string;
+  standInHtml: string;
+};
+
+function solidStandIn(color: string): string {
+  return `<!doctype html><html><body style="margin:0"><div style="position:absolute;inset:0;background:${color}"></div></body></html>`;
+}
+
+const MIXCLOUD_BAR_STAND_IN = `<!doctype html><html><body style="margin:0;background:#e8e8e8"><div style="height:60px;background:#323234"></div></body></html>`;
+
+const PLAYER_WINDOW_CASES: PlayerWindowCase[] = [
+  {
+    name: "youtube",
+    listenLabel: "Listen on YouTube",
+    seedLinks: [
+      { sourceName: "youtube", url: "https://www.youtube.com/watch?v=otb-player-window" },
+    ],
+    iframeSrc: /youtube-nocookie\.com\/embed\/otb-player-window/,
+    widgetPattern: "**youtube-nocookie.com/embed/**",
+    standInHtml: solidStandIn("#111111"),
+  },
+  {
+    name: "bandcamp",
+    listenLabel: "Listen on Bandcamp",
+    seedLinks: [
+      {
+        sourceName: "bandcamp",
+        url: "https://tapetracks.bandcamp.com/album/harbour-line",
+        metadata: { album_id: "4213567", item_type: "album" },
+      },
+    ],
+    iframeSrc: /bandcamp\.com\/EmbeddedPlayer\/album=4213567/,
+    widgetPattern: "**bandcamp.com/EmbeddedPlayer/**",
+    standInHtml: solidStandIn("#b7c9c2"),
+  },
+  {
+    name: "soundcloud",
+    listenLabel: "Listen on SoundCloud",
+    seedLinks: [
+      {
+        sourceName: "soundcloud",
+        url: "https://soundcloud.com/tape-anchor/harbour-line",
+        metadata: { soundcloud_urn: "soundcloud:tracks:1441376377" },
+      },
+    ],
+    iframeSrc: /w\.soundcloud\.com\/player\/.*1441376377/,
+    widgetPattern: "**w.soundcloud.com/player/**",
+    standInHtml: solidStandIn("#e0762f"),
+  },
+  {
+    name: "mixcloud",
+    listenLabel: "Listen on Mixcloud",
+    seedLinks: [
+      { sourceName: "mixcloud", url: "https://www.mixcloud.com/nozwon/light-sleeper-radio-021/" },
+    ],
+    iframeSrc: /mixcloud\.com\/widget\/iframe\/.*feed=%2Fnozwon%2Flight-sleeper-radio-021%2F/,
+    widgetPattern: "**mixcloud.com/widget/iframe/**",
+    standInHtml: MIXCLOUD_BAR_STAND_IN,
+  },
+  {
+    name: "apple-preview",
+    listenLabel: "Listen on Apple Music",
+    seedLinks: [
+      {
+        sourceName: "apple_music",
+        url: "https://music.apple.com/gb/album/harbour-line/1234567890",
+      },
+    ],
+    iframeSrc: /embed\.music\.apple\.com\/gb\/album\/harbour-line\/1234567890/,
+    widgetPattern: "**embed.music.apple.com/**",
+    standInHtml: solidStandIn("#f2f0eb"),
+  },
+];
+
+for (const playerCase of PLAYER_WINDOW_CASES) {
+  test(`captures the player window for ${playerCase.name}`, async ({ page, request }) => {
+    // The player window never renders on the mobile projects' coarse pointer
+    // — there is no listen button to open it.
+    test.skip(
+      test.info().project.name === "visual-mobile",
+      "the player window doesn't suit a phone",
+    );
+
+    const seeded = await request.post("/api/__test__/music-items", {
+      data: { title: "Harbour Line", artistName: "Tape Anchor", links: playerCase.seedLinks },
+    });
+    expect(seeded.ok()).toBe(true);
+    const { id } = (await seeded.json()) as { id: number };
+
+    await page.route(playerCase.widgetPattern, (route) =>
+      route.fulfill({ status: 200, contentType: "text/html", body: playerCase.standInHtml }),
+    );
+
+    await page.goto(`/r/${id}`);
+    const listen = page.getByRole("button", { name: playerCase.listenLabel });
+    await expect(listen).toBeVisible();
+    await listen.click();
+
+    const iframe = page.locator("#player-body iframe");
+    await expect(iframe).toHaveAttribute("src", playerCase.iframeSrc);
+    await captureSnapshot(
+      page.locator("#now-playing-player"),
+      `player-window-${playerCase.name}`,
+      page,
+    );
+  });
+}
+
 test("captures add loading dialog", async ({ page }) => {
   await page.goto("/");
   await expect(page.getByPlaceholder("search or paste a link")).toBeVisible();

@@ -32,6 +32,12 @@ export const test = base.extend<{}, WorkerFixtures>({
         // Block server-side calls to external lookup APIs (iTunes etc.) so
         // tests never depend on third-party availability or timing.
         OTB_DISABLE_EXTERNAL_LOOKUPS: "1",
+        // MusicKit being configured replaces the Apple Music preview iframe
+        // with the SDK transport. Blank any credentials carried over from the
+        // surrounding machine so every run sees the same player, like CI does.
+        APPLE_MUSIC_TEAM_ID: "",
+        APPLE_MUSIC_KEY_ID: "",
+        APPLE_MUSIC_PRIVATE_KEY: "",
       };
 
       clearDatabaseFiles(databasePath);

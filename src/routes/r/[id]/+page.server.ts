@@ -56,7 +56,7 @@ function parseLinkMetadata(raw: string | null): Record<string, string> | null {
 export interface ListenEmbed {
   src: string;
   href: string | null;
-  playerType: "audio" | "video";
+  playerType: "audio" | "video" | "bar";
 }
 
 function youTubeEmbed(item: MusicItemFull): ListenEmbed | null {
@@ -138,15 +138,19 @@ function mixcloudUrlForItem(item: MusicItemFull): string | null {
  * the actions and now plays in the player window like everything else. The
  * fallback carries no href: the page it came from stays in the "there" list,
  * so it remains reachable.
+ *
+ * The widget is a fixed-height play bar: it paints its own background under
+ * the bar whatever height it's given, so it plays as a "bar" — the window
+ * shrinks to the bar instead of stretching gray void below it.
  */
 function mixcloudEmbed(item: MusicItemFull): ListenEmbed | null {
   const url = mixcloudUrlForItem(item);
   if (url) {
     const src = mixcloudWidgetSrc(url);
-    if (src) return { src, href: url, playerType: "audio" };
+    if (src) return { src, href: url, playerType: "bar" };
   }
   const embedded = mixcloudWidgetSrc(parseLinkMetadata(item.primary_link_metadata)?.mixcloud_url);
-  return embedded ? { src: embedded, href: null, playerType: "audio" } : null;
+  return embedded ? { src: embedded, href: null, playerType: "bar" } : null;
 }
 
 /**

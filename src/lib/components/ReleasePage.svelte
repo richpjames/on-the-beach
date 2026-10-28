@@ -149,7 +149,7 @@
     source: SourceName;
     href?: string;
     src?: string;
-    playerType?: "audio" | "video";
+    playerType?: "audio" | "video" | "bar";
     amMode?: string;
     play: () => void;
   };
