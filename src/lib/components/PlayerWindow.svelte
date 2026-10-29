@@ -1,5 +1,6 @@
 <script lang="ts">
   import { player } from "../player.svelte";
+  import { enableYouTubeJsApi, watchYouTubeEnd } from "../youtube-ended";
   import {
     musickit,
     togglePlay,
@@ -11,6 +12,7 @@
   } from "../musickit.svelte";
 
   let windowEl: HTMLElement | undefined = $state();
+  let videoIframe: HTMLIFrameElement | undefined = $state();
 
   // The titlebar does double duty: it drags the window and it links back to the
   // release. A drag ends with a click on the link, so remember whether the
@@ -84,6 +86,21 @@
     const value = Number((e.currentTarget as HTMLInputElement).value);
     void seek(value);
   }
+
+  // ── YouTube end detection ──────────────────────────────────────────────────
+  // YouTube is the only embed that reports playback state back (via postMessage,
+  // once enablejsapi=1 is on the src). Watching it lets the queue auto-advance
+  // when the video ends. The watcher lives exactly as long as this iframe: when
+  // playback stops or moves on, the effect's cleanup drops the listener, so a
+  // stale player can never land an ADVANCE for playback that is over.
+  const videoSrc = $derived(player.src !== null ? enableYouTubeJsApi(player.src) : "");
+
+  $effect(() => {
+    const iframe = videoIframe;
+    const src = player.src;
+    if (!iframe || src === null || player.playerType !== "video") return;
+    return watchYouTubeEnd(iframe, () => player.skipNext());
+  });
 </script>
 
 <div
@@ -117,6 +134,20 @@
       >
     {/if}
     <div class="player-window__winbtns">
+      <button
+        class="player-window__queuebtn"
+        id="player-queue-toggle"
+        aria-label={player.queueWindowOpen ? "Hide queue" : "Show queue"}
+        aria-expanded={player.queueWindowOpen}
+        title="Queue"
+        onclick={() => player.toggleQueueWindow()}
+      >
+        ▤{#if player.queue.length > 0}
+          <span class="player-window__queuebtn-count" id="player-queue-count"
+            >{player.queue.length}</span
+          >
+        {/if}
+      </button>
       <button
         class="player-window__winbtn"
         id="player-minimize"
@@ -245,11 +276,12 @@
     {:else if player.src !== null}
       {#if player.playerType === "video"}
         <iframe
-          src={player.src}
+          src={videoSrc}
           title="YouTube player"
           seamless
           allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
           allowfullscreen
+          bind:this={videoIframe}
         ></iframe>
       {:else}
         <iframe

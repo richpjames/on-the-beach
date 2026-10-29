@@ -10,7 +10,12 @@
 
   let clock = $state("");
 
+  // The queue window is desktop-only (like "listen here" and the player
+  // window's queue toggle), so its taskbar button is too.
+  let coarsePointer = $state(false);
+
   onMount(() => {
+    coarsePointer = window.matchMedia("(pointer: coarse)").matches;
     const tick = (): void => {
       clock = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
     };
@@ -268,6 +273,20 @@
   >
     <span aria-hidden="true">♫</span>
     <span id="taskbar-np-label">{player.active ? player.label : ""}</span>
+  </button>
+  <button
+    id="taskbar-queue-btn"
+    class="taskbar__task"
+    hidden={coarsePointer || (!player.active && player.queue.length === 0)}
+    data-minimized={player.queueWindowOpen ? undefined : "true"}
+    title="Play queue"
+    onclick={() => player.toggleQueueWindow()}
+  >
+    <span aria-hidden="true">▤</span>
+    <span id="taskbar-queue-label">Queue</span>
+    {#if player.queue.length > 0}
+      <span class="taskbar__badge" id="taskbar-queue-count">{player.queue.length}</span>
+    {/if}
   </button>
   {#if pendingAlerts > 0}
     <a
