@@ -14,6 +14,7 @@
   import { api, apiFetch } from "../api";
   import { encodeImageFile } from "../encode-image";
   import { player } from "../player.svelte";
+  import type { QueueTarget } from "../../ui/state/player-machine";
   import ServiceIcon from "./ServiceIcon.svelte";
   import StarRating from "./StarRating.svelte";
   import SuggestionPickerModal from "./SuggestionPickerModal.svelte";
@@ -138,6 +139,14 @@
     player.load(embed.src, item.title, item.artist_name ?? "", embed.playerType, item.id);
   }
 
+  // "queue" lines the same release up behind whatever is playing, using the
+  // same target "listen here" resolved — the two buttons always agree on what
+  // would play.
+  function enqueueWith(target: QueueTarget): () => void {
+    const label = item.artist_name ? `${item.artist_name} — ${item.title}` : item.title;
+    return () => player.enqueue({ itemId: item.id, label, target });
+  }
+
   // The one source that wins the "listen here" button, by priority: the lookup
   // streaming service when it can genuinely play in-app (Apple Music full-track
   // via MusicKit — the store's own link first, then the on-view lookup), then
@@ -152,6 +161,7 @@
     playerType?: "audio" | "video";
     amMode?: string;
     play: () => void;
+    enqueue: () => void;
   };
 
   const hereTarget = $derived.by<HereTarget | null>(() => {
@@ -169,6 +179,7 @@
         href: appleMusic.href,
         amMode: "musickit",
         play: () => playAppleMusic(resource.kind, resource.id),
+        enqueue: enqueueWith({ kind: "appleMusic", amKind: resource.kind, id: resource.id }),
       };
     }
     const lookup = lookupLink;
@@ -181,6 +192,7 @@
         href: lookup.url,
         amMode: "musickit",
         play: () => playAppleMusic(resource.kind, resource.id),
+        enqueue: enqueueWith({ kind: "appleMusic", amKind: resource.kind, id: resource.id }),
       };
     }
     const bandcamp = data.bandcampEmbed;
@@ -193,6 +205,11 @@
         src: bandcamp.src,
         playerType: bandcamp.playerType,
         play: () => listen(bandcamp),
+        enqueue: enqueueWith({
+          kind: "iframe",
+          src: bandcamp.src,
+          playerType: bandcamp.playerType,
+        }),
       };
     }
     const youtube = data.youtubeEmbed;
@@ -205,6 +222,11 @@
         src: youtube.src,
         playerType: youtube.playerType,
         play: () => listen(youtube),
+        enqueue: enqueueWith({
+          kind: "iframe",
+          src: youtube.src,
+          playerType: youtube.playerType,
+        }),
       };
     }
     const soundcloud = data.soundcloudEmbed;
@@ -217,6 +239,11 @@
         src: soundcloud.src,
         playerType: soundcloud.playerType,
         play: () => listen(soundcloud),
+        enqueue: enqueueWith({
+          kind: "iframe",
+          src: soundcloud.src,
+          playerType: soundcloud.playerType,
+        }),
       };
     }
     const mixcloud = data.mixcloudEmbed;
@@ -229,6 +256,11 @@
         src: mixcloud.src,
         playerType: mixcloud.playerType,
         play: () => listen(mixcloud),
+        enqueue: enqueueWith({
+          kind: "iframe",
+          src: mixcloud.src,
+          playerType: mixcloud.playerType,
+        }),
       };
     }
     if (appleMusic?.src) {
@@ -241,6 +273,7 @@
         playerType: "audio",
         amMode: "preview",
         play: () => listen({ src: appleMusic.src!, href: appleMusic.href, playerType: "audio" }),
+        enqueue: enqueueWith({ kind: "iframe", src: appleMusic.src!, playerType: "audio" }),
       };
     }
     return null;
@@ -677,6 +710,14 @@
                 title={hereTarget.service}
                 aria-label={`Listen on ${hereTarget.service}`}
                 onclick={hereTarget.play}>listen here</button
+              >
+              <button
+                class="release-page__listen-btn"
+                id="queue-release-btn"
+                data-src={hereTarget.src}
+                title={`Queue on ${hereTarget.service}`}
+                aria-label={`Queue on ${hereTarget.service}`}
+                onclick={hereTarget.enqueue}>queue</button
               >
             {/if}
             {#each externalLinks as link (link.key)}
