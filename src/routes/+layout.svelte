@@ -3,6 +3,7 @@
   import "../styles/main.css";
   import { page } from "$app/state";
   import PlayerWindow from "$lib/components/PlayerWindow.svelte";
+  import QueueWindow from "$lib/components/QueueWindow.svelte";
   import Taskbar from "$lib/components/Taskbar.svelte";
 
   let { children } = $props();
@@ -42,5 +43,7 @@
 {/if}
 
 <PlayerWindow />
+
+<QueueWindow />
 
 <Taskbar showStart={!isReleasePage} showClock={!isReleasePage} />
