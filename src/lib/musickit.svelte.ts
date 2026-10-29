@@ -152,6 +152,49 @@ function isPlayingState(state: number, MK: MusicKitStatic): boolean {
   return typeof playing === "number" ? state === playing : state === 2;
 }
 
+/**
+ * Whether a playback state means "the queue played through to the end" — the
+ * natural-completion signal the app auto-advances on. Defensive lookup, like
+ * isPlayingState: MusicKit JS v3's PlaybackStates names it `ended` (5); if a
+ * build renames it, `completed` or the numeric fallback still lands close.
+ */
+function isEndedState(state: number, MK: MusicKitStatic): boolean {
+  const states = MK.PlaybackStates;
+  const ended =
+    typeof states?.ended === "number"
+      ? states.ended
+      : typeof states?.completed === "number"
+        ? states.completed
+        : 5;
+  return state === ended;
+}
+
+// ── End-of-playback callback (auto-advance) ─────────────────────────────────
+// Registered by player.svelte.ts — this module must not import it back (the
+// facade already imports this one; the dependency only flows one way). The
+// generation counter is the stale-signal guard: every playResource/stop bumps
+// `playbackGeneration`, and only an `ended` arriving while `playingGeneration`
+// still matches invokes the callback. So the teardown states a manual skip or a
+// new release causes can never masquerade as natural completion, and a burst of
+// duplicate `ended` events fires the callback at most once per playback.
+let onQueueEnded: (() => void) | null = null;
+let playbackGeneration = 0;
+let playingGeneration = -1;
+
+/** Set (or clear) the callback invoked when Apple Music playback completes naturally. */
+export function setOnQueueEnded(callback: (() => void) | null): void {
+  onQueueEnded = callback;
+}
+
+function maybeNotifyQueueEnded(MK: MusicKitStatic): void {
+  if (!instance || !onQueueEnded) return;
+  if (!isEndedState(instance.playbackState, MK)) return;
+  if (playingGeneration !== playbackGeneration) return;
+  // Consume this playback's completion so a repeat event can't re-fire it.
+  playingGeneration = -1;
+  onQueueEnded();
+}
+
 function syncFromInstance(MK: MusicKitStatic): void {
   if (!instance) return;
   ui.authorized = instance.isAuthorized;
@@ -180,7 +223,10 @@ function syncQueueFromInstance(): void {
 function attachListeners(MK: MusicKitStatic): void {
   if (!instance) return;
   const sync = (): void => syncFromInstance(MK);
-  instance.addEventListener("playbackStateDidChange", sync);
+  instance.addEventListener("playbackStateDidChange", () => {
+    sync();
+    maybeNotifyQueueEnded(MK);
+  });
   instance.addEventListener("nowPlayingItemDidChange", sync);
   instance.addEventListener("authorizationStatusDidChange", sync);
   instance.addEventListener("queueItemsDidChange", () => syncQueueFromInstance());
@@ -278,6 +324,11 @@ export async function playResource(kind: AppleMusicKind, id: string): Promise<vo
   const mk = await ensureConfigured();
   if (!mk) return;
 
+  // A new resource is a new playback generation: any `ended` still in flight
+  // from the previous one is stale by the time it arrives.
+  playbackGeneration++;
+  playingGeneration = playbackGeneration;
+
   ui.loadingTrack = true;
   ui.error = null;
   try {
@@ -352,6 +403,10 @@ export async function seek(seconds: number): Promise<void> {
 }
 
 export async function stop(): Promise<void> {
+  // Teardown on purpose (window ✕, manual skip, a new release taking over) —
+  // retire the playback generation so the state changes it triggers are never
+  // read back as natural completion.
+  playbackGeneration++;
   if (!instance) return;
   try {
     await instance.stop();
