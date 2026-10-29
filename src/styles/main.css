@@ -3522,7 +3522,8 @@ a:where(:hover) {
   display: none;
 }
 
-.release-page__listen-btn {
+.release-page__listen-btn,
+.release-page__queue-btn {
   display: inline-flex;
   align-items: center;
   gap: var(--space-3);
@@ -3536,11 +3537,13 @@ a:where(:hover) {
   color: #000000;
 }
 
-.release-page__listen-btn:hover {
+.release-page__listen-btn:hover,
+.release-page__queue-btn:hover {
   background: var(--chrome-light);
 }
 
-.release-page__listen-btn:active {
+.release-page__listen-btn:active,
+.release-page__queue-btn:active {
   border-color: var(--bevel-sunken);
   /* Base padding is 4px 12px; shift the label 1px down-right without
      changing the button's outer size. */
@@ -3601,7 +3604,8 @@ a:where(:hover) {
     gap: var(--space-2);
   }
 
-  .release-page__actions .release-page__listen-btn {
+  .release-page__actions .release-page__listen-btn,
+  .release-page__actions .release-page__queue-btn {
     flex: 1 0 100%;
     justify-content: center;
     min-height: var(--control-h);

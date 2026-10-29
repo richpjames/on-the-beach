@@ -712,7 +712,7 @@
                 onclick={hereTarget.play}>listen here</button
               >
               <button
-                class="release-page__listen-btn"
+                class="release-page__queue-btn"
                 id="queue-release-btn"
                 data-src={hereTarget.src}
                 title={`Queue on ${hereTarget.service}`}
