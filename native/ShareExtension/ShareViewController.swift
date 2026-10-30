@@ -2181,6 +2181,13 @@ final class Win98BarButton: UIControl {
         isAccessibilityElement = true
         accessibilityTraits = .button
         accessibilityLabel = title
+
+        // The bevel must not take the touch. It covers the whole control, and
+        // a plain UIView subview is hit-tested before its control parent — a
+        // UIControl never fires for a touch delivered to another view, so with
+        // interaction left on, every tap landed on the bevel and Add did
+        // nothing. (The label is already non-interactive by default.)
+        bevel.isUserInteractionEnabled = false
     }
 
     @available(*, unavailable)
@@ -2213,6 +2220,11 @@ final class BeveledBarButtonItem: UIBarButtonItem {
         button = Win98BarButton(title: title)
         super.init()
         customView = button
+        // iOS 26 draws its Liquid Glass capsule behind every bar item, custom
+        // views included — it wrapped the chrome button in a bulging
+        // translucent pill that clipped against the screen edge. The button's
+        // own silver face is the whole point, so opt the item out.
+        hidesSharedBackground = true
         button.addTarget(target, action: action, for: .touchUpInside)
     }
 
