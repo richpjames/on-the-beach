@@ -238,6 +238,10 @@ function solidStandIn(color: string): string {
   return `<!doctype html><html><body style="margin:0"><div style="position:absolute;inset:0;background:${color}"></div></body></html>`;
 }
 
+// The bar's 60px is duplicated here from the window CSS
+// (.player-window--bar .player-window__body iframe in src/styles/main.css):
+// the window crop (overflow: hidden) and the stand-in must move together if
+// Mixcloud ever changes its bar height — no baseline can catch the drift.
 const MIXCLOUD_BAR_STAND_IN = `<!doctype html><html><body style="margin:0;background:#e8e8e8"><div style="height:60px;background:#323234"></div></body></html>`;
 
 const PLAYER_WINDOW_CASES: PlayerWindowCase[] = [
@@ -330,6 +334,13 @@ for (const playerCase of PLAYER_WINDOW_CASES) {
 
     const iframe = page.locator("#player-body iframe");
     await expect(iframe).toHaveAttribute("src", playerCase.iframeSrc);
+
+    // src is set the moment the iframe mounts; the stand-in page paints
+    // inside the frame a beat later, and the capture could beat that paint
+    // (route interception makes the gap near-instant, so only CI retries
+    // masked it). Waiting on the stand-in's own element inside the frame,
+    // not the src outside it, closes the race.
+    await expect(iframe.contentFrame().locator("div")).toBeVisible();
     await captureSnapshot(
       page.locator("#now-playing-player"),
       `player-window-${playerCase.name}`,
