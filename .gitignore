@@ -67,6 +67,10 @@ ios/
 native/ShareExtension/Secrets.xcconfig
 *.ipa
 Pods/
+# App Store Connect API keys: archive-ios.sh's first lookup dir is
+# ./private_keys, and a stray AuthKey_*.p8 anywhere is the same secret.
+private_keys/
+*.p8
 eval/resolution/results/search-cache.json
 
 # Stryker mutation testing (html report + incremental state)
