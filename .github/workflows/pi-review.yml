@@ -1,0 +1,124 @@
+name: Pi review
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+
+# A new push supersedes the review of the previous head; don't pay for a stale one.
+concurrency:
+  group: pi-review-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    if: ${{ !github.event.pull_request.draft }} # drafts are reviewed when marked ready
+    env:
+      PR: ${{ github.event.pull_request.number }}
+      ZAI_API_KEY: ${{ secrets.ZAI_API_KEY }}
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+    steps:
+      # Until the ZAI_API_KEY repository secret exists, stay green and say why.
+      - name: Check the API key is configured
+        id: gate
+        run: |
+          if [ -n "$ZAI_API_KEY" ]; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::notice::ZAI_API_KEY repository secret is not set, so this pull request is not reviewed. Add the secret to enable pi reviews."
+          fi
+
+      - name: Checkout the merge commit
+        if: steps.gate.outputs.run == 'true'
+        uses: actions/checkout@v6
+
+      - name: Setup Node
+        if: steps.gate.outputs.run == 'true'
+        uses: actions/setup-node@v5
+        with:
+          node-version: 22
+
+      # Pinned to the version validated locally; bump deliberately.
+      - name: Install pi
+        if: steps.gate.outputs.run == 'true'
+        run: npm install -g @earendil-works/pi-coding-agent@0.74.2
+
+      - name: Gather the pull request context
+        if: steps.gate.outputs.run == 'true'
+        run: |
+          gh pr view "$PR" --json title,body,author,additions,deletions,changedFiles \
+            | jq -r '"# \(.title)\n\nAuthor: \(.author.login)\n\(.changedFiles) files changed, +\(.additions)/-\(.deletions)\n\n## Description\n\n\(.body // "")"' > pr-context.md
+          gh pr diff "$PR" > pr.diff
+          if [ "$(wc -c < pr.diff)" -gt 150000 ]; then
+            head -c 150000 pr.diff > pr.diff.truncated && mv pr.diff.truncated pr.diff
+            echo "_The diff was truncated to its first 150KB._" >> pr-context.md
+          fi
+
+      - name: Write the review instructions
+        if: steps.gate.outputs.run == 'true'
+        run: |
+          cat <<'EOF' > review-instructions.md
+          You are the code reviewer for this pull request. The repository is checked out at the pull request's merge commit; the root AGENTS.md carries the project conventions (Bun not node, the retro design language, the hexagonal layer boundaries) — read it first and hold this change to it.
+
+          Work from the pull request metadata and diff below. Your tools are read-only: use them to read the code around each hunk before judging it. Do not wrap your reply in a code fence and do not begin it with a title or heading — the comment already carries one.
+
+          Review for:
+
+          - Correctness bugs the tests would not catch.
+          - Violations of AGENTS.md: wrong runtime commands, imports across the hexagonal layer boundaries (domain/, ports/, app/, adapters/, server/, src/), visual changes that ignore smaller screens or the retro design language.
+          - Changed behaviour with no test covering it.
+
+          Write the review as a markdown pull request comment, in three parts:
+
+          1. A one-paragraph summary of what the change does and whether it is sound.
+          2. Findings, most important first, one line each: **path/to/file.ts:42** — what is wrong, in a sentence.
+          3. A final line, "Verdict: approve" or "Verdict: request changes", judged on severity alone.
+
+          If the change looks good, say so plainly — do not invent findings. If you cannot verify something, say what you could not check.
+          EOF
+
+      - name: Ask pi to review
+        if: steps.gate.outputs.run == 'true'
+        run: |
+          {
+            cat review-instructions.md
+            echo
+            echo "## Pull request"
+            echo
+            cat pr-context.md
+            echo
+            echo "## Diff"
+            echo
+            echo '```diff'
+            cat pr.diff
+            echo '```'
+          } > review-prompt.md
+          # Extensions and skills execute arbitrary code at load, whatever --tools
+          # allows; a review of the diff never needs them.
+          pi -p --no-session \
+            --provider zai --model glm-5.1 \
+            --tools read,grep,find,ls \
+            --no-extensions --no-skills --no-prompt-templates --no-themes \
+            @review-prompt.md > review.md
+          test -s review.md
+
+      - name: Post the review
+        if: steps.gate.outputs.run == 'true'
+        run: |
+          sed -i '1{/^```/d;}' review.md
+          sed -i '${/^```$/d;}' review.md
+          sed -i '1{/^#### Pi agent review/d;}' review.md
+          {
+            echo '#### Pi agent review (glm-5.1)'
+            echo
+            echo '_Generated from the pull request'"'"'s own content — treat its links and verdict like any untrusted comment._'
+            echo
+            cat review.md
+          } > comment.md
+          gh pr review "$PR" --comment --body-file comment.md
