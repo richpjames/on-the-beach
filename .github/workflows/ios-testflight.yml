@@ -20,8 +20,11 @@ name: iOS TestFlight
 # One-time setup (GitHub ▸ Settings ▸ Secrets and variables ▸ Actions):
 #   OTB_INGEST_API_KEY  the real ingest key (CI builds embed a dummy only when
 #                       this is unset, and shares won't post from that build)
-#   OTB_API_KEY         ASC API key ID (Users and Access ▸ Integrations; App
-#   OTB_API_ISSUER      Manager role covers upload + cloud-managed signing)
+#   OTB_API_KEY         ASC API key ID (Users and Access ▸ Integrations). The
+#   OTB_API_ISSUER      key needs the ADMIN role: App Manager authenticates and
+#                       uploads fine but export dies with "Cloud signing
+#                       permission error" because it can't use cloud-managed
+#                       distribution certificates.
 #   OTB_API_KEY_P8_B64  base64 of the key's AuthKey_<ID>.p8:
 #                       base64 -i AuthKey_XXXX.p8 | gh secret set OTB_API_KEY_P8_B64
 
