@@ -58,10 +58,10 @@
   --link-hover: #004a62; /* pressed-ink hover on light */
   --link-on-dark: var(--sea); /* links on deep/black */
 
-  --accent: var(--sea);
+  /* --accent and --danger are main.css's legacy tokens; this file must not
+     redefine them — see the legacy map in docs/design-system.md. */
   --warning: var(--sun);
   --warning-text: var(--sun-deep);
-  --danger: var(--signal);
   --danger-text: var(--signal-deep);
 
   --focus: var(--sea); /* focus rings, marquee dots */
@@ -76,7 +76,7 @@
   --chip-text: var(--sea);
   --chip-border: var(--deep-soft);
   --chip-text-warn: var(--sun);
-  --chip-text-dim: var(--deep-soft);
+  --chip-text-dim: #8f96c9; /* dimmed label (5.5:1 on the well) */
 
   /* ── Buttons ── */
   --btn-primary-bg: var(--deep);
@@ -310,9 +310,11 @@
   color: var(--chip-text-dim);
 }
 
+/* Alert badges are red wells, not red washes: --signal-soft with a
+   --signal-deep label only reaches 3.9:1, below the 4.5:1 small-text gate. */
 .ds-badge--alert {
-  background: var(--signal-soft);
-  color: var(--signal-deep);
+  background: var(--signal-deep);
+  color: var(--foam);
   border-color: var(--signal);
 }
 
