@@ -461,10 +461,48 @@ it already has, so pass a higher one — `OTB_BUILD_NUMBER=101 bun run
 ios:archive -- --upload`. A new commit needs nothing: the count moves by
 itself.
 
-> Why not upload from CI? The archive is fully reproducible (CI compiles the
-> same three targets), but distribution signing means exporting the
-> certificate and an App Store Connect key as GitHub secrets — real ceremony
-> for a single-user app that one command on the build Mac already covers.
+> Why upload from CI now? The archive is fully reproducible, and cloud-managed
+> signing means no certificate ever becomes a GitHub secret — only an App Store
+> Connect API key (which can be revoked) does. See the next section for the
+> automated route; the one command above still works on the build Mac.
+
+### Automated uploads from CI
+
+`.github/workflows/ios-testflight.yml` archives and uploads to TestFlight on
+**every merge to `main` that changes the app** — the same path filter
+`ios-build.yml` uses to decide when to compile (plus the archive script and the
+workflow itself), so a web-only merge doesn't spend 10x-priced macOS minutes
+producing a byte-identical shell. It runs the same `bun run ios:archive --
+--upload`; the build number is the git commit count, so each merge is a fresh
+version+build pair with no coordination.
+
+The difference from the local run is signing: a runner has no Xcode account
+session, so when `OTB_API_KEY`/`OTB_API_ISSUER` are set the script passes the
+API key to `xcodebuild` itself (`-authenticationKeyPath/-ID/-IssuerID`), and
+`-allowProvisioningUpdates` mints the cloud-managed distribution certificate
+and profiles headlessly. Locally, with the env vars unset, nothing changes —
+the session route still works.
+
+One-time setup (GitHub ▸ Settings ▸ Secrets and variables ▸ Actions):
+
+1. Create an **App Store Connect API key** (Users and Access ▸ Integrations ▸
+   Team Keys) with the **App Manager** role — it needs to upload *and* manage
+   cloud signing. Download the `AuthKey_<KeyID>.p8`.
+2. Set the secrets:
+   ```bash
+   gh secret set OTB_API_KEY --body '<Key ID>'
+   gh secret set OTB_API_ISSUER --body '<Issuer ID>'
+   base64 -i AuthKey_<KeyID>.p8 | gh secret set OTB_API_KEY_P8_B64
+   gh secret set OTB_INGEST_API_KEY --body '<the server's INGEST_API_KEY>'
+   ```
+   The ingest key is a secret because a CI-built TestFlight app must embed the
+   *real* key or shares won't post — unlike the PR compile check, which
+   deliberately uses a dummy.
+
+Re-running a successful run of the same commit is rejected by TestFlight (same
+version+build pair); use the workflow's **Run workflow** button with a higher
+build number instead. The workflow can also be dispatched by hand on any branch
+to test the pipeline before it lands on `main`.
 
 ## Updating after web changes
 

@@ -43,6 +43,8 @@
 #     must live in ./private_keys, ~/private_keys or ~/.appstoreconnect)
 # With neither, the script stops after exporting and points at the ready .ipa —
 # dragging it onto Apple's free Transporter app is the credential-free route.
+# When OTB_API_KEY/OTB_API_ISSUER are set, the key also authenticates
+# -allowProvisioningUpdates for signing (headless CI has no Xcode session).
 
 set -euo pipefail
 cd "$(git -C "$(dirname "$0")" rev-parse --show-toplevel)"
@@ -54,6 +56,40 @@ case "${1:-}" in
   --upload) UPLOAD=true ;;
   *) echo "usage: $(basename "$0") [--upload]" >&2; exit 1 ;;
 esac
+
+# --- App Store Connect API key (optional signing auth) -------------------------
+# -allowProvisioningUpdates authenticates against App Store Connect. Locally that
+# rides on the Xcode account session; on a headless runner there is no session, so
+# when the upload API-key env vars are set, pass the same key to xcodebuild
+# (-authenticationKeyPath/-ID/-IssuerID) and signing works there too. The .p8 is
+# looked up in the same three directories altool searches (see the header), so one
+# key file serves both signing and upload; OTB_API_KEY_PATH overrides. With the
+# env vars unset — the plain local flow — nothing changes.
+#
+# The expansion guard `${AUTH_ARGS[@]+"${AUTH_ARGS[@]}"}` is the macOS-bash-3.2
+# safe form: plain "${AUTH_ARGS[@]}" on an empty array is an "unbound variable"
+# error under set -u there.
+AUTH_ARGS=()
+if [[ -n "${OTB_API_KEY:-}" && -n "${OTB_API_ISSUER:-}" ]]; then
+  KEY_PATH="${OTB_API_KEY_PATH:-}"
+  if [[ -z "$KEY_PATH" ]]; then
+    for candidate in "./private_keys/AuthKey_${OTB_API_KEY}.p8" \
+                     "$HOME/private_keys/AuthKey_${OTB_API_KEY}.p8" \
+                     "$HOME/.appstoreconnect/AuthKey_${OTB_API_KEY}.p8"; do
+      if [[ -f "$candidate" ]]; then KEY_PATH="$candidate"; break; fi
+    done
+  fi
+  if [[ -n "$KEY_PATH" && -f "$KEY_PATH" ]]; then
+    AUTH_ARGS=(-authenticationKeyPath "$KEY_PATH"
+               -authenticationKeyID "$OTB_API_KEY"
+               -authenticationKeyIssuerID "$OTB_API_ISSUER")
+    log "Signing via App Store Connect API key ($KEY_PATH)"
+  else
+    echo "archive-ios: OTB_API_KEY set but AuthKey_${OTB_API_KEY}.p8 not found in" >&2
+    echo "  ./private_keys, ~/private_keys or ~/.appstoreconnect — signing falls back to" >&2
+    echo "  the Xcode session (upload still needs the key file)." >&2
+  fi
+fi
 
 APP_VERSION=$(bun -e 'console.log(require("./package.json").version)')
 BUILD_NUMBER="${OTB_BUILD_NUMBER:-$(git rev-list --count HEAD)}"
@@ -85,7 +121,8 @@ if [[ -z "$IPA" ]]; then
     CODE_SIGN_STYLE=Automatic \
     MARKETING_VERSION="$APP_VERSION" \
     CURRENT_PROJECT_VERSION="$BUILD_NUMBER" \
-    -allowProvisioningUpdates
+    -allowProvisioningUpdates \
+    ${AUTH_ARGS[@]+"${AUTH_ARGS[@]}"}
 
   # --- Export the signed .ipa --------------------------------------------------
   # Xcode 27 removed destination=upload from -exportArchive (the key now only
@@ -119,7 +156,8 @@ PLIST
     -archivePath "$ARCHIVE" \
     -exportOptionsPlist "$OPTIONS" \
     -exportPath "$IPA_DIR" \
-    -allowProvisioningUpdates
+    -allowProvisioningUpdates \
+    ${AUTH_ARGS[@]+"${AUTH_ARGS[@]}"}
 
   IPA=$(find_ipa)
   [[ -n "$IPA" ]] || { echo "archive-ios: export produced no .ipa under $IPA_DIR" >&2; exit 1; }
