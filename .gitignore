@@ -50,6 +50,9 @@ eval/fixtures/pending-review.json
 # only in the repo because someone had force-added them, so a new page's
 # baselines were silently dropped on the next `test:visual:update`.
 !tests/visual/ui.spec.ts-snapshots/*.png
+# ...and the design-system doc screenshots ARE tracked: docs/design-system.md
+# embeds them, and a doc that references missing images is worse than no doc.
+!docs/assets/*.png
 
 # Runtime cover-image uploads dir (UPLOADS_DIR default). Anchored to the repo
 # root so it doesn't also swallow src/routes/uploads/ (the serving route).

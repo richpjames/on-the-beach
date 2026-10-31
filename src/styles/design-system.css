@@ -1,0 +1,381 @@
+/* ═══════════════════════════════════════════════════
+   ON THE BEACH — DESIGN SYSTEM
+   Five colours, dressed for 1997.
+
+   --sea    #00b9f4   pool-water cyan   — links, focus, "to listen"
+   --foam   #f6f6f6   sea-foam white    — surfaces, panels, fields
+   --signal #f01c1a   lifeguard red     — danger, delete, errors
+   --sun    #f0a202   afternoon amber   — warnings, "listening", stars
+   --deep   #29339b   deep-water indigo — text, primary buttons, wells
+
+   Rules of the system:
+   - Ink is indigo. On light surfaces text is --deep / --ink-soft,
+     never cyan or amber (they fail contrast on foam).
+   - Cyan and amber speak only on dark surfaces (--deep, --deep-deep,
+     black) or as borders, washes and LED dots on light ones.
+   - Red is danger. On foam as small text use --signal-deep;
+     red fills take foam labels only in bold/large sizes, otherwise
+     use --signal-deep as the fill.
+   - There is no green. "Done" is neutral: --ink-soft, dimmed.
+   - Pixels only: zero radius, hard 1–3px offsets, bevels over shadows.
+   ═══════════════════════════════════════════════════ */
+
+:root {
+  /* ── The five ── */
+  --sea: #00b9f4;
+  --foam: #f6f6f6;
+  --signal: #f01c1a;
+  --sun: #f0a202;
+  --deep: #29339b;
+
+  /* ── Ramps — tints toward foam, shades toward ink ── */
+  --sea-soft: #aee9fd; /* washes, selected rows */
+  --sea-mid: #4dcef7; /* brighter cyan for hover on dark */
+  --sea-deep: #006686; /* cyan inked down to read on foam (6:1) */
+
+  --foam-dim: #e4e4e4; /* pressed / hover surface */
+  --foam-line: #c9c9c9; /* hairlines on light */
+
+  --signal-soft: #fda3a2; /* alert washes */
+  --signal-deep: #a81412; /* danger text and danger fills (7:1 on foam) */
+
+  --sun-soft: #fcd48a; /* highlight washes */
+  --sun-deep: #845901; /* warning text on foam (5.7:1) */
+
+  --deep-mid: #4952aa; /* borders on dark */
+  --deep-soft: #6970b9; /* muted chrome on dark */
+  --deep-deep: #171c55; /* wells, chips, badge backgrounds */
+  --drift: #6e7186; /* the one neutral: disabled text, shadows */
+
+  /* ── Semantic roles ── */
+  --ink: var(--deep); /* default text on light surfaces */
+  --ink-soft: #5e64b2; /* secondary text on light (4.9:1) */
+  --surface: var(--foam);
+  --surface-dim: var(--foam-dim);
+  --field: #ffffff; /* sunken inputs */
+
+  --link: var(--sea-deep); /* links on light */
+  --link-hover: #004a62; /* pressed-ink hover on light */
+  --link-on-dark: var(--sea); /* links on deep/black */
+
+  /* --accent and --danger are main.css's legacy tokens; this file must not
+     redefine them — see the legacy map in docs/design-system.md. */
+  --warning: var(--sun);
+  --warning-text: var(--sun-deep);
+  --danger-text: var(--signal-deep);
+
+  --focus: var(--sea); /* focus rings, marquee dots */
+
+  /* ── Status (mirrors the listen / listening / listened flow) ── */
+  --status-todo: var(--sea); /* to listen */
+  --status-active: var(--sun); /* listening */
+  --status-done: var(--drift); /* listened — neutral, no green */
+
+  /* ── Chip / badge recipe — dark well, bright label, soft border ── */
+  --chip-bg: var(--deep-deep);
+  --chip-text: var(--sea);
+  --chip-border: var(--deep-soft);
+  --chip-text-warn: var(--sun);
+  --chip-text-dim: #8f96c9; /* dimmed label (5.5:1 on the well) */
+
+  /* ── Buttons ── */
+  --btn-primary-bg: var(--deep);
+  --btn-primary-text: var(--foam); /* 9.5:1 */
+  --btn-danger-bg: var(--signal-deep);
+  --btn-danger-text: var(--foam); /* 7:1 */
+
+  /* ── Bevels — the 3D edge, rebuilt from foam and ink ── */
+  --ds-bevel-raised: #ffffff var(--drift) var(--drift) #ffffff;
+  --ds-bevel-sunken: var(--drift) #ffffff #ffffff var(--drift);
+  --ds-shadow: 3px 3px 0 var(--deep-deep);
+}
+
+/* ═══════════════════════════════════════════════════
+   STYLE GUIDE PAGE (/design-system)
+   The living reference: every rule above, rendered.
+═══════════════════════════════════════════════════ */
+
+.ds {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding: var(--space-4) var(--space-2);
+  background: var(--surface);
+  color: var(--ink);
+}
+
+.ds__intro {
+  font-size: var(--text-base);
+  color: var(--ink-soft);
+  max-width: 60ch;
+}
+
+.ds__section {
+  border-width: 2px;
+  border-style: solid;
+  border-color: var(--ds-bevel-raised);
+  background: var(--surface);
+  padding: var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.ds__section-title {
+  font-size: var(--text-xs);
+  font-weight: bold;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--ink);
+  border-bottom: 1px solid var(--foam-line);
+  padding-bottom: var(--space-2);
+}
+
+/* ── Palette cards ── */
+.ds-swatches {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: var(--space-3);
+}
+
+.ds-swatch__chip {
+  height: 64px;
+  border-width: 2px;
+  border-style: solid;
+  border-color: var(--ds-bevel-sunken);
+  display: flex;
+  align-items: flex-end;
+  padding: var(--space-2);
+}
+
+.ds-swatch__name {
+  font-size: var(--text-base);
+  font-weight: bold;
+}
+
+.ds-swatch__hex {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--ink-soft);
+}
+
+.ds-swatch__role {
+  font-size: var(--text-2xs);
+  color: var(--ink-soft);
+}
+
+/* ── Ramps ── */
+.ds-ramp {
+  display: flex;
+  align-items: stretch;
+  border-width: 1px;
+  border-style: solid;
+  border-color: var(--foam-line);
+}
+
+.ds-ramp__step {
+  flex: 1;
+  min-height: 28px;
+  display: flex;
+  align-items: flex-end;
+  padding: 2px 4px;
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+}
+
+/* ── Pairing ledger — every allowed text pair, with its ratio ── */
+.ds-pairs {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--text-xs);
+}
+
+.ds-pairs th {
+  text-align: left;
+  font-size: var(--text-2xs);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--ink-soft);
+  border-bottom: 1px solid var(--foam-line);
+  padding: var(--space-1) var(--space-2);
+}
+
+.ds-pairs td {
+  padding: var(--space-1) var(--space-2);
+  border-bottom: 1px dotted var(--foam-line);
+}
+
+.ds-pairs__sample {
+  display: inline-block;
+  padding: 0 var(--space-2);
+  font-weight: bold;
+  white-space: nowrap;
+}
+
+.ds-pairs__ratio {
+  font-family: var(--font-mono);
+}
+
+/* ── Type scale specimens ── */
+.ds-type__row {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-3);
+}
+
+.ds-type__label {
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  color: var(--ink-soft);
+  width: 10ch;
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+/* ── Control gallery ── */
+.ds-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  align-items: center;
+}
+
+.ds-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px 12px;
+  min-height: var(--control-h);
+  border-width: 2px;
+  border-style: solid;
+  border-color: var(--ds-bevel-raised);
+  background: var(--surface);
+  color: var(--ink);
+  font-size: var(--text-base);
+  cursor: pointer;
+}
+
+.ds-btn:active {
+  border-color: var(--ds-bevel-sunken);
+}
+
+.ds-btn--primary {
+  background: var(--btn-primary-bg);
+  color: var(--btn-primary-text);
+  border-color: var(--deep-mid) var(--deep-deep) var(--deep-deep) var(--deep-mid);
+}
+
+.ds-btn--danger {
+  background: var(--btn-danger-bg);
+  color: var(--btn-danger-text);
+  border-color: var(--signal) var(--signal-deep) var(--signal-deep) var(--signal);
+}
+
+.ds-btn:focus-visible,
+.ds-input:focus-visible {
+  outline: 2px dotted var(--focus);
+  outline-offset: -4px;
+}
+
+.ds-input {
+  padding: 2px 4px;
+  height: var(--control-h);
+  background: var(--field);
+  border-width: 2px;
+  border-style: solid;
+  border-color: var(--ds-bevel-sunken);
+  color: var(--ink);
+  font-size: var(--text-base);
+}
+
+/* ── Badges — the chip recipe ── */
+.ds-badge {
+  display: inline-block;
+  padding: 0 5px;
+  font-size: var(--text-2xs);
+  font-weight: bold;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  line-height: 14px;
+  background: var(--chip-bg);
+  color: var(--chip-text);
+  border: 1px solid var(--chip-border);
+}
+
+.ds-badge--warn {
+  color: var(--chip-text-warn);
+}
+
+.ds-badge--dim {
+  color: var(--chip-text-dim);
+}
+
+/* Alert badges are red wells, not red washes: --signal-soft with a
+   --signal-deep label only reaches 3.9:1, below the 4.5:1 small-text gate. */
+.ds-badge--alert {
+  background: var(--signal-deep);
+  color: var(--foam);
+  border-color: var(--signal);
+}
+
+/* ── Status LEDs ── */
+.ds-led {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-xs);
+}
+
+.ds-led::before {
+  content: "";
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--led);
+  box-shadow: 0 0 4px var(--led);
+}
+
+/* ── Do / don't ── */
+.ds-rule {
+  display: flex;
+  gap: var(--space-2);
+  font-size: var(--text-xs);
+  align-items: baseline;
+}
+
+.ds-rule__mark {
+  font-weight: bold;
+  flex-shrink: 0;
+}
+
+.ds-rule__mark--do {
+  color: var(--sea-deep);
+}
+
+.ds-rule__mark--dont {
+  color: var(--signal-deep);
+}
+
+@media (max-width: 520px) {
+  .ds {
+    padding: var(--space-3) var(--space-1);
+  }
+
+  .ds-swatches {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  /* Ramps scroll sideways rather than crushing five steps into 150px. */
+  .ds-ramp {
+    overflow-x: auto;
+  }
+
+  .ds-ramp__step {
+    min-width: 64px;
+  }
+
+  .ds-pairs__sample {
+    display: block;
+    margin-bottom: 2px;
+  }
+}
