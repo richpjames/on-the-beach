@@ -82,6 +82,11 @@ if [[ -n "${OTB_API_KEY:-}" && -n "${OTB_API_ISSUER:-}" ]]; then
     done
   fi
   if [[ -n "$KEY_PATH" && -f "$KEY_PATH" ]]; then
+    # xcodebuild rejects a relative -authenticationKeyPath outright (exit 64,
+    # "must be an absolute path to an existing file"), and the ./private_keys
+    # candidate above is repo-relative — the script has already cd'd to the
+    # repo root, so prefixing $PWD resolves it.
+    if [[ "$KEY_PATH" != /* ]]; then KEY_PATH="$PWD/${KEY_PATH#./}"; fi
     AUTH_ARGS=(-authenticationKeyPath "$KEY_PATH"
                -authenticationKeyID "$OTB_API_KEY"
                -authenticationKeyIssuerID "$OTB_API_ISSUER")
