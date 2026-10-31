@@ -117,8 +117,9 @@ iOS share sheet ──► ShareExtension compose form ──┬─► POST /api/
 | `native/App/OTBLaunchActions.swift` | hand-authored | yes        |
 | `native/AppIcon.appiconset/`      | generated from `assets/logo.png` | yes |
 | `scripts/add-share-extension.rb`  | hand-authored   | yes        |
-| `scripts/add-widget-extension.rb` | hand-authored   | yes        |
+| `scripts/add-widget-extension.rb`  | hand-authored   | yes        |
 | `scripts/add-listen-shortcut.rb`  | hand-authored   | yes        |
+| `scripts/archive-ios.sh`          | hand-authored   | yes        |
 | `assets/logo.png`                 | hand-authored (the one brand master) | yes |
 | `scripts/generate-brand-assets.sh` | hand-authored  | yes        |
 | `public/favicon*`, `public/*-chrome-*`, `apple-touch-icon.png` | generated from `assets/logo.png` | yes |
@@ -392,6 +393,78 @@ button/menu and pick **On The Beach**. If it isn't listed, enable it under
 **System Settings ▸ Privacy & Security ▸ Extensions ▸ Sharing**) and tick **On
 The Beach**. The compose form, note field, and List picker all work the same as
 on iOS.
+
+## TestFlight (internal testing)
+
+`bun run ios:archive` archives the app (plus Share Extension and Widget — the
+scheme builds all three) for distribution; `bun run ios:archive -- --upload`
+pushes the archive to App Store Connect as a **TestFlight** build. The upload
+uses the `release-testing` distribution method, which is TestFlight-only — the
+build can never be submitted to the App Store, matching how this app is
+distributed: to you, via **internal testing**, which needs no Beta App Review.
+
+### One-time setup
+
+1. **A paid Apple Developer Program membership** on the build team
+   (`W2BS7F6CHM` — the one `scripts/lib/native-build-common.sh` signs with).
+   Free personal teams — enough for `bun run ios` onto your own phone — cannot
+   use TestFlight at all.
+2. **Create the app in App Store Connect**: Apps ▸ **+** ▸ New App ▸ iOS ▸
+   bundle id `es.ricojam.onthebeach`, a name, and a SKU. Don't register the
+   extension bundle IDs by hand — `-allowProvisioningUpdates` on the archive
+   creates the App IDs and App Store profiles for the app and both extensions.
+3. **An Apple Distribution certificate** (only if the archive complains about
+   signing): Xcode ▸ Settings ▸ Accounts ▸ your team ▸ Manage Certificates ▸
+   **+** ▸ Apple Distribution.
+4. **Xcode signed in** to that Apple ID (Settings ▸ Accounts). The
+   distribution export mints the App Store provisioning profiles for the app
+   and both extensions — and, first run only, the iOS Distribution
+   certificate — through that session; without it the export fails with
+   "No Accounts".
+
+### Upload and install
+
+```bash
+bun run ios:archive -- --upload
+```
+
+The script archives, then exports a signed `.ipa` (the upload is separate:
+Xcode 27 removed direct upload from `xcodebuild -exportArchive`, so the
+`.ipa` goes up via `altool`). The version is stamped from `package.json` and
+the build number from the git commit count (the generated project pins both
+at 1.0/1, and Capacitor never copies the real version across). After ~10–15
+minutes of App Store Connect processing the build appears under TestFlight.
+Add yourself to the **Internal Testing** group (App Store Connect users with
+access — the Account Holder already qualifies), accept the email invite once,
+and install via the TestFlight app like any tester.
+
+**Uploading** needs App Store Connect credentials of one of these shapes,
+because Xcode's GUI session no longer covers CLI uploads:
+
+```bash
+# an app-specific password (appleid.apple.com ▸ Sign-In and Security ▸
+# App-Specific Passwords):
+OTB_APPLE_ID='you@example.com' OTB_APP_SPECIFIC_PASSWORD='xxxx-xxxx-xxxx-xxxx' \
+  bun run ios:archive -- --upload
+
+# or an App Store Connect API team key (Users and Access ▸ Integrations; the
+# AuthKey_<KEY>.p8 goes in ./private_keys, ~/private_keys or ~/.appstoreconnect):
+OTB_API_KEY='ABCDE12345' OTB_API_ISSUER='69a6de…' bun run ios:archive -- --upload
+```
+
+With neither set, the script stops after exporting and prints the `.ipa` path —
+dragging it onto Apple's free **Transporter** Mac app and clicking Deliver is
+the credential-free route.
+
+**Re-uploading from the same commit:** TestFlight rejects a version+build pair
+it already has, so pass a higher one — `OTB_BUILD_NUMBER=101 bun run
+ios:archive -- --upload`. A new commit needs nothing: the count moves by
+itself.
+
+> Why not upload from CI? The archive is fully reproducible (CI compiles the
+> same three targets), but distribution signing means exporting the
+> certificate and an App Store Connect key as GitHub secrets — real ceremony
+> for a single-user app that one command on the build Mac already covers.
 
 ## Updating after web changes
 
