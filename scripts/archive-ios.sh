@@ -9,12 +9,14 @@
 # iOS device destination, signed with the team's distribution identity) instead
 # of a Debug build installed onto a connected phone.
 #
-# A signed .ipa is final: same commit, same build number, same bytes. When one
-# already exists in build/ios-archives/upload/ the archive + export steps are
-# skipped and the file is reused — delete that directory to rebuild. This also
-# routes around the flakiest step: export rides on the Xcode account session,
-# which on this machine expires within minutes ("No Accounts" errors), while
-# uploading needs no session at all.
+# A signed .ipa is final: same version, same build number, same bytes. When the
+# .ipa already in build/ios-archives/upload/ was built from exactly this
+# version+build pair (a stamp file records it) the archive + export steps are
+# skipped and the file is reused — any new commit or version bump builds fresh,
+# so a stale .ipa is never re-uploaded as the wrong build. Delete that directory
+# to force a rebuild anyway. Reuse also routes around the flakiest step: export
+# rides on the Xcode account session, which on this machine expires within
+# minutes ("No Accounts" errors), while uploading needs no session at all.
 #
 # Versioning: the generated project pins MARKETING_VERSION=1.0 and
 # CURRENT_PROJECT_VERSION=1 (Capacitor never copies package.json's version
@@ -96,18 +98,28 @@ BUILD_NUMBER="${OTB_BUILD_NUMBER:-$(git rev-list --count HEAD)}"
 ARCHIVE_DIR="build/ios-archives"
 ARCHIVE="$ARCHIVE_DIR/OnTheBeach-$APP_VERSION-$BUILD_NUMBER.xcarchive"
 IPA_DIR="$ARCHIVE_DIR/upload"
+# Written after a successful export. Reuse below only fires when the stamp
+# matches the version+build being built now, so an .ipa left over from an
+# earlier commit (or an earlier package.json version) is rebuilt, not silently
+# re-uploaded as this build.
+STAMP="$IPA_DIR/.built-$APP_VERSION-$BUILD_NUMBER"
 
 # `|| true` so a missing IPA_DIR is just "no ipa" — pipefail would otherwise
 # make find's non-zero exit kill the script under set -e.
 find_ipa() { find "$IPA_DIR" -maxdepth 1 -name '*.ipa' -type f 2>/dev/null | head -1 || true; }
 
-IPA=$(find_ipa)
+IPA=""
+if [[ -f "$STAMP" ]]; then
+  IPA=$(find_ipa)
+fi
 if [[ -z "$IPA" ]]; then
   native_preflight
   native_regenerate
 
   mkdir -p "$ARCHIVE_DIR"
-  rm -rf "$ARCHIVE"
+  # Clear any .ipa + stamp from an earlier version+build so the export dir
+  # holds exactly one .ipa and find_ipa can't pick a stale sibling.
+  rm -rf "$ARCHIVE" "$IPA_DIR"
 
   log "Archiving $APP_VERSION (build $BUILD_NUMBER) for distribution"
   xcodebuild archive \
@@ -161,6 +173,7 @@ PLIST
 
   IPA=$(find_ipa)
   [[ -n "$IPA" ]] || { echo "archive-ios: export produced no .ipa under $IPA_DIR" >&2; exit 1; }
+  touch "$STAMP"
 else
   log "Reusing already-signed $IPA"
   echo "  (delete $IPA_DIR to archive + export fresh)"
