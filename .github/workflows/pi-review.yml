@@ -66,7 +66,7 @@ jobs:
           cat <<'EOF' > review-instructions.md
           You are the code reviewer for this pull request. The repository is checked out at the pull request's merge commit; the root AGENTS.md carries the project conventions (Bun not node, the retro design language, the hexagonal layer boundaries) — read it first and hold this change to it.
 
-          Work from the pull request metadata and diff below. Your tools are read-only: use them to read the code around each hunk before judging it. Do not wrap your reply in a code fence.
+          Work from the pull request metadata and diff below. Your tools are read-only: use them to read the code around each hunk before judging it. Do not wrap your reply in a code fence and do not begin it with a title or heading — the comment already carries one.
 
           Review for:
 
@@ -99,9 +99,12 @@ jobs:
             cat pr.diff
             echo '```'
           } > review-prompt.md
+          # Extensions and skills execute arbitrary code at load, whatever --tools
+          # allows; a review of the diff never needs them.
           pi -p --no-session \
             --provider zai --model glm-5.1 \
             --tools read,grep,find,ls \
+            --no-extensions --no-skills --no-prompt-templates --no-themes \
             @review-prompt.md > review.md
           test -s review.md
 
@@ -110,8 +113,11 @@ jobs:
         run: |
           sed -i '1{/^```/d;}' review.md
           sed -i '${/^```$/d;}' review.md
+          sed -i '1{/^#### Pi agent review/d;}' review.md
           {
             echo '#### Pi agent review (glm-5.1)'
+            echo
+            echo '_Generated from the pull request'"'"'s own content — treat its links and verdict like any untrusted comment._'
             echo
             cat review.md
           } > comment.md
