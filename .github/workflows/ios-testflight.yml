@@ -115,7 +115,10 @@ jobs:
       - name: Write build credentials
         # The real ingest key (a TestFlight build must actually be able to post
         # shares) and the App Store Connect API key, decoded to the ./private_keys
-        # location both altool and archive-ios.sh look in.
+        # location both altool and archive-ios.sh look in. The p8 secret may hold
+        # either the base64 of the .p8 or the pasted PEM itself — both work —
+        # and is validated here so a bad paste dies in seconds with a fix, not
+        # as an opaque exit 78 from xcodebuild minutes into the archive.
         env:
           OTB_API_KEY: ${{ secrets.OTB_API_KEY }}
           OTB_API_ISSUER: ${{ secrets.OTB_API_ISSUER }}
@@ -124,7 +127,19 @@ jobs:
         run: |
           printf 'OTB_INGEST_API_KEY = %s\n' "$OTB_INGEST_API_KEY" > native/ShareExtension/Secrets.xcconfig
           mkdir -p private_keys
-          printf '%s' "$OTB_API_KEY_P8_B64" | base64 --decode > "private_keys/AuthKey_${OTB_API_KEY}.p8"
+          KEY_FILE="private_keys/AuthKey_${OTB_API_KEY}.p8"
+          if printf '%s' "$OTB_API_KEY_P8_B64" | grep -q 'BEGIN PRIVATE KEY'; then
+            printf '%s\n' "$OTB_API_KEY_P8_B64" > "$KEY_FILE"
+          else
+            printf '%s' "$OTB_API_KEY_P8_B64" | tr -d ' \r\n\t' | base64 --decode > "$KEY_FILE"
+          fi
+          if ! openssl pkey -in "$KEY_FILE" -noout 2>/dev/null; then
+            echo "::error title=OTB_API_KEY_P8_B64 is not a usable key::OpenSSL cannot parse the decoded $(wc -c < "$KEY_FILE" | tr -d ' ') bytes as a private key — and OTB_API_KEY must be the Key ID of the SAME key the .p8 came from. Re-set both:"
+            echo "    gh secret set OTB_API_KEY --body '<Key ID from the ASC key list>'"
+            echo "    base64 -i AuthKey_<KeyID>.p8 | gh secret set OTB_API_KEY_P8_B64"
+            echo "  (pasting the whole -----BEGIN PRIVATE KEY----- file into the secret value works too)"
+            exit 1
+          fi
 
       - name: Archive + upload to TestFlight
         # archive-ios.sh regenerates ios/, archives, exports the signed .ipa
