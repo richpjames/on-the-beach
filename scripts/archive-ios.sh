@@ -47,6 +47,9 @@
 # dragging it onto Apple's free Transporter app is the credential-free route.
 # When OTB_API_KEY/OTB_API_ISSUER are set, the key also authenticates
 # -allowProvisioningUpdates for signing (headless CI has no Xcode session).
+# The key must have the ADMIN role — App Manager authenticates but export fails
+# with "Cloud signing permission error" (no access to cloud-managed
+# distribution certificates).
 
 set -euo pipefail
 cd "$(git -C "$(dirname "$0")" rev-parse --show-toplevel)"

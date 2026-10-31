@@ -486,8 +486,10 @@ the session route still works.
 One-time setup (GitHub ▸ Settings ▸ Secrets and variables ▸ Actions):
 
 1. Create an **App Store Connect API key** (Users and Access ▸ Integrations ▸
-   Team Keys) with the **App Manager** role — it needs to upload *and* manage
-   cloud signing. Download the `AuthKey_<KeyID>.p8`.
+   Team Keys) with the **Admin** role. Admin is required, not merely convenient:
+   an App Manager key authenticates and even archives fine, but the export dies
+   with `Cloud signing permission error` because only Admin can use
+   cloud-managed distribution certificates. Download the `AuthKey_<KeyID>.p8`.
 2. Set the secrets:
    ```bash
    gh secret set OTB_API_KEY --body '<Key ID>'
