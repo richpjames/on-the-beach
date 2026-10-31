@@ -47,8 +47,8 @@ APP_DISPLAY_NAME = "On The Beach"
 # current iOS, so we target the latest (26.0) rather than carrying an older
 # floor — which also comfortably clears the iOS 14 `UTType` API that
 # ShareViewController.swift relies on. Applied below to the extension, the App
-# target, and the project (overriding Capacitor's generated 13.0 default) so the
-# whole app shares one floor instead of a 13/26 split.
+# target, the project, and the Pods targets (overriding Capacitor's generated
+# 13.0 default) so the whole app shares one floor instead of a 13/26 split.
 DEPLOYMENT_TARGET = "26.0"
 
 def die(message)
@@ -199,6 +199,28 @@ project.build_configurations.each do |config|
 end
 
 project.save
+
+# --- Raise the Pods targets to the same floor --------------------------------
+# `cap add` runs `pod install` against Capacitor's template Podfile
+# (`platform :ios, '13.0'`), which bakes IPHONEOS_DEPLOYMENT_TARGET = 13.0 into
+# every target of the generated Pods project. For a Catalyst build Xcode
+# derives MACOSX_DEPLOYMENT_TARGET from that iOS floor — iOS 13 maps to macOS
+# 10.15 — and Xcode 27 rejects Catalyst deployment targets below macOS 12, so
+# the build dies in Pods-App/Capacitor/CapacitorCordova (an older Xcode, like
+# CI's, still accepts 10.15 — which is why CI stays green while local builds
+# fail). Raise the Pods targets to the app's floor so the whole workspace
+# shares one deployment target.
+pods_project_path = File.join(REPO_ROOT, "ios", "App", "Pods", "Pods.xcodeproj")
+if File.exist?(pods_project_path)
+  pods_project = Xcodeproj::Project.open(pods_project_path)
+  pods_project.targets.each do |target|
+    target.build_configurations.each do |config|
+      config.build_settings["IPHONEOS_DEPLOYMENT_TARGET"] = DEPLOYMENT_TARGET
+    end
+  end
+  pods_project.save
+  puts "add-share-extension: raised Pods targets' deployment target to iOS #{DEPLOYMENT_TARGET}"
+end
 
 # --- App display name (Dock / app switcher / macOS Sharing pane) -------------
 # Two Info.plist keys carry the user-facing name, and both must be set:

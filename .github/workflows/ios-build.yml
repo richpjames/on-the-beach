@@ -123,11 +123,14 @@ jobs:
         # handler must be in the App target's sources, the scheme and quick
         # action must be declared, and the microphone purpose string must exist
         # or iOS terminates the app the first time the recogniser asks for audio.
+        # ITSAppUsesNonExemptEncryption keeps TestFlight uploads off the
+        # export-compliance question — same silent-if-missing failure shape.
         run: |
           grep -q 'OTBLaunchActions.swift in Sources' ios/App/App.xcodeproj/project.pbxproj
           grep -q 'onthebeach' ios/App/App/Info.plist
           grep -q 'otb-listen' ios/App/App/Info.plist
           grep -q 'NSMicrophoneUsageDescription' ios/App/App/Info.plist
+          grep -q 'ITSAppUsesNonExemptEncryption' ios/App/App/Info.plist
 
       - name: Verify Share Extension macOS entitlements
         # Regression guard for a bug that only bit the real Mac app: macOS always

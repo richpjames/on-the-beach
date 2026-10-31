@@ -41,6 +41,7 @@
     "mac:install": "bash scripts/build-mac.sh --install",
     "mac:local": "OTB_APP_URL=http://localhost:3000 bash scripts/build-mac.sh --install",
     "ios": "bash scripts/build-ios.sh",
+    "ios:archive": "bash scripts/archive-ios.sh",
     "brand:assets": "bash scripts/generate-brand-assets.sh"
   },
   "dependencies": {
