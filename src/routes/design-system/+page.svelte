@@ -1,10 +1,12 @@
 <script lang="ts">
+  // Label colours follow the ramps: ink on the light fills (sea, sun, foam),
+  // foam on the dark ones (signal, deep).
   const swatches = [
-    { name: "sea", hex: "#00b9f4", role: "links, focus, to-listen", onDark: true },
-    { name: "foam", hex: "#f6f6f6", role: "surfaces, panels, fields", onDark: false },
-    { name: "signal", hex: "#f01c1a", role: "danger, delete, errors", onDark: true },
-    { name: "sun", hex: "#f0a202", role: "warnings, listening, stars", onDark: true },
-    { name: "deep", hex: "#29339b", role: "text, primary buttons, wells", onDark: true },
+    { name: "sea", hex: "#00b9f4", role: "links, focus, to-listen", text: "#171c55" },
+    { name: "foam", hex: "#f6f6f6", role: "surfaces, panels, fields", text: "#29339b" },
+    { name: "signal", hex: "#f01c1a", role: "danger, delete, errors", text: "#f6f6f6" },
+    { name: "sun", hex: "#f0a202", role: "warnings, listening, stars", text: "#171c55" },
+    { name: "deep", hex: "#29339b", role: "text, primary buttons, wells", text: "#f6f6f6" },
   ];
 
   const ramps = [
@@ -115,7 +117,7 @@
       bg: "#a81412",
       bgName: "signal-deep",
       ratio: "7.0",
-      use: "danger button labels",
+      use: "danger buttons, alert badges",
     },
     {
       fg: "#171c55",
@@ -132,6 +134,14 @@
       bgName: "deep-deep",
       ratio: "6.9",
       use: "chip / badge labels",
+    },
+    {
+      fg: "#8f96c9",
+      fgName: "chip-text-dim",
+      bg: "#171c55",
+      bgName: "deep-deep",
+      ratio: "5.5",
+      use: "dimmed badge labels",
     },
   ];
 
@@ -195,11 +205,7 @@
         {#each swatches as s (s.name)}
           <div class="ds-swatch">
             <div class="ds-swatch__chip" style:background={s.hex}>
-              {#if s.onDark}
-                <span class="ds-swatch__hex" style:color="var(--foam)">{s.hex}</span>
-              {:else}
-                <span class="ds-swatch__hex" style:color="var(--deep)">{s.hex}</span>
-              {/if}
+              <span class="ds-swatch__hex" style:color={s.text}>{s.hex}</span>
             </div>
             <div class="ds-swatch__name">{s.name}</div>
             <div class="ds-swatch__role">{s.role}</div>
