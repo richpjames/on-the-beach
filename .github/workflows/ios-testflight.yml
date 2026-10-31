@@ -56,6 +56,26 @@ jobs:
     timeout-minutes: 60
 
     steps:
+      - name: Check required secrets
+        # Before any setup: no point paying for a minute of Xcode/Bun/Ruby
+        # tooling (macOS runners bill at 10x) just to learn a secret is missing
+        # — the alternative failure is an obscure signing error halfway through
+        # a 20-minute archive.
+        env:
+          OTB_API_KEY: ${{ secrets.OTB_API_KEY }}
+          OTB_API_ISSUER: ${{ secrets.OTB_API_ISSUER }}
+          OTB_API_KEY_P8_B64: ${{ secrets.OTB_API_KEY_P8_B64 }}
+          OTB_INGEST_API_KEY: ${{ secrets.OTB_INGEST_API_KEY }}
+        run: |
+          missing=0
+          for v in OTB_API_KEY OTB_API_ISSUER OTB_API_KEY_P8_B64 OTB_INGEST_API_KEY; do
+            if [[ -z "${!v}" ]]; then
+              echo "::error title=Missing secret::$v is not set (Settings ▸ Secrets and variables ▸ Actions)"
+              missing=1
+            fi
+          done
+          exit "$missing"
+
       - name: Checkout (full history)
         # The build number is the git commit count, so the checkout needs every
         # commit — actions/checkout's default depth of 1 would count 1.
@@ -91,24 +111,6 @@ jobs:
 
       - name: Install dependencies
         run: bun install --frozen-lockfile
-
-      - name: Check required secrets
-        # Fail fast with a named list rather than an obscure signing error
-        # halfway through a 20-minute archive.
-        env:
-          OTB_API_KEY: ${{ secrets.OTB_API_KEY }}
-          OTB_API_ISSUER: ${{ secrets.OTB_API_ISSUER }}
-          OTB_API_KEY_P8_B64: ${{ secrets.OTB_API_KEY_P8_B64 }}
-          OTB_INGEST_API_KEY: ${{ secrets.OTB_INGEST_API_KEY }}
-        run: |
-          missing=0
-          for v in OTB_API_KEY OTB_API_ISSUER OTB_API_KEY_P8_B64 OTB_INGEST_API_KEY; do
-            if [[ -z "${!v}" ]]; then
-              echo "::error title=Missing secret::$v is not set (Settings ▸ Secrets and variables ▸ Actions)"
-              missing=1
-            fi
-          done
-          exit "$missing"
 
       - name: Write build credentials
         # The real ingest key (a TestFlight build must actually be able to post
