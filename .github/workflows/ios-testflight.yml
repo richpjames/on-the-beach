@@ -18,15 +18,20 @@ name: iOS TestFlight
 # workflow_dispatch with a higher build_number instead.
 #
 # One-time setup (GitHub ▸ Settings ▸ Secrets and variables ▸ Actions):
-#   OTB_INGEST_API_KEY  the real ingest key (CI builds embed a dummy only when
-#                       this is unset, and shares won't post from that build)
-#   OTB_API_KEY         ASC API key ID (Users and Access ▸ Integrations). The
-#   OTB_API_ISSUER      key needs the ADMIN role: App Manager authenticates and
-#                       uploads fine but export dies with "Cloud signing
-#                       permission error" because it can't use cloud-managed
-#                       distribution certificates.
-#   OTB_API_KEY_P8_B64  base64 of the key's AuthKey_<ID>.p8:
-#                       base64 -i AuthKey_XXXX.p8 | gh secret set OTB_API_KEY_P8_B64
+#   OTB_INGEST_API_KEY          the real ingest key (CI builds embed a dummy
+#                               only when unset, and shares won't post)
+#   OTB_API_KEY                 an App Store Connect API key, App Manager role
+#   OTB_API_ISSUER              (Admin NOT needed): it signs the archive step
+#                               and drives the altool upload
+#   OTB_API_KEY_P8_B64          base64 of the key's AuthKey_XXXX.p8
+#   OTB_DISTRIBUTION_P12_B64    base64 of the Apple Distribution .p12 exported
+#   OTB_DISTRIBUTION_P12_PASSWORD   from the build Mac's keychain, plus its passphrase
+#   OTB_DIST_PROFILES_ZIP_B64   zip of the three App Store Connect
+#                               .mobileprovision files (app, Share Extension,
+#                               Widget) pinned to that certificate
+# Distribution signing is MANUAL (cert + profiles imported per-run), so the
+# API key never needs the Admin role that cloud signing would demand. Full
+# walkthrough: docs/ios-native-app.md ▸ TestFlight ▸ Automated uploads.
 
 on:
   push:
@@ -69,9 +74,13 @@ jobs:
           OTB_API_ISSUER: ${{ secrets.OTB_API_ISSUER }}
           OTB_API_KEY_P8_B64: ${{ secrets.OTB_API_KEY_P8_B64 }}
           OTB_INGEST_API_KEY: ${{ secrets.OTB_INGEST_API_KEY }}
+          OTB_DISTRIBUTION_P12_B64: ${{ secrets.OTB_DISTRIBUTION_P12_B64 }}
+          OTB_DISTRIBUTION_P12_PASSWORD: ${{ secrets.OTB_DISTRIBUTION_P12_PASSWORD }}
+          OTB_DIST_PROFILES_ZIP_B64: ${{ secrets.OTB_DIST_PROFILES_ZIP_B64 }}
         run: |
           missing=0
-          for v in OTB_API_KEY OTB_API_ISSUER OTB_API_KEY_P8_B64 OTB_INGEST_API_KEY; do
+          for v in OTB_API_KEY OTB_API_ISSUER OTB_API_KEY_P8_B64 OTB_INGEST_API_KEY \
+                   OTB_DISTRIBUTION_P12_B64 OTB_DISTRIBUTION_P12_PASSWORD OTB_DIST_PROFILES_ZIP_B64; do
             if [[ -z "${!v}" ]]; then
               echo "::error title=Missing secret::$v is not set (Settings ▸ Secrets and variables ▸ Actions)"
               missing=1
@@ -144,15 +153,83 @@ jobs:
             exit 1
           fi
 
+      - name: Import distribution cert + profiles (manual signing)
+        # Distribution signing without an Admin API key: a classic Apple
+        # Distribution certificate (exported from the build Mac's keychain)
+        # and the three App Store profiles go into a throwaway keychain and
+        # the runner's profile dir. Each profile's NAME is resolved by bundle
+        # id and exported for archive-ios.sh's ExportOptions — the names are
+        # whatever they were called in the portal, so nothing here depends on
+        # a naming convention.
+        env:
+          OTB_DISTRIBUTION_P12_B64: ${{ secrets.OTB_DISTRIBUTION_P12_B64 }}
+          OTB_DISTRIBUTION_P12_PASSWORD: ${{ secrets.OTB_DISTRIBUTION_P12_PASSWORD }}
+          OTB_DIST_PROFILES_ZIP_B64: ${{ secrets.OTB_DIST_PROFILES_ZIP_B64 }}
+        run: |
+          CERT_DIR="$(mktemp -d)"
+          printf '%s' "$OTB_DISTRIBUTION_P12_B64" | base64 --decode > "$CERT_DIR/dist.p12"
+          printf '%s' "$OTB_DIST_PROFILES_ZIP_B64" | base64 --decode > "$CERT_DIR/profiles.zip"
+          unzip -qo "$CERT_DIR/profiles.zip" -d "$CERT_DIR/profiles"
+
+          KEYCHAIN="ci-signing.keychain-db"
+          KEYCHAIN_PW="$(openssl rand -hex 16)"
+          security create-keychain -p "$KEYCHAIN_PW" "$KEYCHAIN"
+          security unlock-keychain -p "$KEYCHAIN_PW" "$KEYCHAIN"
+          security set-keychain-settings -t 21600 -u "$KEYCHAIN"
+          security import "$CERT_DIR/dist.p12" -k "$KEYCHAIN" \
+            -P "$OTB_DISTRIBUTION_P12_PASSWORD" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple: -k "$KEYCHAIN_PW" "$KEYCHAIN" >/dev/null
+          security list-keychains -d user -s "$KEYCHAIN" \
+            $(security list-keychains -d user | tr -d '"')
+
+          PROFILE_DIR="$HOME/Library/MobileDevice/Provisioning Profiles"
+          mkdir -p "$PROFILE_DIR"
+          shopt -s globstar nullglob
+          for f in "$CERT_DIR"/profiles/**/*.mobileprovision; do
+            security cms -D -i "$f" > "$CERT_DIR/profile.plist"
+            UUID="$(plutil -extract UUID raw "$CERT_DIR/profile.plist")"
+            NAME="$(plutil -extract Name raw "$CERT_DIR/profile.plist")"
+            cp "$f" "$PROFILE_DIR/$UUID.mobileprovision"
+            JSON="$(plutil -convert json -o - "$CERT_DIR/profile.plist")"
+            VAR=""
+            case "$JSON" in
+              *es.ricojam.onthebeach.ShareExtension*) VAR=OTB_PROFILE_SHARE ;;
+              *es.ricojam.onthebeach.OTBWidget*)      VAR=OTB_PROFILE_WIDGET ;;
+              *es.ricojam.onthebeach*)                VAR=OTB_PROFILE_APP ;;
+            esac
+            if [[ -z "$VAR" ]]; then
+              echo "::error title=Unexpected provisioning profile::$(basename "$f") matches none of the app's three bundle IDs"
+              exit 1
+            fi
+            echo "$VAR=$NAME" >> "$GITHUB_ENV"
+            echo "matched $VAR: $NAME ($UUID)"
+          done
+          for v in OTB_PROFILE_APP OTB_PROFILE_SHARE OTB_PROFILE_WIDGET; do
+            if ! grep -q "^$v=" "$GITHUB_ENV"; then
+              echo "::error title=Missing profile::OTB_DIST_PROFILES_ZIP_B64 has no App Store profile for $v's bundle ID"
+              exit 1
+            fi
+          done
+          echo "OTB_EXPORT_MANUAL=1" >> "$GITHUB_ENV"
+          rm -rf "$CERT_DIR"
+
       - name: Archive + upload to TestFlight
-        # archive-ios.sh regenerates ios/, archives, exports the signed .ipa
-        # (cloud-managed signing via the API key), and uploads with altool.
-        # native_preflight keeps the Secrets.xcconfig written above.
+        # archive-ios.sh regenerates ios/, archives (cloud signing via the API
+        # key), exports the .ipa with the imported certificate and profiles
+        # (manual, no ASC access), and uploads with altool. native_preflight
+        # keeps the Secrets.xcconfig written above.
         env:
           OTB_API_KEY: ${{ secrets.OTB_API_KEY }}
           OTB_API_ISSUER: ${{ secrets.OTB_API_ISSUER }}
           OTB_BUILD_NUMBER: ${{ inputs.build_number }}
+          OTB_EXPORT_MANUAL: "1"
         run: bun run ios:archive -- --upload
+
+      - name: Remove signing keychain and profiles
+        if: always()
+        run: |
+          security delete-keychain ci-signing.keychain-db >/dev/null 2>&1 || true
+          rm -rf "$HOME/Library/MobileDevice/Provisioning Profiles"
 
       - name: Summarise
         if: always()
