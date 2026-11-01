@@ -156,10 +156,12 @@ if [[ -z "$IPA" ]]; then
   # - manual (OTB_EXPORT_MANUAL=1, the CI flow): a classic Apple Distribution
   #   certificate and App Store profiles were imported by the workflow ahead of
   #   this script, so xcodebuild re-signs with them and nothing talks to
-  #   App Store Connect. Profile NAMES arrive via env (OTB_PROFILE_APP /
-  #   _SHARE / _WIDGET) because they are whatever the portal named them; the
-  #   bundle IDs they're keyed by mirror the injectors (es.ricojam.onthebeach
-  #   plus .ShareExtension / .OTBWidget).
+  #   App Store Connect. Method is app-store-connect, which pairs with
+  #   App Store-type profiles; release-testing maps to Ad Hoc-type profiles
+  #   and rejects them ("… is not an 'iOS Ad Hoc' profile"). Profile NAMES
+  #   arrive via env (OTB_PROFILE_APP / _SHARE / _WIDGET) because they are
+  #   whatever the portal named them; the bundle IDs they're keyed by mirror
+  #   the injectors (es.ricojam.onthebeach plus .ShareExtension / .OTBWidget).
   log "Exporting signed .ipa"
   OPTIONS="$ARCHIVE_DIR/exportOptions-$APP_VERSION-$BUILD_NUMBER.plist"
   if [[ "${OTB_EXPORT_MANUAL:-}" == "1" ]]; then
@@ -175,7 +177,7 @@ if [[ -z "$IPA" ]]; then
 <plist version="1.0">
 <dict>
   <key>method</key>
-  <string>release-testing</string>
+  <string>app-store-connect</string>
   <key>destination</key>
   <string>export</string>
   <key>teamID</key>
