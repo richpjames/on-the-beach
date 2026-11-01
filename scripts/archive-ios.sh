@@ -147,15 +147,62 @@ if [[ -z "$IPA" ]]; then
   # --- Export the signed .ipa --------------------------------------------------
   # Xcode 27 removed destination=upload from -exportArchive (the key now only
   # accepts "export"), so exporting produces the signed .ipa and uploading is
-  # altool's job below. method=release-testing is TestFlight-only: the build
-  # can never be submitted to the App Store, which is the point for an
-  # internal-testing distribution. (app-store-connect also works but hunts for
-  # classic App Store profiles; release-testing is the one Xcode 27 provisions
-  # end-to-end for this team.) Automatic signing + -allowProvisioningUpdates
-  # re-signs with the distribution identity, minting it on first use.
+  # altool's job below. Two signing modes:
+  #
+  # - cloud/automatic (the default, and the local flow): -allowProvisioningUpdates
+  #   rides on the Xcode session (or the ASC API key) and mints cloud-managed
+  #   distribution certificates and profiles. That requires an Admin-strength
+  #   credential — see the header.
+  # - manual (OTB_EXPORT_MANUAL=1, the CI flow): a classic Apple Distribution
+  #   certificate and App Store profiles were imported by the workflow ahead of
+  #   this script, so xcodebuild re-signs with them and nothing talks to
+  #   App Store Connect. Profile NAMES arrive via env (OTB_PROFILE_APP /
+  #   _SHARE / _WIDGET) because they are whatever the portal named them; the
+  #   bundle IDs they're keyed by mirror the injectors (es.ricojam.onthebeach
+  #   plus .ShareExtension / .OTBWidget).
   log "Exporting signed .ipa"
   OPTIONS="$ARCHIVE_DIR/exportOptions-$APP_VERSION-$BUILD_NUMBER.plist"
-  cat > "$OPTIONS" <<PLIST
+  if [[ "${OTB_EXPORT_MANUAL:-}" == "1" ]]; then
+    for v in OTB_PROFILE_APP OTB_PROFILE_SHARE OTB_PROFILE_WIDGET; do
+      if [[ -z "${!v:-}" ]]; then
+        echo "archive-ios: manual export needs $v (the profile's portal name) in the environment" >&2
+        exit 1
+      fi
+    done
+    cat > "$OPTIONS" <<PLIST
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>method</key>
+  <string>release-testing</string>
+  <key>destination</key>
+  <string>export</string>
+  <key>teamID</key>
+  <string>$DEV_TEAM</string>
+  <key>signingStyle</key>
+  <string>manual</string>
+  <key>signingCertificate</key>
+  <string>Apple Distribution</string>
+  <key>provisioningProfiles</key>
+  <dict>
+    <key>es.ricojam.onthebeach</key>
+    <string>${OTB_PROFILE_APP}</string>
+    <key>es.ricojam.onthebeach.ShareExtension</key>
+    <string>${OTB_PROFILE_SHARE}</string>
+    <key>es.ricojam.onthebeach.OTBWidget</key>
+    <string>${OTB_PROFILE_WIDGET}</string>
+  </dict>
+</dict>
+</plist>
+PLIST
+
+    xcodebuild -exportArchive \
+      -archivePath "$ARCHIVE" \
+      -exportOptionsPlist "$OPTIONS" \
+      -exportPath "$IPA_DIR"
+  else
+    cat > "$OPTIONS" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
@@ -172,12 +219,13 @@ if [[ -z "$IPA" ]]; then
 </plist>
 PLIST
 
-  xcodebuild -exportArchive \
-    -archivePath "$ARCHIVE" \
-    -exportOptionsPlist "$OPTIONS" \
-    -exportPath "$IPA_DIR" \
-    -allowProvisioningUpdates \
-    ${AUTH_ARGS[@]+"${AUTH_ARGS[@]}"}
+    xcodebuild -exportArchive \
+      -archivePath "$ARCHIVE" \
+      -exportOptionsPlist "$OPTIONS" \
+      -exportPath "$IPA_DIR" \
+      -allowProvisioningUpdates \
+      ${AUTH_ARGS[@]+"${AUTH_ARGS[@]}"}
+  fi
 
   IPA=$(find_ipa)
   [[ -n "$IPA" ]] || { echo "archive-ios: export produced no .ipa under $IPA_DIR" >&2; exit 1; }

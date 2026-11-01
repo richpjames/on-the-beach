@@ -476,21 +476,21 @@ producing a byte-identical shell. It runs the same `bun run ios:archive --
 --upload`; the build number is the git commit count, so each merge is a fresh
 version+build pair with no coordination.
 
-The difference from the local run is signing: a runner has no Xcode account
-session, so when `OTB_API_KEY`/`OTB_API_ISSUER` are set the script passes the
-API key to `xcodebuild` itself (`-authenticationKeyPath/-ID/-IssuerID`), and
-`-allowProvisioningUpdates` mints the cloud-managed distribution certificate
-and profiles headlessly. Locally, with the env vars unset, nothing changes —
+Signing differs from the local run in two ways. **Archiving** uses an App
+Store Connect API key passed to `xcodebuild` itself
+(`-authenticationKeyPath/-ID/-IssuerID`) instead of the Xcode account session a
+runner doesn't have — the key only needs the **App Manager** role for this.
+**Exporting** is *manual* signing: the workflow imports a classic Apple
+Distribution certificate and the three App Store profiles from secrets and
+re-signs with those, so no credential in CI can reach cloud-managed
+distribution certificates — which is exactly what would otherwise force the
+API key to the Admin role. Locally, with the env vars unset, nothing changes —
 the session route still works.
 
 One-time setup (GitHub ▸ Settings ▸ Secrets and variables ▸ Actions):
 
 1. Create an **App Store Connect API key** (Users and Access ▸ Integrations ▸
-   Team Keys) with the **Admin** role. Admin is required, not merely convenient:
-   an App Manager key authenticates and even archives fine, but the export dies
-   with `Cloud signing permission error` because only Admin can use
-   cloud-managed distribution certificates. Download the `AuthKey_<KeyID>.p8`.
-2. Set the secrets:
+   Team Keys, **App Manager** role) and set:
    ```bash
    gh secret set OTB_API_KEY --body '<Key ID>'
    gh secret set OTB_API_ISSUER --body '<Issuer ID>'
@@ -500,6 +500,27 @@ One-time setup (GitHub ▸ Settings ▸ Secrets and variables ▸ Actions):
    The ingest key is a secret because a CI-built TestFlight app must embed the
    *real* key or shares won't post — unlike the PR compile check, which
    deliberately uses a dummy.
+2. Create a **classic distribution certificate** (the one Xcode's cloud signing
+   uses keeps its private key at Apple, so it can't be exported): Xcode ▸
+   Settings ▸ Accounts ▸ the team ▸ Manage Certificates ▸ **+ ▸ Apple
+   Distribution**. Then Keychain Access ▸ login ▸ My Certificates ▸
+   *Apple Distribution: …* ▸ Export as `.p12` with a passphrase, and:
+   ```bash
+   base64 -i AppleDistribution.p12 | gh secret set OTB_DISTRIBUTION_P12_B64
+   gh secret set OTB_DISTRIBUTION_P12_PASSWORD --body '<the passphrase>'
+   ```
+3. Create an **App Store distribution profile per bundle ID** pinned to that
+   certificate — Certificates, Identifiers & Profiles ▸ Profiles ▸ + ▸ App
+   Store — for `es.ricojam.onthebeach`, `es.ricojam.onthebeach.ShareExtension`
+   and `es.ricojam.onthebeach.OTBWidget`, download all three, and:
+   ```bash
+   zip -j profiles.zip *.mobileprovision
+   base64 -i profiles.zip | gh secret set OTB_DIST_PROFILES_ZIP_B64
+   ```
+
+The certificate expires after a year: re-export (or recreate) it, refresh the
+profiles against the new certificate, and update the three secrets — the
+workflow fails with a keychain/import error when the cert lapses.
 
 Re-running a successful run of the same commit is rejected by TestFlight (same
 version+build pair); use the workflow's **Run workflow** button with a higher
