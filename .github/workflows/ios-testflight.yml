@@ -184,8 +184,9 @@ jobs:
 
           PROFILE_DIR="$HOME/Library/MobileDevice/Provisioning Profiles"
           mkdir -p "$PROFILE_DIR"
-          shopt -s globstar nullglob
-          for f in "$CERT_DIR"/profiles/**/*.mobileprovision; do
+          # Plain glob, not globstar: the zip is flat (zip -j), and macOS
+          # runners ship bash 3.2 where `shopt -s globstar` is an error.
+          for f in "$CERT_DIR"/profiles/*.mobileprovision; do
             security cms -D -i "$f" > "$CERT_DIR/profile.plist"
             UUID="$(plutil -extract UUID raw "$CERT_DIR/profile.plist")"
             NAME="$(plutil -extract Name raw "$CERT_DIR/profile.plist")"
