@@ -221,12 +221,12 @@ jobs:
         # archive-ios.sh regenerates ios/, archives (cloud signing via the API
         # key), exports the .ipa with the imported certificate and profiles
         # (manual, no ASC access), and uploads with altool. native_preflight
-        # keeps the Secrets.xcconfig written above.
+        # keeps the Secrets.xcconfig written above. OTB_EXPORT_MANUAL=1 comes
+        # from the import step's GITHUB_ENV write above.
         env:
           OTB_API_KEY: ${{ secrets.OTB_API_KEY }}
           OTB_API_ISSUER: ${{ secrets.OTB_API_ISSUER }}
           OTB_BUILD_NUMBER: ${{ inputs.build_number }}
-          OTB_EXPORT_MANUAL: "1"
         run: bun run ios:archive -- --upload
 
       - name: Remove signing keychain and profiles

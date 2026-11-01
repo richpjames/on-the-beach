@@ -461,10 +461,12 @@ it already has, so pass a higher one — `OTB_BUILD_NUMBER=101 bun run
 ios:archive -- --upload`. A new commit needs nothing: the count moves by
 itself.
 
-> Why upload from CI now? The archive is fully reproducible, and cloud-managed
-> signing means no certificate ever becomes a GitHub secret — only an App Store
-> Connect API key (which can be revoked) does. See the next section for the
-> automated route; the one command above still works on the build Mac.
+> Why upload from CI now? The archive is fully reproducible, and CI's manual
+> signing keeps every credential narrow: the App Store Connect API key it
+> holds can be revoked in one click and can't mint distribution certificates,
+> and the imported signing material (the `.p12` and profiles) only ever signs
+> this one app. See the next section for the automated route; the one command
+> above still works on the build Mac.
 
 ### Automated uploads from CI
 
@@ -519,8 +521,11 @@ One-time setup (GitHub ▸ Settings ▸ Secrets and variables ▸ Actions):
    ```
 
 The certificate expires after a year: re-export (or recreate) it, refresh the
-profiles against the new certificate, and update the three secrets — the
-workflow fails with a keychain/import error when the cert lapses.
+profiles against the new certificate, and update the three secrets. The lapse
+fails late, not at import — `security import` accepts an expired certificate
+happily — so the symptom is `xcodebuild -exportArchive` dying with a
+codesigning error ("No signing certificate 'Apple Distribution' found" or
+similar) once the expiry passes.
 
 Re-running a successful run of the same commit is rejected by TestFlight (same
 version+build pair); use the workflow's **Run workflow** button with a higher
