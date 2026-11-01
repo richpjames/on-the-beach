@@ -173,6 +173,18 @@ if [[ -z "$IPA" ]]; then
         exit 1
       fi
     done
+    # Escape &, < and > for XML text content. Portal profile names are free
+    # text ("OTB App Store & friends" is legal), and a raw & would make this
+    # plist unparseable — failing at export, late and opaquely. sed, not
+    # ${var//&/…}: bash ≥ 5.2 expands a bare & in a pattern-substitution
+    # replacement to the matched text, which mangles the very entities being
+    # written; sed's \& is literal on both BSD and GNU.
+    xml_escape() {
+      printf '%s' "$1" | sed -e 's/&/\&amp;/g' -e 's/</\&lt;/g' -e 's/>/\&gt;/g'
+    }
+    PROFILE_APP=$(xml_escape "$OTB_PROFILE_APP")
+    PROFILE_SHARE=$(xml_escape "$OTB_PROFILE_SHARE")
+    PROFILE_WIDGET=$(xml_escape "$OTB_PROFILE_WIDGET")
     cat > "$OPTIONS" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -191,11 +203,11 @@ if [[ -z "$IPA" ]]; then
   <key>provisioningProfiles</key>
   <dict>
     <key>es.ricojam.onthebeach</key>
-    <string>${OTB_PROFILE_APP}</string>
+    <string>${PROFILE_APP}</string>
     <key>es.ricojam.onthebeach.ShareExtension</key>
-    <string>${OTB_PROFILE_SHARE}</string>
+    <string>${PROFILE_SHARE}</string>
     <key>es.ricojam.onthebeach.OTBWidget</key>
-    <string>${OTB_PROFILE_WIDGET}</string>
+    <string>${PROFILE_WIDGET}</string>
   </dict>
 </dict>
 </plist>
