@@ -191,19 +191,22 @@ jobs:
             UUID="$(plutil -extract UUID raw "$CERT_DIR/profile.plist")"
             NAME="$(plutil -extract Name raw "$CERT_DIR/profile.plist")"
             cp "$f" "$PROFILE_DIR/$UUID.mobileprovision"
-            JSON="$(plutil -convert json -o - "$CERT_DIR/profile.plist")"
+            # Match on the exact entitlement field, not a whole-plist grep:
+            # the plist embeds DER certificate data blobs, which make
+            # `plutil -convert json` fail outright.
+            APPID="$(plutil -extract 'Entitlements.application-identifier' raw "$CERT_DIR/profile.plist")"
             VAR=""
-            case "$JSON" in
+            case "$APPID" in
               *es.ricojam.onthebeach.ShareExtension*) VAR=OTB_PROFILE_SHARE ;;
               *es.ricojam.onthebeach.OTBWidget*)      VAR=OTB_PROFILE_WIDGET ;;
               *es.ricojam.onthebeach*)                VAR=OTB_PROFILE_APP ;;
             esac
             if [[ -z "$VAR" ]]; then
-              echo "::error title=Unexpected provisioning profile::$(basename "$f") matches none of the app's three bundle IDs"
+              echo "::error title=Unexpected provisioning profile::$(basename "$f") matches none of the app's three bundle IDs (got $APPID)"
               exit 1
             fi
             echo "$VAR=$NAME" >> "$GITHUB_ENV"
-            echo "matched $VAR: $NAME ($UUID)"
+            echo "matched $VAR: $NAME ($APPID, $UUID)"
           done
           for v in OTB_PROFILE_APP OTB_PROFILE_SHARE OTB_PROFILE_WIDGET; do
             if ! grep -q "^$v=" "$GITHUB_ENV"; then
