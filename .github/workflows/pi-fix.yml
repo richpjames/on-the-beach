@@ -83,10 +83,11 @@ jobs:
         with:
           node-version: 22
 
-      # Pinned to the version validated locally; bump deliberately.
+      # Pinned to the version validated locally; bump deliberately. 1.5.0
+      # crashes on startup under the Node 22 runner — check before bumping.
       - name: Install pi
         if: steps.gate.outputs.run == 'true'
-        run: npm install -g @earendil-works/pi-coding-agent@0.74.2
+        run: npm install -g @earendil-works/pi-coding-agent@1.4.0
 
       - name: Setup Bun
         if: steps.gate.outputs.run == 'true'
