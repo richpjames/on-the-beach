@@ -24,6 +24,9 @@ If CI fails or conflicts exist, fix or surface them rather than reporting the PR
 - Never add a "Generated with Claude Code" footer (or any generated-by line) to PR bodies.
 - Always state the full PR URL prominently, on its own line, every time a PR is created or updated.
 
+### Applying Pi review feedback
+The `Pi review` check only comments. Reply `/fix` on the pull request and the `Pi fix` workflow applies the findings of the latest Pi review to the branch — same-repository pull requests only, and lint plus the unit tests must pass before anything is pushed.
+
 ### Plain terms over jargon
 Prefer the word the repo already uses for a concept over the textbook term (e.g. `--config ground-truth`, not `--config oracle`; the repo's word for a provider is "source" / `SourceName`). If a term needs a glossary entry to be understood, it probably needs renaming instead. Applies to identifiers, CLI flags, and prose in reports.
 
