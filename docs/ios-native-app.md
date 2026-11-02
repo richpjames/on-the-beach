@@ -244,11 +244,12 @@ address bar by the list's URL sync, so a reload doesn't fire it twice.
 - **Cold launch.** A shortcut is delivered before the bridge view controller has
   loaded its web view, so the action is held and retried for ~5s, then dropped
   rather than firing at some unrelated later moment.
-- **Microphone.** `scripts/add-listen-shortcut.rb` also writes
-  `NSMicrophoneUsageDescription` into the app's Info.plist. Capacitor
-  auto-grants the WebKit-level capture permission, but without the purpose string
-  iOS terminates the app the first time the page asks for audio — so Listen
-  cannot work inside the native shell without it.
+- **Purpose strings.** `scripts/add-listen-shortcut.rb` also writes
+  `NSMicrophoneUsageDescription` and `NSCameraUsageDescription` into the app's
+  Info.plist. Capacitor auto-grants the WebKit-level capture permission, but
+  without the purpose string iOS terminates the app the first time the page asks
+  for audio (Listen) or the camera is opened (the cover scan's "Take Photo") —
+  so neither can work inside the native shell without them.
 - **Mac Catalyst.** The quick-action hook is compiled out (`#if
   !targetEnvironment(macCatalyst)`) — a Mac has no Home Screen. The widget's deep
   link works there as it does on iOS.
