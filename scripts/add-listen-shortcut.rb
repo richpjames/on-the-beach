@@ -17,9 +17,9 @@
 #   3. registers the Home Screen quick action (`UIApplicationShortcutItems`) —
 #      iOS gives apps no way to add to a *widget's* long-press menu, so the app
 #      icon's is where "long press ▸ Listen" lives;
-#   4. declares `NSMicrophoneUsageDescription`, without which the recogniser's
-#      first `getUserMedia` call is refused by the system and Listen can never
-#      work inside the native app;
+#   4. declares the `NSMicrophoneUsageDescription` and `NSCameraUsageDescription`
+#      purpose strings — iOS terminates the app on the first microphone use
+#      (Listen) or camera use (the cover scan's "Take Photo") without them;
 #   5. declares `ITSAppUsesNonExemptEncryption = false` (the app's networking is
 #      plain HTTPS over Apple's own crypto), so TestFlight/App Store uploads
 #      don't stop on the per-build export-compliance question.
@@ -56,6 +56,8 @@ URL_SCHEME = "onthebeach"
 LISTEN_SHORTCUT_TYPE = "otb-listen"
 MIC_USAGE_DESCRIPTION =
   "On The Beach listens to what's playing so it can name the release and add it to your list."
+CAMERA_USAGE_DESCRIPTION =
+  "On The Beach photographs a release cover so it can look the release up and add it to your list."
 
 def die(message)
   warn "add-listen-shortcut: #{message}"
@@ -117,10 +119,13 @@ plist["UIApplicationShortcutItems"] = [
   },
 ]
 
-# 3. Microphone permission. The web app records ~15s of audio for recognition;
-#    WKWebView grants the page's getUserMedia (Capacitor auto-allows it), but the
-#    system prompt still needs a purpose string or the app is terminated.
+# 3. Capture permissions. Without a purpose string iOS terminates the app the
+#    first time it reaches for the hardware: the microphone via the recogniser's
+#    getUserMedia (WKWebView lets the page's capture through — Capacitor
+#    auto-allows it), the camera via the "Take Photo" option the file picker
+#    offers on the add form's cover scan.
 plist["NSMicrophoneUsageDescription"] = MIC_USAGE_DESCRIPTION
+plist["NSCameraUsageDescription"] = CAMERA_USAGE_DESCRIPTION
 
 # 4. Export compliance. Everything the app and its extensions send travels over
 #    plain HTTPS (Apple's exempt crypto), so declare that once here instead of
