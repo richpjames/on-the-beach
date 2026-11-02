@@ -116,7 +116,7 @@ jobs:
           # Extensions and skills execute arbitrary code at load, whatever
           # --tools allows; applying review findings never needs them.
           pi -p --no-session \
-            --provider zai --model glm-5.1 \
+            --provider zai --model glm-5.3 \
             --tools read,edit,write,grep,find,ls \
             --no-extensions --no-skills --no-prompt-templates --no-themes \
             "@$RUNNER_TEMP/fix-prompt.md" > "$RUNNER_TEMP/fix-summary.md"
@@ -167,7 +167,7 @@ jobs:
         if: steps.changes.outputs.applied == 'true'
         run: |
           {
-            echo '#### Pi fix applied (glm-5.1)'
+            echo '#### Pi fix applied (glm-5.3)'
             echo
             cat "$RUNNER_TEMP/fix-summary.md"
             echo

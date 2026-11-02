@@ -102,7 +102,7 @@ jobs:
           # Extensions and skills execute arbitrary code at load, whatever --tools
           # allows; a review of the diff never needs them.
           pi -p --no-session \
-            --provider zai --model glm-5.1 \
+            --provider zai --model glm-5.3 \
             --tools read,grep,find,ls \
             --no-extensions --no-skills --no-prompt-templates --no-themes \
             @review-prompt.md > review.md
@@ -115,7 +115,7 @@ jobs:
           sed -i '${/^```$/d;}' review.md
           sed -i '1{/^#### Pi agent review/d;}' review.md
           {
-            echo '#### Pi agent review (glm-5.1)'
+            echo '#### Pi agent review (glm-5.3)'
             echo
             echo '_Generated from the pull request'"'"'s own content — treat its links and verdict like any untrusted comment._'
             echo
