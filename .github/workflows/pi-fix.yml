@@ -8,9 +8,11 @@ on:
   issue_comment:
     types: [created]
 
-# A newer /fix on the same pull request supersedes one still running.
+# Only comments that are exactly /fix (optionally with arguments) join the
+# cancelling group; every other comment lands in the -false group so a stray
+# reply can never cancel a fix that is mid-flight.
 concurrency:
-  group: pi-fix-${{ github.event.issue.number }}
+  group: pi-fix-${{ github.event.issue.number }}-${{ github.event.comment.body == '/fix' || startsWith(github.event.comment.body, '/fix ') }}
   cancel-in-progress: true
 
 permissions:
@@ -21,12 +23,12 @@ jobs:
   fix:
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    # Any comment starting with /fix on a pull request, from someone with
-    # write access. Fork pull requests are rejected inside the job: comments
-    # from forks run here in the base repo, with this repo's secrets.
+    # A /fix comment on a pull request, from someone with write access. Fork
+    # pull requests are rejected inside the job: comments from forks run here
+    # in the base repo, with this repo's secrets.
     if: >
       github.event.issue.pull_request &&
-      startsWith(github.event.comment.body, '/fix') &&
+      (github.event.comment.body == '/fix' || startsWith(github.event.comment.body, '/fix ')) &&
       contains(fromJSON('["OWNER", "MEMBER", "COLLABORATOR"]'), github.event.comment.author_association)
     env:
       PR: ${{ github.event.issue.number }}
@@ -47,22 +49,24 @@ jobs:
             echo "::notice::ZAI_API_KEY repository secret is not set, so /fix cannot run."
             exit 0
           fi
-          gh pr view "$PR" --json state,isCrossRepository,headRefName > pr.json
-          if [ "$(jq -r .state pr.json)" != "OPEN" ]; then
+          gh pr view "$PR" --json state,isCrossRepository,headRefName > "$RUNNER_TEMP/pr.json"
+          if [ "$(jq -r .state "$RUNNER_TEMP/pr.json")" != "OPEN" ]; then
             gh pr comment "$PR" --body "Pi fix: this pull request is not open, so there is nothing to fix."
             exit 0
           fi
-          if [ "$(jq -r .isCrossRepository pr.json)" = "true" ]; then
+          if [ "$(jq -r .isCrossRepository "$RUNNER_TEMP/pr.json")" = "true" ]; then
             gh pr comment "$PR" --body "Pi fix: findings on a fork pull request have to be applied by hand."
             exit 0
           fi
+          # The review is matched on its author as well as its heading: the
+          # heading alone could be forged in a review by any commenter.
           gh pr view "$PR" --json reviews \
-            | jq -r '[.reviews[] | select(.body | startswith("#### Pi agent review"))] | last | .body // empty' > "$RUNNER_TEMP/pi-review.md"
+            | jq -r '[.reviews[] | select(.author.login == "github-actions[bot]" and (.body | startswith("#### Pi agent review")))] | last | .body // empty' > "$RUNNER_TEMP/pi-review.md"
           if [ ! -s "$RUNNER_TEMP/pi-review.md" ]; then
             gh pr comment "$PR" --body "Pi fix: there is no Pi review on this pull request yet, so there is nothing to fix."
             exit 0
           fi
-          echo "head_ref=$(jq -r .headRefName pr.json)" >> "$GITHUB_OUTPUT"
+          echo "head_ref=$(jq -r .headRefName "$RUNNER_TEMP/pr.json")" >> "$GITHUB_OUTPUT"
           echo "run=true" >> "$GITHUB_OUTPUT"
 
       # Without a PI_FIX_TOKEN secret the push falls back to github.token,
