@@ -11,6 +11,7 @@
  * navigation, mirroring `player.svelte.ts`.
  */
 import type { AppleMusicKind } from "../../domain/apple-music";
+import { createPlaybackGeneration, isEndedState } from "./musickit-ended";
 
 const MUSICKIT_SRC = "https://js-cdn.music.apple.com/musickit/v3/musickit.js";
 
@@ -152,34 +153,13 @@ function isPlayingState(state: number, MK: MusicKitStatic): boolean {
   return typeof playing === "number" ? state === playing : state === 2;
 }
 
-/**
- * Whether a playback state means "the queue played through to the end" — the
- * natural-completion signal the app auto-advances on. Defensive lookup, like
- * isPlayingState: MusicKit JS v3's PlaybackStates names it `ended` (5); if a
- * build renames it, `completed` or the numeric fallback still lands close.
- */
-function isEndedState(state: number, MK: MusicKitStatic): boolean {
-  const states = MK.PlaybackStates;
-  const ended =
-    typeof states?.ended === "number"
-      ? states.ended
-      : typeof states?.completed === "number"
-        ? states.completed
-        : 5;
-  return state === ended;
-}
-
 // ── End-of-playback callback (auto-advance) ─────────────────────────────────
 // Registered by player.svelte.ts — this module must not import it back (the
 // facade already imports this one; the dependency only flows one way). The
-// generation counter is the stale-signal guard: every playResource/stop bumps
-// `playbackGeneration`, and only an `ended` arriving while `playingGeneration`
-// still matches invokes the callback. So the teardown states a manual skip or a
-// new release causes can never masquerade as natural completion, and a burst of
-// duplicate `ended` events fires the callback at most once per playback.
+// generation counter (musickit-ended.ts, unit-tested there) keeps teardown
+// noise from reaching the actor and collapses duplicate `ended` events.
 let onQueueEnded: (() => void) | null = null;
-let playbackGeneration = 0;
-let playingGeneration = -1;
+const playbackGeneration = createPlaybackGeneration();
 
 /** Set (or clear) the callback invoked when Apple Music playback completes naturally. */
 export function setOnQueueEnded(callback: (() => void) | null): void {
@@ -188,10 +168,8 @@ export function setOnQueueEnded(callback: (() => void) | null): void {
 
 function maybeNotifyQueueEnded(MK: MusicKitStatic): void {
   if (!instance || !onQueueEnded) return;
-  if (!isEndedState(instance.playbackState, MK)) return;
-  if (playingGeneration !== playbackGeneration) return;
-  // Consume this playback's completion so a repeat event can't re-fire it.
-  playingGeneration = -1;
+  if (!isEndedState(instance.playbackState, MK.PlaybackStates)) return;
+  if (!playbackGeneration.consumeIfLive()) return;
   onQueueEnded();
 }
 
@@ -326,8 +304,7 @@ export async function playResource(kind: AppleMusicKind, id: string): Promise<vo
 
   // A new resource is a new playback generation: any `ended` still in flight
   // from the previous one is stale by the time it arrives.
-  playbackGeneration++;
-  playingGeneration = playbackGeneration;
+  playbackGeneration.begin();
 
   ui.loadingTrack = true;
   ui.error = null;
@@ -406,7 +383,7 @@ export async function stop(): Promise<void> {
   // Teardown on purpose (window ✕, manual skip, a new release taking over) —
   // retire the playback generation so the state changes it triggers are never
   // read back as natural completion.
-  playbackGeneration++;
+  playbackGeneration.retire();
   if (!instance) return;
   try {
     await instance.stop();

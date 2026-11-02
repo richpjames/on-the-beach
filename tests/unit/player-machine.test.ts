@@ -307,4 +307,67 @@ describe("player machine — pure queue helpers", () => {
       ]),
     ).toEqual([good, appleEntry(9)]);
   });
+
+  it("parseStoredQueue keeps Mixcloud bar entries, so they survive a reload", () => {
+    const mixcloud: QueueEntry = {
+      itemId: 7,
+      label: "Light Sleeper Radio",
+      target: {
+        kind: "iframe",
+        src: "https://www.mixcloud.com/widget/iframe/?feed=%2Fnozwon%2Flight-sleeper-radio-021%2F",
+        playerType: "bar",
+      },
+    };
+    expect(parseStoredQueue(JSON.parse(JSON.stringify([mixcloud])))).toEqual([mixcloud]);
+  });
+
+  it("ADVANCE plays a queued Mixcloud bar entry", () => {
+    const { actor } = makePlayer();
+    actor.send({
+      type: "LOAD_IFRAME",
+      src: "https://bandcamp.com/embed/1",
+      label: "Item 1",
+      playerType: "audio",
+    });
+    const mixcloud: QueueEntry = {
+      itemId: 9,
+      label: "Light Sleeper Radio",
+      target: {
+        kind: "iframe",
+        src: "https://www.mixcloud.com/widget/iframe/?feed=%2Fnozwon%2F",
+        playerType: "bar",
+      },
+    };
+    actor.send({ type: "ENQUEUE", entry: mixcloud });
+    actor.send({ type: "ADVANCE" });
+
+    const snap = actor.getSnapshot();
+    expect(snap.context.src).toBe("https://www.mixcloud.com/widget/iframe/?feed=%2Fnozwon%2F");
+    expect(snap.context.playerType).toBe("bar");
+    expect(snap.context.queue).toEqual([]);
+  });
+
+  it("bumps playbackSeq on every started playback, even for an identical src", () => {
+    const { actor } = makePlayer();
+    const target = {
+      kind: "iframe" as const,
+      src: "https://www.youtube.com/embed/x",
+      playerType: "video" as const,
+    };
+    actor.send({ type: "ENQUEUE", entry: { itemId: 1, label: "A", target } });
+    const first = actor.getSnapshot().context.playbackSeq;
+    expect(first).toBeGreaterThan(0);
+
+    // Queue and window events are not playbacks.
+    actor.send({ type: "TOGGLE_QUEUE_WINDOW" });
+    expect(actor.getSnapshot().context.playbackSeq).toBe(first);
+
+    // The same release again: same src, but a new playback (fresh embed).
+    actor.send({ type: "ENQUEUE", entry: { itemId: 2, label: "A again", target } });
+    actor.send({ type: "ADVANCE" });
+    const snap = actor.getSnapshot();
+    expect(snap.context.playbackSeq).toBe(first + 1);
+    expect(snap.context.src).toBe(target.src);
+    expect(snap.context.itemId).toBe(2);
+  });
 });

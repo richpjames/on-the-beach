@@ -90,9 +90,11 @@
   // ── YouTube end detection ──────────────────────────────────────────────────
   // YouTube is the only embed that reports playback state back (via postMessage,
   // once enablejsapi=1 is on the src). Watching it lets the queue auto-advance
-  // when the video ends. The watcher lives exactly as long as this iframe: when
-  // playback stops or moves on, the effect's cleanup drops the listener, so a
-  // stale player can never land an ADVANCE for playback that is over.
+  // when the video ends. The watcher lives exactly as long as its iframe: the
+  // key below remounts the embed on every playback, so a fresh browsing context
+  // (and a fresh watcher) starts each time — a stale player can never land an
+  // ADVANCE for playback that is over, and an identical src queued twice still
+  // reloads instead of leaving the ended player on screen.
   const videoSrc = $derived(player.src !== null ? enableYouTubeJsApi(player.src) : "");
 
   $effect(() => {
@@ -275,23 +277,28 @@
         {/if}
       </div>
     {:else if player.src !== null}
-      {#if player.playerType === "video"}
-        <iframe
-          src={videoSrc}
-          title="YouTube player"
-          seamless
-          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-          allowfullscreen
-          bind:this={videoIframe}
-        ></iframe>
-      {:else}
-        <iframe
-          src={player.src}
-          title="Audio player"
-          seamless
-          allow="autoplay; encrypted-media"
-        ></iframe>
-      {/if}
+      <!-- Keyed by playbackSeq so every playback gets a fresh embed: Svelte
+           doesn't re-set an unchanged src attribute, so the same release queued
+           twice back-to-back would otherwise keep the ended player mounted. -->
+      {#key player.playbackSeq}
+        {#if player.playerType === "video"}
+          <iframe
+            src={videoSrc}
+            title="YouTube player"
+            seamless
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+            allowfullscreen
+            bind:this={videoIframe}
+          ></iframe>
+        {:else}
+          <iframe
+            src={player.src}
+            title="Audio player"
+            seamless
+            allow="autoplay; encrypted-media"
+          ></iframe>
+        {/if}
+      {/key}
     {/if}
   </div>
 </div>
