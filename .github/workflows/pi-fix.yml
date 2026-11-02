@@ -59,9 +59,11 @@ jobs:
             exit 0
           fi
           # The review is matched on its author as well as its heading: the
-          # heading alone could be forged in a review by any commenter.
+          # heading alone could be forged in a review by any commenter. gh
+          # reports the workflow token's reviews under the login
+          # "github-actions" (no [bot] suffix).
           gh pr view "$PR" --json reviews \
-            | jq -r '[.reviews[] | select(.author.login == "github-actions[bot]" and (.body | startswith("#### Pi agent review")))] | last | .body // empty' > "$RUNNER_TEMP/pi-review.md"
+            | jq -r '[.reviews[] | select(.author.login == "github-actions" and (.body | startswith("#### Pi agent review")))] | last | .body // empty' > "$RUNNER_TEMP/pi-review.md"
           if [ ! -s "$RUNNER_TEMP/pi-review.md" ]; then
             gh pr comment "$PR" --body "Pi fix: there is no Pi review on this pull request yet, so there is nothing to fix."
             exit 0
