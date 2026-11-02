@@ -54,6 +54,10 @@ export interface PlayerContext extends PlayerEffects {
   queue: QueueEntry[];
   /** Whether the queue window is open. The queue itself persists regardless. */
   queueWindowVisible: boolean;
+  /** Bumped every time a playback starts. Back-to-back plays of the same
+   * release keep an identical `src`, so PlayerWindow keys its embeds on this
+   * to force a remount — without it the ended player would just sit there. */
+  playbackSeq: number;
 }
 
 export type PlayerEvent =
@@ -77,6 +81,8 @@ export type PlayerInput = Partial<PlayerEffects> & {
 const noop = (): void => {};
 
 const APPLE_MUSIC_KINDS: AppleMusicKind[] = ["album", "song", "playlist", "musicVideo"];
+
+const PLAYER_TYPES: PlayerType[] = ["audio", "video", "bar"];
 
 // ── Pure queue helpers (exported for the facade and unit tests) ─────────────
 
@@ -118,10 +124,9 @@ function isQueueTarget(value: unknown): value is QueueTarget {
   if (!value || typeof value !== "object") return false;
   const target = value as Record<string, unknown>;
   if (target.kind === "iframe") {
-    return (
-      typeof target.src === "string" &&
-      (target.playerType === "audio" || target.playerType === "video")
-    );
+    // Every PlayerType a real source produces is valid here — Mixcloud embeds
+    // queue as "bar", and rejecting it would silently drop them on reload.
+    return typeof target.src === "string" && PLAYER_TYPES.includes(target.playerType as PlayerType);
   }
   if (target.kind === "appleMusic") {
     return (
@@ -189,7 +194,7 @@ export const playerMachine = setup({
     },
     // ENQUEUE while idle: the entry becomes now-playing directly (it never
     // passes through the queue array), mirroring the LOAD_* assigns.
-    playEntry: assign(({ event }) => {
+    playEntry: assign(({ context, event }) => {
       if (event.type !== "ENQUEUE") return {};
       const { entry } = event;
       if (entry.target.kind === "iframe") {
@@ -200,6 +205,7 @@ export const playerMachine = setup({
           itemId: entry.itemId,
           playerType: entry.target.playerType,
           minimized: false,
+          playbackSeq: context.playbackSeq + 1,
         };
       }
       return {
@@ -209,6 +215,7 @@ export const playerMachine = setup({
         itemId: entry.itemId,
         playerType: "audio" as const,
         minimized: false,
+        playbackSeq: context.playbackSeq + 1,
       };
     }),
     appendToQueue: assign(({ context, event }) => {
@@ -231,6 +238,7 @@ export const playerMachine = setup({
           itemId: head.itemId,
           playerType: head.target.playerType,
           minimized: false,
+          playbackSeq: context.playbackSeq + 1,
         };
       }
       return {
@@ -241,6 +249,7 @@ export const playerMachine = setup({
         itemId: head.itemId,
         playerType: "audio" as const,
         minimized: false,
+        playbackSeq: context.playbackSeq + 1,
       };
     }),
     resetNowPlaying: assign({
@@ -270,6 +279,7 @@ export const playerMachine = setup({
     minimized: false,
     queue: input?.initialQueue ?? [],
     queueWindowVisible: false,
+    playbackSeq: 0,
     playAppleMusic: input?.playAppleMusic ?? noop,
     stopAppleMusic: input?.stopAppleMusic ?? noop,
   }),
@@ -282,24 +292,26 @@ export const playerMachine = setup({
     // left untouched: a stray play never drops what's lined up.
     LOAD_IFRAME: {
       target: ".iframe",
-      actions: assign(({ event }) => ({
+      actions: assign(({ context, event }) => ({
         src: event.src,
         apple: null,
         label: event.label,
         itemId: event.itemId ?? null,
         playerType: event.playerType,
         minimized: false,
+        playbackSeq: context.playbackSeq + 1,
       })),
     },
     LOAD_APPLE_MUSIC: {
       target: ".appleMusic",
-      actions: assign(({ event }) => ({
+      actions: assign(({ context, event }) => ({
         src: null,
         apple: { kind: event.kind, id: event.id },
         label: event.label,
         itemId: event.itemId ?? null,
         playerType: "audio" as const,
         minimized: false,
+        playbackSeq: context.playbackSeq + 1,
       })),
     },
     // ADVANCE serves both natural end-of-playback (MusicKit / YouTube end

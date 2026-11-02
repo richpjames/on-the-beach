@@ -2996,11 +2996,31 @@ a:where(:hover) {
   resize: none;
 }
 
-/* Narrow screens: no room beside the player, so the queue docks above it. */
+/* Narrow screens: no room beside the player, so the queue docks above it.
+   The offset must clear the player window, whose height depends on what is
+   playing — read off the type class the player window carries (it renders as
+   the queue window's previous sibling). The Apple Music window is auto-height
+   (a long tracklist outgrows any fixed offset), so while it is up the queue
+   docks at the top of the screen instead. */
 @media (max-width: 860px) {
   .queue-window {
     right: calc(12px + var(--safe-right));
+    /* The player window's 8px bottom offset + the 263px audio window + an
+       8px gap above it. */
     bottom: calc(var(--taskbar-clearance) + 279px);
+  }
+  /* The video window is 292px tall. */
+  .player-window--video ~ .queue-window {
+    bottom: calc(var(--taskbar-clearance) + 308px);
+  }
+  /* The bar window shrink-wraps its 60px widget (titlebar + bar ≈ 90px). */
+  .player-window--bar ~ .queue-window {
+    bottom: calc(var(--taskbar-clearance) + 106px);
+  }
+  /* Auto-height window: no fixed offset can clear it, so dock at the top. */
+  .player-window--apple-music ~ .queue-window {
+    bottom: auto;
+    top: calc(var(--window-top-space) + var(--safe-top));
   }
 }
 

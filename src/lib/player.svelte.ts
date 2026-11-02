@@ -100,6 +100,10 @@ export const player = {
   get playerType() {
     return snapshot.context.playerType;
   },
+  /** Bumped on every started playback; keys embed remounts (see PlayerWindow). */
+  get playbackSeq() {
+    return snapshot.context.playbackSeq;
+  },
   /** Link back to the release that started playback, or null if unknown. */
   get releaseHref() {
     const id = snapshot.context.itemId;

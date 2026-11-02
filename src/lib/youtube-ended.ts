@@ -49,7 +49,8 @@ interface YouTubeMessage {
  *  2. We answer with `{"event":"listening", id, channel}` so it starts
  *     broadcasting state changes to us.
  *  3. `{"event":"onStateChange","info":0}` (ended) invokes `onEnded` — once
- *     per ended message.
+ *     per watch, so a duplicate ended message can't skip a second release
+ *     (the MusicKit side guards the same way with its generation counter).
  *
  * Returns a dispose function that drops the window-level listener; call it when
  * the iframe goes away (stop, unmount, src change) so a stale player can never
@@ -58,6 +59,7 @@ interface YouTubeMessage {
 export function watchYouTubeEnd(iframe: HTMLIFrameElement, onEnded: () => void): () => void {
   let disposed = false;
   let handshook = false;
+  let ended = false;
 
   const onMessage = (ev: MessageEvent): void => {
     if (disposed) return;
@@ -90,7 +92,8 @@ export function watchYouTubeEnd(iframe: HTMLIFrameElement, onEnded: () => void):
       // missing it would mean missing the ended event.
     }
 
-    if (data.event === "onStateChange" && data.info === 0) {
+    if (data.event === "onStateChange" && data.info === 0 && !ended) {
+      ended = true;
       onEnded();
     }
   };
