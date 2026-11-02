@@ -60,10 +60,10 @@ jobs:
           fi
           # The review is matched on its author as well as its heading: the
           # heading alone could be forged in a review by any commenter. gh
-          # reports the workflow token's reviews under the login
-          # "github-actions" (no [bot] suffix).
+          # has been seen to report the workflow token's login both with and
+          # without the [bot] suffix, so both forms are accepted.
           gh pr view "$PR" --json reviews \
-            | jq -r '[.reviews[] | select(.author.login == "github-actions" and (.body | startswith("#### Pi agent review")))] | last | .body // empty' > "$RUNNER_TEMP/pi-review.md"
+            | jq -r '[.reviews[] | select((.author.login == "github-actions" or .author.login == "github-actions[bot]") and (.body | startswith("#### Pi agent review")))] | last | .body // empty' > "$RUNNER_TEMP/pi-review.md"
           if [ ! -s "$RUNNER_TEMP/pi-review.md" ]; then
             gh pr comment "$PR" --body "Pi fix: there is no Pi review on this pull request yet, so there is nothing to fix."
             exit 0
@@ -163,8 +163,8 @@ jobs:
         env:
           HEAD_REF: ${{ steps.gate.outputs.head_ref }}
         run: |
-          git config user.name "Pi fix workflow"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
           git add -A
           git commit -m "Apply the Pi review findings" \
                     -m "Requested with the /fix command; lint and the unit tests ran in the pi-fix job before this push."
@@ -186,3 +186,10 @@ jobs:
         if: failure()
         run: |
           gh pr comment "$PR" --body "Pi fix: applying the findings failed — see the [run log](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}). Nothing was pushed."
+
+      # failure() does not fire on cancellation, so a /fix superseded by a
+      # newer one would otherwise vanish without a word.
+      - name: Report a superseded fix
+        if: cancelled()
+        run: |
+          gh pr comment "$PR" --body "Pi fix: this run was superseded by a newer /fix before it finished; nothing was applied from it."
