@@ -159,6 +159,7 @@ jobs:
         run: bun run test:unit
 
       - name: Push the fix to the branch
+        id: push
         if: steps.changes.outputs.applied == 'true'
         env:
           HEAD_REF: ${{ steps.gate.outputs.head_ref }}
@@ -182,14 +183,21 @@ jobs:
           } > "$RUNNER_TEMP/comment.md"
           gh pr comment "$PR" --body-file "$RUNNER_TEMP/comment.md"
 
+      # Only claim nothing was pushed when the push step really did not run
+      # or failed; if it succeeded and a later step failed, say that instead.
       - name: Report a failed fix
         if: failure()
         run: |
-          gh pr comment "$PR" --body "Pi fix: applying the findings failed — see the [run log](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}). Nothing was pushed."
+          if [ "${{ steps.push.outcome }}" = "success" ]; then
+            gh pr comment "$PR" --body "Pi fix: the fix was pushed, but reporting it back failed — see the [run log](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}) and check the branch for the commit."
+          else
+            gh pr comment "$PR" --body "Pi fix: applying the findings failed — see the [run log](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}). Nothing was pushed."
+          fi
 
-      # failure() does not fire on cancellation, so a /fix superseded by a
-      # newer one would otherwise vanish without a word.
+      # failure() does not fire on cancellation, so a run cut short would
+      # otherwise vanish without a word. cancelled() also covers timeouts
+      # and manual cancels, so the message hedges on the cause.
       - name: Report a superseded fix
         if: cancelled()
         run: |
-          gh pr comment "$PR" --body "Pi fix: this run was superseded by a newer /fix before it finished; nothing was applied from it."
+          gh pr comment "$PR" --body "Pi fix: this run was cancelled before it finished — most likely superseded by a newer /fix. Nothing was applied from it."
