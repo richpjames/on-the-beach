@@ -1,0 +1,181 @@
+name: Pi fix
+
+# The softer half of the Pi review: the review check only comments, and a
+# person replies /fix on the pull request to have the findings applied to the
+# branch. issue_comment workflows always run the copy of this file from the
+# default branch, so this takes effect only once the change reaches main.
+on:
+  issue_comment:
+    types: [created]
+
+# A newer /fix on the same pull request supersedes one still running.
+concurrency:
+  group: pi-fix-${{ github.event.issue.number }}
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    # Any comment starting with /fix on a pull request, from someone with
+    # write access. Fork pull requests are rejected inside the job: comments
+    # from forks run here in the base repo, with this repo's secrets.
+    if: >
+      github.event.issue.pull_request &&
+      startsWith(github.event.comment.body, '/fix') &&
+      contains(fromJSON('["OWNER", "MEMBER", "COLLABORATOR"]'), github.event.comment.author_association)
+    env:
+      PR: ${{ github.event.issue.number }}
+      ZAI_API_KEY: ${{ secrets.ZAI_API_KEY }}
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+    steps:
+      - name: Acknowledge the command
+        run: gh api "repos/$GH_REPO/issues/comments/$COMMENT_ID/reactions" -f content=eyes || true
+        env:
+          COMMENT_ID: ${{ github.event.comment.id }}
+
+      # Until the ZAI_API_KEY repository secret exists, stay green and say why.
+      - name: Check the pull request can be fixed
+        id: gate
+        run: |
+          if [ -z "$ZAI_API_KEY" ]; then
+            echo "::notice::ZAI_API_KEY repository secret is not set, so /fix cannot run."
+            exit 0
+          fi
+          gh pr view "$PR" --json state,isCrossRepository,headRefName > pr.json
+          if [ "$(jq -r .state pr.json)" != "OPEN" ]; then
+            gh pr comment "$PR" --body "Pi fix: this pull request is not open, so there is nothing to fix."
+            exit 0
+          fi
+          if [ "$(jq -r .isCrossRepository pr.json)" = "true" ]; then
+            gh pr comment "$PR" --body "Pi fix: findings on a fork pull request have to be applied by hand."
+            exit 0
+          fi
+          gh pr view "$PR" --json reviews \
+            | jq -r '[.reviews[] | select(.body | startswith("#### Pi agent review"))] | last | .body // empty' > "$RUNNER_TEMP/pi-review.md"
+          if [ ! -s "$RUNNER_TEMP/pi-review.md" ]; then
+            gh pr comment "$PR" --body "Pi fix: there is no Pi review on this pull request yet, so there is nothing to fix."
+            exit 0
+          fi
+          echo "head_ref=$(jq -r .headRefName pr.json)" >> "$GITHUB_OUTPUT"
+          echo "run=true" >> "$GITHUB_OUTPUT"
+
+      # Without a PI_FIX_TOKEN secret the push falls back to github.token,
+      # which does not re-trigger the checks — so this job runs the same lint
+      # and unit test steps as CI before pushing. With a fine-grained PAT
+      # (Contents: read and write on this repo) in PI_FIX_TOKEN everything
+      # re-triggers normally and the fix commit gets its own CI run and review.
+      - name: Checkout the head branch
+        if: steps.gate.outputs.run == 'true'
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ steps.gate.outputs.head_ref }}
+          token: ${{ secrets.PI_FIX_TOKEN || github.token }}
+
+      - name: Setup Node
+        if: steps.gate.outputs.run == 'true'
+        uses: actions/setup-node@v5
+        with:
+          node-version: 22
+
+      # Pinned to the version validated locally; bump deliberately.
+      - name: Install pi
+        if: steps.gate.outputs.run == 'true'
+        run: npm install -g @earendil-works/pi-coding-agent@0.74.2
+
+      - name: Setup Bun
+        if: steps.gate.outputs.run == 'true'
+        uses: oven-sh/setup-bun@v2
+
+      - name: Write the fix instructions
+        if: steps.gate.outputs.run == 'true'
+        run: |
+          cat <<'EOF' > "$RUNNER_TEMP/fix-instructions.md"
+          You are the fix pass for this pull request. The repository is checked out at the pull request's head branch; the root AGENTS.md carries the project conventions (Bun not node, the retro design language, the hexagonal layer boundaries) — read it first and hold every change to it.
+
+          Below is the review this pull request received. Apply its findings to the code. Your tools read and edit files but cannot run commands, so fix the code itself: no TODOs, no describing a change instead of making it. Touch only what the findings require — no reformatting, no drive-by refactors. Where a finding is wrong, or fixing it needs a decision the author should make, skip it and say so.
+
+          Reply with a short markdown summary, one line per finding: fixed (and how), or skipped (and why). Do not wrap your reply in a code fence and do not begin it with a title or heading — the comment already carries one.
+          EOF
+
+      - name: Ask pi to fix the findings
+        if: steps.gate.outputs.run == 'true'
+        run: |
+          {
+            cat "$RUNNER_TEMP/fix-instructions.md"
+            echo
+            echo "## The review"
+            echo
+            cat "$RUNNER_TEMP/pi-review.md"
+          } > "$RUNNER_TEMP/fix-prompt.md"
+          # Extensions and skills execute arbitrary code at load, whatever
+          # --tools allows; applying review findings never needs them.
+          pi -p --no-session \
+            --provider zai --model glm-5.1 \
+            --tools read,edit,write,grep,find,ls \
+            --no-extensions --no-skills --no-prompt-templates --no-themes \
+            "@$RUNNER_TEMP/fix-prompt.md" > "$RUNNER_TEMP/fix-summary.md"
+          test -s "$RUNNER_TEMP/fix-summary.md"
+
+      - name: Stop when pi changed nothing
+        id: changes
+        if: steps.gate.outputs.run == 'true'
+        run: |
+          if [ -z "$(git status --porcelain)" ]; then
+            {
+              echo '#### Pi fix: nothing to apply'
+              echo
+              cat "$RUNNER_TEMP/fix-summary.md"
+            } > "$RUNNER_TEMP/comment.md"
+            gh pr comment "$PR" --body-file "$RUNNER_TEMP/comment.md"
+            exit 0
+          fi
+          echo "applied=true" >> "$GITHUB_OUTPUT"
+
+      - name: Install dependencies
+        if: steps.changes.outputs.applied == 'true'
+        run: bun install --frozen-lockfile --ignore-scripts
+
+      # The same steps as the CI unit job (test.yml); the tests must pass
+      # before anything is pushed.
+      - name: Lint
+        if: steps.changes.outputs.applied == 'true'
+        run: bun run lint
+
+      - name: Run unit tests
+        if: steps.changes.outputs.applied == 'true'
+        run: bun run test:unit
+
+      - name: Push the fix to the branch
+        if: steps.changes.outputs.applied == 'true'
+        env:
+          HEAD_REF: ${{ steps.gate.outputs.head_ref }}
+        run: |
+          git config user.name "Pi fix workflow"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Apply the Pi review findings" \
+                    -m "Requested with the /fix command; lint and the unit tests ran in the pi-fix job before this push."
+          git push origin HEAD:"$HEAD_REF"
+
+      - name: Report the fix
+        if: steps.changes.outputs.applied == 'true'
+        run: |
+          {
+            echo '#### Pi fix applied (glm-5.1)'
+            echo
+            cat "$RUNNER_TEMP/fix-summary.md"
+            echo
+            echo "Pushed as commit $(git rev-parse --short HEAD)."
+          } > "$RUNNER_TEMP/comment.md"
+          gh pr comment "$PR" --body-file "$RUNNER_TEMP/comment.md"
+
+      - name: Report a failed fix
+        if: failure()
+        run: |
+          gh pr comment "$PR" --body "Pi fix: applying the findings failed — see the [run log](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}). Nothing was pushed."
