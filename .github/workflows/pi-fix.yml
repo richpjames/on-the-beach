@@ -23,9 +23,11 @@ jobs:
   fix:
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    # A /fix comment on a pull request, from someone with write access. Fork
-    # pull requests are rejected inside the job: comments from forks run here
-    # in the base repo, with this repo's secrets.
+    # A /fix comment on a pull request. The association here is only a cheap
+    # prefilter — COLLABORATOR covers read- and triage-only access too — the
+    # gate step below checks real write permission. Fork pull requests are
+    # also rejected inside the job: comments from forks run here in the base
+    # repo, with this repo's secrets.
     if: >
       github.event.issue.pull_request &&
       (github.event.comment.body == '/fix' || startsWith(github.event.comment.body, '/fix ')) &&
@@ -44,7 +46,16 @@ jobs:
       # Until the ZAI_API_KEY repository secret exists, stay green and say why.
       - name: Check the pull request can be fixed
         id: gate
+        env:
+          COMMENTER: ${{ github.event.comment.user.login }}
         run: |
+          # author_association's COLLABORATOR includes read- and triage-only
+          # collaborators; require actual write access before anything else.
+          perm=$(gh api "repos/$GH_REPO/collaborators/$COMMENTER/permission" --jq .permission 2>/dev/null || echo none)
+          if [ "$perm" != "write" ] && [ "$perm" != "admin" ]; then
+            gh pr comment "$PR" --body "Pi fix: /fix needs write access; $COMMENTER has ${perm:-none}."
+            exit 0
+          fi
           if [ -z "$ZAI_API_KEY" ]; then
             echo "::notice::ZAI_API_KEY repository secret is not set, so /fix cannot run."
             exit 0
