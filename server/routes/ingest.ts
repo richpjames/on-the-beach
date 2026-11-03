@@ -73,6 +73,7 @@ export type ListStacksFn = () => Promise<IngestStack[]>;
 export type ResolveOrCreateStackFn = (name: string) => Promise<IngestStack>;
 export type AttachItemToStackFn = (itemId: number, stackId: number) => Promise<void>;
 export type SetItemReminderFn = (itemId: number, remindAt: Date) => Promise<void>;
+export type SetItemRatingFn = (itemId: number, rating: number) => Promise<void>;
 export type CountToListenFn = () => Promise<number>;
 
 export interface IngestRoutesDeps {
@@ -83,6 +84,7 @@ export interface IngestRoutesDeps {
   resolveOrCreateStack?: ResolveOrCreateStackFn;
   attachItemToStack?: AttachItemToStackFn;
   setItemReminder?: SetItemReminderFn;
+  setItemRating?: SetItemRatingFn;
   countToListen?: CountToListenFn;
 }
 
@@ -186,6 +188,18 @@ async function defaultSetItemReminder(itemId: number, remindAt: Date): Promise<v
 }
 
 /**
+ * Set an item's star rating — the share sheet's "Rating" row. Written as the
+ * same half-step number the web app PATCHes to /api/music-items/:id, so an
+ * item rated from either surface stores (and sorts) identically.
+ */
+async function defaultSetItemRating(itemId: number, rating: number): Promise<void> {
+  await db
+    .update(musicItems)
+    .set({ rating, updatedAt: new Date() })
+    .where(eq(musicItems.id, itemId));
+}
+
+/**
  * Parse an optional `remindAt` scheduled date from a /link request body. Returns
  * the parsed Date, `null` when absent/blank, or an `error` when present but not a
  * valid date string — mirroring the strictness of the /:id/reminder endpoint so a
@@ -199,6 +213,38 @@ function parseRemindAt(body: unknown): { date: Date | null } | { error: string }
   const date = new Date(remindAt);
   if (isNaN(date.getTime())) return { error: "remindAt must be a valid date" };
   return { date };
+}
+
+/**
+ * Parse an optional `rating` — the share sheet's star control — from a request
+ * body. Returns the parsed half-step rating (0.5–5, the app's own scale), `null`
+ * when absent/blank, or an `error` when present but out of range or not on a
+ * half step — the same surfaced-not-swallowed strictness as parseRemindAt. A
+ * numeric string is accepted alongside a number because form-data fields (the
+ * Shortcut's photo posts) arrive as text.
+ */
+function parseRating(body: unknown): { rating: number | null } | { error: string } {
+  if (!body || typeof body !== "object") return { rating: null };
+  const { rating } = body as Record<string, unknown>;
+  if (rating === undefined || rating === null || rating === "") return { rating: null };
+
+  let value: number;
+  if (typeof rating === "number") {
+    value = rating;
+  } else if (typeof rating === "string" && rating.trim() !== "") {
+    value = Number(rating);
+  } else {
+    return { error: "rating must be a number" };
+  }
+
+  if (!Number.isFinite(value)) return { error: "rating must be a number" };
+
+  const halfSteps = value * 2;
+  if (halfSteps < 1 || halfSteps > 10 || Math.abs(halfSteps - Math.round(halfSteps)) > 1e-9) {
+    return { error: "rating must be between 0.5 and 5 in half steps" };
+  }
+
+  return { rating: Math.round(halfSteps) / 2 };
 }
 
 /**
@@ -263,6 +309,7 @@ export function createIngestRoutes(deps: IngestRoutesDeps = {}): Hono {
   const resolveOrCreateStack = deps.resolveOrCreateStack ?? defaultResolveOrCreateStack;
   const attachItemToStack = deps.attachItemToStack ?? defaultAttachItemToStack;
   const setItemReminder = deps.setItemReminder ?? defaultSetItemReminder;
+  const setItemRating = deps.setItemRating ?? defaultSetItemRating;
   const countToListen = deps.countToListen ?? defaultCountToListen;
 
   const routes = new Hono();
@@ -438,6 +485,15 @@ export function createIngestRoutes(deps: IngestRoutesDeps = {}): Hono {
     }
     const remindAt = remindAtResult.date;
 
+    // Optional star rating ("Rating" in the share sheet). Same contract as the
+    // date: absent/blank leaves the item's rating alone, an invalid value is a
+    // client bug.
+    const ratingResult = parseRating(body);
+    if ("error" in ratingResult) {
+      return c.json({ error: ratingResult.error }, 400);
+    }
+    const rating = ratingResult.rating;
+
     // Notes are only meaningful for a freshly-created item; createMusicItemsFromUrl
     // returns a duplicate's existing item unchanged, so passing them there can never
     // clobber an existing note.
@@ -471,6 +527,11 @@ export function createIngestRoutes(deps: IngestRoutesDeps = {}): Hono {
         // just like re-sharing to file it into a list does.
         if (remindAt) {
           await setItemReminder(result.item.id, remindAt);
+        }
+        // The rating lands the same way — on every item the share names,
+        // duplicates included, so re-sharing to change the stars works too.
+        if (rating !== null) {
+          await setItemRating(result.item.id, rating);
         }
         if (result.created) {
           scheduleAppleMusicBackfill(result.item.id);
@@ -523,12 +584,13 @@ export function createIngestRoutes(deps: IngestRoutesDeps = {}): Hono {
     let imageBase64: unknown;
     let notes: unknown;
     let from: unknown;
-    // Lists and an optional reminder date the item should be filed with — the
-    // share sheet sends these for a photo just as it does for a link, so a
-    // shared image lands in the same lists (and gets the same "Remind me" date)
-    // as a shared URL would.
+    // Lists, an optional reminder date, and an optional star rating the item
+    // should be filed with — the share sheet sends these for a photo just as it
+    // does for a link, so a shared image lands in the same lists (and gets the
+    // same "Remind me" date and rating) as a shared URL would.
     let listNames: string[] = [];
     let remindAtRaw: unknown;
+    let ratingRaw: unknown;
 
     const contentType = c.req.header("Content-Type") ?? "";
 
@@ -563,6 +625,7 @@ export function createIngestRoutes(deps: IngestRoutesDeps = {}): Hono {
             : [],
       });
       remindAtRaw = Array.isArray(form.remindAt) ? form.remindAt[0] : form.remindAt;
+      ratingRaw = Array.isArray(form.rating) ? form.rating[0] : form.rating;
     } else {
       let body: unknown;
       try {
@@ -580,6 +643,7 @@ export function createIngestRoutes(deps: IngestRoutesDeps = {}): Hono {
       ({ imageBase64, notes, from } = record);
       listNames = collectListNames(record);
       remindAtRaw = record.remindAt;
+      ratingRaw = record.rating;
     }
 
     const validation = validateImageBase64(imageBase64);
@@ -587,13 +651,19 @@ export function createIngestRoutes(deps: IngestRoutesDeps = {}): Hono {
       return c.json({ error: validation.error }, 400);
     }
 
-    // Validate the reminder before saving anything, so a mis-formatted date
-    // fails cleanly instead of leaving an orphaned upload behind.
+    // Validate the reminder and rating before saving anything, so a
+    // mis-formatted value fails cleanly instead of leaving an orphaned upload
+    // behind.
     const remindAtResult = parseRemindAt({ remindAt: remindAtRaw });
     if ("error" in remindAtResult) {
       return c.json({ error: remindAtResult.error }, 400);
     }
     const remindAt = remindAtResult.date;
+    const ratingResult = parseRating({ rating: ratingRaw });
+    if ("error" in ratingResult) {
+      return c.json({ error: ratingResult.error }, 400);
+    }
+    const rating = ratingResult.rating;
 
     let artworkUrl: string;
     try {
@@ -634,14 +704,18 @@ export function createIngestRoutes(deps: IngestRoutesDeps = {}): Hono {
       });
 
       // File the new item into every chosen list (creating any that are new),
-      // then apply the reminder — mirroring the /link path so the share sheet's
-      // list and "Remind me" controls behave the same for a photo.
+      // then apply the reminder and rating — mirroring the /link path so the
+      // share sheet's list, "Remind me", and rating controls behave the same
+      // for a photo.
       const lists = await Promise.all(listNames.map((name) => resolveOrCreateStack(name)));
       for (const list of lists) {
         await attachItemToStack(result.item.id, list.id);
       }
       if (remindAt) {
         await setItemReminder(result.item.id, remindAt);
+      }
+      if (rating !== null) {
+        await setItemRating(result.item.id, rating);
       }
 
       scheduleAppleMusicBackfill(result.item.id);

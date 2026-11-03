@@ -241,7 +241,7 @@ final class ShareViewController: UIViewController {
     /// Posts the shared content with whatever the compose form currently holds.
     /// Called from the form's Add button, the list picker's, and — with the
     /// chosen candidate ids — the release picker's, so all send exactly the
-    /// same note, lists, and reminder.
+    /// same note, lists, reminder, and rating.
     ///
     /// `selectedCandidateIds` is empty on a first post. When the shared page
     /// names several releases the server answers 409 with the candidates
@@ -256,6 +256,7 @@ final class ShareViewController: UIViewController {
         }
         let note = compose.noteText
         let remindAt = compose.remindAt
+        let rating = compose.rating
 
         let handle: (PostResult) -> Void = { [weak self] result in
             guard let self else { return }
@@ -279,6 +280,7 @@ final class ShareViewController: UIViewController {
                 note: note,
                 listNames: selectedListNames,
                 remindAt: remindAt,
+                rating: rating,
                 selectedCandidateIds: selectedCandidateIds,
                 completion: handle
             )
@@ -288,6 +290,7 @@ final class ShareViewController: UIViewController {
                 note: note,
                 listNames: selectedListNames,
                 remindAt: remindAt,
+                rating: rating,
                 completion: handle
             )
         }
@@ -702,6 +705,7 @@ final class ShareViewController: UIViewController {
         note: String,
         listNames: [String],
         remindAt: Date?,
+        rating: Int?,
         selectedCandidateIds: [String] = [],
         completion: @escaping (PostResult) -> Void
     ) {
@@ -720,6 +724,8 @@ final class ShareViewController: UIViewController {
         // Send the schedule as a plain yyyy-MM-dd date, matching the web reminder
         // control; the server parses it with `new Date(...)`.
         if let remindAt { payload["remindAt"] = Self.scheduleFormatter.string(from: remindAt) }
+        // A star picked on the form, as the whole-star number the server stores.
+        if let rating { payload["rating"] = rating }
         // The user's answer to an earlier ambiguous (multi-release) response.
         if !selectedCandidateIds.isEmpty { payload["selectedCandidateIds"] = selectedCandidateIds }
 
@@ -784,6 +790,7 @@ final class ShareViewController: UIViewController {
         note: String,
         listNames: [String],
         remindAt: Date?,
+        rating: Int?,
         completion: @escaping (PostResult) -> Void
     ) {
         let total = payloads.count
@@ -804,7 +811,8 @@ final class ShareViewController: UIViewController {
                 imageData: next,
                 note: note,
                 listNames: listNames,
-                remindAt: remindAt
+                remindAt: remindAt,
+                rating: rating
             ) { outcome in
                 switch outcome {
                 case .added(let lists):
@@ -834,15 +842,16 @@ final class ShareViewController: UIViewController {
 
     /// Posts one shared image to `/api/ingest/photo`. The image is sent as base64
     /// JSON — the same shape the web add-form's scan flow uses — alongside the
-    /// same note, lists, and reminder the link path sends, so the server files
-    /// and schedules the created item identically. The lists it reports back are
-    /// handed to the caller, which builds the confirmation toast once the whole
-    /// queue has been posted.
+    /// same note, lists, reminder, and rating the link path sends, so the server
+    /// files, schedules, and rates the created item identically. The lists it
+    /// reports back are handed to the caller, which builds the confirmation
+    /// toast once the whole queue has been posted.
     private func postPhoto(
         imageData: Data,
         note: String,
         listNames: [String],
         remindAt: Date?,
+        rating: Int?,
         completion: @escaping (PhotoPostOutcome) -> Void
     ) {
         guard let endpoint = URL(string: baseURL + "/api/ingest/photo") else {
@@ -858,6 +867,7 @@ final class ShareViewController: UIViewController {
         if !note.isEmpty { payload["notes"] = note }
         if !listNames.isEmpty { payload["listNames"] = listNames }
         if let remindAt { payload["remindAt"] = Self.scheduleFormatter.string(from: remindAt) }
+        if let rating { payload["rating"] = rating }
 
         var request = URLRequest(url: endpoint)
         request.httpMethod = "POST"
@@ -1039,11 +1049,77 @@ private final class PostingIndicator: UIView {
     }
 }
 
-/// The compose form: an optional note field, a tappable "List" row, and a
-/// "Release date" switch that reveals a date picker, with Cancel/Add in the
-/// navigation bar. It owns no state and does no networking — it reports Cancel,
-/// Add (with the note text and any chosen date), and List taps back to its
-/// container via closures.
+/// The web app's star control, mirrored natively: five ★ glyphs, tap one to
+/// rate 1–5 whole stars, tap the lit star again to clear. Lit stars use the
+/// app's --star-gold, unlit ones the --chrome-darker outline colour — exactly
+/// the palette `.rating-stars` paints in main.css. Whole stars only: the sheet
+/// is a capture form, and finer steps are the app's own control.
+///
+/// `value` is `nil` until a star is picked (and after a clear), and the form
+/// only sends `rating` when non-nil — the same absent-means-untouched contract
+/// the reminder follows, so an unrated share can't clobber a stored rating.
+private final class StarRatingControl: UIControl {
+    /// The picked whole-star value, 1…5; nil before a pick or after a clear.
+    private(set) var value: Int?
+
+    private let stars: [UILabel] = (1...5).map { star in
+        let label = UILabel()
+        label.text = "★"
+        label.font = OTBTheme.ui(22)
+        label.textAlignment = .center
+        label.isUserInteractionEnabled = false
+        label.tag = star
+        return label
+    }
+
+    override init(frame: CGRect) {
+        super.init(frame: frame)
+
+        let row = UIStackView(arrangedSubviews: stars)
+        row.axis = .horizontal
+        row.spacing = 2
+        row.translatesAutoresizingMaskIntoConstraints = false
+        addSubview(row)
+        NSLayoutConstraint.activate(
+            stars.map { $0.widthAnchor.constraint(equalToConstant: 32) } + [
+                row.topAnchor.constraint(equalTo: topAnchor),
+                row.bottomAnchor.constraint(equalTo: bottomAnchor),
+                row.leadingAnchor.constraint(equalTo: leadingAnchor),
+                row.trailingAnchor.constraint(equalTo: trailingAnchor),
+            ]
+        )
+
+        isAccessibilityElement = true
+        accessibilityLabel = "Rating"
+        paint()
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
+
+    /// A tap picks the star it lands in; tapping the one already lit clears
+    /// the rating — the web control's tap-again-to-clear rule.
+    override func touchesEnded(_ touches: Set<UITouch>, with event: UIEvent?) {
+        guard let point = touches.first?.location(in: self),
+              let star = stars.first(where: { $0.frame.contains(point) }) else { return }
+        value = value == star.tag ? nil : star.tag
+        paint()
+    }
+
+    private func paint() {
+        for star in stars {
+            let lit = value.map { star.tag <= $0 } ?? false
+            star.textColor = lit ? OTBTheme.starGold : OTBTheme.chromeDarker
+        }
+        accessibilityValue = value.map { "\($0) of 5" } ?? "Not rated"
+    }
+}
+
+/// The compose form: an optional note field, a tappable "List" row, a "Rating"
+/// row of tappable stars, and a "Release date" switch that reveals a date
+/// picker, with Cancel/Add in the navigation bar. It owns no state and does no
+/// networking — it reports Cancel, Add (with the note text and any chosen
+/// date), and List taps back to its container via closures.
 private final class ComposeFormController: UIViewController, UITextViewDelegate {
     var onCancel: (() -> Void)?
     var onSubmit: (() -> Void)?
@@ -1062,6 +1138,13 @@ private final class ComposeFormController: UIViewController, UITextViewDelegate 
         scheduleSwitch.isOn ? datePicker.date : nil
     }
 
+    /// The picked whole-star rating (1–5), or `nil` while none is picked.
+    /// Posted as the item's `rating` — the same half-step scale the web app's
+    /// star control writes, whole steps because a tap is a whole star.
+    var rating: Int? {
+        ratingControl.value
+    }
+
     /// Whether there's anything to post yet — mirrored onto the list picker's
     /// Add button so both are gated on the same condition.
     var canSubmit: Bool { hasContent && !isPosting }
@@ -1076,6 +1159,7 @@ private final class ComposeFormController: UIViewController, UITextViewDelegate 
     private let noteView = UITextView()
     private let notePlaceholder = UILabel()
     private let listValueLabel = UILabel()
+    private let ratingControl = StarRatingControl()
     private let scheduleSwitch = UISwitch()
     private let datePicker = UIDatePicker()
     /// Whether the user has set the "Release date" switch themselves — see
@@ -1148,9 +1232,12 @@ private final class ComposeFormController: UIViewController, UITextViewDelegate 
         notePlaceholder.translatesAutoresizingMaskIntoConstraints = false
 
         let listRow = makeListRow()
+        let ratingRow = makeRatingRow()
         let scheduleRow = makeScheduleRow()
 
-        let stack = UIStackView(arrangedSubviews: [statusLabel, imageWell, noteField, listRow, scheduleRow, datePicker])
+        let stack = UIStackView(
+            arrangedSubviews: [statusLabel, imageWell, noteField, listRow, ratingRow, scheduleRow, datePicker]
+        )
         stack.axis = .vertical
         stack.spacing = 12
         stack.translatesAutoresizingMaskIntoConstraints = false
@@ -1214,6 +1301,36 @@ private final class ComposeFormController: UIViewController, UITextViewDelegate 
         row.alignment = .center
         row.isLayoutMarginsRelativeArrangement = true
         row.layoutMargins = UIEdgeInsets(top: 12, left: 12, bottom: 12, right: 12)
+        row.translatesAutoresizingMaskIntoConstraints = false
+        container.addSubview(row)
+        NSLayoutConstraint.activate([
+            row.topAnchor.constraint(equalTo: container.topAnchor),
+            row.bottomAnchor.constraint(equalTo: container.bottomAnchor),
+            row.leadingAnchor.constraint(equalTo: container.leadingAnchor),
+            row.trailingAnchor.constraint(equalTo: container.trailingAnchor),
+        ])
+        return container
+    }
+
+    /// Builds the "Rating" row: a title and the star control, right-aligned so
+    /// the compose rows read label → value like the List and Release date rows.
+    private func makeRatingRow() -> UIView {
+        let container = BeveledView(style: .raised, fill: OTBTheme.chromePanel)
+
+        let title = UILabel()
+        title.text = "Rating"
+        title.font = OTBTheme.ui(14)
+        title.textColor = .black
+        title.setContentHuggingPriority(.defaultLow, for: .horizontal)
+
+        ratingControl.setContentHuggingPriority(.required, for: .horizontal)
+
+        let row = UIStackView(arrangedSubviews: [title, ratingControl])
+        row.axis = .horizontal
+        row.spacing = 8
+        row.alignment = .center
+        row.isLayoutMarginsRelativeArrangement = true
+        row.layoutMargins = UIEdgeInsets(top: 8, left: 12, bottom: 8, right: 12)
         row.translatesAutoresizingMaskIntoConstraints = false
         container.addSubview(row)
         NSLayoutConstraint.activate([
@@ -1969,6 +2086,7 @@ enum OTBTheme {
     static let navy = UIColor(rgb: 0x001033)         // --navy
     static let navyBorder = UIColor(rgb: 0x224499)   // --navy-border
     static let ledGreen = UIColor(rgb: 0x00FF41)     // --led-green
+    static let starGold = UIColor(rgb: 0xC8A000)     // --star-gold: lit rating stars
 
     /// UI chrome type. The web uses Tahoma; iOS doesn't ship it, so we use
     /// Verdana — the same designer's near-identical face, bundled on every device.

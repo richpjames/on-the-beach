@@ -20,7 +20,10 @@ The "Get Contents of URL" step is configured as:
 - **Method:** POST
 - **Headers:** `Authorization: Bearer <INGEST_API_KEY>`
 - **Request Body:** JSON
-  - Key: `url`, Type: **URL**, Value: `Shortcut Input`
+  - Key: `url`, Type: **URL**, Value: `Shortcut Input**
+  - Optionally `notes` (Text), `listNames` (Text, one field per list), `remindAt`
+    (Text, `yyyy-MM-dd`), and `rating` (Number, 0.5–5 in half steps) — the same
+    fields the native Share Extension sends.
 
 The `INGEST_API_KEY` value must match what is set in the server's environment.
 
@@ -39,8 +42,9 @@ type to the Receive step and post each photo separately, because
    - **Headers:** `Authorization: Bearer <INGEST_API_KEY>`
    - **Request Body:** Form
      - Key: `photo`, Type: **File**, Value: `Repeat Item`
-     - Optionally `listNames` (Text, one field per list) and `remindAt`
-       (Text, `yyyy-MM-dd`) — the same fields the native Share Extension sends.
+     - Optionally `listNames` (Text, one field per list), `remindAt`
+       (Text, `yyyy-MM-dd`), and `rating` (Number, 0.5–5 in half steps) — the
+       same fields the native Share Extension sends.
 4. **Show Notification** after the repeat, so one summary appears rather than one
    per photo.
 

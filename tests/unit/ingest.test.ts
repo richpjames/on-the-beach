@@ -18,6 +18,7 @@ const mockListStacks = mock();
 const mockResolveOrCreateStack = mock();
 const mockAttachItemToStack = mock();
 const mockSetItemReminder = mock();
+const mockSetItemRating = mock();
 const mockCountToListen = mock();
 
 // Mock the music-item-creator module before importing any route, overriding
@@ -61,6 +62,7 @@ function makeApp() {
       resolveOrCreateStack: mockResolveOrCreateStack,
       attachItemToStack: mockAttachItemToStack,
       setItemReminder: mockSetItemReminder,
+      setItemRating: mockSetItemRating,
       countToListen: mockCountToListen,
     }),
   );
@@ -592,6 +594,134 @@ describe("POST /api/ingest/link with a scheduled date", () => {
   });
 });
 
+describe("POST /api/ingest/link with a star rating", () => {
+  const originalEnv = { ...process.env };
+  const url = "https://artist.bandcamp.com/album/cool-album";
+
+  beforeEach(() => {
+    process.env.INGEST_API_KEY = "test-secret";
+    delete process.env.INGEST_ENABLED;
+    mockCreateMany.mockReset();
+    mockSetItemRating.mockReset();
+  });
+
+  afterEach(() => {
+    process.env = { ...originalEnv };
+  });
+
+  it("sets the rating on the created item", async () => {
+    mockCreateMany.mockResolvedValue([
+      { item: { id: 7, title: "Cool Album", primary_url: url } as any, created: true },
+    ]);
+
+    const app = makeApp();
+    const res = await makeLinkRequest(app, { url, rating: 4 }, { apiKey: "test-secret" });
+
+    expect(res.status).toBe(200);
+    expect(mockSetItemRating).toHaveBeenCalledTimes(1);
+    expect(mockSetItemRating).toHaveBeenCalledWith(7, 4);
+  });
+
+  it("keeps half steps intact", async () => {
+    mockCreateMany.mockResolvedValue([
+      { item: { id: 7, title: "Cool Album", primary_url: url } as any, created: true },
+    ]);
+
+    const app = makeApp();
+    const res = await makeLinkRequest(app, { url, rating: 4.5 }, { apiKey: "test-secret" });
+
+    expect(res.status).toBe(200);
+    expect(mockSetItemRating).toHaveBeenCalledWith(7, 4.5);
+  });
+
+  it("also rates a duplicate item, so re-sharing to change the stars works", async () => {
+    mockCreateMany.mockResolvedValue([
+      { item: { id: 9, title: "Cool Album" } as any, created: false },
+    ]);
+
+    const app = makeApp();
+    const res = await makeLinkRequest(app, { url, rating: 3 }, { apiKey: "test-secret" });
+
+    expect(res.status).toBe(200);
+    expect(mockSetItemRating).toHaveBeenCalledWith(9, 3);
+  });
+
+  it("rates every item a multi-release pick creates", async () => {
+    mockCreateMany.mockResolvedValue([
+      { item: { id: 1, title: "First Album" } as any, created: true },
+      { item: { id: 2, title: "Second Album" } as any, created: true },
+    ]);
+
+    const app = makeApp();
+    const res = await makeLinkRequest(
+      app,
+      { url, rating: 5, selectedCandidateIds: ["first-album", "second-album"] },
+      { apiKey: "test-secret" },
+    );
+
+    expect(res.status).toBe(200);
+    expect(mockSetItemRating).toHaveBeenCalledWith(1, 5);
+    expect(mockSetItemRating).toHaveBeenCalledWith(2, 5);
+  });
+
+  it("accepts a numeric string, as form-data clients send", async () => {
+    mockCreateMany.mockResolvedValue([
+      { item: { id: 7, title: "Cool Album", primary_url: url } as any, created: true },
+    ]);
+
+    const app = makeApp();
+    const res = await makeLinkRequest(app, { url, rating: "4" }, { apiKey: "test-secret" });
+
+    expect(res.status).toBe(200);
+    expect(mockSetItemRating).toHaveBeenCalledWith(7, 4);
+  });
+
+  it("leaves the rating alone when none is given", async () => {
+    mockCreateMany.mockResolvedValue([
+      { item: { id: 1, title: "Cool Album", primary_url: url } as any, created: true },
+    ]);
+
+    const app = makeApp();
+    const res = await makeLinkRequest(app, { url }, { apiKey: "test-secret" });
+
+    expect(res.status).toBe(200);
+    expect(mockSetItemRating).not.toHaveBeenCalled();
+  });
+
+  it("ignores a blank rating", async () => {
+    mockCreateMany.mockResolvedValue([
+      { item: { id: 1, title: "Cool Album", primary_url: url } as any, created: true },
+    ]);
+
+    const app = makeApp();
+    const res = await makeLinkRequest(app, { url, rating: "" }, { apiKey: "test-secret" });
+
+    expect(res.status).toBe(200);
+    expect(mockSetItemRating).not.toHaveBeenCalled();
+  });
+
+  it("returns 400 for a non-numeric rating and creates nothing", async () => {
+    const app = makeApp();
+    const res = await makeLinkRequest(app, { url, rating: "excellent" }, { apiKey: "test-secret" });
+
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.error).toContain("rating");
+    expect(mockCreateMany).not.toHaveBeenCalled();
+    expect(mockSetItemRating).not.toHaveBeenCalled();
+  });
+
+  it.each([0, 5.5, 3.25])("returns 400 for a rating of %s", async (value) => {
+    const app = makeApp();
+    const res = await makeLinkRequest(app, { url, rating: value }, { apiKey: "test-secret" });
+
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.error).toContain("rating");
+    expect(mockCreateMany).not.toHaveBeenCalled();
+  });
+});
+
 describe("GET /api/ingest/stacks", () => {
   const originalEnv = { ...process.env };
 
@@ -1089,6 +1219,7 @@ describe("POST /api/ingest/photo", () => {
     mockResolveOrCreateStack.mockReset();
     mockAttachItemToStack.mockReset();
     mockSetItemReminder.mockReset();
+    mockSetItemRating.mockReset();
   });
 
   afterEach(() => {
@@ -1493,5 +1624,55 @@ describe("POST /api/ingest/photo", () => {
       { id: 3, name: "Jazz finds" },
       { id: 5, name: "Wishlist" },
     ]);
+  });
+
+  it("sets a rating on the created item", async () => {
+    mockCreateDirect.mockResolvedValue({ item: { id: 8, title: "Untitled" }, created: true });
+
+    const app = makeApp();
+    const res = await makePhotoRequest(
+      app,
+      { imageBase64: validBase64, rating: 4.5 },
+      { apiKey: "test-secret" },
+    );
+
+    expect(res.status).toBe(200);
+    expect(mockSetItemRating).toHaveBeenCalledTimes(1);
+    expect(mockSetItemRating).toHaveBeenCalledWith(8, 4.5);
+  });
+
+  it("accepts a multipart rating field", async () => {
+    mockCreateDirect.mockResolvedValue({ item: { id: 5, title: "Untitled" }, created: true });
+
+    const imageBytes = new Uint8Array([1, 2, 3, 4]);
+    const form = new FormData();
+    form.append("photo", new File([imageBytes], "cover.jpg", { type: "image/jpeg" }));
+    form.append("rating", "3");
+
+    const app = makeApp();
+    const res = await app.request("http://localhost/api/ingest/photo", {
+      method: "POST",
+      headers: { Authorization: "Bearer test-secret" },
+      body: form,
+    });
+
+    expect(res.status).toBe(200);
+    expect(mockSetItemRating).toHaveBeenCalledWith(5, 3);
+  });
+
+  it("returns 400 for an invalid rating and saves nothing", async () => {
+    const app = makeApp();
+    const res = await makePhotoRequest(
+      app,
+      { imageBase64: validBase64, rating: 6 },
+      { apiKey: "test-secret" },
+    );
+
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.error).toContain("rating");
+    expect(mockSaveImage).not.toHaveBeenCalled();
+    expect(mockCreateDirect).not.toHaveBeenCalled();
+    expect(mockSetItemRating).not.toHaveBeenCalled();
   });
 });

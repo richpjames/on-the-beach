@@ -29,7 +29,7 @@ for free by building the same targets with **Mac Catalyst** (see [Enable macOS
   Swift is needed.
 - The Share Extension (`native/ShareExtension/`) is the part that matters. When the
   user shares a link, `ShareViewController.swift` shows a small compose form with an
-  optional **note** field and a **List** row. The List row fetches your lists from
+  optional **note** field, a **List** row, and a **Rating** row of stars. The List row fetches your lists from
   `GET /api/ingest/stacks` and lets you pick an existing one or create a new one by
   name. On **Add** it `POST`s the URL — plus `notes` and `listName` when set — to
   `POST /api/ingest/link` with a `Bearer` token. The extension talks to the server
@@ -42,6 +42,12 @@ for free by building the same targets with **Mac Catalyst** (see [Enable macOS
   record already out arms nothing. It's best-effort: a failed or slow preview leaves the
   form exactly as it was, and if you've already set the switch yourself a late answer
   doesn't touch it.
+- The **Rating** row is the web app's star control in miniature: tap a star to rate
+  the release 1–5 on the spot, tap the lit star again to clear. An unrated (or
+  cleared) share sends no `rating`, so it never clobbers a rating already stored —
+  while a picked one lands on every item the share creates, duplicates included
+  (re-sharing an already-saved item updates its stars), exactly like the lists and
+  reminder. Whole stars only: finer half-star steps stay in the app.
 - The list picker has a **search field pinned above the rows**, the native counterpart
   of the web app's `StackDropdown` (same "Search or add a list…" placeholder). Typing
   filters your lists case- and accent-insensitively; pressing Return files the item into
@@ -53,8 +59,8 @@ for free by building the same targets with **Mac Catalyst** (see [Enable macOS
 - The list picker carries **its own Add button** in the top right, doing exactly what
   the compose form's does. Picking a list is usually the last decision, so this saves
   a trip back to the first screen just to post. Whichever Add you tap, the same note,
-  lists, and reminder are sent, and the in-flight spinner / error alert appear on the
-  screen you're on.
+  lists, rating, and reminder are sent, and the in-flight spinner / error alert appear
+  on the screen you're on.
 - **Sharing a page with several releases** (e.g. a best-of-the-year blog post) works
   like the web app's link picker. The server answers `POST /api/ingest/link` with
   `409 ambiguous_link` and the extracted candidates instead of adding anything; the
@@ -66,7 +72,7 @@ for free by building the same targets with **Mac Catalyst** (see [Enable macOS
   nothing.
 - **Sharing images** works the same way. When the payload is photos rather than a
   link (e.g. record covers shared from Photos), the extension shows the same compose
-  form — with an image preview above the note — and the same note, list, and
+  form — with an image preview above the note — and the same note, list, rating, and
   reminder controls. Each image is downscaled to a 1024px JPEG and re-encoded at
   progressively lower quality/size until the base64 payload fits the upload budget
   (mirroring the web add-form's `encodeImageFile`, so a detailed sleeve compresses
@@ -76,7 +82,7 @@ for free by building the same targets with **Mac Catalyst** (see [Enable macOS
   link is preferred when the share carries both (a shared web page often includes a
   thumbnail image we don't want).
 - **Several photos at once.** Multi-selecting sleeves in Photos and sharing them
-  adds one item per photo, all with the same note, lists, and reminder. The
+  adds one item per photo, all with the same note, lists, rating, and reminder. The
   activation rule allows up to **10** images (`NSExtensionActivationSupportsImageWithMaxCount`
   in `native/ShareExtension/Info.plist`) — iOS hides the extension outright once a
   selection exceeds that, so the number is the real cap on a multi-select share. The
