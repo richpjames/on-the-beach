@@ -79,8 +79,8 @@
   }
 
   // Track what we last pushed so clearing the form only resets the list
-  // filter when the add bar itself set it (not a query typed in the browse
-  // search panel).
+  // filter when the add bar itself set it (not a query adopted from the URL
+  // via VIEW_RESTORED).
   let lastSearchQuery = "";
   function syncSearch(): void {
     const query = toListSearchQuery(url);
