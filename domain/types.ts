@@ -111,6 +111,7 @@ export interface MusicItem {
   price_cents: number | null;
   currency: string;
   notes: string | null;
+  /** Out of 100 (two decimals), null = unrated — see domain/rating.ts. */
   rating: number | null;
   created_at: string;
   updated_at: string;
@@ -220,6 +221,7 @@ export interface UpdateMusicItemInput {
   priceCents?: number | null;
   currency?: string;
   notes?: string | null;
+  /** Out of 100 (two decimals), null = unrated — see domain/rating.ts. */
   rating?: number | null;
   artworkUrl?: string | null;
   label?: string | null;

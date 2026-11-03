@@ -6,9 +6,15 @@
 
   let {
     app,
+    ratingEnabled,
+    starCount,
     onPickRandom,
   }: {
     app: MachineHandle<typeof appMachine>;
+    /** Whether ratings are on at all — off hides every rating surface here. */
+    ratingEnabled: boolean;
+    /** How many stars the scale has; decides what the pick-by-rating menu offers. */
+    starCount: number;
     onPickRandom: (rating?: number | null) => Promise<{ id: number } | null>;
   } = $props();
 
@@ -71,12 +77,24 @@
   let randomBtnDisabled = $state(false);
 
   // Press-and-hold on Pick One opens a menu to constrain the roll to a rating.
-  const RATING_OPTIONS: number[] = [5, 4.5, 4, 3.5, 3, 2.5, 2, 1.5, 1, 0.5];
+  // The options follow the configured scale: half-stars while that stays a
+  // readable list (up to 10 stars), whole stars beyond it.
+  const RATING_OPTIONS: number[] = $derived.by(() => {
+    const step = starCount <= 10 ? 0.5 : 1;
+    const options: number[] = [];
+    for (let value = starCount; value >= 0.5; value -= step) {
+      options.push(Math.round(value * 2) / 2);
+    }
+    return options;
+  });
   const LONG_PRESS_MS = 450;
   let ratingMenuOpen = $state(false);
   let pickRandomEl: HTMLElement | undefined = $state();
   let longPressTimer: ReturnType<typeof setTimeout> | undefined;
   let longPressFired = false;
+
+  // Glyph rows only make sense while they still fit a menu row.
+  const showRatingGlyphs = $derived(starCount <= 10);
 
   function ratingStars(value: number): string {
     const full = Math.floor(value);
@@ -84,7 +102,7 @@
   }
 
   function openRatingMenu(): void {
-    if (randomBtnDisabled) return;
+    if (randomBtnDisabled || !ratingEnabled) return;
     ratingMenuOpen = true;
   }
 
@@ -193,9 +211,13 @@
           type="button"
           id="pick-random-btn"
           class="filter-btn filter-btn--action"
-          title="Pick a random item from To Listen — hold to pick by rating"
-          aria-label="Pick a random item from To Listen. Press and hold to pick by star rating."
-          aria-haspopup="menu"
+          title={ratingEnabled
+            ? "Pick a random item from To Listen — hold to pick by rating"
+            : "Pick a random item from To Listen"}
+          aria-label={ratingEnabled
+            ? "Pick a random item from To Listen. Press and hold to pick by star rating."
+            : "Pick a random item from To Listen."}
+          aria-haspopup={ratingEnabled ? "menu" : undefined}
           aria-expanded={ratingMenuOpen ? "true" : "false"}
           disabled={randomBtnDisabled}
           onclick={onPickRandomClick}
@@ -221,7 +243,11 @@
                 role="menuitem"
                 onclick={() => selectRating(value)}
               >
-                <span class="pick-random__menu-stars" aria-hidden="true">{ratingStars(value)}</span>
+                {#if showRatingGlyphs}
+                  <span class="pick-random__menu-stars" aria-hidden="true"
+                    >{ratingStars(value)}</span
+                  >
+                {/if}
                 <span class="pick-random__menu-label">{value} star{value === 1 ? "" : "s"}</span>
               </button>
             {/each}
@@ -263,7 +289,9 @@
             >
             <option value="artist-name">Artist A–Z</option>
             <option value="release-name">Release A–Z</option>
-            <option value="star-rating">Star rating</option>
+            {#if ratingEnabled}
+              <option value="star-rating">Star rating</option>
+            {/if}
           </select>
         </label>
         <button

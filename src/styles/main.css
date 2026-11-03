@@ -643,6 +643,43 @@ select.input {
   font-size: 28px;
 }
 
+/* Large scales shrink their glyphs by band (see StarRating.svelte) so a
+   100-star rating still fits the row; they also wrap, since no band makes
+   a hundred glyphs single-line. Specificity is kept above the plain and
+   media-query star rules so the bands win at every width. */
+.rating-stars.rating-stars--compact {
+  flex-wrap: wrap;
+  gap: 0;
+}
+
+.rating-stars.rating-stars--compact .rating-stars__star {
+  width: 18px;
+  height: 20px;
+  font-size: 12px;
+}
+
+.rating-stars.rating-stars--tight {
+  flex-wrap: wrap;
+  gap: 0;
+}
+
+.rating-stars.rating-stars--tight .rating-stars__star {
+  width: 12px;
+  height: 16px;
+  font-size: 10px;
+}
+
+.rating-stars.rating-stars--packed {
+  flex-wrap: wrap;
+  gap: 0;
+}
+
+.rating-stars.rating-stars--packed .rating-stars__star {
+  width: 9px;
+  height: 14px;
+  font-size: 8px;
+}
+
 .btn--ghost {
   background: transparent;
   border-color: transparent;

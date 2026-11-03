@@ -30,6 +30,7 @@ export async function seedPreviewData(): Promise<void> {
     title: string;
     artistIdx: number;
     listenStatus: "to-listen" | "listened";
+    /** Out of 100, the stored rating scale — see domain/rating.ts. */
     rating?: number;
     remindAt?: Date;
     genre?: string;
@@ -46,9 +47,9 @@ export async function seedPreviewData(): Promise<void> {
     { title: "Surf Memory", artistIdx: 2, listenStatus: "to-listen", genre: "Dub", year: 2023 },
     { title: "Terminal Departures", artistIdx: 3, listenStatus: "to-listen", year: 2025 },
     { title: "Low Tide Versions", artistIdx: 2, listenStatus: "to-listen", genre: "Dub" },
-    { title: "Motorway Sodium", artistIdx: 0, listenStatus: "listened", rating: 8, year: 2022 },
-    { title: "Greenhouse Nights", artistIdx: 1, listenStatus: "listened", rating: 6 },
-    { title: "Pier Organ Suite", artistIdx: 3, listenStatus: "listened", rating: 9, year: 2021 },
+    { title: "Motorway Sodium", artistIdx: 0, listenStatus: "listened", rating: 80, year: 2022 },
+    { title: "Greenhouse Nights", artistIdx: 1, listenStatus: "listened", rating: 60 },
+    { title: "Pier Organ Suite", artistIdx: 3, listenStatus: "listened", rating: 90, year: 2021 },
     {
       title: "Causeway",
       artistIdx: 1,

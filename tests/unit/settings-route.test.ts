@@ -11,8 +11,10 @@ import {
   setReleaseLengthPreference,
   getArtistWatchSettings,
   setArtistWatchSettings,
+  getRatingSettings,
   DEFAULT_ARTIST_WATCH_SETTINGS,
   ARTIST_WATCH_KEYS,
+  RATING_KEYS,
 } from "../../app/settings";
 
 function makeApp(): Hono {
@@ -27,6 +29,8 @@ beforeEach(async () => {
   process.env.OTB_DISABLE_EXTERNAL_LOOKUPS = "1";
   await setLookupService("apple_music");
   await setReleaseLengthPreference("longer");
+  await db.delete(appSettings).where(eq(appSettings.key, RATING_KEYS.enabled));
+  await db.delete(appSettings).where(eq(appSettings.key, RATING_KEYS.starCount));
 });
 
 afterEach(() => {
@@ -254,5 +258,86 @@ describe("artist watch settings", () => {
 
     expect(res.status).toBe(400);
     expect((await getArtistWatchSettings()).freshnessMonths).toBe(18);
+  });
+});
+
+describe("rating settings", () => {
+  test("defaults to five stars, switched on", async () => {
+    expect(await getRatingSettings()).toEqual({ enabled: true, starCount: 5 });
+  });
+
+  test("GET exposes the rating block", async () => {
+    const app = makeApp();
+    const body = await (await app.request("http://localhost/api/settings")).json();
+
+    expect(body.rating).toEqual({ enabled: true, starCount: 5 });
+  });
+
+  test("PUT round-trips the scale and the off switch", async () => {
+    const app = makeApp();
+    const res = await app.request("http://localhost/api/settings", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ratingStarCount: 10 }),
+    });
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({
+      rating: { enabled: true, starCount: 10 },
+      changed: true,
+    });
+
+    const off = await app.request("http://localhost/api/settings", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ratingEnabled: false }),
+    });
+
+    expect(off.status).toBe(200);
+    expect(await getRatingSettings()).toEqual({ enabled: false, starCount: 10 });
+  });
+
+  test("accepts the whole 1–100.00 range", async () => {
+    const app = makeApp();
+    for (const starCount of [1, 2, 7.5, 100]) {
+      const res = await app.request("http://localhost/api/settings", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ratingStarCount: starCount }),
+      });
+      expect(res.status).toBe(200);
+      expect((await getRatingSettings()).starCount).toBe(starCount);
+    }
+  });
+
+  test("rejects star counts outside the range or over-precise", async () => {
+    const app = makeApp();
+    for (const starCount of [0, 100.5, 7.333, -3]) {
+      const res = await app.request("http://localhost/api/settings", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ratingStarCount: starCount }),
+      });
+      expect(res.status).toBe(400);
+      expect(await getRatingSettings()).toEqual({ enabled: true, starCount: 5 });
+    }
+  });
+
+  test("rejects a non-boolean enable flag", async () => {
+    const app = makeApp();
+    const res = await app.request("http://localhost/api/settings", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ratingEnabled: "yes" }),
+    });
+
+    expect(res.status).toBe(400);
+    expect(await getRatingSettings()).toEqual({ enabled: true, starCount: 5 });
+  });
+
+  test("an unset or corrupt scale falls back to five stars", async () => {
+    await db.insert(appSettings).values({ key: RATING_KEYS.starCount, value: "banana" });
+
+    expect(await getRatingSettings()).toEqual({ enabled: true, starCount: 5 });
   });
 });

@@ -141,6 +141,13 @@
       "when": 1792604578465,
       "tag": "0019_opt_in_following",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "6",
+      "when": 1792697600000,
+      "tag": "0020_rating_out_of_100",
+      "breakpoints": true
     }
   ]
 }

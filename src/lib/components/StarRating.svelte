@@ -1,36 +1,47 @@
 <script lang="ts">
   import {
-    MAX_STARS,
+    DEFAULT_STAR_COUNT,
     normalizeStarRating,
     ratingForPointer,
     starFill,
+    starGlyphValues,
   } from "../../ui/components/star-rating-model";
+  import { starRatingToStored, storedToStarRating } from "../../../domain/rating";
 
   let {
     itemId,
     rating,
+    starCount = DEFAULT_STAR_COUNT,
     className = "",
     label = "Rating",
     onRate,
   }: {
     /**
      * The item being rated, stamped as `data-item-id` for the list code that
-     * scrolls to a card. Omitted when the stars aren't attached to an item —
-     * the settings page uses them to pick a threshold, not to rate anything.
+     * scrolls to a card. Omitted when the stars aren't attached to an item.
      */
     itemId?: number;
+    /** The stored rating, out of 100 — see domain/rating.ts. */
     rating: number | null;
+    /** How many stars the scale has; the settings page decides. */
+    starCount?: number;
     className?: string;
     /** Group label for screen readers; override when it isn't an item rating. */
     label?: string;
-    /** Persist the new rating; throw to roll back the optimistic update. */
+    /**
+     * Persist the new rating — already converted to the stored out-of-100
+     * value, so callers pass it straight through. Throw to roll back the
+     * optimistic update.
+     */
     onRate: (next: number | null) => Promise<void>;
   } = $props();
 
-  // The committed rating, mirrored from props (optimistically updated on click).
+  // The committed rating as a star value, mirrored from props (optimistically
+  // updated on click). The stored value keeps the precision; this is what the
+  // glyphs can paint.
   let selected = $state<number | null>(null);
   $effect.pre(() => {
-    selected = normalizeStarRating(rating);
+    selected = storedToStarRating(rating, starCount);
   });
 
   // The live hover value; null when the pointer is away. Never persisted.
@@ -40,8 +51,18 @@
   // What the stars actually paint: hover wins over the committed selection.
   const effective = $derived(preview ?? selected);
 
-  // Descending so DOM order is 5..1; `row-reverse` paints them left-to-right.
-  const stars = Array.from({ length: MAX_STARS }, (_, i) => MAX_STARS - i);
+  // Descending so DOM order matches `row-reverse` painting left-to-right.
+  const stars = $derived(starGlyphValues(starCount));
+
+  // Past ten stars the default 24px hit areas can't fit a row; shrink the
+  // glyphs by band so a 100-star scale still fits the card. The bands trade
+  // tap target for density — big scales are precision picks, not nudges.
+  const scaleClass = $derived.by(() => {
+    if (starCount > 40) return " rating-stars--packed";
+    if (starCount > 20) return " rating-stars--tight";
+    if (starCount > 10) return " rating-stars--compact";
+    return "";
+  });
 
   /** Fraction (0..1) of how far across a star button the pointer sits. */
   function pointerFraction(event: PointerEvent | MouseEvent): number {
@@ -54,7 +75,7 @@
   function onPointerMove(starValue: number, event: PointerEvent): void {
     if (pending) return;
     // A hover is purely positional — always derive the half from where we are.
-    preview = ratingForPointer(starValue, pointerFraction(event));
+    preview = ratingForPointer(starValue, pointerFraction(event), starCount);
   }
 
   function onPointerLeave(): void {
@@ -67,7 +88,7 @@
     selected = next;
     pending = true;
     try {
-      await onRate(next);
+      await onRate(next === null ? null : starRatingToStored(next, starCount));
     } catch (error) {
       console.error("Failed to update rating:", error);
       selected = previous;
@@ -82,7 +103,9 @@
     // Keyboard activation (Enter/Space) reports detail 0 and has no position —
     // it means "the whole star". A mouse click uses the pointer geometry.
     const value =
-      event.detail === 0 ? starValue : ratingForPointer(starValue, pointerFraction(event));
+      event.detail === 0
+        ? normalizeStarRating(starValue, starCount)
+        : ratingForPointer(starValue, pointerFraction(event), starCount);
     if (value === null) return;
     // Clicking the already-selected value clears the rating.
     await commit(selected === value ? null : value);
@@ -90,13 +113,14 @@
 </script>
 
 <div
-  class="rating-stars{className ? ` ${className}` : ''}"
+  class="rating-stars{scaleClass}{className ? ` ${className}` : ''}"
   class:is-pending={pending}
   data-rating-stars
   data-item-id={itemId}
+  data-star-count={starCount}
   data-rating-value={selected ?? ""}
   role="group"
-  aria-label={label}
+  aria-label="{label} (out of {starCount})"
   onpointerleave={onPointerLeave}
 >
   {#each stars as value (value)}
