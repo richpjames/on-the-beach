@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { invalidateAll } from "$app/navigation";
   import { onMount } from "svelte";
   import { apiFetch } from "$lib/api";
   import { musickit, authorize, unauthorize, ensureConfigured } from "$lib/musickit.svelte";
@@ -62,6 +63,10 @@
       const result = (await res.json()) as { rating: { enabled: boolean; starCount: number } };
       ratingEnabled = result.rating.enabled;
       starCountInput = String(result.rating.starCount);
+      // The scale every other page paints comes from the root layout load;
+      // invalidate it so in-app navigation (back, links) shows the new scale
+      // — and hides the stars when switched off — without a full reload.
+      await invalidateAll();
       ratingStatusMessage = result.rating.enabled
         ? "Saved. Existing ratings keep their value on the new scale."
         : "Saved. Ratings are hidden until switched back on.";

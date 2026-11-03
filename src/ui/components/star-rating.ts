@@ -1,3 +1,4 @@
+import { isValidStarCount } from "../../../domain/rating";
 import {
   DEFAULT_STAR_COUNT,
   normalizeStarRating,
@@ -55,6 +56,7 @@ export function renderStarRatingControl({
       class="rating-stars${className ? ` ${className}` : ""}"
       data-rating-stars
       data-item-id="${itemId}"
+      data-star-count="${starCount}"
       data-rating-value="${normalized ?? ""}"
       role="group"
       aria-label="Rating"
@@ -63,16 +65,27 @@ export function renderStarRatingControl({
     </div>`;
 }
 
-/** The scale a rendered control paints: its highest glyph value. */
+/**
+ * The scale a rendered control paints: the count it declares, else its
+ * highest glyph value. The declared count is authoritative (StarRating.svelte
+ * stamps the same attribute); the glyph scan only covers markup from before
+ * the attribute existed, and seeds at zero — not the default 5 — so a sub-5
+ * or fractional scale resolves to its own size rather than 5.
+ */
 function scaleOf(element: HTMLElement): number {
-  let max = DEFAULT_STAR_COUNT;
+  const declared = Number(element.dataset.starCount);
+  if (isValidStarCount(declared)) {
+    return declared;
+  }
+
+  let max = 0;
   element.querySelectorAll("[data-rating-star]").forEach((candidate) => {
     const value = Number((candidate as HTMLElement).dataset.ratingStar);
     if (Number.isFinite(value) && value > max) {
       max = value;
     }
   });
-  return max;
+  return max > 0 ? max : DEFAULT_STAR_COUNT;
 }
 
 export function resolveStarRatingInteraction(event: MouseEvent): StarRatingInteraction | null {
