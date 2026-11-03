@@ -1,4 +1,4 @@
-import { describe, expect, test } from "bun:test";
+import { afterAll, describe, expect, test } from "bun:test";
 import { eq } from "drizzle-orm";
 import { Hono } from "hono";
 import { musicItemRoutes } from "../../server/routes/music-items";
@@ -9,7 +9,17 @@ import { musicItems } from "../../adapters/db/schema";
 // Ratings cross the PATCH boundary as the stored out-of-100 value — these
 // tests pin the validation at the route (see domain/rating.ts for the scale).
 
+// Item creation must never reach the live web — but the flag has to be
+// restored afterwards: bun runs test files in one process, and a leaked
+// OTB_DISABLE_EXTERNAL_LOOKUPS makes release-route.test.ts's enrichment
+// tests (which need it unset) silently return {} instead.
+const LOOKUPS_BEFORE = process.env.OTB_DISABLE_EXTERNAL_LOOKUPS;
 process.env.OTB_DISABLE_EXTERNAL_LOOKUPS = "1";
+
+afterAll(() => {
+  if (LOOKUPS_BEFORE === undefined) delete process.env.OTB_DISABLE_EXTERNAL_LOOKUPS;
+  else process.env.OTB_DISABLE_EXTERNAL_LOOKUPS = LOOKUPS_BEFORE;
+});
 
 function makeApp(): Hono {
   const app = new Hono();
