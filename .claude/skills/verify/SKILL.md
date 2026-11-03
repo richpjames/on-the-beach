@@ -36,10 +36,9 @@ Chromium is preinstalled at `/opt/pw-browsers/chromium`; drive with a
 `playwright-core` script run under `bun`, launching with
 `{ executablePath: "/opt/pw-browsers/chromium", args: ["--no-sandbox"] }`.
 
-Useful selectors: add bar = `getByPlaceholder("search or paste a link")`;
-list cards = `.music-card`; list container = `#music-list` (note: `.music-list`
-class also sits on a wrapper — use the id); browse search input =
-`#browse-search`; its clear button = `#search-clear-btn`.
+Useful selectors: add bar = `getByPlaceholder("search or paste a link")` (it
+doubles as the search box); list cards = `.music-card`; list container =
+`#music-list` (note: `.music-list` class also sits on a wrapper — use the id).
 
 ## Gotchas
 

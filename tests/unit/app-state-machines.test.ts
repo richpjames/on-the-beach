@@ -738,36 +738,24 @@ describe("add form machine — the home-screen Listen shortcut", () => {
 });
 
 describe("app machine — browse panels", () => {
-  it("opens search panel on first toggle", () => {
+  it("opens sort panel on first toggle", () => {
     const actor = createActor(appMachine, { input: {} }).start();
-    actor.send({ type: "SEARCH_PANEL_TOGGLED" });
-    expect(actor.getSnapshot().context.searchPanelOpen).toBe(true);
+    actor.send({ type: "SORT_PANEL_TOGGLED" });
+    expect(actor.getSnapshot().context.sortPanelOpen).toBe(true);
+  });
+
+  it("closes sort panel on second toggle", () => {
+    const actor = createActor(appMachine, { input: {} }).start();
+    actor.send({ type: "SORT_PANEL_TOGGLED" });
+    actor.send({ type: "SORT_PANEL_TOGGLED" });
     expect(actor.getSnapshot().context.sortPanelOpen).toBe(false);
   });
 
-  it("closes search panel on second toggle", () => {
+  it("BROWSE_PANELS_CLOSED closes the sort panel", () => {
     const actor = createActor(appMachine, { input: {} }).start();
-    actor.send({ type: "SEARCH_PANEL_TOGGLED" });
-    actor.send({ type: "SEARCH_PANEL_TOGGLED" });
-    expect(actor.getSnapshot().context.searchPanelOpen).toBe(false);
-  });
-
-  it("opens sort panel and closes search panel", () => {
-    const actor = createActor(appMachine, { input: {} }).start();
-    actor.send({ type: "SEARCH_PANEL_TOGGLED" });
     actor.send({ type: "SORT_PANEL_TOGGLED" });
-    const ctx = actor.getSnapshot().context;
-    expect(ctx.sortPanelOpen).toBe(true);
-    expect(ctx.searchPanelOpen).toBe(false);
-  });
-
-  it("BROWSE_PANELS_CLOSED closes all panels", () => {
-    const actor = createActor(appMachine, { input: {} }).start();
-    actor.send({ type: "SEARCH_PANEL_TOGGLED" });
     actor.send({ type: "BROWSE_PANELS_CLOSED" });
-    const ctx = actor.getSnapshot().context;
-    expect(ctx.searchPanelOpen).toBe(false);
-    expect(ctx.sortPanelOpen).toBe(false);
+    expect(actor.getSnapshot().context.sortPanelOpen).toBe(false);
   });
 });
 

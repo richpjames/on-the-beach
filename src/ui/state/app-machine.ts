@@ -15,7 +15,6 @@ export interface AppContext {
   stacks: StackWithCount[];
   isReady: boolean;
   stackManageOpen: boolean;
-  searchPanelOpen: boolean;
   sortPanelOpen: boolean;
   listVersion: number;
   stackBarVersion: number;
@@ -32,7 +31,6 @@ export type AppEvent =
   | { type: "STACKS_LOADED"; stacks: StackWithCount[] }
   | { type: "STACK_MANAGE_TOGGLED" }
   | { type: "STACK_DELETED"; stackId: number }
-  | { type: "SEARCH_PANEL_TOGGLED" }
   | { type: "SORT_PANEL_TOGGLED" }
   | { type: "BROWSE_PANELS_CLOSED" }
   | { type: "ITEM_CREATED" }
@@ -75,7 +73,6 @@ export const appMachine = createMachine({
     stacks: input?.stacks ?? [],
     isReady: false,
     stackManageOpen: false,
-    searchPanelOpen: false,
     sortPanelOpen: false,
     listVersion: input?.needsListRefresh ? 1 : 0,
     stackBarVersion: 0,
@@ -149,20 +146,13 @@ export const appMachine = createMachine({
         stackBarVersion: context.stackBarVersion + 1,
       })),
     },
-    SEARCH_PANEL_TOGGLED: {
-      actions: assign(({ context }) => ({
-        searchPanelOpen: !context.searchPanelOpen,
-        sortPanelOpen: false,
-      })),
-    },
     SORT_PANEL_TOGGLED: {
       actions: assign(({ context }) => ({
         sortPanelOpen: !context.sortPanelOpen,
-        searchPanelOpen: false,
       })),
     },
     BROWSE_PANELS_CLOSED: {
-      actions: assign({ searchPanelOpen: false, sortPanelOpen: false }),
+      actions: assign({ sortPanelOpen: false }),
     },
     LIST_REFRESH: {
       actions: assign(({ context }) => ({ listVersion: context.listVersion + 1 })),

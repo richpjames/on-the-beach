@@ -66,27 +66,6 @@
         document.getElementById("pick-random-btn")?.click();
         break;
       }
-      case "search": {
-        // Defer past the current click event — document-level outside-click
-        // handlers would close the panel this opens.
-        setTimeout(() => {
-          const toggle = document.getElementById("browse-search-toggle");
-          const search = document.getElementById("browse-search");
-          // On small screens the search input lives behind a toggle; open
-          // the panel first, then focus.
-          if (toggle instanceof HTMLElement && toggle.offsetParent !== null) {
-            if (toggle.getAttribute("aria-expanded") !== "true") {
-              toggle.click();
-            }
-          } else {
-            search?.scrollIntoView({ block: "center" });
-          }
-          if (search instanceof HTMLInputElement) {
-            search.focus();
-          }
-        }, 0);
-        break;
-      }
       case "stacks": {
         const manageBtn = document.getElementById("manage-stacks-btn");
         const panel = document.getElementById("stack-manage");
@@ -217,15 +196,6 @@
           onclick={() => onStartAction("pick")}
         >
           <span class="start-menu__icon" aria-hidden="true">🎲</span>Pick One
-        </button>
-        <button
-          type="button"
-          class="start-menu__item"
-          role="menuitem"
-          data-start-action="search"
-          onclick={() => onStartAction("search")}
-        >
-          <span class="start-menu__icon" aria-hidden="true">🔍</span>Search
         </button>
         <button
           type="button"

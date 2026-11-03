@@ -1,5 +1,4 @@
 <script lang="ts">
-  import { tick } from "svelte";
   import type { MusicItemSort, MusicItemSortDirection } from "../../../domain/types";
   import type { FilterSelection } from "../../../domain/types";
   import type { appMachine } from "../../ui/state/app-machine";
@@ -23,7 +22,6 @@
   ];
 
   let browseToolsEl: HTMLElement | undefined = $state();
-  let searchInputEl: HTMLInputElement | undefined = $state();
 
   function selectFilter(filter: FilterSelection): void {
     app.send({ type: "FILTER_SELECTED", filter });
@@ -32,15 +30,6 @@
     if (filter !== "listened" && ctx.currentSort === "date-listened") {
       app.send({ type: "SORT_UPDATED", sort: "date-added" });
     }
-  }
-
-  function onSearchInput(event: Event): void {
-    app.send({ type: "SEARCH_UPDATED", query: (event.currentTarget as HTMLInputElement).value });
-  }
-
-  function clearSearch(): void {
-    app.send({ type: "SEARCH_UPDATED", query: "" });
-    searchInputEl?.focus();
   }
 
   function onSortChange(event: Event): void {
@@ -75,12 +64,6 @@
         : "Sort direction: lowest first";
     }
     return direction === "asc" ? "Sort direction: A to Z" : "Sort direction: Z to A";
-  }
-
-  function toggleSearchPanel(): void {
-    app.send({ type: "SEARCH_PANEL_TOGGLED" });
-    if (!ctx.searchPanelOpen) return;
-    tick().then(() => searchInputEl?.focus());
   }
 
   // ── Random pick ────────────────────────────────────────────────────────────
@@ -250,22 +233,6 @@
       <div class="browse-tools__mobile-actions">
         <button
           type="button"
-          id="browse-search-toggle"
-          class="browse-tools__icon-btn"
-          aria-label="Toggle search"
-          aria-controls="browse-search-panel"
-          aria-expanded={ctx.searchPanelOpen ? "true" : "false"}
-          onclick={toggleSearchPanel}
-        >
-          <svg viewBox="0 0 24 24" aria-hidden="true">
-            <circle cx="10" cy="10" r="5.5"></circle>
-            <path d="M14.5 14.5L20 20"></path>
-            <path d="M7.5 10H12.5"></path>
-            <path d="M10 7.5V12.5"></path>
-          </svg>
-        </button>
-        <button
-          type="button"
           id="browse-sort-toggle"
           class="browse-tools__icon-btn"
           aria-label="Toggle sort"
@@ -280,32 +247,6 @@
             <path d="M13 17L16 20L19 17"></path>
           </svg>
         </button>
-      </div>
-      <div
-        id="browse-search-panel"
-        class="browse-tools__panel browse-tools__panel--search"
-        class:is-open={ctx.searchPanelOpen}
-      >
-        <div class="browse-tools__search-wrap">
-          <input
-            type="search"
-            id="browse-search"
-            class="input browse-tools__search"
-            placeholder="Search releases or lists..."
-            aria-label="Search releases or lists"
-            value={ctx.searchQuery}
-            oninput={onSearchInput}
-            bind:this={searchInputEl}
-          />
-          <button
-            type="button"
-            id="search-clear-btn"
-            class="browse-tools__search-clear"
-            aria-label="Clear search"
-            style:display={ctx.searchQuery ? undefined : "none"}
-            onclick={clearSearch}>&#x2715;</button
-          >
-        </div>
       </div>
       <div
         id="browse-sort-panel"
