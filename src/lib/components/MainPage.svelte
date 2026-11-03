@@ -14,7 +14,8 @@
     type ListViewState,
   } from "../../ui/logic/list-url";
   import { parseLaunchAction } from "../../ui/logic/launch-action";
-  import { normalizeStarRating } from "../../ui/components/star-rating";
+  import { storedToStarRating } from "../../../domain/rating";
+  import type { RatingSettings } from "../../../app/settings";
   import { addFormMachine } from "../../ui/state/add-form-machine";
   import { appMachine } from "../../ui/state/app-machine";
   import {
@@ -39,7 +40,13 @@
   let {
     data,
   }: {
-    data: { items: MusicItemFull[]; stacks: StackWithCount[]; stackId: number | null };
+    data: {
+      items: MusicItemFull[];
+      stacks: StackWithCount[];
+      stackId: number | null;
+      /** From the root layout — the star scale the pages paint with. */
+      rating: RatingSettings;
+    };
   } = $props();
 
   // The machine is seeded from the URL once per page instance; from then on
@@ -64,7 +71,12 @@
       currentStack: initialStackId,
       currentFilter: initialView.filter,
       searchQuery: initialView.search,
-      currentSort: initialView.sort,
+      // A URL carrying ?sort=star-rating must not sort by ratings that are
+      // switched off — fall back to the default view order.
+      currentSort:
+        initialView.sort === "star-rating" && !data.rating.enabled
+          ? "date-added"
+          : initialView.sort,
       currentSortDirection: initialView.sortDirection,
       // The payload only covers the default view of the scope it was loaded
       // for, so anything else needs a refetch as soon as we hydrate.
@@ -417,7 +429,9 @@
     const pool =
       rating === null
         ? result.items
-        : result.items.filter((item) => normalizeStarRating(item.rating) === rating);
+        : result.items.filter(
+            (item) => storedToStarRating(item.rating, data.rating.starCount) === rating,
+          );
     if (pool.length === 0) {
       return null;
     }
@@ -481,12 +495,18 @@
     />
   </section>
 
-  <BrowseControls {app} onPickRandom={pickRandom} />
+  <BrowseControls
+    {app}
+    ratingEnabled={data.rating.enabled}
+    starCount={data.rating.starCount}
+    onPickRandom={pickRandom}
+  />
 
   <MusicList
     {items}
     {childStacks}
     {breadcrumbs}
+    rating={data.rating}
     stacks={ctx.stacks}
     currentStack={ctx.currentStack}
     currentFilter={ctx.currentFilter}

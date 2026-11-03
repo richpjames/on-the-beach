@@ -1,7 +1,8 @@
 import { Hono } from "hono";
-import { eq } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import { db } from "../../adapters/db/index";
 import {
+  appSettings,
   musicItemStacks,
   musicLinks,
   musicItems,
@@ -14,12 +15,13 @@ import {
   itemSuggestions,
   sources,
 } from "../../adapters/db/schema";
+import { RATING_KEYS } from "../../app/settings";
 import { normalize } from "../../domain/text";
 
 export const testRoutes = new Hono();
 
 testRoutes.post("/reset", async (c) => {
-  // Truncate in dependency order (respect foreign keys)
+  // Truncate in dependency order (respecting foreign keys)
   await db.delete(musicItemStacks);
   await db.delete(stackParents);
   await db.delete(musicLinks);
@@ -30,7 +32,12 @@ testRoutes.post("/reset", async (c) => {
   await db.delete(musicItemOrder);
   await db.delete(artists);
   await db.delete(stacks);
-  // sources are seeded/static — leave them alone
+  // sources are seeded/static — leave them alone. The rating scale is a
+  // per-spec setting, so it goes back to the default instead of leaking
+  // between specs.
+  await db
+    .delete(appSettings)
+    .where(inArray(appSettings.key, [RATING_KEYS.enabled, RATING_KEYS.starCount]));
   return c.json({ success: true });
 });
 

@@ -4,6 +4,7 @@
   import { musickit, authorize, unauthorize, ensureConfigured } from "$lib/musickit.svelte";
   import { api } from "$lib/api";
   import type { LookupService, ReleaseLengthPreference } from "../../../app/settings";
+  import { isValidStarCount } from "../../../domain/rating";
   import type { MbArtistCandidateView, TrackedArtist } from "../../../domain/types";
 
   let { data } = $props();
@@ -20,6 +21,54 @@
     longer: "Longer releases — albums before EPs and singles (default)",
     shorter: "Shorter releases — EPs and singles before albums",
   };
+
+  // ── Star ratings ────────────────────────────────────────────────────────────
+  // From the root layout load. The count is kept as a string while editing so
+  // the field can be temporarily empty without NaN-ing the scale.
+  // svelte-ignore state_referenced_locally
+  let ratingEnabled = $state(data.rating.enabled);
+  // svelte-ignore state_referenced_locally
+  let starCountInput = $state(String(data.rating.starCount));
+  let ratingStatusMessage = $state("");
+
+  async function saveRatingEnabled(enabled: boolean): Promise<void> {
+    ratingEnabled = enabled;
+    await saveRating({ ratingEnabled: enabled });
+  }
+
+  async function saveStarCount(raw: string): Promise<void> {
+    const parsed = Number(raw);
+    if (!isValidStarCount(parsed)) {
+      ratingStatusMessage = "Stars must be a number from 1 to 100.00.";
+      starCountInput = String(data.rating.starCount);
+      return;
+    }
+    await saveRating({ ratingStarCount: parsed });
+  }
+
+  async function saveRating(update: Record<string, unknown>): Promise<void> {
+    ratingStatusMessage = "Saving…";
+    try {
+      const res = await apiFetch("/api/settings", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(update),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        ratingStatusMessage = err.error || "Failed to save.";
+        return;
+      }
+      const result = (await res.json()) as { rating: { enabled: boolean; starCount: number } };
+      ratingEnabled = result.rating.enabled;
+      starCountInput = String(result.rating.starCount);
+      ratingStatusMessage = result.rating.enabled
+        ? "Saved. Existing ratings keep their value on the new scale."
+        : "Saved. Ratings are hidden until switched back on.";
+    } catch {
+      ratingStatusMessage = "Failed to save.";
+    }
+  }
 
   // ── Apple Music configuration status ────────────────────────────────────────
   // Probe the token endpoint so the page reflects the *live* server state,
@@ -300,6 +349,45 @@
         aria-live="polite"
       >
         {lengthStatusMessage}
+      </p>
+    </section>
+
+    <section class="settings__section" id="star-rating-settings">
+      <h2 class="settings__heading">Star ratings</h2>
+      <p class="settings__hint">
+        Rate releases out of however many stars suit you — anything from 1 to 100.00. Ratings are
+        remembered out of 100, so changing the number of stars never loses your accuracy; untick to
+        hide ratings everywhere.
+      </p>
+      <form id="star-rating-form" class="settings__options">
+        <label class="settings__option">
+          <input
+            type="checkbox"
+            name="rating-enabled"
+            checked={ratingEnabled}
+            onchange={(event) => saveRatingEnabled(event.currentTarget.checked)}
+          />
+          <span>Show star ratings</span>
+        </label>
+        <label class="settings__option settings__option--field">
+          <span>Rate each release out of</span>
+          <input
+            type="number"
+            class="settings__number"
+            name="rating-star-count"
+            min="1"
+            max="100"
+            step="0.01"
+            inputmode="decimal"
+            value={starCountInput}
+            disabled={!ratingEnabled}
+            onchange={(event) => saveStarCount(event.currentTarget.value)}
+          />
+          <span>stars</span>
+        </label>
+      </form>
+      <p id="star-rating-status" class="settings__status" role="status" aria-live="polite">
+        {ratingStatusMessage}
       </p>
     </section>
 

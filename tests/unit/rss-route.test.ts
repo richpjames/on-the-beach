@@ -4,6 +4,7 @@ import { createRssRoutes } from "../../server/routes/rss";
 import type { MusicItemFull } from "../../domain/types";
 import type { PrimaryFeedKey } from "../../domain/rss";
 import type { ReleaseAlertView } from "../../app/release-alerts";
+import type { RatingSettings } from "../../app/settings";
 
 type StackInfo = { id: number; name: string };
 
@@ -67,11 +68,21 @@ function makeApp(
   fetchStackItems: (stackId: number) => Promise<MusicItemFull[]>,
   fetchPrimaryFeedItems: (feed: PrimaryFeedKey) => Promise<MusicItemFull[]>,
   fetchReleaseAlerts: () => Promise<ReleaseAlertView[]> = async () => [],
+  fetchRatingSettings: () => Promise<RatingSettings> = async () => ({
+    enabled: true,
+    starCount: 5,
+  }),
 ): Hono {
   const app = new Hono();
   app.route(
     "/feed",
-    createRssRoutes(fetchStack, fetchStackItems, fetchPrimaryFeedItems, fetchReleaseAlerts),
+    createRssRoutes(
+      fetchStack,
+      fetchStackItems,
+      fetchPrimaryFeedItems,
+      fetchReleaseAlerts,
+      fetchRatingSettings,
+    ),
   );
   return app;
 }
@@ -447,7 +458,7 @@ describe("GET /feed/stacks/:stackId.rss", () => {
         primary_source: "bandcamp",
         primary_url: "https://warp.bandcamp.com/album/tri-repetae",
         notes: "Seminal album",
-        rating: 4,
+        rating: 80,
       }),
     ]);
     const fetchPrimaryFeedItems = mock(async (_feed: PrimaryFeedKey) => []);
@@ -461,6 +472,36 @@ describe("GET /feed/stacks/:stackId.rss", () => {
     expect(body).toContain("Source: Bandcamp");
     expect(body).toContain("★★★★☆");
     expect(body).toContain("Seminal album");
+  });
+
+  test("rating line follows the configured star scale", async () => {
+    const fetchStack = mock(async (_id: number) => ({ id: 1, name: "Ambient" }));
+    const fetchItems = mock(async (_id: number) => [makeItem({ rating: 90 })]);
+    const fetchPrimaryFeedItems = mock(async (_feed: PrimaryFeedKey) => []);
+    const tenStars = makeApp(
+      fetchStack,
+      fetchItems,
+      fetchPrimaryFeedItems,
+      undefined,
+      async () => ({
+        enabled: true,
+        starCount: 10,
+      }),
+    );
+
+    const body = await (await tenStars.request("http://localhost/feed/stacks/1.rss")).text();
+    // 90 out of 100 is nine of ten stars
+    expect(body).toContain("Rating: ★★★★★★★★★☆");
+
+    const switchedOff = makeApp(
+      fetchStack,
+      fetchItems,
+      fetchPrimaryFeedItems,
+      undefined,
+      async () => ({ enabled: false, starCount: 10 }),
+    );
+    const offBody = await (await switchedOff.request("http://localhost/feed/stacks/1.rss")).text();
+    expect(offBody).not.toContain("Rating:");
   });
 
   test("item description omits missing fields gracefully", async () => {

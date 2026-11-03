@@ -1,5 +1,6 @@
 import { eq } from "drizzle-orm";
 import type { ReleaseLengthPreference } from "../domain/types";
+import { isValidStarCount } from "../domain/rating";
 import { db } from "../adapters/db/index";
 import { appSettings, itemSuggestions, musicItems } from "../adapters/db/schema";
 
@@ -103,6 +104,57 @@ export async function setReleaseLengthPreference(
   await putSetting(RELEASE_LENGTH_PREFERENCE_KEY, preference);
   await db.delete(itemSuggestions).where(eq(itemSuggestions.status, "pending"));
   return { changed: true };
+}
+
+// ---------------------------------------------------------------------------
+// Star ratings
+// ---------------------------------------------------------------------------
+
+export interface RatingSettings {
+  /** Master switch — off hides the rating stars everywhere. */
+  enabled: boolean;
+  /** How many stars the scale has, 1–100 with up to two decimals. */
+  starCount: number;
+}
+
+export const RATING_KEYS = {
+  enabled: "rating_enabled",
+  starCount: "rating_star_count",
+} as const;
+
+export const DEFAULT_RATING_SETTINGS: RatingSettings = {
+  enabled: true,
+  starCount: 5,
+};
+
+export async function getRatingSettings(): Promise<RatingSettings> {
+  const [enabled, starCount] = await Promise.all([
+    getSetting(RATING_KEYS.enabled),
+    getSetting(RATING_KEYS.starCount),
+  ]);
+
+  const parsedCount = starCount === null ? Number.NaN : Number(starCount);
+
+  return {
+    enabled: parseBoolean(enabled, DEFAULT_RATING_SETTINGS.enabled),
+    starCount: isValidStarCount(parsedCount) ? parsedCount : DEFAULT_RATING_SETTINGS.starCount,
+  };
+}
+
+/**
+ * Set the rating settings. Values are validated here as well as at the route
+ * so a caller that bypasses the route can't wedge the scale out of range —
+ * an invalid value is ignored, not coerced.
+ */
+export async function setRatingSettings(update: Partial<RatingSettings>): Promise<RatingSettings> {
+  if (update.enabled !== undefined) {
+    await putSetting(RATING_KEYS.enabled, String(update.enabled));
+  }
+  if (update.starCount !== undefined && isValidStarCount(update.starCount)) {
+    await putSetting(RATING_KEYS.starCount, String(update.starCount));
+  }
+
+  return getRatingSettings();
 }
 
 // ---------------------------------------------------------------------------

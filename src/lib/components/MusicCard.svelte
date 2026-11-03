@@ -2,6 +2,7 @@
   import Case from "case";
   import { tick } from "svelte";
   import type { ListenStatus, MusicItemFull, StackWithCount } from "../../../domain/types";
+  import type { RatingSettings } from "../../../app/settings";
   import { buildReleaseHref } from "../../ui/logic/list-url";
   import { STATUS_LABELS } from "../../ui/logic/status";
   import { api } from "../api";
@@ -12,6 +13,7 @@
 
   let {
     item,
+    rating,
     backHref,
     onStatusChanged,
     onDelete,
@@ -19,6 +21,8 @@
     onStackDropdownClosed,
   }: {
     item: MusicItemFull;
+    /** The star scale to rate with; hidden entirely when disabled. */
+    rating: RatingSettings;
     /** The list view to return to from the release page. */
     backHref: string | null;
     onStatusChanged: (itemId: number, status: ListenStatus) => Promise<void>;
@@ -174,13 +178,16 @@
           <option {value} selected={item.listen_status === value}>{label}</option>
         {/each}
       </select>
-      <StarRating
-        itemId={item.id}
-        rating={item.rating}
-        onRate={async (next) => {
-          await api.updateMusicItem(item.id, { rating: next });
-        }}
-      />
+      {#if rating.enabled}
+        <StarRating
+          itemId={item.id}
+          rating={item.rating}
+          starCount={rating.starCount}
+          onRate={async (next) => {
+            await api.updateMusicItem(item.id, { rating: next });
+          }}
+        />
+      {/if}
       {#if item.primary_source}
         {#if item.primary_url}
           <a

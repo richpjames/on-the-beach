@@ -1,10 +1,15 @@
-const MIN_RATING = 0.5;
-const MAX_RATING = 5;
-const HALF_STEP = 0.5;
+import {
+  DEFAULT_STAR_COUNT,
+  normalizeStarRating,
+  starFill,
+  starGlyphValues,
+} from "./star-rating-model";
 
 export interface StarRatingRenderOptions {
   itemId: number;
   rating: number | null;
+  /** How many stars the scale has — defaults to 5. */
+  starCount?: number;
   className?: string;
 }
 
@@ -20,20 +25,19 @@ export interface StarRatingHoverInteraction {
   hoverRating: number;
 }
 
-type StarFillState = "empty" | "half" | "full";
-
 export function renderStarRatingControl({
   itemId,
   rating,
+  starCount = DEFAULT_STAR_COUNT,
   className,
 }: StarRatingRenderOptions): string {
-  const normalized = normalizeStarRating(rating);
-  const stars = Array.from({ length: MAX_RATING }, (_, index) => {
-    const value = MAX_RATING - index;
-    const fill = getStarFillState(normalized, value);
-    const starClass =
-      fill === "full" ? " is-active-full" : fill === "half" ? " is-active-half" : "";
-    return `
+  const normalized = normalizeStarRating(rating, starCount);
+  const stars = starGlyphValues(starCount)
+    .map((value) => {
+      const fill = starFill(normalized, value);
+      const starClass =
+        fill === "full" ? " is-active-full" : fill === "half" ? " is-active-half" : "";
+      return `
       <button
         type="button"
         class="rating-stars__star${starClass}"
@@ -43,7 +47,8 @@ export function renderStarRatingControl({
       >
         <span aria-hidden="true">★</span>
       </button>`;
-  }).join("");
+    })
+    .join("");
 
   return `
     <div
@@ -56,6 +61,18 @@ export function renderStarRatingControl({
     >
       ${stars}
     </div>`;
+}
+
+/** The scale a rendered control paints: its highest glyph value. */
+function scaleOf(element: HTMLElement): number {
+  let max = DEFAULT_STAR_COUNT;
+  element.querySelectorAll("[data-rating-star]").forEach((candidate) => {
+    const value = Number((candidate as HTMLElement).dataset.ratingStar);
+    if (Number.isFinite(value) && value > max) {
+      max = value;
+    }
+  });
+  return max;
 }
 
 export function resolveStarRatingInteraction(event: MouseEvent): StarRatingInteraction | null {
@@ -86,6 +103,7 @@ export function resolveStarRatingInteraction(event: MouseEvent): StarRatingInter
 
   const currentRating = normalizeStarRating(
     element.dataset.ratingValue ? Number(element.dataset.ratingValue) : null,
+    scaleOf(element),
   );
   const nextRating = currentRating === selectedValue ? null : selectedValue;
 
@@ -122,13 +140,13 @@ export function resolveStarRatingHover(event: MouseEvent): StarRatingHoverIntera
 }
 
 export function setStarRatingValue(element: HTMLElement, rating: number | null): void {
-  const normalized = normalizeStarRating(rating);
+  const normalized = normalizeStarRating(rating, scaleOf(element));
   element.dataset.ratingValue = normalized === null ? "" : String(normalized);
   applyStarRatingVisualState(element);
 }
 
 export function setStarRatingPreview(element: HTMLElement, rating: number | null): void {
-  const normalized = normalizeStarRating(rating);
+  const normalized = normalizeStarRating(rating, scaleOf(element));
   element.dataset.previewValue = normalized === null ? "" : String(normalized);
   applyStarRatingVisualState(element);
 }
@@ -139,11 +157,14 @@ export function clearStarRatingPreview(element: HTMLElement): void {
 }
 
 function applyStarRatingVisualState(element: HTMLElement): void {
+  const starCount = scaleOf(element);
   const preview = normalizeStarRating(
     element.dataset.previewValue ? Number(element.dataset.previewValue) : null,
+    starCount,
   );
   const selected = normalizeStarRating(
     element.dataset.ratingValue ? Number(element.dataset.ratingValue) : null,
+    starCount,
   );
   const effective = preview ?? selected;
 
@@ -153,9 +174,9 @@ function applyStarRatingVisualState(element: HTMLElement): void {
       return;
     }
 
-    const value = normalizeStarRating(Number(candidate.dataset.ratingStar));
-    const fill = value === null ? "empty" : getStarFillState(effective, value);
-    const isSelected = value !== null && getStarFillState(selected, value) !== "empty";
+    const value = normalizeStarRating(Number(candidate.dataset.ratingStar), starCount);
+    const fill = value === null ? "empty" : starFill(effective, value);
+    const isSelected = value !== null && starFill(selected, value) !== "empty";
     candidate.classList.toggle("is-active-full", fill === "full");
     candidate.classList.toggle("is-active-half", fill === "half");
     candidate.setAttribute("aria-pressed", isSelected ? "true" : "false");
@@ -174,37 +195,11 @@ export function setStarRatingPending(element: HTMLElement, pending: boolean): vo
   });
 }
 
-export function normalizeStarRating(rating: number | null): number | null {
-  if (rating === null || !Number.isFinite(rating)) {
-    return null;
-  }
-
-  const rounded = Math.round(rating / HALF_STEP) * HALF_STEP;
-  if (rounded < MIN_RATING || rounded > MAX_RATING) {
-    return null;
-  }
-
-  return rounded;
-}
-
-function getStarFillState(rating: number | null, starValue: number): StarFillState {
-  if (rating === null) {
-    return "empty";
-  }
-
-  if (rating >= starValue) {
-    return "full";
-  }
-
-  if (Math.abs(rating - (starValue - HALF_STEP)) < 0.001) {
-    return "half";
-  }
-
-  return "empty";
-}
-
 function resolveSelectedRatingValue(button: HTMLButtonElement, event: MouseEvent): number | null {
-  const fullValue = normalizeStarRating(Number(button.dataset.ratingStar));
+  const starCount = scaleOf(
+    (button.closest("[data-rating-stars]") as HTMLElement | null) ?? button,
+  );
+  const fullValue = normalizeStarRating(Number(button.dataset.ratingStar), starCount);
   if (fullValue === null) {
     return null;
   }
@@ -225,5 +220,7 @@ function resolveSelectedRatingValue(button: HTMLButtonElement, event: MouseEvent
     return fullValue;
   }
 
-  return normalizeStarRating(fullValue - HALF_STEP);
+  return normalizeStarRating(fullValue - 0.5, starCount);
 }
+
+export { normalizeStarRating };

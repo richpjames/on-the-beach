@@ -68,3 +68,68 @@ test("half stars preview live while hovering, before any click", async ({ page }
   await page.mouse.move(box.x, box.y - 100);
   await expect(star).not.toHaveClass(/is-active/);
 });
+
+test("star count is configurable and ratings keep accuracy across scale changes", async ({
+  page,
+  request,
+}) => {
+  // A 10-star scale paints ten glyphs.
+  const settings = await request.put("/api/settings", {
+    data: { ratingStarCount: 10 },
+  });
+  expect(settings.ok()).toBe(true);
+
+  await page.goto("/");
+  await page.getByRole("button", { name: "Add" }).click();
+  await page.locator('input[name="title"]').fill("Ten Scale Release");
+  await page.getByRole("button", { name: "Add" }).click();
+  const card = page.locator(".music-card").first();
+  await expect(card).toBeVisible({ timeout: 10_000 });
+  await expect(card.locator("[data-rating-star]")).toHaveCount(10);
+
+  // Nine of ten stars…
+  await Promise.all([
+    page.waitForResponse(
+      (resp) => resp.url().includes("/api/music-items/") && resp.request().method() === "PATCH",
+    ),
+    card.locator('[data-rating-star="9"]').click(),
+  ]);
+
+  // …is four and a half of five after the scale changes…
+  await request.put("/api/settings", { data: { ratingStarCount: 5 } });
+  await page.reload();
+  const fiveScaleCard = page.locator(".music-card").first();
+  await expect(fiveScaleCard.locator("[data-rating-star]")).toHaveCount(5);
+  await expect(fiveScaleCard.locator('[data-rating-star="4"]')).toHaveClass(/is-active-full/);
+  await expect(fiveScaleCard.locator('[data-rating-star="5"]')).toHaveClass(/is-active-half/);
+
+  // …and exactly nine of ten again when the scale returns — the stored
+  // out-of-100 rating lost nothing in the round trip.
+  await request.put("/api/settings", { data: { ratingStarCount: 10 } });
+  await page.reload();
+  const tenScaleCard = page.locator(".music-card").first();
+  await expect(tenScaleCard.locator("[data-rating-star]")).toHaveCount(10);
+  await expect(tenScaleCard.locator('[data-rating-star="9"]')).toHaveClass(/is-active-full/);
+});
+
+test("ratings can be switched off entirely", async ({ page, request }) => {
+  const settings = await request.put("/api/settings", {
+    data: { ratingEnabled: false },
+  });
+  expect(settings.ok()).toBe(true);
+
+  await page.goto("/");
+  await page.getByRole("button", { name: "Add" }).click();
+  await page.locator('input[name="title"]').fill("Unrated Release");
+  await page.getByRole("button", { name: "Add" }).click();
+  const card = page.locator(".music-card").first();
+  await expect(card).toBeVisible({ timeout: 10_000 });
+
+  // No stars on the card, and no star-rating sort offered.
+  await expect(card.locator("[data-rating-stars]")).toHaveCount(0);
+  await expect(page.locator('#browse-sort option[value="star-rating"]')).toHaveCount(0);
+
+  // The release page hides them too.
+  await card.locator(".music-card__title").click();
+  await expect(page.locator("[data-rating-stars]")).toHaveCount(0);
+});

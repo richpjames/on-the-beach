@@ -70,6 +70,11 @@ export const musicItems = sqliteTable(
     priceCents: integer("price_cents"),
     currency: text("currency").default("USD"),
     notes: text("notes"),
+    // Out of 100, two decimals, null = unrated — see domain/rating.ts. The
+    // stars on screen are a setting; the stored value survives the scale
+    // changing (5 stars to 2 and back to 10). Declared integer but holds
+    // decimals — SQLite keeps a REAL in an integer-affinity column, exactly
+    // as it already did for the old half-star values.
     rating: integer("rating"),
     createdAt: integer("created_at", { mode: "timestamp" })
       .notNull()

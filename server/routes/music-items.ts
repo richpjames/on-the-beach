@@ -12,6 +12,7 @@ import {
   itemSuggestions,
 } from "../../adapters/db/schema";
 import { isValidUrl, normalize } from "../../domain/text";
+import { isValidStoredRating, roundStoredRating } from "../../domain/rating";
 import { applyOrder, buildContextKey } from "../../domain/music-list-context";
 import {
   AmbiguousLinkSelectionError,
@@ -49,7 +50,6 @@ const DIRECT_UPDATE_FIELDS: ReadonlyArray<
   | "itemType"
   | "purchaseIntent"
   | "notes"
-  | "rating"
   | "priceCents"
   | "currency"
   | "label"
@@ -63,7 +63,6 @@ const DIRECT_UPDATE_FIELDS: ReadonlyArray<
   "itemType",
   "purchaseIntent",
   "notes",
-  "rating",
   "priceCents",
   "currency",
   "label",
@@ -106,6 +105,24 @@ function applyDirectUpdateFields(setFields: MusicItemUpdateSet, input: UpdateMus
       setFields[field] = value;
     }
   }
+}
+
+/**
+ * Ratings travel as the stored out-of-100 value (see domain/rating.ts):
+ * null clears, anything else must be a finite 0–100 number and is rounded to
+ * the two decimals the scale keeps.
+ */
+function applyRatingUpdate(setFields: MusicItemUpdateSet, input: UpdateMusicItemInput): boolean {
+  if (input.rating === undefined) {
+    return true;
+  }
+
+  if (!isValidStoredRating(input.rating)) {
+    return false;
+  }
+
+  setFields.rating = input.rating === null ? null : roundStoredRating(input.rating);
+  return true;
 }
 
 function applyArtworkUpdate(setFields: MusicItemUpdateSet, input: UpdateMusicItemInput): boolean {
@@ -497,6 +514,10 @@ musicItemRoutes.patch("/:id", async (c) => {
   applyTitleUpdate(setFields, input);
   applyListenStatusUpdate(setFields, input);
   applyDirectUpdateFields(setFields, input);
+
+  if (!applyRatingUpdate(setFields, input)) {
+    return c.json({ error: "rating must be null or a number from 0 to 100" }, 400);
+  }
 
   if (!applyArtworkUpdate(setFields, input)) {
     return c.json({ error: "Invalid artwork URL" }, 400);

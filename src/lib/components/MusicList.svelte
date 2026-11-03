@@ -3,6 +3,7 @@
   import { onMount } from "svelte";
   import type { ListenStatus, MusicItemFull, StackWithCount } from "../../../domain/types";
   import type { FilterSelection } from "../../../domain/types";
+  import type { RatingSettings } from "../../../app/settings";
   import { getEmptyStateHint, getEmptyStateMessage } from "../../ui/logic/music-list";
   import { api } from "../api";
   import FolderRow from "./FolderRow.svelte";
@@ -13,6 +14,7 @@
     items,
     childStacks,
     breadcrumbs,
+    rating,
     stacks,
     currentStack,
     currentFilter,
@@ -29,6 +31,8 @@
     items: MusicItemFull[];
     childStacks: Array<{ id: number; name: string; item_count: number }>;
     breadcrumbs: Array<{ id: number; name: string }>;
+    /** The star scale the cards rate with (settings page decides). */
+    rating: RatingSettings;
     stacks: StackWithCount[];
     currentStack: number | null;
     currentFilter: FilterSelection;
@@ -257,6 +261,7 @@
         {#each items as item (item.id)}
           <MusicCard
             {item}
+            {rating}
             {backHref}
             {onStatusChanged}
             {onDelete}

@@ -656,14 +656,17 @@
               >
             {/if}
           </div>
-          <StarRating
-            itemId={item.id}
-            rating={item.rating}
-            className="star-rating--large"
-            onRate={async (next) => {
-              await api.updateMusicItem(item.id, { rating: next });
-            }}
-          />
+          {#if data.rating.enabled}
+            <StarRating
+              itemId={item.id}
+              rating={item.rating}
+              starCount={data.rating.starCount}
+              className="star-rating--large"
+              onRate={async (next) => {
+                await api.updateMusicItem(item.id, { rating: next });
+              }}
+            />
+          {/if}
           <div class="release-page__actions">
             {#if !coarsePointer && hereTarget}
               <button

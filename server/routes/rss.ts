@@ -13,6 +13,8 @@ import type { MusicItemFull } from "../../domain/types";
 import type { PrimaryFeedKey } from "../../domain/rss";
 import type { ReleaseAlertView } from "../../app/release-alerts";
 import { listReleaseAlerts } from "../../app/release-alerts";
+import { getRatingSettings, type RatingSettings } from "../../app/settings";
+import { storedToStarRating } from "../../domain/rating";
 
 type StackInfo = { id: number; name: string };
 type FeedInfo = { title: string; description: string };
@@ -21,6 +23,7 @@ export type FetchStackFn = (stackId: number) => Promise<StackInfo | null>;
 export type FetchStackItemsFn = (stackId: number) => Promise<MusicItemFull[]>;
 export type FetchPrimaryFeedItemsFn = (feed: PrimaryFeedKey) => Promise<MusicItemFull[]>;
 export type FetchReleaseAlertsFn = () => Promise<ReleaseAlertView[]>;
+export type FetchRatingSettingsFn = () => Promise<RatingSettings>;
 
 /**
  * The renderer's unit of work. Feeds that aren't lists of music items — the
@@ -115,7 +118,7 @@ function itemTitle(item: MusicItemFull): string {
   return item.artist_name ? `${item.artist_name} — ${item.title}` : item.title;
 }
 
-function renderItemDescription(item: MusicItemFull): string {
+function renderItemDescription(item: MusicItemFull, rating: RatingSettings): string {
   const lines: string[] = [];
 
   // Type · Year · Genre · Country
@@ -137,10 +140,18 @@ function renderItemDescription(item: MusicItemFull): string {
     lines.push(`Source: ${capitalize(item.primary_source)}`);
   }
 
-  // Rating
-  if (item.rating != null) {
-    const stars = "★".repeat(item.rating) + "☆".repeat(5 - item.rating);
-    lines.push(`Rating: ${stars}`);
+  // Rating — the stored out-of-100 value as glyphs on the configured scale
+  if (rating.enabled && item.rating != null) {
+    const starValue = storedToStarRating(item.rating, rating.starCount);
+    if (starValue !== null) {
+      const full = Math.floor(starValue);
+      const half = starValue - full >= 0.5;
+      const stars =
+        "★".repeat(full) +
+        (half ? "½" : "") +
+        "☆".repeat(Math.max(rating.starCount - full - (half ? 1 : 0), 0));
+      lines.push(`Rating: ${stars}`);
+    }
   }
 
   // Status
@@ -162,13 +173,13 @@ function renderItemDescription(item: MusicItemFull): string {
 }
 
 /** A music item as a feed entry. */
-function itemToEntry(item: MusicItemFull, baseUrl: string): FeedEntry {
+function itemToEntry(item: MusicItemFull, baseUrl: string, rating: RatingSettings): FeedEntry {
   return {
     guid: `music-item-${item.id}`,
     title: itemTitle(item),
     link: `${baseUrl}/r/${item.id}`,
     pubDate: item.created_at,
-    description: renderItemDescription(item),
+    description: renderItemDescription(item, rating),
     imageUrl: absoluteArtworkUrl(item.artwork_url, baseUrl),
   };
 }
@@ -451,18 +462,22 @@ export function createRssRoutes(
   fetchStackItems: FetchStackItemsFn = defaultFetchStackItems,
   fetchPrimaryFeedItems: FetchPrimaryFeedItemsFn = defaultFetchPrimaryFeedItems,
   fetchReleaseAlerts: FetchReleaseAlertsFn = () => listReleaseAlerts(["pending", "seen"]),
+  fetchRatingSettings: FetchRatingSettingsFn = getRatingSettings,
 ): Hono {
   const routes = new Hono();
 
   routes.get("/all.rss", async (c) => {
-    const items = await fetchPrimaryFeedItems("all");
+    const [items, rating] = await Promise.all([
+      fetchPrimaryFeedItems("all"),
+      fetchRatingSettings(),
+    ]);
     const baseUrl = new URL(c.req.url).origin;
     const xml = renderRss(
       {
         title: "On the Beach — All",
         description: "All items in On the Beach",
       },
-      items.map((item) => itemToEntry(item, baseUrl)),
+      items.map((item) => itemToEntry(item, baseUrl, rating)),
     );
 
     return c.body(xml, 200, {
@@ -471,14 +486,17 @@ export function createRssRoutes(
   });
 
   routes.get("/to-listen.rss", async (c) => {
-    const items = await fetchPrimaryFeedItems("to-listen");
+    const [items, rating] = await Promise.all([
+      fetchPrimaryFeedItems("to-listen"),
+      fetchRatingSettings(),
+    ]);
     const baseUrl = new URL(c.req.url).origin;
     const xml = renderRss(
       {
         title: "On the Beach — To Listen",
         description: 'Items with status "To Listen" in On the Beach',
       },
-      items.map((item) => itemToEntry(item, baseUrl)),
+      items.map((item) => itemToEntry(item, baseUrl, rating)),
     );
 
     return c.body(xml, 200, {
@@ -487,14 +505,17 @@ export function createRssRoutes(
   });
 
   routes.get("/listened.rss", async (c) => {
-    const items = await fetchPrimaryFeedItems("listened");
+    const [items, rating] = await Promise.all([
+      fetchPrimaryFeedItems("listened"),
+      fetchRatingSettings(),
+    ]);
     const baseUrl = new URL(c.req.url).origin;
     const xml = renderRss(
       {
         title: "On the Beach — Listened",
         description: 'Items with status "Listened" in On the Beach',
       },
-      items.map((item) => itemToEntry(item, baseUrl)),
+      items.map((item) => itemToEntry(item, baseUrl, rating)),
     );
 
     return c.body(xml, 200, {
@@ -533,14 +554,14 @@ export function createRssRoutes(
       return c.json({ error: "Stack not found" }, 404);
     }
 
-    const items = await fetchStackItems(stackId);
+    const [items, rating] = await Promise.all([fetchStackItems(stackId), fetchRatingSettings()]);
     const baseUrl = new URL(c.req.url).origin;
     const xml = renderRss(
       {
         title: `On the Beach — ${stack.name}`,
         description: `Items in the ${stack.name} stack on On the Beach`,
       },
-      items.map((item) => itemToEntry(item, baseUrl)),
+      items.map((item) => itemToEntry(item, baseUrl, rating)),
     );
 
     return c.body(xml, 200, {

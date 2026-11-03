@@ -11,7 +11,10 @@ import {
   getArtistWatchSettings,
   setArtistWatchSettings,
   type ArtistWatchSettings,
+  getRatingSettings,
+  setRatingSettings,
 } from "../../app/settings";
+import { isValidStarCount } from "../../domain/rating";
 import { ensureSuggestionsForToListenArtists } from "../../app/suggestions";
 
 /**
@@ -66,6 +69,7 @@ export function createSettingsRoutes(): Hono {
       lookupServices: LOOKUP_SERVICES,
       releaseLengthPreference,
       releaseLengthPreferences: RELEASE_LENGTH_PREFERENCES,
+      rating: await getRatingSettings(),
       artistWatch: await getArtistWatchSettings(),
     });
   });
@@ -83,7 +87,7 @@ export function createSettingsRoutes(): Hono {
     }
 
     const payload = body as Record<string, unknown>;
-    const { lookupService, releaseLengthPreference } = payload;
+    const { lookupService, releaseLengthPreference, ratingEnabled, ratingStarCount } = payload;
 
     const artistWatch = readArtistWatchUpdate(payload);
     if ("error" in artistWatch) return c.json({ error: artistWatch.error }, 400);
@@ -92,6 +96,8 @@ export function createSettingsRoutes(): Hono {
     if (
       lookupService === undefined &&
       releaseLengthPreference === undefined &&
+      ratingEnabled === undefined &&
+      ratingStarCount === undefined &&
       !hasArtistWatchUpdate
     ) {
       return c.json({ error: "Provide lookupService and/or releaseLengthPreference" }, 400);
@@ -110,6 +116,12 @@ export function createSettingsRoutes(): Hono {
         400,
       );
     }
+    if (ratingEnabled !== undefined && typeof ratingEnabled !== "boolean") {
+      return c.json({ error: "ratingEnabled must be a boolean" }, 400);
+    }
+    if (ratingStarCount !== undefined && !isValidStarCount(ratingStarCount)) {
+      return c.json({ error: "ratingStarCount must be a number from 1 to 100.00" }, 400);
+    }
 
     let changed = false;
     if (isLookupService(lookupService)) {
@@ -127,6 +139,13 @@ export function createSettingsRoutes(): Hono {
         });
       }
     }
+    if (ratingEnabled !== undefined || ratingStarCount !== undefined) {
+      await setRatingSettings({
+        ...(ratingEnabled === undefined ? {} : { enabled: ratingEnabled }),
+        ...(ratingStarCount === undefined ? {} : { starCount: ratingStarCount }),
+      });
+      changed = true;
+    }
 
     if (hasArtistWatchUpdate) {
       await setArtistWatchSettings(artistWatch.update);
@@ -137,6 +156,7 @@ export function createSettingsRoutes(): Hono {
       {
         lookupService: await getLookupService(),
         releaseLengthPreference: await getReleaseLengthPreference(),
+        rating: await getRatingSettings(),
         artistWatch: await getArtistWatchSettings(),
         changed,
       },
