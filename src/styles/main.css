@@ -1069,36 +1069,6 @@ select.input {
 .browse-tools__panel {
   display: contents;
 }
-.browse-tools__search-wrap {
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-}
-
-.browse-tools__search {
-  width: min(240px, 42vw);
-}
-
-/* Hide native Safari clear button — we use our own */
-.browse-tools__search::-webkit-search-cancel-button {
-  display: none;
-}
-
-.browse-tools__search-clear {
-  position: absolute;
-  right: 4px;
-  background: none;
-  border: none;
-  padding: 0 2px;
-  cursor: pointer;
-  font-size: var(--text-base);
-  color: var(--chrome-darker);
-  line-height: 1;
-}
-
-.browse-tools__search-clear:hover {
-  color: #000;
-}
 
 .btn--saved {
   background: #5a9;
@@ -1526,7 +1496,7 @@ select.input {
     position: relative;
   }
 
-  /* Thumb-zone dock: filters + search/sort live in a fixed bar just above
+  /* Thumb-zone dock: filters + sort live in a fixed bar just above
      the taskbar, where they're reachable one-handed, instead of at the top
      of the page. Content clearance comes from body padding below. */
   .filter-section {
@@ -1572,14 +1542,6 @@ select.input {
 
   .browse-tools__panel.is-open {
     display: block;
-  }
-
-  .browse-tools__panel--search .browse-tools__search-wrap {
-    width: 100%;
-  }
-
-  .browse-tools__panel--search .browse-tools__search {
-    width: 100%;
   }
 
   /* Full-bleed across the dock rather than a narrow overlay on the right, but
