@@ -1072,6 +1072,11 @@ private final class StarRatingControl: UIControl {
         return label
     }
 
+    /// The star the current touch began in — see `touchesEnded`: a rating
+    /// commits only when down and up land on the same star, like the web
+    /// control's five separate buttons.
+    private var touchStar: Int?
+
     override init(frame: CGRect) {
         super.init(frame: frame)
 
@@ -1091,19 +1096,56 @@ private final class StarRatingControl: UIControl {
 
         isAccessibilityElement = true
         accessibilityLabel = "Rating"
+        // Adjustable, so VoiceOver can set and clear the rating by swiping —
+        // the web control it mirrors is five real buttons.
+        accessibilityTraits = .adjustable
+        accessibilityHint = "Swipe up or down to adjust. Going below one clears the rating."
         paint()
     }
 
     @available(*, unavailable)
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
 
+    /// VoiceOver's swipe up: step up one star, from "Not rated" to one and
+    /// capped at five.
+    override func accessibilityIncrement() {
+        let next = (value ?? 0) + 1
+        guard next <= 5 else { return }
+        value = next
+        paint()
+    }
+
+    /// VoiceOver's swipe down: step down one star, and going below one clears
+    /// the rating — the tap-again-to-clear rule.
+    override func accessibilityDecrement() {
+        guard let current = value else { return }
+        value = current > 1 ? current - 1 : nil
+        paint()
+    }
+
+    /// Remembers the star a touch begins in — see `touchesEnded`.
+    override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
+        guard let point = touches.first?.location(in: self) else { return }
+        touchStar = stars.first { $0.frame.contains(point) }?.tag
+    }
+
     /// A tap picks the star it lands in; tapping the one already lit clears
-    /// the rating — the web control's tap-again-to-clear rule.
+    /// the rating — the web control's tap-again-to-clear rule. Only when the
+    /// touch began on that star, though: like the web control's five separate
+    /// buttons, a touch that begins on one star and ends on another rates
+    /// nothing.
     override func touchesEnded(_ touches: Set<UITouch>, with event: UIEvent?) {
+        defer { touchStar = nil }
         guard let point = touches.first?.location(in: self),
-              let star = stars.first(where: { $0.frame.contains(point) }) else { return }
+              let began = touchStar,
+              let star = stars.first(where: { $0.frame.contains(point) }),
+              star.tag == began else { return }
         value = value == star.tag ? nil : star.tag
         paint()
+    }
+
+    override func touchesCancelled(_ touches: Set<UITouch>, with event: UIEvent?) {
+        touchStar = nil
     }
 
     private func paint() {
