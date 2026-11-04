@@ -1,0 +1,334 @@
+name: Merge queue
+
+# GitHub's native merge queue can't be used in this repo: it only supports
+# merge-commit and squash merges, and the repo is rebase-only. This workflow
+# clones its behaviour instead. /queue on a pull request joins a FIFO queue
+# (comments are the source of truth — see scripts/merge-queue.sh — mirrored by
+# the merge-queue label), and one entry at a time the processor rebases the PR
+# onto the current main and force-pushes the branch, so the PR's own checks run
+# on main + PR combined: exactly the tree a rebase merge lands. Green merges;
+# conflicts and red combined checks kick the entry out with a comment while the
+# queue carries on — every landed state is verified against the main it landed
+# on. The half-hourly schedule is a watchdog that re-drives a queue whose
+# processor died.
+#
+# The rebase push and the merge both run as the MERGE_QUEUE_TOKEN PAT, never
+# github.token: pushes and merges made with the workflow token do not trigger
+# other workflows, so deploys (Test → Deploy) and TestFlight uploads would
+# silently stop. issue_comment and schedule events only run this file from the
+# default branch, so the queue takes effect once this reaches main.
+on:
+  issue_comment:
+    types: [created]
+  workflow_dispatch:
+  schedule:
+    - cron: '13,43 * * * *'
+
+permissions:
+  pull-requests: write
+  issues: write
+  actions: write
+
+jobs:
+  command:
+    name: Handle a merge-queue command
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # /queue, /queue-status and /dequeue all share these two prefixes; the
+    # exact command is parsed inside the job. The association gate is the cheap
+    # first pass — the job re-checks real write access before acting.
+    if: >
+      github.event_name == 'issue_comment' &&
+      github.event.issue.pull_request &&
+      (startsWith(github.event.comment.body, '/queue') || startsWith(github.event.comment.body, '/dequeue')) &&
+      contains(fromJSON('["OWNER", "MEMBER", "COLLABORATOR"]'), github.event.comment.author_association)
+    # One lane per pull request so a newer command supersedes an older one; the
+    # event name keeps dispatch/schedule runs (which have no comment context)
+    # out of these groups.
+    concurrency:
+      group: merge-queue-command-${{ github.event_name }}-${{ github.event.issue.number || 0 }}
+      cancel-in-progress: true
+    env:
+      PR: ${{ github.event.issue.number }}
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      MERGE_QUEUE_TOKEN: ${{ secrets.MERGE_QUEUE_TOKEN }}
+    steps:
+      - name: Acknowledge the command
+        run: gh api "repos/$GH_REPO/issues/comments/$COMMENT_ID/reactions" -f content=eyes || true
+        env:
+          COMMENT_ID: ${{ github.event.comment.id }}
+
+      - name: Parse the command and check real write access
+        id: parse
+        env:
+          COMMENT_BODY: ${{ github.event.comment.body }}
+          COMMENTER: ${{ github.event.comment.user.login }}
+        run: |
+          body="${COMMENT_BODY%%$'\n'*}"
+          cmd="${body%% *}"
+          case "$cmd" in
+            /queue | /dequeue | /queue-status) ;;
+            *) exit 0 ;;
+          esac
+          # author_association's COLLABORATOR includes read- and triage-only
+          # collaborators; require actual write access (the /fix pattern).
+          perm=$(gh api "repos/$GH_REPO/collaborators/$COMMENTER/permission" --jq .permission 2>/dev/null || echo none)
+          if [ "$perm" != write ] && [ "$perm" != admin ]; then
+            gh pr comment "$PR" --body "Merge queue: $cmd needs write access; $COMMENTER has ${perm:-none}."
+            exit 0
+          fi
+          echo "cmd=$cmd" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout for the queue scan
+        uses: actions/checkout@v6
+
+      - name: Run the command
+        env:
+          CMD: ${{ steps.parse.outputs.cmd }}
+        run: |
+          case "$CMD" in
+            /dequeue)
+              gh pr edit "$PR" --remove-label merge-queue >/dev/null 2>&1 || true
+              gh pr comment "$PR" --body "Merge queue: removed by request."
+              ;;
+            /queue-status)
+              {
+                echo '#### Merge queue'
+                echo
+                n=0
+                while IFS=$'\t' read -r pr _; do
+                  n=$((n + 1))
+                  title=$(gh pr view "$pr" --json title --jq .title)
+                  echo "$n. #$pr — $title"
+                done < <(scripts/merge-queue.sh)
+                [ "$n" -gt 0 ] || echo '_Empty — nothing is queued._'
+              } > "$RUNNER_TEMP/status.md"
+              gh pr comment "$PR" --body-file "$RUNNER_TEMP/status.md"
+              ;;
+            /queue)
+              gh pr view "$PR" --json state,isDraft,isCrossRepository > "$RUNNER_TEMP/pr.json"
+              if [ "$(jq -r .state "$RUNNER_TEMP/pr.json")" != OPEN ]; then
+                gh pr comment "$PR" --body "Merge queue: this pull request is not open."
+                exit 0
+              fi
+              if [ "$(jq -r .isDraft "$RUNNER_TEMP/pr.json")" = true ]; then
+                gh pr comment "$PR" --body "Merge queue: mark the pull request ready for review first, then /queue it again."
+                exit 0
+              fi
+              if [ "$(jq -r .isCrossRepository "$RUNNER_TEMP/pr.json")" = true ]; then
+                gh pr comment "$PR" --body "Merge queue: fork pull requests can't be queued — the queue rebases and pushes the branch itself."
+                exit 0
+              fi
+              if [ -z "$MERGE_QUEUE_TOKEN" ]; then
+                gh pr comment "$PR" --body "Merge queue: the MERGE_QUEUE_TOKEN repository secret is not set, so the queue cannot merge anything — with the workflow token instead, deploys and TestFlight uploads would silently stop. Add a fine-grained PAT (Contents, Pull requests and Issues, read and write, this repo only) as MERGE_QUEUE_TOKEN — see docs/plans/2026-11-04-merge-queue-design.md — then /queue again."
+                exit 1
+              fi
+              # The triggering /queue comment is already on the PR, so the scan
+              # includes it; count the entries ahead of it.
+              n=0
+              position=0
+              while IFS=$'\t' read -r pr _; do
+                n=$((n + 1))
+                [ "$pr" = "$PR" ] && position=$n
+              done < <(scripts/merge-queue.sh)
+              [ "$position" -gt 0 ] || position=1
+              gh label create merge-queue --color 0e8a16 \
+                --description "Queued for a verified rebase merge" 2>/dev/null || true
+              gh pr edit "$PR" --add-label merge-queue
+              gh pr comment "$PR" --body "Merge queue: joined at position $position of $n. The queue will rebase this pull request onto main, wait for the checks on the combined tree, and merge it with a rebase merge."
+              ;;
+          esac
+          # Any command can change what the processor should do next, so wake it.
+          gh workflow run merge-queue.yml
+
+  process:
+    name: Process the queue
+    runs-on: ubuntu-latest
+    timeout-minutes: 330
+    if: github.event_name == 'workflow_dispatch' || github.event_name == 'schedule'
+    # Exactly one processor at a time; later dispatches (a /queue while one is
+    # running, the self re-dispatch, the half-hourly watchdog) pile up as a
+    # single pending run that replaces older pendings. Safe, because every run
+    # recomputes the queue from the comments.
+    concurrency:
+      group: merge-queue
+      cancel-in-progress: false
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      MERGE_QUEUE_TOKEN: ${{ secrets.MERGE_QUEUE_TOKEN }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Stop when the queue is empty or the token is missing
+        run: |
+          entries=$(scripts/merge-queue.sh)
+          if [ -z "$entries" ]; then
+            echo "Queue empty — nothing to do."
+            exit 0
+          fi
+          printf 'Queued:\n%s\n' "$entries"
+          if [ -z "$MERGE_QUEUE_TOKEN" ]; then
+            echo "::error::MERGE_QUEUE_TOKEN is not set; the queue cannot push or merge (with github.token, deploys and TestFlight would silently stop). See docs/plans/2026-11-04-merge-queue-design.md."
+            exit 1
+          fi
+
+      - name: Process the queue
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          kick() { # <pr> <reason> — the comment is an authoritative removal in the scan
+            gh pr comment "$1" --body "Merge queue: removed — $2"
+            gh pr edit "$1" --remove-label merge-queue >/dev/null 2>&1 || true
+          }
+
+          process_entry() { # <pr>; returns 0 only when the entry was merged
+            pr=$1
+            gh pr view "$pr" --json state,isDraft,isCrossRepository,headRefName > "$RUNNER_TEMP/pr.json" || return 1
+            if [ "$(jq -r .state "$RUNNER_TEMP/pr.json")" != OPEN ]; then
+              gh pr edit "$pr" --remove-label merge-queue >/dev/null 2>&1 || true
+              return 1
+            fi
+            if [ "$(jq -r .isDraft "$RUNNER_TEMP/pr.json")" = true ]; then
+              kick "$pr" "the pull request became a draft."
+              return 1
+            fi
+            if [ "$(jq -r .isCrossRepository "$RUNNER_TEMP/pr.json")" = true ]; then
+              kick "$pr" "fork pull requests can't be rebased and pushed by the queue."
+              return 1
+            fi
+            head_ref=$(jq -r .headRefName "$RUNNER_TEMP/pr.json")
+
+            # The entry's own checks must not already be red (gh pr checks:
+            # 0 = green, 8 = pending, 1 = failing).
+            set +e
+            gh pr checks "$pr" >/dev/null 2>&1
+            rc=$?
+            set -e
+            if [ "$rc" -eq 1 ]; then
+              kick "$pr" "its own checks are failing — fix them and /queue again: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/pull/$pr/checks"
+              return 1
+            fi
+
+            # Rebase onto the current main: the combined tree the checks will
+            # then run on is exactly the tree a rebase merge lands.
+            git fetch origin main "$head_ref" || { kick "$pr" "its branch could not be fetched (deleted?)."; return 1; }
+            base=$(git rev-parse origin/main)
+            before=$(git rev-parse "refs/remotes/origin/$head_ref")
+            git checkout --detach "refs/remotes/origin/$head_ref" >/dev/null 2>&1
+            if ! git rebase origin/main; then
+              git rebase --abort 2>/dev/null || true
+              kick "$pr" "it conflicts with main — rebase it by hand and /queue it again."
+              return 1
+            fi
+            after=$(git rev-parse HEAD)
+
+            if [ "$after" != "$before" ]; then
+              # Push as the PAT, not github.token: only a PAT push triggers
+              # the synchronize events that run the combined-tree checks.
+              auth=$(printf 'x-access-token:%s' "$MERGE_QUEUE_TOKEN" | base64 | tr -d '\n')
+              if ! git -c "http.$GITHUB_SERVER_URL/.extraheader=AUTHORIZATION: basic $auth" \
+                push --force-with-lease="refs/heads/$head_ref:$before" origin "HEAD:refs/heads/$head_ref"; then
+                kick "$pr" "its branch moved while the queue was working on it; /queue it again once it settles."
+                return 1
+              fi
+            else
+              echo "::notice::$pr is already based on the current main — waiting on its existing checks."
+            fi
+
+            # Wait for the checks on the combined tree (0 = green, 8 = pending).
+            deadline=$(( $(date +%s) + 75 * 60 ))
+            while :; do
+              set +e
+              gh pr checks "$pr" >/dev/null 2>&1
+              rc=$?
+              set -e
+              [ "$rc" -eq 0 ] && break
+              if [ "$rc" -ne 8 ]; then
+                kick "$pr" "the checks on main + this pull request failed: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/pull/$pr/checks"
+                return 1
+              fi
+              if [ "$(date +%s)" -ge "$deadline" ]; then
+                kick "$pr" "the checks on the combined tree did not finish within 75 minutes."
+                return 1
+              fi
+              sleep 60
+            done
+
+            # Re-validate immediately before merging: the tested head, the
+            # base it was tested against, and the PR itself must be unchanged
+            # since the checks passed.
+            gh pr view "$pr" --json state,isDraft,headRefOid > "$RUNNER_TEMP/pr2.json"
+            if [ "$(jq -r .state "$RUNNER_TEMP/pr2.json")" != OPEN ] || [ "$(jq -r .isDraft "$RUNNER_TEMP/pr2.json")" = true ]; then
+              return 1
+            fi
+            if [ "$(jq -r .headRefOid "$RUNNER_TEMP/pr2.json")" != "$after" ]; then
+              kick "$pr" "its branch gained commits while the queue was waiting; /queue it again."
+              return 1
+            fi
+            git fetch origin main
+            if [ "$(git rev-parse origin/main)" != "$base" ]; then
+              echo "::notice::main moved under #$pr — it will be retried against the new main."
+              return 1
+            fi
+            # GitHub computes mergeability asynchronously; let it settle.
+            for _ in $(seq 1 24); do
+              m=$(gh pr view "$pr" --json mergeable --jq .mergeable)
+              [ "$m" != UNKNOWN ] && break
+              sleep 5
+            done
+
+            # Merge as the PAT so the landing push triggers Test → Deploy and
+            # (on native changes) TestFlight, like any hand merge.
+            if ! GH_TOKEN="$MERGE_QUEUE_TOKEN" gh pr merge "$pr" --rebase --delete-branch; then
+              kick "$pr" "GitHub refused the rebase merge — see the run log: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+              return 1
+            fi
+            gh pr comment "$pr" --body "Merge queue: merged — the checks passed on main + this pull request combined, and it landed with a rebase merge."
+            gh pr edit "$pr" --remove-label merge-queue >/dev/null 2>&1 || true
+            return 0
+          }
+
+          # Stop for a fresh run after three merges or 2.5 hours; the tail of
+          # the run block re-dispatches if entries remain.
+          START=$(date +%s)
+          merged=0
+          while [ "$merged" -lt 3 ] && [ $(( $(date +%s) - START )) -lt 9000 ]; do
+            entries=$(scripts/merge-queue.sh)
+            [ -n "$entries" ] || { echo "Queue drained."; break; }
+            pr=$(printf '%s\n' "$entries" | head -1 | cut -f1)
+            echo "current=$pr" > "$RUNNER_TEMP/merge-queue-current"
+            echo "::group::Entry #$pr"
+            if process_entry "$pr"; then
+              merged=$((merged + 1))
+            fi
+            echo "::endgroup::"
+          done
+
+          remaining=$(scripts/merge-queue.sh)
+          if [ -n "$remaining" ]; then
+            echo "Merge cap or time budget reached with entries left — re-dispatching for the rest."
+            gh workflow run merge-queue.yml || gh workflow run merge-queue.yml
+          fi
+
+      # failure() does not fire on cancellation, so both are covered.
+      - name: Report a failed run
+        if: failure()
+        run: |
+          pr=$(cut -d= -f2 "$RUNNER_TEMP/merge-queue-current" 2>/dev/null || true)
+          if [ -n "$pr" ]; then
+            gh pr comment "$pr" --body "Merge queue: the processor failed mid-run — see the [run log]($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID). The entry stays queued and the half-hourly pass retries it; /dequeue to stop that."
+          fi
+
+      - name: Report a cancelled run
+        if: cancelled()
+        run: |
+          pr=$(cut -d= -f2 "$RUNNER_TEMP/merge-queue-current" 2>/dev/null || true)
+          if [ -n "$pr" ]; then
+            gh pr comment "$pr" --body "Merge queue: this processor run was cancelled — most likely by a person or a timeout. The entry stays queued and the half-hourly pass retries it."
+          fi

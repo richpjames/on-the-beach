@@ -18,6 +18,7 @@ When asked to "open a PR" (or raise/create a PR):
 1. Create the PR.
 2. Watch CI until it passes GREEN (e.g. `gh pr checks --watch` / `gh run watch`) — don't fire-and-forget.
 3. Ensure there are no merge conflicts against `main` (`gh pr view --json mergeable,mergeStateStatus`).
+4. Hand it over: `/queue` on the pull request merges it through the merge queue (see below).
 If CI fails or conflicts exist, fix or surface them rather than reporting the PR as opened.
 
 ### PR hygiene
@@ -26,6 +27,13 @@ If CI fails or conflicts exist, fix or surface them rather than reporting the PR
 
 ### The agent review and /fix
 The `PR-Agent review` workflow (Qodo PR-Agent, self-hosted, on the GLM model) reviews every pull request: a "PR Reviewer Guide" comment it keeps updated on each push, inline findings, and a "PR Code Suggestions" comment whose suggestions GitHub can apply on click. It only comments — reply `/fix` on the pull request and the `Pi fix` workflow applies the findings of the latest review and suggestions to the branch — same-repository pull requests only, and lint plus the unit tests must pass before anything is pushed.
+
+### Merging via the merge queue
+When a pull request's checks are green, comment `/queue` on it instead of merging by hand. The merge queue (`.github/workflows/merge-queue.yml`) processes entries one at a time, oldest `/queue` first: it rebases the pull request onto the current `main`, force-pushes the branch (so the pull request's own checks run on the combined tree — exactly what a rebase merge lands), waits for green, and merges it with a rebase merge. This is GitHub's native merge-queue guarantee, hand-rolled because the native feature only supports merge-commit/squash and this repo is rebase-only.
+
+- `/dequeue` removes an entry; `/queue-status` posts the queue. Commenting `/queue` again moves an entry to the back of the queue.
+- Entries that conflict with `main` or fail the combined checks are kicked out with a comment saying why; the queue carries on with the next entry.
+- The queue is advisory — a manual merge is still possible, as nothing on `main` is enforced. Queue merges only deploy/TestFlight when the `MERGE_QUEUE_TOKEN` repository secret exists (a fine-grained PAT with Contents, Pull requests and Issues read+write on this repo — see `docs/plans/2026-11-04-merge-queue-design.md`).
 
 ### Plain terms over jargon
 Prefer the word the repo already uses for a concept over the textbook term (e.g. `--config ground-truth`, not `--config oracle`; the repo's word for a provider is "source" / `SourceName`). If a term needs a glossary entry to be understood, it probably needs renaming instead. Applies to identifiers, CLI flags, and prose in reports.

@@ -101,13 +101,9 @@ This overwrites the baseline PNGs. Review the diff, then commit the updated file
 
 ### Reviewing diffs in pull requests
 
-The `Visual Regression` GitHub Actions workflow runs automatically on every PR against `main`. When it completes, a sticky comment is posted with a link to the Playwright HTML report published to GitHub Pages at:
+The `Visual Regression` GitHub Actions workflow runs automatically on every PR against `main`. When it completes, a sticky comment is posted with a link to the Playwright HTML report published to GitHub Pages. Pages is a single shared slot — each run's deployment replaces the previous one, so only the most recently run PR's report is live at any time.
 
-```
-https://<owner>.github.io/<repo>/visual-reports/<pr-number>/
-```
-
-The workflow uses `continue-on-error: true` so the report is always published even when screenshots differ, giving reviewers a chance to inspect the diff before deciding whether it is intentional.
+A failing screenshot diff fails the workflow, but the report is still published and linked, so the diff can be inspected before deciding whether the change is intentional and the baselines should be updated.
 
 ## Email Ingest
 
