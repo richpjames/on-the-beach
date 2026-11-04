@@ -55,3 +55,13 @@ jobs:
           # .pr_agent.toml.
           OPENAI__KEY: ${{ secrets.ZAI_API_KEY }}
           OPENAI_API_BASE: https://api.z.ai/api/coding/paas/v4
+          # Read .pr_agent.toml from the pull request's own branch. Without
+          # this the settings come from the default branch — where the file
+          # does not exist yet on a new pull request like this one — and the
+          # model falls back to PR-Agent's built-in defaults, which the Z.ai
+          # endpoint does not serve. Empty on issue_comment events, where the
+          # default branch is the right place to look.
+          PR_AGENT_CONFIG_BRANCH: ${{ github.head_ref }}
+          # Floor for the model wiring: even if the settings file cannot be
+          # read, never send the built-in default models to Z.ai.
+          CONFIG__MODEL: openai/glm-5.3
