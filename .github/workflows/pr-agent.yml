@@ -27,8 +27,14 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     # The action ignores bot senders itself; skipping early saves the docker
-    # pull on our own posted comments.
-    if: ${{ github.event.sender.type != 'Bot' }}
+    # pull on our own posted comments. Slash commands from comments are
+    # restricted to the same write-access roles the /fix command accepts —
+    # this repository is public, and without the gate any GitHub user could
+    # spend the ZAI_API_KEY on GLM calls.
+    if: >-
+      ${{ github.event.sender.type != 'Bot' &&
+      (github.event_name != 'issue_comment' ||
+      contains(fromJSON('["OWNER", "MEMBER", "COLLABORATOR"]'), github.event.comment.author_association)) }}
     steps:
       # Until the ZAI_API_KEY repository secret exists, stay green and say why.
       - name: Check the API key is configured
