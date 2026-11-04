@@ -8,6 +8,9 @@
 model = "openai/glm-5.3" # routed to Z.ai by the workflow's OPENAI_API_BASE
 fallback_models = []
 custom_model_max_tokens = 128000
+# GLM-5.3 is a reasoning model: the improve prompts can take minutes to
+# answer, and the 120s default timed out on them.
+ai_timeout = 600
 
 [github_action_config]
 auto_review = true

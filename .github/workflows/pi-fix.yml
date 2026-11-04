@@ -64,9 +64,13 @@ jobs:
           # has been seen to report the workflow token's login both with and
           # without the [bot] suffix, so both forms are accepted. PR-Agent
           # keeps one persistent comment per heading per pull request.
-          gh api "repos/$GH_REPO/issues/$PR/comments?per_page=100" > "$RUNNER_TEMP/comments.json"
-          jq -r '[.[] | select((.user.login == "github-actions" or .user.login == "github-actions[bot]") and (.body | contains("PR Reviewer Guide")))] | last | .body // empty' "$RUNNER_TEMP/comments.json" > "$RUNNER_TEMP/pi-review.md"
-          jq -r '[.[] | select((.user.login == "github-actions" or .user.login == "github-actions[bot]") and (.body | contains("PR Code Suggestions")))] | last | .body // empty' "$RUNNER_TEMP/comments.json" > "$RUNNER_TEMP/pi-suggestions.md"
+          # --paginate, because the persistent comment is created once and
+          # edited after: on a pull request with over 100 comments it can sit
+          # far back in the conversation. The pages arrive as consecutive
+          # JSON arrays, merged by jq's slurp.
+          gh api --paginate "repos/$GH_REPO/issues/$PR/comments?per_page=100" > "$RUNNER_TEMP/comments.json"
+          jq -rs 'add | [.[] | select((.user.login == "github-actions" or .user.login == "github-actions[bot]") and (.body | contains("PR Reviewer Guide")))] | last | .body // empty' "$RUNNER_TEMP/comments.json" > "$RUNNER_TEMP/pi-review.md"
+          jq -rs 'add | [.[] | select((.user.login == "github-actions" or .user.login == "github-actions[bot]") and (.body | contains("PR Code Suggestions")))] | last | .body // empty' "$RUNNER_TEMP/comments.json" > "$RUNNER_TEMP/pi-suggestions.md"
           if [ ! -s "$RUNNER_TEMP/pi-review.md" ] && [ ! -s "$RUNNER_TEMP/pi-suggestions.md" ]; then
             gh pr comment "$PR" --body "Pi fix: there is no agent review on this pull request yet, so there is nothing to fix."
             exit 0
