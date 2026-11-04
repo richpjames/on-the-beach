@@ -1,0 +1,57 @@
+name: PR-Agent review
+
+# Qodo PR-Agent, self-hosted: reviews every pull request and answers slash
+# commands (/review, /improve, /ask, ...) in pull request comments. The GLM
+# model is reached through Z.ai's OpenAI-compatible endpoint with the same
+# ZAI_API_KEY secret the Pi review workflow used. Review behaviour is
+# configured in .pr_agent.toml.
+on:
+  pull_request:
+    types: [opened, reopened, ready_for_review]
+  issue_comment:
+    types: [created]
+
+# A new push supersedes the review of the previous head; a manual command is
+# never cancelled by an unrelated comment landing on the same pull request.
+concurrency:
+  group: pr-agent-${{ github.event_name }}-${{ github.event.pull_request.number || github.event.issue.number }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: write
+
+jobs:
+  pr_agent:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    # The action ignores bot senders itself; skipping early saves the docker
+    # pull on our own posted comments.
+    if: ${{ github.event.sender.type != 'Bot' }}
+    steps:
+      # Until the ZAI_API_KEY repository secret exists, stay green and say why.
+      - name: Check the API key is configured
+        id: gate
+        env:
+          ZAI_API_KEY: ${{ secrets.ZAI_API_KEY }}
+        run: |
+          if [ -n "$ZAI_API_KEY" ]; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::notice::ZAI_API_KEY repository secret is not set, so this pull request is not reviewed. Add the secret to enable PR-Agent reviews."
+          fi
+
+      # Pinned to the release validated against the Z.ai endpoint — check the
+      # release notes before bumping.
+      - name: PR Agent action step
+        if: steps.gate.outputs.run == 'true'
+        uses: docker://pragent/pr-agent:0.49.0-github_action
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          # PR-Agent reads the base URL from OPENAI_API_BASE and the key from
+          # its OPENAI.KEY setting, spelled OPENAI__KEY as an environment
+          # variable. glm-5.3 is a reasoning model; PR-Agent's budgets are in
+          # .pr_agent.toml.
+          OPENAI__KEY: ${{ secrets.ZAI_API_KEY }}
+          OPENAI_API_BASE: https://api.z.ai/api/coding/paas/v4
