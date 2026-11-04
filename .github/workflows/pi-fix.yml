@@ -1,9 +1,10 @@
 name: Pi fix
 
-# The softer half of the Pi review: the review check only comments, and a
-# person replies /fix on the pull request to have the findings applied to the
-# branch. issue_comment workflows always run the copy of this file from the
-# default branch, so this takes effect only once the change reaches main.
+# The softer half of the agent review: the PR-Agent review workflow only
+# comments, and a person replies /fix on the pull request to have the findings
+# applied to the branch. issue_comment workflows always run the copy of this
+# file from the default branch, so this takes effect only once the change
+# reaches main.
 on:
   issue_comment:
     types: [created]
@@ -59,13 +60,15 @@ jobs:
             exit 0
           fi
           # The review is matched on its author as well as its heading: the
-          # heading alone could be forged in a review by any commenter. gh
+          # heading alone could be forged in a comment by any commenter. gh
           # has been seen to report the workflow token's login both with and
-          # without the [bot] suffix, so both forms are accepted.
-          gh pr view "$PR" --json reviews \
-            | jq -r '[.reviews[] | select((.author.login == "github-actions" or .author.login == "github-actions[bot]") and (.body | startswith("#### Pi agent review")))] | last | .body // empty' > "$RUNNER_TEMP/pi-review.md"
-          if [ ! -s "$RUNNER_TEMP/pi-review.md" ]; then
-            gh pr comment "$PR" --body "Pi fix: there is no Pi review on this pull request yet, so there is nothing to fix."
+          # without the [bot] suffix, so both forms are accepted. PR-Agent
+          # keeps one persistent comment per heading per pull request.
+          gh api "repos/$GH_REPO/issues/$PR/comments?per_page=100" > "$RUNNER_TEMP/comments.json"
+          jq -r '[.[] | select((.user.login == "github-actions" or .user.login == "github-actions[bot]") and (.body | contains("PR Reviewer Guide")))] | last | .body // empty' "$RUNNER_TEMP/comments.json" > "$RUNNER_TEMP/pi-review.md"
+          jq -r '[.[] | select((.user.login == "github-actions" or .user.login == "github-actions[bot]") and (.body | contains("PR Code Suggestions")))] | last | .body // empty' "$RUNNER_TEMP/comments.json" > "$RUNNER_TEMP/pi-suggestions.md"
+          if [ ! -s "$RUNNER_TEMP/pi-review.md" ] && [ ! -s "$RUNNER_TEMP/pi-suggestions.md" ]; then
+            gh pr comment "$PR" --body "Pi fix: there is no agent review on this pull request yet, so there is nothing to fix."
             exit 0
           fi
           echo "head_ref=$(jq -r .headRefName "$RUNNER_TEMP/pr.json")" >> "$GITHUB_OUTPUT"
@@ -115,10 +118,18 @@ jobs:
         run: |
           {
             cat "$RUNNER_TEMP/fix-instructions.md"
-            echo
-            echo "## The review"
-            echo
-            cat "$RUNNER_TEMP/pi-review.md"
+            if [ -s "$RUNNER_TEMP/pi-review.md" ]; then
+              echo
+              echo "## The review"
+              echo
+              cat "$RUNNER_TEMP/pi-review.md"
+            fi
+            if [ -s "$RUNNER_TEMP/pi-suggestions.md" ]; then
+              echo
+              echo "## The code suggestions"
+              echo
+              cat "$RUNNER_TEMP/pi-suggestions.md"
+            fi
           } > "$RUNNER_TEMP/fix-prompt.md"
           # Extensions and skills execute arbitrary code at load, whatever
           # --tools allows; applying review findings never needs them.
@@ -167,7 +178,7 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add -A
-          git commit -m "Apply the Pi review findings" \
+          git commit -m "Apply the agent review findings" \
                     -m "Requested with the /fix command; lint and the unit tests ran in the pi-fix job before this push."
           git push origin HEAD:"$HEAD_REF"
 

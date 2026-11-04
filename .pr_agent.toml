@@ -1,0 +1,38 @@
+# Qodo PR-Agent configuration — the workflow that runs it is
+# .github/workflows/pr-agent.yml, which also supplies the model endpoint and
+# key. The root AGENTS.md is added to every prompt automatically
+# (config.repo_context_files), so the instructions here only cover what it
+# cannot say about reviewing this repository.
+
+[config]
+model = "openai/glm-5.3" # routed to Z.ai by the workflow's OPENAI_API_BASE
+fallback_models = []
+custom_model_max_tokens = 128000
+
+[github_action_config]
+auto_review = true
+auto_improve = true
+auto_describe = false # pull request titles and bodies here are written by hand
+pr_actions = ["opened", "reopened", "ready_for_review"]
+# New commits re-run the review and the suggestions incrementally; the
+# persistent comments are updated in place rather than duplicated.
+handle_push_trigger = true
+push_commands = ["/review", "/improve"]
+
+[pr_reviewer]
+extra_instructions = """
+Hold the change to the repo conventions in AGENTS.md: Bun not node, the hexagonal layer boundaries (domain/, ports/, app/, adapters/, server/, src/), and the retro design language with smaller screens kept usable. This is a solo project — a few real findings beat a full checklist, and a sound change gets a clean review, not invented findings.
+"""
+require_score_review = false
+require_estimate_effort_to_review = false
+require_ticket_analysis_review = false # no tickets are tracked for this repo
+require_security_review = true
+require_merge_recommendation = true # the plain verdict line: no_concerns_found / needs_review / changes_required
+inline_key_issues = true # findings as inline comments on the diff, not only in the table
+num_max_findings = 4
+enable_help_text = false
+
+[pr_code_suggestions]
+committable_code_suggestions = true # render suggestions GitHub can apply on click
+suggestions_score_threshold = 4 # below this the suggestion is noise, not signal
+enable_help_text = false
