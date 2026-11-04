@@ -14,7 +14,7 @@ on:
 # A new push supersedes the review of the previous head; a manual command is
 # never cancelled by an unrelated comment landing on the same pull request.
 concurrency:
-  group: pr-agent-${{ github.event_name }}-${{ github.event.pull_request.number || github.event.issue.number }}
+  group: pr-agent-${{ github.event.pull_request.number || github.event.issue.number }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
