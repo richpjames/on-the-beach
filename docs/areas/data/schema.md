@@ -17,5 +17,9 @@
 ## Modeling notes
 
 - Titles and artist names are normalized for searching and deduping.
+- Duplicate detection keys on the *work*, not the pressing: two items match
+  when they share a MusicBrainz release-group, a Discogs master, or either
+  release id (the Discogs release id doubles as the work key when Discogs has
+  no master) — the same grain the resolution eval scores at.
 - Link metadata is stored as JSON text when a source needs extra embed fields.
 - Ordering is persisted by browse context, not globally, via keys from `domain/music-list-context.ts`.

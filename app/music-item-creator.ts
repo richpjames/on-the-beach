@@ -529,11 +529,12 @@ const scrapingMachine = setup({
       const byId = new Map<number, MusicItemFull>(existingItems.map((item) => [item.id, item]));
       for (const candidate of candidates) {
         if (byId.size >= DUPLICATE_MATCH_LIMIT) break;
-        const found = await findDuplicateItems(
-          candidate.artistName,
-          candidate.title,
-          overrides?.musicbrainzReleaseId,
-        );
+        const found = await findDuplicateItems(candidate.artistName, candidate.title, {
+          musicbrainzReleaseId: overrides?.musicbrainzReleaseId,
+          musicbrainzReleaseGroupId: overrides?.musicbrainzReleaseGroupId,
+          discogsReleaseId: overrides?.discogsReleaseId,
+          discogsMasterId: overrides?.discogsMasterId,
+        });
         for (const item of found) byId.set(item.id, item);
       }
       return [...byId.values()].slice(0, DUPLICATE_MATCH_LIMIT);
