@@ -228,8 +228,11 @@ describe("work-key duplicate detection", () => {
     try {
       await createMusicItemDirect(
         {
+          // A different title, so only the shared Discogs master can match —
+          // the pre-existing normalized title + artist check would otherwise
+          // satisfy this test on its own.
           artistName: "Celia Cruz",
-          title: "Son con Guaguancó",
+          title: "Son con Guaguancó Reissue",
           discogsReleaseId: 222222,
           discogsMasterId: 706722,
         },
