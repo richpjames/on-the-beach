@@ -186,6 +186,112 @@ describe("warn-mode duplicate detection", () => {
   });
 });
 
+describe("work-key duplicate detection", () => {
+  test("another pressing of the same album matches on the MusicBrainz release-group", async () => {
+    // The pressing a photo resolves to and the pressing a link resolved to are
+    // different releases of the same album — the release-group is the work.
+    await createMusicItemDirect({
+      artistName: "Orquesta El Macabeo",
+      title: "Salsa Bestial",
+      musicbrainzReleaseId: "pressing-a",
+      musicbrainzReleaseGroupId: "rg-salsa-bestial",
+    });
+
+    let thrown: unknown;
+    try {
+      await createMusicItemDirect(
+        {
+          artistName: "Orquesta El Macabeo",
+          title: "Salsa Bestial (Remastered)",
+          musicbrainzReleaseId: "pressing-b",
+          musicbrainzReleaseGroupId: "rg-salsa-bestial",
+        },
+        { warnOnDuplicate: true },
+      );
+    } catch (error) {
+      thrown = error;
+    }
+
+    expect(thrown).toBeInstanceOf(DuplicateItemSelectionError);
+    expect((thrown as DuplicateItemSelectionError).payload.items[0]!.title).toBe("Salsa Bestial");
+  });
+
+  test("a shared Discogs master matches even with different release ids", async () => {
+    await createMusicItemDirect({
+      artistName: "Celia Cruz",
+      title: "Son con Guaguancó",
+      discogsReleaseId: 111111,
+      discogsMasterId: 706722,
+    });
+
+    let thrown: unknown;
+    try {
+      await createMusicItemDirect(
+        {
+          artistName: "Celia Cruz",
+          title: "Son con Guaguancó",
+          discogsReleaseId: 222222,
+          discogsMasterId: 706722,
+        },
+        { warnOnDuplicate: true },
+      );
+    } catch (error) {
+      thrown = error;
+    }
+
+    expect(thrown).toBeInstanceOf(DuplicateItemSelectionError);
+  });
+
+  test("a Discogs release id matches on its own — it is the work key when there is no master", async () => {
+    // 18 fixtures have master_id: 0; there the release id is the identity.
+    await createMusicItemDirect({
+      artistName: "Típico Santa Rosa",
+      title: "Típico Santa Rosa",
+      discogsReleaseId: 333333,
+    });
+
+    let thrown: unknown;
+    try {
+      await createMusicItemDirect(
+        {
+          artistName: "Típico Santa Rosa",
+          title: "Típico Santa Rosa (repress)",
+          discogsReleaseId: 333333,
+        },
+        { warnOnDuplicate: true },
+      );
+    } catch (error) {
+      thrown = error;
+    }
+
+    expect(thrown).toBeInstanceOf(DuplicateItemSelectionError);
+  });
+
+  test("a different release-group is not a duplicate", async () => {
+    // Guaco 76 and Guaco 77: maximally similar strings, different records —
+    // the work keys must keep them apart, not conflate them.
+    await createMusicItemDirect({
+      artistName: "Grupo Guaco",
+      title: "Guaco 76",
+      musicbrainzReleaseId: "mb-guaco-76",
+      musicbrainzReleaseGroupId: "rg-guaco-76",
+    });
+
+    const { item, created } = await createMusicItemDirect(
+      {
+        artistName: "Grupo Guaco",
+        title: "Guaco 77",
+        musicbrainzReleaseId: "mb-guaco-77",
+        musicbrainzReleaseGroupId: "rg-guaco-77",
+      },
+      { warnOnDuplicate: true },
+    );
+
+    expect(created).toBe(true);
+    expect(item.title).toBe("Guaco 77");
+  });
+});
+
 describe("warn-mode duplicate detection on URL adds", () => {
   test("re-adding the same link warns instead of silently returning the existing item", async () => {
     await addMixcloudShows();

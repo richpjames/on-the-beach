@@ -56,23 +56,65 @@ function isBlankOrUntitled(title: string): boolean {
 }
 
 /**
+ * Work-level identity for a release. A photograph or a link captures one
+ * *pressing*, but the list should not grow a second copy of an album just
+ * because a different pressing resolved to different pressing-level ids —
+ * so duplicates key on the work, not the pressing:
+ *
+ * - MusicBrainz: the release-group. Two releases sharing one are the same
+ *   album; the release id stays in as a pressing-level key because equal
+ *   pressings are trivially the same work too.
+ * - Discogs: the master. Where Discogs has no master (`master_id: 0`) the
+ *   release id itself is the work key, so it is matched directly.
+ *
+ * Same grain the resolution eval scores at — see
+ * `docs/plans/2026-08-16-release-resolution-eval.md`, §0.1.
+ */
+export interface ReleaseWorkKeys {
+  musicbrainzReleaseId?: string;
+  musicbrainzReleaseGroupId?: string;
+  discogsReleaseId?: number;
+  discogsMasterId?: number;
+}
+
+function hasAnyWorkKey(keys: ReleaseWorkKeys): boolean {
+  return Boolean(
+    keys.musicbrainzReleaseId ||
+    keys.musicbrainzReleaseGroupId ||
+    keys.discogsReleaseId ||
+    keys.discogsMasterId,
+  );
+}
+
+/**
  * Library-wide duplicate check — the one the URL-keyed checks can't do. An
- * item matches when it shares the MusicBrainz release id, or when both the
- * normalized title and the artist's normalized name agree. A title without an
- * artist matches nothing: "Greatest Hits" alone is not a duplicate of
- * anything. Returns at most `DUPLICATE_MATCH_LIMIT` full items.
+ * item matches when it is the same *work*: a shared work-level id (MusicBrainz
+ * release-group, Discogs master), a shared pressing-level id (either release
+ * id), or when both the normalized title and the artist's normalized name
+ * agree. A title without an artist matches nothing: "Greatest Hits" alone is
+ * not a duplicate of anything. Returns at most `DUPLICATE_MATCH_LIMIT` full
+ * items.
  */
 export async function findDuplicateItems(
   artistName: string | undefined,
   title: string,
-  musicbrainzReleaseId?: string,
+  workKeys: ReleaseWorkKeys = {},
 ): Promise<MusicItemFull[]> {
   const titleUsable = !isBlankOrUntitled(title);
-  if (!titleUsable && !musicbrainzReleaseId) return [];
+  if (!titleUsable && !hasAnyWorkKey(workKeys)) return [];
 
   const conditions = [];
-  if (musicbrainzReleaseId) {
-    conditions.push(eq(musicItems.musicbrainzReleaseId, musicbrainzReleaseId));
+  if (workKeys.musicbrainzReleaseGroupId) {
+    conditions.push(eq(musicItems.musicbrainzReleaseGroupId, workKeys.musicbrainzReleaseGroupId));
+  }
+  if (workKeys.discogsMasterId) {
+    conditions.push(eq(musicItems.discogsMasterId, workKeys.discogsMasterId));
+  }
+  if (workKeys.musicbrainzReleaseId) {
+    conditions.push(eq(musicItems.musicbrainzReleaseId, workKeys.musicbrainzReleaseId));
+  }
+  if (workKeys.discogsReleaseId) {
+    conditions.push(eq(musicItems.discogsReleaseId, workKeys.discogsReleaseId));
   }
   if (titleUsable && artistName?.trim()) {
     const [artist] = await db
@@ -228,7 +270,12 @@ export async function createMusicItemDirect(
   const artistName = overrides.artistName;
 
   if (options.warnOnDuplicate && !options.forceDuplicate) {
-    const duplicates = await findDuplicateItems(artistName, title, overrides.musicbrainzReleaseId);
+    const duplicates = await findDuplicateItems(artistName, title, {
+      musicbrainzReleaseId: overrides.musicbrainzReleaseId,
+      musicbrainzReleaseGroupId: overrides.musicbrainzReleaseGroupId,
+      discogsReleaseId: overrides.discogsReleaseId,
+      discogsMasterId: overrides.discogsMasterId,
+    });
     if (duplicates.length > 0) {
       throw new DuplicateItemSelectionError({
         kind: "duplicate_item",
