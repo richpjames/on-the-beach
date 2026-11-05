@@ -202,7 +202,10 @@ describe("work-key duplicate detection", () => {
       await createMusicItemDirect(
         {
           artistName: "Orquesta El Macabeo",
-          title: "Salsa Bestial (Remastered)",
+          // Keep the difference at the word level: if normalize() strips
+          // parenthetical qualifiers, "(Remastered)" would vanish and the
+          // plain title + artist match would pass this test on its own.
+          title: "Salsa Bestial Remastered edition",
           musicbrainzReleaseId: "pressing-b",
           musicbrainzReleaseGroupId: "rg-salsa-bestial",
         },
