@@ -261,7 +261,7 @@ describe("work-key duplicate detection", () => {
       await createMusicItemDirect(
         {
           artistName: "Típico Santa Rosa",
-          title: "Típico Santa Rosa (repress)",
+          title: "Típico Santa Rosa repress edition",
           discogsReleaseId: 333333,
         },
         { warnOnDuplicate: true },
