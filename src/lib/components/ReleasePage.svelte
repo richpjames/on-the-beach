@@ -552,6 +552,51 @@
   };
   const originLine = $derived(originLabels[item.origin] || null);
 
+  // What the catalogue resolver made of this record, in plain terms — the
+  // provenance line beside "Added from a photo". The catalogue names link to
+  // the entry the resolver verified, so "matched" is checkable at a glance.
+  // Hidden when resolution never ran (`resolution_status` null): rows that
+  // predate the resolver, and every non-scan entry, read exactly as before.
+  type ResolutionSegment = { text: string; href?: string };
+  const resolutionSegments = $derived.by<ResolutionSegment[] | null>(() => {
+    const catalogues: ResolutionSegment[] = [];
+    if (item.discogs_release_id) {
+      catalogues.push({
+        text: "Discogs",
+        href: `https://www.discogs.com/release/${item.discogs_release_id}`,
+      });
+    }
+    if (item.musicbrainz_release_id) {
+      catalogues.push({
+        text: "MusicBrainz",
+        href: `https://musicbrainz.org/release/${item.musicbrainz_release_id}`,
+      });
+    }
+    const names = catalogues.map((segment) => segment.text);
+    switch (item.resolution_status) {
+      case "matched": {
+        if (catalogues.length === 0) return [{ text: "Matched in the catalogues" }];
+        const segments: ResolutionSegment[] = [{ text: "Matched in " }];
+        catalogues.forEach((segment, index) => {
+          if (index > 0) segments.push({ text: " and " });
+          segments.push(segment);
+        });
+        return segments;
+      }
+      case "partial":
+        // Partial means one queried catalogue didn't hold the record — so at
+        // most one id came back, and "only" is the honest word for it.
+        if (names.length === 1) return [{ text: "Matched in " }, catalogues[0]!, { text: " only" }];
+        return [{ text: "Matched in only one catalogue" }];
+      case "absent":
+        return [{ text: "Not in the Discogs or MusicBrainz catalogues" }];
+      case "failed":
+        return [{ text: "Catalogue lookup didn't complete" }];
+      default:
+        return null;
+    }
+  });
+
   // The "there" list: every way to reach this release away from the page,
   // named plainly — the source it came from, the streaming-service lookup when
   // it can't play in-app, and each hand-added link. The destination "listen
@@ -655,6 +700,20 @@
           {/if}
           {#if originLine}
             <p class="release-page__origin">{originLine}</p>
+          {/if}
+          {#if resolutionSegments}
+            <p class="release-page__origin release-page__resolution">
+              {#each resolutionSegments as segment}
+                {#if segment.href}
+                  <a
+                    class="release-page__resolution-link"
+                    href={segment.href}
+                    target="_blank"
+                    rel="noopener noreferrer">{segment.text}</a
+                  >
+                {:else}{segment.text}{/if}
+              {/each}
+            </p>
           {/if}
           <div class="release-page__notes-section">
             {#if notesState === "editing" || notesState === "saving"}
