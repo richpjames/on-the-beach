@@ -45,8 +45,10 @@ Two earlier shapes were rejected after an independent agent review:
 
 ### Why a PAT is load-bearing
 
-`MERGE_QUEUE_TOKEN` (a fine-grained PAT: Contents, Pull requests and Issues,
-read and write, this repo only — the `PI_FIX_TOKEN` shape) performs both the
+`MERGE_QUEUE_TOKEN` (a fine-grained PAT: Contents, Pull requests, Issues and
+Workflows, read and write, this repo only — the `PI_FIX_TOKEN` shape plus
+Workflows, because the queue pushes rebased branches and GitHub refuses a PAT
+push that changes `.github/workflows` without it) performs both the
 rebase push and the merge. Pushes and merges made with `github.token` **do not
 trigger other workflows**, so deploys (Test → Deploy) and TestFlight uploads
 would silently stop for every queue-merged PR. The `/queue` command and the
@@ -129,6 +131,7 @@ is `/queue`d.
 ## Setup (one time)
 
 1. Fine-grained PAT on `richpjames/on-the-beach`: Contents, Pull requests,
-   Issues — read and write. No expiry shorter than you're willing to renew.
+   Issues, Workflows — read and write. No expiry shorter than you're willing
+   to renew.
 2. Add it as the `MERGE_QUEUE_TOKEN` repository secret.
 3. Merge this PR; `/queue` something.

@@ -131,7 +131,7 @@ jobs:
                 exit 0
               fi
               if [ -z "$MERGE_QUEUE_TOKEN" ]; then
-                gh pr comment "$PR" --body "Merge queue: the MERGE_QUEUE_TOKEN repository secret is not set, so the queue cannot merge anything — with the workflow token instead, deploys and TestFlight uploads would silently stop. Add a fine-grained PAT (Contents, Pull requests and Issues, read and write, this repo only) as MERGE_QUEUE_TOKEN — see docs/plans/2026-11-04-merge-queue-design.md — then /queue again."
+                gh pr comment "$PR" --body "Merge queue: the MERGE_QUEUE_TOKEN repository secret is not set, so the queue cannot merge anything — with the workflow token instead, deploys and TestFlight uploads would silently stop. Add a fine-grained PAT (Contents, Pull requests, Issues and Workflows, read and write, this repo only — Workflows because the queue pushes rebased branches, and GitHub refuses a PAT push that changes .github/workflows without it) as MERGE_QUEUE_TOKEN — see docs/plans/2026-11-04-merge-queue-design.md — then /queue again."
                 exit 1
               fi
               # The triggering /queue comment is already on the PR, so the scan
@@ -214,13 +214,16 @@ jobs:
             fi
             head_ref=$(jq -r .headRefName "$RUNNER_TEMP/pr.json")
 
-            # The entry's own checks must not already be red (gh pr checks:
-            # 0 = green, 8 = pending, 1 = failing).
+            # The entry's own checks must not already be red. gh pr checks
+            # exits 1 for red checks, for "no checks reported" and for its
+            # own API errors (network, rate limit) alike, so only a returned
+            # listing is a verdict — anything else proceeds; the wait after
+            # the rebase is the real gate.
             set +e
-            gh pr checks "$pr" >/dev/null 2>&1
+            own_checks=$(gh pr checks "$pr" --json name 2>/dev/null)
             rc=$?
             set -e
-            if [ "$rc" -eq 1 ]; then
+            if [ "$rc" -eq 1 ] && [ -n "$own_checks" ]; then
               kick "$pr" "its own checks are failing — fix them and /queue again: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/pull/$pr/checks"
               return 1
             fi
@@ -241,33 +244,44 @@ jobs:
             if [ "$after" != "$before" ]; then
               # Push as the PAT, not github.token: only a PAT push triggers
               # the synchronize events that run the combined-tree checks.
+              # Capture the output (git prints everything to stderr) so a
+              # refused push can say why — a failed force-with-lease is only
+              # one of the ways it fails, and branch protection or a PAT
+              # without the Workflows permission (when the rebased commits
+              # touch .github/workflows) look the same from the exit code.
               auth=$(printf 'x-access-token:%s' "$MERGE_QUEUE_TOKEN" | base64 | tr -d '\n')
-              if ! git -c "http.$GITHUB_SERVER_URL/.extraheader=AUTHORIZATION: basic $auth" \
-                push --force-with-lease="refs/heads/$head_ref:$before" origin "HEAD:refs/heads/$head_ref"; then
-                kick "$pr" "its branch moved while the queue was working on it; /queue it again once it settles."
+              if ! push_err=$(git -c "http.$GITHUB_SERVER_URL/.extraheader=AUTHORIZATION: basic $auth" \
+                push --force-with-lease="refs/heads/$head_ref:$before" origin "HEAD:refs/heads/$head_ref" 2>&1); then
+                kick "$pr" "the rebased branch could not be pushed — the push was refused (branch moved, branch protection, or a PAT without the Workflows permission when workflow files changed):
+                ${push_err:0:600}"
                 return 1
               fi
+              printf '%s\n' "$push_err"
             else
               echo "::notice::$pr is already based on the current main — waiting on its existing checks."
             fi
 
-            # Wait for the checks on the combined tree (0 = green, 8 = pending).
+            # Wait for the checks on the combined tree. Only a returned
+            # listing is a verdict: gh pr checks exits 1 for red checks, for
+            # "no checks reported" (right after the rebase force-push the new
+            # head's runs have not registered yet — webhook → workflow
+            # queued) and for its own API errors (network, rate limit) alike.
+            # So zero checks is pending, never green, and a read error is
+            # pending too — a transient failure must not evict the entry,
+            # only a genuinely red listing may.
             deadline=$(( $(date +%s) + 75 * 60 ))
             while :; do
               set +e
               checks=$(gh pr checks "$pr" --json name 2>/dev/null)
               rc=$?
               set -e
-              n=$(printf '%s' "$checks" | jq 'length' 2>/dev/null || echo 0)
-              # rc=0 also covers "no checks reported": right after the rebase
-              # force-push the runs for the new head have not registered yet
-              # (webhook → workflow queued), so zero checks is pending, never
-              # green.
-              if [ "$rc" -eq 0 ] && [ "$n" -eq 0 ]; then
-                rc=8
+              # jq exits 0 with no output on empty input, so default n by hand.
+              n=$(printf '%s' "$checks" | jq 'length' 2>/dev/null || true)
+              n=${n:-0}
+              if [ "$n" -gt 0 ] && [ "$rc" -eq 0 ]; then
+                break
               fi
-              [ "$rc" -eq 0 ] && break
-              if [ "$rc" -ne 8 ]; then
+              if [ "$n" -gt 0 ] && [ "$rc" -eq 1 ]; then
                 kick "$pr" "the checks on main + this pull request failed: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/pull/$pr/checks"
                 return 1
               fi

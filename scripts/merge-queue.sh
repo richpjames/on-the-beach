@@ -74,8 +74,14 @@ queued_at() {
   return 1
 }
 
+# An if, not `[ -n "$ts" ] && printf …`: the loop's exit status is the last
+# body command's, and under `set -o pipefail` a failing test on the final
+# not-queued PR would fail the whole scan pipeline — and every caller runs the
+# scan under `bash -e`.
 for pr in $(gh pr list --repo "$GH_REPO" --state open --base main --limit 100 \
   --json number,isDraft --jq '.[] | select(.isDraft | not) | .number'); do
   ts=$(queued_at "$pr" || true)
-  [ -n "$ts" ] && printf '%s\t%s\n' "$pr" "$ts"
+  if [ -n "$ts" ]; then
+    printf '%s\t%s\n' "$pr" "$ts"
+  fi
 done | sort -t$'\t' -k2,2
