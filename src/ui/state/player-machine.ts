@@ -126,7 +126,13 @@ function isQueueTarget(value: unknown): value is QueueTarget {
   if (target.kind === "iframe") {
     // Every PlayerType a real source produces is valid here — Mixcloud embeds
     // queue as "bar", and rejecting it would silently drop them on reload.
-    return typeof target.src === "string" && PLAYER_TYPES.includes(target.playerType as PlayerType);
+    // https-only: this src is re-assigned to an <iframe> straight from
+    // localStorage, so schemes like javascript: or data: must not survive.
+    return (
+      typeof target.src === "string" &&
+      target.src.startsWith("https://") &&
+      PLAYER_TYPES.includes(target.playerType as PlayerType)
+    );
   }
   if (target.kind === "appleMusic") {
     return (
