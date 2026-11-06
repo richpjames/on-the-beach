@@ -24,10 +24,16 @@ on:
   schedule:
     - cron: '13,43 * * * *'
 
+# Once a permissions block exists every unlisted scope is none, so the read
+# scopes must be spelled out too: contents for the checkouts, checks and
+# statuses for the check-runs lookups behind gh pr checks.
 permissions:
+  contents: read
   pull-requests: write
   issues: write
   actions: write
+  checks: read
+  statuses: read
 
 jobs:
   command:
@@ -107,9 +113,13 @@ jobs:
               gh pr comment "$PR" --body-file "$RUNNER_TEMP/status.md"
               ;;
             /queue)
-              gh pr view "$PR" --json state,isDraft,isCrossRepository > "$RUNNER_TEMP/pr.json"
+              gh pr view "$PR" --json state,isDraft,isCrossRepository,baseRefName > "$RUNNER_TEMP/pr.json"
               if [ "$(jq -r .state "$RUNNER_TEMP/pr.json")" != OPEN ]; then
                 gh pr comment "$PR" --body "Merge queue: this pull request is not open."
+                exit 0
+              fi
+              if [ "$(jq -r .baseRefName "$RUNNER_TEMP/pr.json")" != main ]; then
+                gh pr comment "$PR" --body "Merge queue: only pull requests targeting main can be queued — the queue rebases onto main."
                 exit 0
               fi
               if [ "$(jq -r .isDraft "$RUNNER_TEMP/pr.json")" = true ]; then
@@ -245,9 +255,17 @@ jobs:
             deadline=$(( $(date +%s) + 75 * 60 ))
             while :; do
               set +e
-              gh pr checks "$pr" >/dev/null 2>&1
+              checks=$(gh pr checks "$pr" --json name 2>/dev/null)
               rc=$?
               set -e
+              n=$(printf '%s' "$checks" | jq 'length' 2>/dev/null || echo 0)
+              # rc=0 also covers "no checks reported": right after the rebase
+              # force-push the runs for the new head have not registered yet
+              # (webhook → workflow queued), so zero checks is pending, never
+              # green.
+              if [ "$rc" -eq 0 ] && [ "$n" -eq 0 ]; then
+                rc=8
+              fi
               [ "$rc" -eq 0 ] && break
               if [ "$rc" -ne 8 ]; then
                 kick "$pr" "the checks on main + this pull request failed: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/pull/$pr/checks"
@@ -262,7 +280,8 @@ jobs:
 
             # Re-validate immediately before merging: the tested head, the
             # base it was tested against, and the PR itself must be unchanged
-            # since the checks passed.
+            # since the checks passed; the queue re-scan just before the merge
+            # adds "still the queue head" to the list.
             gh pr view "$pr" --json state,isDraft,headRefOid > "$RUNNER_TEMP/pr2.json"
             if [ "$(jq -r .state "$RUNNER_TEMP/pr2.json")" != OPEN ] || [ "$(jq -r .isDraft "$RUNNER_TEMP/pr2.json")" = true ]; then
               return 1
@@ -282,6 +301,15 @@ jobs:
               [ "$m" != UNKNOWN ] && break
               sleep 5
             done
+
+            # Honor a /dequeue (or a re-queue to the back) that landed while
+            # the checks ran: re-scan the queue and only merge the entry that
+            # is still its head. Never kick here — a re-queued entry must
+            # survive to its later turn.
+            if [ "$(scripts/merge-queue.sh | head -1 | cut -f1)" != "$pr" ]; then
+              echo "::notice::$pr is no longer the head of the queue — skipping the merge; the queue moves on."
+              return 1
+            fi
 
             # Merge as the PAT so the landing push triggers Test → Deploy and
             # (on native changes) TestFlight, like any hand merge.

@@ -68,19 +68,21 @@ command still stands. Output: `pr\tjoined-at` lines, oldest first.
 ### `.github/workflows/merge-queue.yml`
 
 - **`command` job** (`issue_comment`): parses the command, checks real write
-  access, gates the PR state (open, non-draft, not a fork, token present),
-  mirrors the label, comments the position, and wakes the processor.
-  Per-PR concurrency with the event name in the key, so commands on one PR
-  supersede each other but nothing else can land in those groups.
+  access, gates the PR state (open, targeting `main`, non-draft, not a fork,
+  token present), mirrors the label, comments the position, and wakes the
+  processor. Per-PR concurrency with the event name in the key, so commands on
+  one PR supersede each other but nothing else can land in those groups.
 - **`process` job** (`workflow_dispatch` + half-hourly `schedule` watchdog):
   single concurrency lane (`merge-queue`, no cancelling). Per entry: validate
   → kick if own checks already red → fetch + rebase onto `main`
   (conflicts → kick) → PAT force-push with lease → poll `gh pr checks` until
-  green (75-minute budget; exit codes 0 green / 8 pending / 1 failing) →
+  green (75-minute budget; exit codes 0 green / 8 pending / 1 failing, and
+  "no checks reported yet" counts as pending — right after the force-push the
+  runs for the new head have not registered) →
   **re-validate immediately before merging** (head sha, base main sha, PR
-  state, no newer dequeue — the tested tree must still be the landable tree)
-  → PAT rebase merge → comment. Stops after 3 merges or 2.5 h and re-dispatches
-  itself if entries remain, respecting the 6-hour job cap.
+  state, no newer dequeue — the queue is re-scanned and the entry must still
+  be its head) → PAT rebase merge → comment. Stops after 3 merges or 2.5 h and
+  re-dispatches itself if entries remain, respecting the 6-hour job cap.
 
 ## Failure modes
 
