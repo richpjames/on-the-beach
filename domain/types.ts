@@ -126,6 +126,12 @@ export interface MusicItem {
   catalogue_number: string | null;
   musicbrainz_release_id: string | null;
   musicbrainz_artist_id: string | null;
+  /** Work-level catalogue ids from the release resolver (release-group, Discogs master). */
+  musicbrainz_release_group_id: string | null;
+  discogs_release_id: number | null;
+  discogs_master_id: number | null;
+  /** `matched` / `partial` / `absent` / `failed`, or null when never attempted. */
+  resolution_status: string | null;
   remind_at: string | null;
   reminder_pending: boolean;
   /** How the item entered the list — see `ItemOrigin`. */
