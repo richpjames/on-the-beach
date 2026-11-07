@@ -28,6 +28,7 @@ import { DuplicateItemSelectionError } from "../../app/music-item-store";
 import { hydrateItemStacks } from "../../domain/hydrate-item-stacks";
 import { scrapeAddedLink } from "../../app/added-link-scrape";
 import { collectDescendantStackIds } from "../../app/queries/stack-tree";
+import { fetchReleaseGroupIdForRelease } from "../../adapters/musicbrainz/index";
 import { saveArtwork, saveLabel } from "../../app/secondary-link-enrichment";
 import { UnsupportedMusicLinkError } from "../../app/scrape";
 import { ensureSuggestionsForItemNow, findPendingSuggestionsForItem } from "../../app/suggestions";
@@ -70,7 +71,6 @@ const DIRECT_UPDATE_FIELDS: ReadonlyArray<
   "country",
   "genre",
   "catalogueNumber",
-  "musicbrainzReleaseId",
   "musicbrainzArtistId",
 ];
 
@@ -189,6 +189,102 @@ async function applyLookupMarkerReset(id: number, setFields: MusicItemUpdateSet)
   if (renamed || reattributed) {
     setFields.lookupAttemptedAt = null;
   }
+}
+
+/**
+ * A hand-corrected catalogue match — the fix for a resolver false-ID. Any of
+ * the four id fields being present (null included; null clears) means the
+ * match was corrected by hand, which outranks whatever the resolver
+ * concluded: ids remaining → `matched`, stamped now as the strongest
+ * verification there is; all four cleared → back to never-attempted, so a
+ * future sweep can try again. Setting a MusicBrainz release id also derives
+ * its release-group — overwriting a stale one from the match being corrected
+ * — so work-key duplicate matching keeps working on hand-corrected rows.
+ * Best-effort: a failed lookup leaves the group as stored, never the whole
+ * edit.
+ *
+ * Returns an error message for a malformed id, or null when the update is
+ * fine (including when nothing resolution-shaped was sent at all).
+ */
+const RESOLUTION_ID_FIELDS = [
+  "musicbrainzReleaseId",
+  "musicbrainzReleaseGroupId",
+  "discogsReleaseId",
+  "discogsMasterId",
+] as const;
+
+type ResolutionIdField = (typeof RESOLUTION_ID_FIELDS)[number];
+
+async function applyResolutionUpdate(
+  id: number,
+  setFields: MusicItemUpdateSet,
+  input: UpdateMusicItemInput,
+): Promise<string | null> {
+  const sent = RESOLUTION_ID_FIELDS.filter((field) => input[field] !== undefined);
+  if (sent.length === 0) return null;
+
+  const picked: Partial<Record<ResolutionIdField, string | number | null>> = {};
+  for (const field of sent) {
+    const value = input[field];
+    if (value === null) {
+      picked[field] = null;
+      setFields[field] = null;
+      continue;
+    }
+    if (field === "discogsReleaseId" || field === "discogsMasterId") {
+      const numeric = typeof value === "number" ? value : Number(value);
+      if (!Number.isInteger(numeric) || numeric <= 0) {
+        return `${field} must be a whole number or null`;
+      }
+      picked[field] = numeric;
+    } else {
+      if (typeof value !== "string" || !value.trim()) {
+        return `${field} must be an id or null`;
+      }
+      picked[field] = value.trim();
+    }
+    setFields[field] = picked[field];
+  }
+
+  // The verdict is judged on the merged row, not just what was sent: a
+  // correction can set one id while others stay stored.
+  const rows = await db
+    .select({
+      musicbrainzReleaseId: musicItems.musicbrainzReleaseId,
+      musicbrainzReleaseGroupId: musicItems.musicbrainzReleaseGroupId,
+      discogsReleaseId: musicItems.discogsReleaseId,
+      discogsMasterId: musicItems.discogsMasterId,
+    })
+    .from(musicItems)
+    .where(eq(musicItems.id, id))
+    .limit(1);
+  const current = rows[0];
+  if (!current) return null; // the fetch below answers 404
+
+  const merged = { ...current, ...picked };
+  const anyId =
+    merged.musicbrainzReleaseId ||
+    merged.musicbrainzReleaseGroupId ||
+    merged.discogsReleaseId ||
+    merged.discogsMasterId;
+  setFields.resolutionStatus = anyId ? "matched" : null;
+  setFields.resolutionAttemptedAt = anyId ? new Date() : null;
+
+  if (
+    typeof picked.musicbrainzReleaseId === "string" &&
+    process.env.OTB_DISABLE_EXTERNAL_LOOKUPS !== "1"
+  ) {
+    try {
+      // Derive on every hand-set release id, overwriting a stale group from
+      // the match being corrected — the old group belongs to the wrong record.
+      const groupId = await fetchReleaseGroupIdForRelease(picked.musicbrainzReleaseId);
+      if (groupId) setFields.musicbrainzReleaseGroupId = groupId;
+    } catch {
+      // Best-effort, as promised — the release id is stored either way.
+    }
+  }
+
+  return null;
 }
 
 // ---------------------------------------------------------------------------
@@ -514,6 +610,11 @@ musicItemRoutes.patch("/:id", async (c) => {
   applyTitleUpdate(setFields, input);
   applyListenStatusUpdate(setFields, input);
   applyDirectUpdateFields(setFields, input);
+
+  const resolutionError = await applyResolutionUpdate(id, setFields, input);
+  if (resolutionError) {
+    return c.json({ error: resolutionError }, 400);
+  }
 
   if (!applyRatingUpdate(setFields, input)) {
     return c.json({ error: "rating must be null or a number from 0 to 100" }, 400);

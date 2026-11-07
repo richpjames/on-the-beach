@@ -237,6 +237,16 @@ export interface UpdateMusicItemInput {
   catalogueNumber?: string | null;
   musicbrainzReleaseId?: string | null;
   musicbrainzArtistId?: string | null;
+  /**
+   * Hand-corrected catalogue match. Sending any of these (null included —
+   * null clears) recomputes `resolutionStatus`: ids remaining means `matched`
+   * — a hand-set id is the strongest verification there is — while all four
+   * cleared returns the row to never-attempted. Accepts pasted URLs via
+   * `domain/catalogue-ref.ts` on the client.
+   */
+  musicbrainzReleaseGroupId?: string | null;
+  discogsReleaseId?: number | null;
+  discogsMasterId?: number | null;
 }
 
 // Query/filter types

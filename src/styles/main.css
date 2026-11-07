@@ -3489,6 +3489,14 @@ a:where(:hover) {
   min-width: 0;
 }
 
+/* The catalogue-match pair sits on one line where there's room; on a phone
+   the two long-URL fields each need the full width. */
+@media (max-width: 480px) {
+  .release-page__edit-row--match {
+    flex-direction: column;
+  }
+}
+
 .release-page__edit-artwork {
   display: flex;
   align-items: center;

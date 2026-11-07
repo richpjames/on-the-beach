@@ -11,6 +11,7 @@
     SourceName,
   } from "../../../domain/types";
   import { parseAppleMusicCatalogUrl, type AppleMusicResource } from "../../../domain/apple-music";
+  import { catalogueMatchUpdates } from "../../ui/logic/catalogue-match";
   import { api, apiFetch } from "../api";
   import { encodeImageFile } from "../encode-image";
   import { player } from "../player.svelte";
@@ -288,6 +289,8 @@
   let editCountry = $state(item.country ?? "");
   let editGenre = $state(item.genre ?? "");
   let editCatalogue = $state(item.catalogue_number ?? "");
+  let editDiscogs = $state(item.discogs_release_id != null ? String(item.discogs_release_id) : "");
+  let editMbRelease = $state(item.musicbrainz_release_id ?? "");
   let editNotes = $state(item.notes ?? "");
   let editArtworkUrl = $state(item.artwork_url ?? "");
 
@@ -326,7 +329,14 @@
     notesState = "idle";
   }
 
+  // The catalogue match is computed by `ui/logic/catalogue-match.ts` —
+  // paste to correct, empty both to clear the whole match.
   async function saveChanges(): Promise<void> {
+    const matchUpdates = catalogueMatchUpdates(editDiscogs, editMbRelease, item);
+    if ("error" in matchUpdates) {
+      alert(matchUpdates.error);
+      return;
+    }
     const body = {
       title: editTitle.trim() || undefined,
       artistName: editArtist.trim() || undefined,
@@ -337,6 +347,7 @@
       catalogueNumber: editCatalogue.trim() || null,
       notes: editNotes.trim() || null,
       artworkUrl: editArtworkUrl.trim() || null,
+      ...matchUpdates,
     };
     const res = await apiFetch(`/api/music-items/${item.id}`, {
       method: "PATCH",
@@ -829,6 +840,24 @@
               placeholder="Catalogue number"
               bind:value={editCatalogue}
             />
+            <div class="release-page__edit-row release-page__edit-row--match">
+              <input
+                class="input"
+                type="text"
+                id="edit-discogs"
+                placeholder="Discogs link or number"
+                inputmode="url"
+                bind:value={editDiscogs}
+              />
+              <input
+                class="input"
+                type="text"
+                id="edit-mb-release"
+                placeholder="MusicBrainz link or id"
+                inputmode="url"
+                bind:value={editMbRelease}
+              />
+            </div>
             <textarea class="input" id="edit-notes" placeholder="Notes" bind:value={editNotes}></textarea>
             <div class="release-page__edit-artwork">
               <input
