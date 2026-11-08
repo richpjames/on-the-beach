@@ -10,6 +10,13 @@ import {
   similarity,
   stripCreditClause,
 } from "../../app/release-resolver";
+import { clearSearchCache } from "../../adapters/search-cache";
+
+// Searches cached by an earlier test would bypass this test's fetch mocks —
+// the resolver repeats queries across tests, so the cache must not outlive one.
+afterEach(() => {
+  clearSearchCache();
+});
 
 describe("normalizeForMatch", () => {
   test("strips diacritics so a sleeve without accents matches a catalogue with them", () => {

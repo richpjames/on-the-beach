@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, mock, spyOn, test } from "bun:test";
+import { clearSearchCache } from "../../adapters/search-cache";
 import {
   findSuggestedReleases,
   fetchReleaseGroupDetail,
@@ -51,9 +52,12 @@ function queryOf(call: unknown): string {
 // "returns the release closest in year to sourceYear" came to see zero releases
 // on CI (a `{ artists: [...] }` shape has no `releases` key) while passing
 // locally, where the file order put it first. Start every test from an
-// unmocked fetch rather than trusting whatever ran before.
+// unmocked fetch rather than trusting whatever ran before. The search cache
+// is cleared for the same reason — a cached search would outlive the mocks
+// that produced it.
 beforeEach(() => {
   mock.restore();
+  clearSearchCache();
 });
 
 describe("findSuggestedReleases", () => {

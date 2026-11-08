@@ -1,5 +1,6 @@
 import type { ItemType, ReleaseLengthPreference } from "../../domain/types";
 import { titleMatchesAny } from "../../domain/title-similarity";
+import { cachedSearch } from "../search-cache";
 
 const MB_API_BASE = "https://musicbrainz.org/ws/2";
 // MusicBrainz requires a User-Agent identifying the app with contact info —
@@ -481,38 +482,40 @@ export async function searchArtistCandidates(
   limit = 5,
 ): Promise<MbArtistCandidate[]> {
   const params = new URLSearchParams({ query: artistName, limit: String(limit), fmt: "json" });
-  const response = await mbFetch(`${MB_API_BASE}/artist?${params}`);
-  if (!response.ok) {
-    throw new MusicBrainzHttpError(
-      response.status,
-      `MusicBrainz artist search returned ${response.status} for "${artistName}"`,
-    );
-  }
+  return cachedSearch(`mb:artist?${params}`, async () => {
+    const response = await mbFetch(`${MB_API_BASE}/artist?${params}`);
+    if (!response.ok) {
+      throw new MusicBrainzHttpError(
+        response.status,
+        `MusicBrainz artist search returned ${response.status} for "${artistName}"`,
+      );
+    }
 
-  const data = (await response.json()) as MbArtistCandidateResponse;
-  const raw = Array.isArray(data.artists) ? data.artists : [];
+    const data = (await response.json()) as MbArtistCandidateResponse;
+    const raw = Array.isArray(data.artists) ? data.artists : [];
 
-  return raw.flatMap((entry) => {
-    if (!entry || typeof entry !== "object") return [];
-    const artist = entry as Record<string, unknown>;
-    if (typeof artist.id !== "string" || typeof artist.name !== "string") return [];
-    const lifeSpan = (artist["life-span"] ?? {}) as Record<string, unknown>;
+    return raw.flatMap((entry) => {
+      if (!entry || typeof entry !== "object") return [];
+      const artist = entry as Record<string, unknown>;
+      if (typeof artist.id !== "string" || typeof artist.name !== "string") return [];
+      const lifeSpan = (artist["life-span"] ?? {}) as Record<string, unknown>;
 
-    return [
-      {
-        id: artist.id,
-        name: artist.name,
-        score: typeof artist.score === "number" ? artist.score : 0,
-        disambiguation:
-          typeof artist.disambiguation === "string" && artist.disambiguation.length > 0
-            ? artist.disambiguation
-            : null,
-        country: typeof artist.country === "string" ? artist.country : null,
-        type: typeof artist.type === "string" ? artist.type : null,
-        lifeSpanBegin: typeof lifeSpan.begin === "string" ? lifeSpan.begin : null,
-        lifeSpanEnd: typeof lifeSpan.end === "string" ? lifeSpan.end : null,
-      },
-    ];
+      return [
+        {
+          id: artist.id,
+          name: artist.name,
+          score: typeof artist.score === "number" ? artist.score : 0,
+          disambiguation:
+            typeof artist.disambiguation === "string" && artist.disambiguation.length > 0
+              ? artist.disambiguation
+              : null,
+          country: typeof artist.country === "string" ? artist.country : null,
+          type: typeof artist.type === "string" ? artist.type : null,
+          lifeSpanBegin: typeof lifeSpan.begin === "string" ? lifeSpan.begin : null,
+          lifeSpanEnd: typeof lifeSpan.end === "string" ? lifeSpan.end : null,
+        },
+      ];
+    });
   });
 }
 

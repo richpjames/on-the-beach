@@ -1,4 +1,5 @@
 import type { ItemType } from "../../domain/types";
+import { cachedSearch } from "../search-cache";
 
 const DISCOGS_API_BASE = "https://api.discogs.com";
 const USER_AGENT = "on-the-beach/1.0 (https://github.com/richpjames/on-the-beach)";
@@ -398,19 +399,21 @@ export async function searchReleases(
   if (query.q) params.set("q", query.q);
 
   const url = `${DISCOGS_API_BASE}/database/search?${params}`;
-  const response = await discogsFetch(url);
+  return cachedSearch(`discogs:${url}`, async () => {
+    const response = await discogsFetch(url);
 
-  if (!response.ok) {
-    throw new DiscogsHttpError(
-      response.status,
-      `Discogs search returned ${response.status} for ${JSON.stringify(query)}`,
-    );
-  }
+    if (!response.ok) {
+      throw new DiscogsHttpError(
+        response.status,
+        `Discogs search returned ${response.status} for ${JSON.stringify(query)}`,
+      );
+    }
 
-  const data = (await response.json()) as { results?: unknown[] };
-  const raw = Array.isArray(data.results) ? data.results : [];
-  return raw.flatMap((entry) => {
-    const parsed = parseSearchResult(entry);
-    return parsed ? [parsed] : [];
+    const data = (await response.json()) as { results?: unknown[] };
+    const raw = Array.isArray(data.results) ? data.results : [];
+    return raw.flatMap((entry) => {
+      const parsed = parseSearchResult(entry);
+      return parsed ? [parsed] : [];
+    });
   });
 }

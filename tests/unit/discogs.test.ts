@@ -5,6 +5,12 @@ import {
   parseDiscogsRelease,
   searchReleases,
 } from "../../adapters/discogs/index";
+import { clearSearchCache } from "../../adapters/search-cache";
+
+// A search cached by an earlier test would bypass this test's fetch mocks.
+afterEach(() => {
+  clearSearchCache();
+});
 
 function makeDiscogsResponse(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
