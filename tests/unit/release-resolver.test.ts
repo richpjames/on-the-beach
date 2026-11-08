@@ -257,14 +257,17 @@ describe("resolveDiscogs", () => {
   });
 
   test("stops the cascade on a transport error rather than reporting absence", async () => {
-    const { calls } = routeFetch({ discogs: [json({ message: "throttled" }, 429)] });
+    // Four deep: the first try plus each rung of the retry ladder. A 429 that
+    // never clears is what "failed" means now — a single one is retried.
+    const throttled = (): Response => json({ message: "throttled" }, 429);
+    const { calls } = routeFetch({ discogs: [throttled(), throttled(), throttled(), throttled()] });
 
     const result = await resolveDiscogs(QUERY);
 
     // A 429 says nothing about whether the record exists. Falling through to
     // the next variant would turn one refused request into a false "absent".
     expect(result.kind).toBe("failed");
-    expect(calls).toHaveLength(1);
+    expect(calls).toHaveLength(4);
   });
 });
 
@@ -316,9 +319,11 @@ describe("resolveRelease", () => {
   });
 
   test("reports 'failed', not 'partial', when a provider errors after the other succeeded", async () => {
+    const throttled = (): Response => json({ error: "unavailable" }, 503);
     routeFetch({
       discogs: [json({ results: [DISCOGS_HIT] })],
-      mbRelease: [json({ error: "unavailable" }, 503)],
+      // MusicBrainz stays throttled across the whole ladder.
+      mbRelease: [throttled(), throttled(), throttled(), throttled()],
       mbArtist: [json({ artists: [] })],
     });
 

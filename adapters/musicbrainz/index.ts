@@ -38,6 +38,20 @@ const sleep = (ms: number): Promise<void> =>
 
 let gateTail: Promise<void> = Promise.resolve();
 
+// A 503 from MusicBrainz means "slow down", not "no such record" — and a
+// resolver that recorded it as an absence is exactly what put wrong entries in
+// the eval fixtures. The ladder is the one the eval harness measured out over
+// sustained sweeps; env-overridable so tests (see tests/unit/preload.ts) can
+// collapse it to nothing.
+function retryBackoffMs(): number[] {
+  const fromEnv = process.env.OTB_PROVIDER_RETRY_BACKOFF_MS;
+  if (fromEnv !== undefined) {
+    const parsed = fromEnv.split(",").map((value) => Number(value));
+    if (parsed.every((value) => Number.isFinite(value) && value >= 0)) return parsed;
+  }
+  return [2_000, 5_000, 12_000];
+}
+
 // A wedged MusicBrainz connection would otherwise hang callers indefinitely —
 // fetch has no default timeout — and, worse, hold the gate shut for everyone
 // queued behind it.
@@ -45,15 +59,24 @@ const MB_FETCH_TIMEOUT_MS = 15_000;
 
 function mbFetch(url: string): Promise<Response> {
   const gap = minRequestGapMs();
-  const turn = gateTail.then(() =>
-    fetch(url, {
-      headers: { "User-Agent": USER_AGENT, Accept: "application/json" },
-      signal: AbortSignal.timeout(MB_FETCH_TIMEOUT_MS),
-    }),
-  );
-  // The next caller waits for this request to finish plus the minimum gap.
-  // Failures must not wedge the queue, so the tail swallows them — the
-  // rejection is still delivered to the caller through `turn`.
+  const backoffs = retryBackoffMs();
+  const turn = gateTail.then(async () => {
+    let response: Response | null = null;
+    for (let attempt = 0; attempt <= backoffs.length; attempt += 1) {
+      if (attempt > 0) await sleep(backoffs[attempt - 1]!);
+      response = await fetch(url, {
+        headers: { "User-Agent": USER_AGENT, Accept: "application/json" },
+        signal: AbortSignal.timeout(MB_FETCH_TIMEOUT_MS),
+      });
+      // Throttling is the only retriable answer: every other status is the
+      // provider's considered response to the question asked.
+      if (response.status !== 503 && response.status !== 429) return response;
+    }
+    return response!;
+  });
+  // The next caller waits for this request — retries included — plus the
+  // minimum gap. Failures must not wedge the queue, so the tail swallows
+  // them — the rejection is still delivered to the caller through `turn`.
   gateTail = turn.then(
     () => sleep(gap),
     () => sleep(gap),

@@ -59,14 +59,37 @@ let gateTail: Promise<void> = Promise.resolve();
 
 const DISCOGS_FETCH_TIMEOUT_MS = 15_000;
 
+// A 429 means "slow down", not "no such record" — answering a resolver with
+// it as a failure is how a throttled sweep ends up half-done (seen live during
+// the first resolution backfill run). Same ladder and env override as the
+// MusicBrainz gate; tests collapse it via tests/unit/preload.ts.
+function retryBackoffMs(): number[] {
+  const fromEnv = process.env.OTB_PROVIDER_RETRY_BACKOFF_MS;
+  if (fromEnv !== undefined) {
+    const parsed = fromEnv.split(",").map((value) => Number(value));
+    if (parsed.every((value) => Number.isFinite(value) && value >= 0)) return parsed;
+  }
+  return [2_000, 5_000, 12_000];
+}
+
 function discogsFetch(url: string, timeoutMs = DISCOGS_FETCH_TIMEOUT_MS): Promise<Response> {
   const gap = minRequestGapMs();
-  const turn = gateTail.then(() =>
-    fetch(url, { headers: discogsHeaders(), signal: AbortSignal.timeout(timeoutMs) }),
-  );
-  // The next caller waits for this request to finish plus the minimum gap.
-  // Failures must not wedge the queue, so the tail swallows them — the
-  // rejection is still delivered to the caller through `turn`.
+  const backoffs = retryBackoffMs();
+  const turn = gateTail.then(async () => {
+    let response: Response | null = null;
+    for (let attempt = 0; attempt <= backoffs.length; attempt += 1) {
+      if (attempt > 0) await sleep(backoffs[attempt - 1]!);
+      response = await fetch(url, {
+        headers: discogsHeaders(),
+        signal: AbortSignal.timeout(timeoutMs),
+      });
+      if (response.status !== 503 && response.status !== 429) return response;
+    }
+    return response!;
+  });
+  // The next caller waits for this request — retries included — plus the
+  // minimum gap. Failures must not wedge the queue, so the tail swallows them
+  // — the rejection is still delivered to the caller through `turn`.
   gateTail = turn.then(
     () => sleep(gap),
     () => sleep(gap),
