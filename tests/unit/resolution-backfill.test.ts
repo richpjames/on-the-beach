@@ -123,6 +123,7 @@ describe("backfillResolutionForRow", () => {
       title: item.title,
       artist: "Orquesta El Macabeo",
       year: null,
+      musicbrainzArtistId: null,
     });
     expect(status).toBe("matched");
 
@@ -148,6 +149,7 @@ describe("backfillResolutionForRow", () => {
       title: item.title,
       artist: "Típico Santa Rosa",
       year: null,
+      musicbrainzArtistId: null,
     });
     expect(status).toBe("absent");
 
@@ -155,6 +157,69 @@ describe("backfillResolutionForRow", () => {
     expect(row.discogsReleaseId).toBeNull();
     expect(row.resolutionStatus).toBe("absent");
     expect(row.resolutionAttemptedAt).not.toBeNull();
+  });
+
+  test("an artist MBID from another path is never overwritten", async () => {
+    const { item } = await createMusicItemDirect({
+      artistName: "Identity Artist",
+      title: "Confirmed Elsewhere",
+    });
+    // The artist-identity backfill stamped this; the resolver must not touch it.
+    await db
+      .update(musicItems)
+      .set({ musicbrainzArtistId: "confirmed-mba" })
+      .where(eq(musicItems.id, item.id));
+    resolveRelease.mockResolvedValueOnce({
+      status: "matched",
+      ids: {
+        musicbrainzReleaseId: "mb-2",
+        musicbrainzReleaseGroupId: "rg-2",
+        musicbrainzArtistId: "resolver-guess-mba",
+        discogsReleaseId: 222222,
+        discogsMasterId: 333333,
+        confidence: 0.9,
+      },
+    });
+
+    const rows = await findResolutionBackfillRows(null);
+    const row = rows.find((r) => r.id === item.id)!;
+    const status = await backfillResolutionForRow(row);
+    expect(status).toBe("matched");
+
+    const [stored] = await db.select().from(musicItems).where(eq(musicItems.id, item.id));
+    expect(stored.musicbrainzArtistId).toBe("confirmed-mba");
+    expect(stored.discogsReleaseId).toBe(222222);
+  });
+
+  test("a row that gained ids after selection is skipped, not overwritten", async () => {
+    const { item } = await createMusicItemDirect({
+      artistName: "Racing Artist",
+      title: "Won By Another Path",
+    });
+    // Selected while eligible, then a live scan wrote an id before the sweep
+    // reached it — the finder's snapshot is now stale.
+    const rows = await findResolutionBackfillRows(null);
+    const staleRow = rows.find((r) => r.id === item.id)!;
+    await db.update(musicItems).set({ discogsReleaseId: 987654 }).where(eq(musicItems.id, item.id));
+    resolveRelease.mockResolvedValueOnce({
+      status: "matched",
+      ids: {
+        musicbrainzReleaseId: "mb-3",
+        musicbrainzReleaseGroupId: "rg-3",
+        musicbrainzArtistId: null,
+        discogsReleaseId: 111111,
+        discogsMasterId: 222222,
+        confidence: 0.9,
+      },
+    });
+
+    const status = await backfillResolutionForRow(staleRow);
+    expect(status).toBe("skipped");
+
+    const [stored] = await db.select().from(musicItems).where(eq(musicItems.id, item.id));
+    expect(stored.discogsReleaseId).toBe(987654);
+    expect(stored.musicbrainzReleaseId).toBeNull();
+    expect(stored.resolutionStatus).toBeNull();
   });
 
   test("a throw reads as a failed attempt — stamped, retryable, sweep continues", async () => {
@@ -184,7 +249,7 @@ describe("runResolutionBackfill", () => {
     expect(seen.length).toBe(summary.processed);
     expect(summary.absent).toBeGreaterThan(0);
     expect(summary.processed).toBe(
-      summary.matched + summary.partial + summary.absent + summary.failed,
+      summary.matched + summary.partial + summary.absent + summary.failed + summary.skipped,
     );
   });
 });

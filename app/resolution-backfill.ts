@@ -13,11 +13,15 @@ import { resolveRelease, type ResolutionStatus } from "./release-resolver";
 // and artwork fall back to nothing for exactly the records that have been
 // there longest. This sweep resolves them.
 //
-// Eligibility is deliberately narrow: rows with no status and no ids of any
-// kind. A row that already carries an id from another path (an Apple Music
-// backfill, a hand correction) keeps its own provenance — the sweep confirms
-// nothing and contradicts nothing. `absent` is terminal, so re-running never
-// re-asks about records neither database holds; `failed` is retryable.
+// Eligibility is deliberately narrow: rows with no status and no release-
+// level ids of any kind. A row that already carries a release id from another
+// path (an Apple Music backfill, a hand correction) keeps its own provenance —
+// the sweep confirms nothing and contradicts nothing. An artist MBID alone
+// doesn't identify a release, so a row carrying only one (stamped by the
+// artist-identity backfill, say) stays eligible for its release ids — but the
+// sweep never overwrites an artist MBID that's already there. `absent` is
+// terminal, so re-running never re-asks about records neither database holds;
+// `failed` is retryable.
 //
 // The resolver paces its own provider requests in-process; the sweep adds a
 // delay between items. Run it off-peak: as a separate process it cannot share
@@ -29,11 +33,13 @@ export interface ResolutionBackfillRow {
   title: string;
   artist: string;
   year: number | null;
+  /** Carried so the sweep never overwrites one that already exists. */
+  musicbrainzArtistId: string | null;
 }
 
 const UNTITLED = normalize("Untitled");
 
-/** Rows the sweep may resolve: never attempted (or last attempt failed), no ids, a named artist, a real title. */
+/** Rows the sweep may resolve: never attempted (or last attempt failed), no release-level ids, a named artist, a real title. */
 export async function findResolutionBackfillRows(
   limit: number | null,
 ): Promise<ResolutionBackfillRow[]> {
@@ -43,6 +49,7 @@ export async function findResolutionBackfillRows(
       title: musicItems.title,
       artist: artists.name,
       year: musicItems.year,
+      musicbrainzArtistId: musicItems.musicbrainzArtistId,
     })
     .from(musicItems)
     .innerJoin(artists, eq(musicItems.artistId, artists.id))
@@ -73,26 +80,44 @@ export async function findResolutionBackfillRows(
  */
 export async function backfillResolutionForRow(
   row: ResolutionBackfillRow,
-): Promise<ResolutionStatus> {
+): Promise<ResolutionStatus | "skipped"> {
   const outcome = await resolveRelease({ artist: row.artist, title: row.title, year: row.year });
 
   const ids = outcome.status === "matched" || outcome.status === "partial" ? outcome.ids : null;
-  await db
+  // An artist MBID from another path (the artist-identity backfill, a hand
+  // correction) outranks the resolver's — only write one where none exists.
+  const artistIdWrite =
+    ids?.musicbrainzArtistId && !row.musicbrainzArtistId
+      ? { musicbrainzArtistId: ids.musicbrainzArtistId }
+      : {};
+  const written = await db
     .update(musicItems)
     .set({
       ...(ids?.musicbrainzReleaseId ? { musicbrainzReleaseId: ids.musicbrainzReleaseId } : {}),
       ...(ids?.musicbrainzReleaseGroupId
         ? { musicbrainzReleaseGroupId: ids.musicbrainzReleaseGroupId }
         : {}),
-      ...(ids?.musicbrainzArtistId ? { musicbrainzArtistId: ids.musicbrainzArtistId } : {}),
+      ...artistIdWrite,
       ...(ids?.discogsReleaseId ? { discogsReleaseId: ids.discogsReleaseId } : {}),
       ...(ids?.discogsMasterId ? { discogsMasterId: ids.discogsMasterId } : {}),
       resolutionStatus: outcome.status,
       resolutionAttemptedAt: new Date(),
     })
-    .where(eq(musicItems.id, row.id));
+    // Re-assert no-release-ids eligibility at write time: a paced sweep runs
+    // alongside live scans and other backfills, and a row that gained ids
+    // since selection keeps them — this update simply matches nothing.
+    .where(
+      and(
+        eq(musicItems.id, row.id),
+        isNull(musicItems.musicbrainzReleaseId),
+        isNull(musicItems.musicbrainzReleaseGroupId),
+        isNull(musicItems.discogsReleaseId),
+        isNull(musicItems.discogsMasterId),
+      ),
+    )
+    .returning({ id: musicItems.id });
 
-  return outcome.status;
+  return written.length === 0 ? "skipped" : outcome.status;
 }
 
 export interface ResolutionBackfillSummary {
@@ -101,13 +126,15 @@ export interface ResolutionBackfillSummary {
   partial: number;
   absent: number;
   failed: number;
+  /** Selected, but gained ids from another path before the write landed. */
+  skipped: number;
 }
 
 /** Run the sweep over every eligible row, paced, counting each verdict. */
 export async function runResolutionBackfill(
   limit: number | null,
   delayMs: number,
-  onProgress?: (row: ResolutionBackfillRow, status: ResolutionStatus) => void,
+  onProgress?: (row: ResolutionBackfillRow, status: ResolutionStatus | "skipped") => void,
 ): Promise<ResolutionBackfillSummary> {
   const rows = await findResolutionBackfillRows(limit);
   const summary: ResolutionBackfillSummary = {
@@ -116,24 +143,32 @@ export async function runResolutionBackfill(
     partial: 0,
     absent: 0,
     failed: 0,
+    skipped: 0,
   };
 
   for (const row of rows) {
-    let status: ResolutionStatus;
+    let status: ResolutionStatus | "skipped";
     try {
       status = await backfillResolutionForRow(row);
     } catch (err) {
       // A throw mid-row (transport, db) reads as a failed attempt: stamp it,
-      // stay retryable, keep sweeping.
+      // stay retryable, keep sweeping. The stamp itself is guarded — a throw
+      // caused by the database would take this update with it, and one bad
+      // row must not cost the whole sweep its summary.
       console.error(`[resolution-backfill] item ${row.id} threw`, err);
-      await db
-        .update(musicItems)
-        .set({ resolutionStatus: "failed", resolutionAttemptedAt: new Date() })
-        .where(eq(musicItems.id, row.id));
+      try {
+        await db
+          .update(musicItems)
+          .set({ resolutionStatus: "failed", resolutionAttemptedAt: new Date() })
+          .where(eq(musicItems.id, row.id));
+      } catch (stampErr) {
+        console.error(`[resolution-backfill] could not stamp item ${row.id} as failed`, stampErr);
+      }
       status = "failed";
     }
     summary.processed++;
-    summary[status]++;
+    if (status === "skipped") summary.skipped++;
+    else summary[status]++;
     onProgress?.(row, status);
     if (delayMs > 0) await new Promise((resolve) => setTimeout(resolve, delayMs));
   }

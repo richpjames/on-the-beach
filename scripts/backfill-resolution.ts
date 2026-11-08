@@ -46,6 +46,10 @@ function parseArgs(argv: string[]): Args {
         "Usage: bun run scripts/backfill-resolution.ts [--limit N] [--delay MS] [--dry-run]",
       );
       process.exit(0);
+    } else {
+      // A typo'd flag (--dryrun) must not fall through into a full mutating
+      // run that was meant to be a report.
+      throw new Error(`Unknown argument: ${arg}`);
     }
   }
   if (args.limit !== null && (!Number.isInteger(args.limit) || args.limit <= 0)) {
@@ -85,7 +89,8 @@ async function main() {
   console.log(
     `\nDone. ${summary.processed} processed — ` +
       `${summary.matched} matched, ${summary.partial} partial, ` +
-      `${summary.absent} absent (terminal), ${summary.failed} failed (retryable).`,
+      `${summary.absent} absent (terminal), ${summary.failed} failed (retryable)` +
+      (summary.skipped > 0 ? `, ${summary.skipped} skipped (gained ids mid-sweep).` : "."),
   );
 }
 
