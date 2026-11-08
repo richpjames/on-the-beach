@@ -28,3 +28,10 @@ if (process.env.OTB_MB_MIN_REQUEST_GAP_MS === undefined) {
 if (process.env.OTB_DISCOGS_MIN_REQUEST_GAP_MS === undefined) {
   process.env.OTB_DISCOGS_MIN_REQUEST_GAP_MS = "0";
 }
+
+// Both provider gates retry 503/429 with a backoff ladder ([2s, 5s, 12s] in
+// production — the ladder the eval measured). Tests mock fetch, so a retry
+// costs nothing to serve and the ladder would only burn wall-clock.
+if (process.env.OTB_PROVIDER_RETRY_BACKOFF_MS === undefined) {
+  process.env.OTB_PROVIDER_RETRY_BACKOFF_MS = "0,0,0";
+}

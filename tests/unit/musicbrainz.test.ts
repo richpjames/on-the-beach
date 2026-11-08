@@ -502,7 +502,7 @@ describe("findSuggestedReleases", () => {
   });
 
   test("throws on a non-2xx MusicBrainz response (e.g. rate limiting)", async () => {
-    spyOn(globalThis, "fetch").mockResolvedValueOnce(new Response("rate limited", { status: 503 }));
+    spyOn(globalThis, "fetch").mockResolvedValue(new Response("rate limited", { status: 503 }));
 
     expect(
       findSuggestedRelease({
@@ -546,7 +546,7 @@ describe("fetchReleaseGroupIdForRelease", () => {
   });
 
   test("throws on a non-2xx response so the caller can retry later", async () => {
-    spyOn(globalThis, "fetch").mockResolvedValueOnce(new Response("rate limited", { status: 503 }));
+    spyOn(globalThis, "fetch").mockResolvedValue(new Response("rate limited", { status: 503 }));
 
     expect(fetchReleaseGroupIdForRelease("r1")).rejects.toThrow("503");
   });
@@ -593,7 +593,7 @@ describe("fetchReleaseGroupUrlRelations", () => {
   });
 
   test("throws on a non-2xx response — a throttled request is not an absence of links", async () => {
-    spyOn(globalThis, "fetch").mockResolvedValueOnce(new Response("rate limited", { status: 503 }));
+    spyOn(globalThis, "fetch").mockResolvedValue(new Response("rate limited", { status: 503 }));
 
     expect(fetchReleaseGroupUrlRelations("rg1")).rejects.toThrow("503");
   });
@@ -677,7 +677,7 @@ describe("fetchArtistReleaseGroups", () => {
   test("throws with the status so the caller can tell a 503 from a miss", async () => {
     // A partial fetch must never be written as a baseline: every group it
     // missed would alert as new on the next successful poll.
-    spyOn(globalThis, "fetch").mockResolvedValueOnce(new Response("", { status: 503 }));
+    spyOn(globalThis, "fetch").mockResolvedValue(new Response("", { status: 503 }));
 
     let caught: unknown;
     try {
@@ -788,6 +788,23 @@ describe("searchReleaseCandidates", () => {
     expect(query).toContain('release:"Un Rio de Sangre"');
   });
 
+  test("a 503 is retried, not answered as a failure", async () => {
+    // Throttling means "ask again slower" — a single 503 must not fail the
+    // search. The backoff ladder is collapsed to nothing by the preload, so
+    // the retry is immediate here.
+    const fetchSpy = spyOn(globalThis, "fetch");
+    fetchSpy.mockResolvedValueOnce(new Response("rate limited", { status: 503 }));
+    fetchSpy.mockResolvedValueOnce(makeSearchResponse([{ ...CANDIDATE }]));
+
+    const candidates = await searchReleaseCandidates({
+      artist: "Violeta Parra",
+      title: "Un Rio de Sangre",
+    });
+
+    expect(fetchSpy).toHaveBeenCalledTimes(2);
+    expect(candidates[0]?.id).toBe("release-uuid");
+  });
+
   test("omits the quotes when asked, for the loose pass of a cascade", async () => {
     const fetchSpy = spyOn(globalThis, "fetch").mockResolvedValueOnce(makeSearchResponse([]));
 
@@ -888,7 +905,7 @@ describe("searchReleaseCandidates", () => {
   });
 
   test("throws on a non-2xx so throttling is not mistaken for absence", async () => {
-    spyOn(globalThis, "fetch").mockResolvedValueOnce(new Response("", { status: 503 }));
+    spyOn(globalThis, "fetch").mockResolvedValue(new Response("", { status: 503 }));
 
     await expect(searchReleaseCandidates({ artist: "a", title: "b" })).rejects.toBeInstanceOf(
       MusicBrainzHttpError,
@@ -1086,7 +1103,7 @@ describe("fetchReleaseGroupDetail", () => {
   test("a failed release browse still yields the group — the tracklist is the nice-to-have", async () => {
     spyOn(globalThis, "fetch")
       .mockResolvedValueOnce(json(GROUP))
-      .mockResolvedValueOnce(new Response("rate limited", { status: 503 }));
+      .mockResolvedValue(new Response("rate limited", { status: 503 }));
 
     const detail = await fetchReleaseGroupDetail("rg1");
     expect(detail.tracks).toEqual([]);
@@ -1096,7 +1113,7 @@ describe("fetchReleaseGroupDetail", () => {
   });
 
   test("throws on a non-2xx group lookup — a throttled request is not an empty record", async () => {
-    spyOn(globalThis, "fetch").mockResolvedValueOnce(new Response("nope", { status: 503 }));
+    spyOn(globalThis, "fetch").mockResolvedValue(new Response("nope", { status: 503 }));
     expect(fetchReleaseGroupDetail("rg1")).rejects.toThrow("503");
   });
 });

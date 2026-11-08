@@ -322,6 +322,30 @@ describe("searchReleases", () => {
     expect(candidate?.title).toBe("Land of Hunger");
   });
 
+  test("a 429 is retried, not answered as a failure", async () => {
+    // Throttling means "ask again slower". The backoff ladder is collapsed to
+    // nothing by the preload, so the retry is immediate here.
+    const fetchSpy = spyOn(globalThis, "fetch");
+    fetchSpy.mockResolvedValueOnce(makeDiscogsResponse({ message: "rate limited" }, 429));
+    fetchSpy.mockResolvedValueOnce(
+      searchResponse([{ id: 1, master_id: 10, title: "The Earons - Land of Hunger" }]),
+    );
+
+    const candidates = await searchReleases({ artist: "The Earons" });
+
+    expect(fetchSpy).toHaveBeenCalledTimes(2);
+    expect(candidates[0]?.title).toBe("Land of Hunger");
+  });
+
+  test("a 429 that never clears surfaces after the ladder is spent", async () => {
+    const fetchSpy = spyOn(globalThis, "fetch");
+    fetchSpy.mockResolvedValue(makeDiscogsResponse({ message: "rate limited" }, 429));
+
+    // Four attempts: the first try plus the three rungs of the ladder.
+    await expect(searchReleases({ artist: "Throttled" })).rejects.toBeInstanceOf(DiscogsHttpError);
+    expect(fetchSpy).toHaveBeenCalledTimes(4);
+  });
+
   test('reads the format so an LP can be told from a 7" of the same name', async () => {
     spyOn(globalThis, "fetch").mockResolvedValueOnce(
       searchResponse([
@@ -428,7 +452,9 @@ describe("searchReleases", () => {
   });
 
   test("throws DiscogsHttpError on a non-2xx so a miss is not confused with a failure", async () => {
-    spyOn(globalThis, "fetch").mockResolvedValueOnce(makeDiscogsResponse({}, 429));
+    // Persistent: a 429 is retried up the backoff ladder, and only a throttle
+    // that never clears becomes the failure this test pins.
+    spyOn(globalThis, "fetch").mockResolvedValue(makeDiscogsResponse({}, 429));
 
     // Returning [] here would record a throttled request as "record absent",
     // which is exactly how an earlier fixture pass invented three false misses.
