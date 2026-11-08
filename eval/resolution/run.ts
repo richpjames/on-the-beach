@@ -1,6 +1,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { basename, dirname, resolve } from "node:path";
-import { resolveRelease } from "../../app/release-resolver";
+import { resolveRelease, resolveDiscogs, resolveMusicBrainz } from "../../app/release-resolver";
+import { adjudicateR6 } from "./r6";
 import type { EvalManifest } from "../types";
 import { scoreCase, summarise, type CaseScore, type ReturnedIds, type Summary } from "./score";
 import { strategies, type ResolutionStrategy } from "./strategies";
@@ -317,11 +318,66 @@ function printReport(strategy: ResolutionStrategy, summary: Summary, failures: n
 }
 
 const runAt = new Date().toISOString();
+
+interface StrategyResult {
+  cases: CaseRecord[];
+  summary: Summary;
+  failures: number;
+}
+
+async function runStrategyR6(strategy: ResolutionStrategy): Promise<StrategyResult> {
+  const records: CaseRecord[] = [];
+  let failures = 0;
+
+  for (const [index, fixture] of fixtures.entries()) {
+    const input = inputs.get(fixture.id);
+    if (!input) {
+      console.warn(`  ${fixture.id}: no input for this fixture, skipped`);
+      continue;
+    }
+
+    const discogs = await resolveDiscogs(input, strategy.options);
+    const musicbrainz = await resolveMusicBrainz(input, strategy.options);
+    if (discogs.kind === "failed" || musicbrainz.kind === "failed") {
+      failures += 1;
+      records.push({ id: fixture.id, outcome: "failed", returned: null });
+      continue;
+    }
+
+    const candidate = await adjudicateR6(
+      process.env.MISTRAL_API_KEY!,
+      input.artist,
+      input.title,
+      discogs.value,
+      musicbrainz.value,
+    );
+    const returned: ReturnedIds = candidate
+      ? {
+          musicbrainzReleaseGroupId:
+            candidate.kind === "mb" ? candidate.value.releaseGroupId : null,
+          musicbrainzReleaseId: candidate.kind === "mb" ? candidate.value.id : null,
+          discogsMasterId: candidate.kind === "discogs" ? candidate.value.masterId : null,
+          discogsReleaseId: candidate.kind === "discogs" ? candidate.value.releaseId : null,
+        }
+      : {
+          musicbrainzReleaseGroupId: null,
+          musicbrainzReleaseId: null,
+          discogsMasterId: null,
+          discogsReleaseId: null,
+        };
+    const score = scoreCase(fixture, returned);
+    records.push({ id: fixture.id, outcome: score.outcome, returned });
+  }
+
+  return { cases: records, summary: summarise(records), failures };
+}
+
 const report: Record<string, unknown> = {};
 
 for (const strategy of selected) {
   console.log(`\n▶ ${strategy.id} — ${strategy.name}`);
-  const { cases, summary, failures } = await runStrategy(strategy);
+  const { cases, summary, failures } =
+    strategy.id === "R6" ? await runStrategyR6(strategy) : await runStrategy(strategy);
   printReport(strategy, summary, failures);
   report[strategy.id] = {
     name: strategy.name,

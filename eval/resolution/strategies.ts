@@ -45,4 +45,10 @@ export const strategies: ResolutionStrategy[] = [
     rationale: "Trades resolution rate for a lower false-ID rate. The two are not equally costly.",
     options: { thresholds: { artist: 0.85, title: 0.85, confidence: 0.9 } },
   },
+  {
+    id: "R6",
+    name: "LLM adjudication",
+    rationale: "Both databases queried, five candidates each, LLM adjudication.",
+    options: { candidateLimit: 5 },
+  },
 ];
