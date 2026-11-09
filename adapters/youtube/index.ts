@@ -1,5 +1,11 @@
 import type { ServiceSearchResult } from "../../ports/service-search";
-import { decodeHtmlEntities, isRecord, type ScrapedMetadata } from "../web/html-metadata";
+import { isRecord, type ScrapedMetadata } from "../web/html-metadata";
+import {
+  channelBelongsToArtist,
+  classifyYouTubeVideo,
+  normalizeForMatch,
+  topicChannelArtist,
+} from "./video-title";
 
 // ---------------------------------------------------------------------------
 // YouTube fallback search
@@ -91,20 +97,6 @@ const OTHER_VERSION_PATTERNS: RegExp[] = [
 ];
 
 /**
- * Lower-case, drop punctuation (to spaces, so "Artist - Title" splits cleanly)
- * and collapse whitespace. Both sides of every comparison go through this, so
- * the exact treatment of apostrophes matters less than applying it uniformly.
- */
-function normalizeForMatch(s: string): string {
-  return decodeHtmlEntities(s)
-    .toLowerCase()
-    .replace(/[^\w\s]/g, " ")
-    .replace(/_/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
-}
-
-/**
  * Drop a Wikipedia-style trailing disambiguator — "Michael Nyman (1981 album)"
  * is filed under that name here, but no uploader ever titles a video with it.
  */
@@ -129,30 +121,6 @@ function removePhrase(haystack: string, phrase: string): string {
     out = out.replace(target, " ");
   }
   return out.replace(/\s+/g, " ").trim();
-}
-
-/**
- * YouTube auto-generates a "<Artist> - Topic" channel for music delivered to it
- * by rights holders — the closest thing the platform has to an official release.
- */
-function topicChannelArtist(channelTitle: string): string | null {
-  const match = /^(.*?)\s+-\s+Topic$/.exec(decodeHtmlEntities(channelTitle).trim());
-  return match ? normalizeForMatch(match[1]) : null;
-}
-
-/**
- * Whether a channel is plausibly the artist's own. Deliberately an equality
- * test (modulo spacing and the usual "VEVO" / "Official" / "Records" dressing)
- * rather than containment — "Massive Attack Karaoke Backings" contains the
- * artist's name but is emphatically not their channel.
- */
-function channelBelongsToArtist(channelNorm: string, wantedArtist: string): boolean {
-  const compact = (s: string) => s.replace(/\s/g, "");
-  const artist = compact(wantedArtist);
-  if (!artist) return false;
-  const base = compact(channelNorm);
-  const undressed = compact(channelNorm.replace(/\b(official|music|records|recordings)\b/g, ""));
-  return base === artist || base.replace(/vevo$/, "") === artist || undressed === artist;
 }
 
 /**
@@ -317,13 +285,22 @@ async function scrapeYouTubeOEmbed(
     const data = (await response.json()) as unknown;
     if (!isRecord(data)) return null;
 
-    const potentialTitle = getString(data.title);
-    const potentialArtist = getString(data.author_name);
+    const videoTitle = getString(data.title);
+    const channelName = getString(data.author_name);
     const imageUrl = getString(data.thumbnail_url);
 
-    if (!potentialTitle && !potentialArtist && !imageUrl) return null;
+    if (!videoTitle && !channelName && !imageUrl) return null;
 
-    return { potentialTitle, potentialArtist, imageUrl };
+    // A video title and an uploader, not a release's title and artist — the
+    // uploader is as often a stranger ripping a record as the artist themself.
+    const { artist, title, year } = classifyYouTubeVideo(videoTitle, channelName);
+    const classified: ScrapedMetadata = {
+      potentialTitle: title,
+      potentialArtist: artist,
+      imageUrl,
+    };
+    if (year !== undefined) classified.year = year;
+    return classified;
   } catch {
     return null;
   }

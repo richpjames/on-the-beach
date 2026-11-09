@@ -554,6 +554,28 @@ describe("scrapeUrl", () => {
     mock.restore();
   });
 
+  test("reads a YouTube rip channel's upload as the artist and title in its video title", async () => {
+    spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          title: "Marcos Valle – Previsão do Tempo (1973) [Full Album]",
+          author_name: "Vinyl Rips",
+          thumbnail_url: "https://i.ytimg.com/vi/prevTempo73/hqdefault.jpg",
+        }),
+        {
+          headers: { "content-type": "application/json; charset=utf-8" },
+        },
+      ),
+    );
+
+    const result = await scrapeUrl("https://www.youtube.com/watch?v=prevTempo73", "youtube");
+    expect(result).not.toBeNull();
+    expect(result!.potentialArtist).toBe("Marcos Valle");
+    expect(result!.potentialTitle).toBe("Previsão do Tempo");
+    expect(result!.year).toBe(1973);
+    mock.restore();
+  });
+
   test("returns null when YouTube oEmbed fails", async () => {
     spyOn(globalThis, "fetch").mockResolvedValueOnce(new Response("{}", { status: 404 }));
 
