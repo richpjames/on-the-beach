@@ -5,6 +5,7 @@ import {
   pickBest,
   recoverMusicBrainzArtistId,
   resolveDiscogs,
+  resolveMusicBrainz,
   resolveRelease,
   scoreCandidate,
   similarity,
@@ -488,5 +489,145 @@ describe("compilation volumes", () => {
       title: "PIPO'S 2 - O Encontro Da Massa",
     });
     expect(score.accepted).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Titles that are only a year. An uploader names a self-titled record by its
+// year — "Rosinha de Valença - 1973" — but "Prince - 1999" is an album called
+// 1999. The literal reading goes first; the self-titled one must match the year.
+// ---------------------------------------------------------------------------
+
+const ROSINHA = { artist: "Rosinha de Valença", title: "1973" };
+const ROSINHA_GROUP = "7ce556cd-3316-4e1f-9255-876a08754e06";
+
+/** Her self-titled album as MusicBrainz files it. */
+function rosinhaRelease(id: string, date: string) {
+  return {
+    id,
+    title: "Rosinha De Valença",
+    date,
+    country: "BR",
+    "artist-credit": [
+      { name: "Rosinha de Valença", artist: { id: "ed6192aa-3abb-4c0b-849e-24eae2ec60ea" } },
+    ],
+    "release-group": { id: ROSINHA_GROUP, "primary-type": "Album" },
+  };
+}
+
+const ROSINHA_1973 = rosinhaRelease("e55a94da-3be1-4040-bca3-bd9166a655ed", "1973");
+const ROSINHA_2005 = rosinhaRelease("66ec5be2-ad91-45ac-9394-2d030f7083da", "2005");
+
+/** What a search request asked, with its query string decoded. */
+function asked(url: string): string {
+  return decodeURIComponent(url.replace(/\+/g, " "));
+}
+
+describe("titles that are only a year", () => {
+  afterEach(() => {
+    mock.restore();
+  });
+
+  test("resolve to the artist's self-titled record dated that year", async () => {
+    routeFetch({
+      mbRelease: [
+        // The literal reading — quoted, then unquoted — finds nothing called "1973".
+        json({ releases: [] }),
+        json({ releases: [] }),
+        // The reissue comes back first, but only the original is dated 1973.
+        json({ releases: [ROSINHA_2005, ROSINHA_1973] }),
+      ],
+    });
+
+    const outcome = await resolveRelease(ROSINHA);
+
+    expect(outcome.ids?.musicbrainzReleaseId).toBe(ROSINHA_1973.id);
+    expect(outcome.ids?.musicbrainzReleaseGroupId).toBe(ROSINHA_GROUP);
+  });
+
+  test("search for the self-titled record only once the literal reading has failed", async () => {
+    const { calls } = routeFetch({
+      mbRelease: [
+        json({ releases: [] }),
+        json({ releases: [] }),
+        json({ releases: [ROSINHA_1973] }),
+      ],
+    });
+
+    const result = await resolveMusicBrainz(ROSINHA);
+
+    expect(result.kind).toBe("found");
+    expect(asked(calls[0]!)).toContain('release:"1973"');
+    expect(asked(calls[2]!)).toContain('release:"Rosinha de Valença"');
+  });
+
+  test("refuse a self-titled record from another year", async () => {
+    // The same work, but nothing in the title says 2005 — taking it would let
+    // any self-titled record answer for a year it wasn't released in.
+    routeFetch({
+      mbRelease: [
+        json({ releases: [] }),
+        json({ releases: [] }),
+        json({ releases: [ROSINHA_2005] }),
+        json({ releases: [ROSINHA_2005] }),
+      ],
+    });
+
+    const result = await resolveMusicBrainz(ROSINHA);
+
+    expect(result.kind).toBe("absent");
+  });
+
+  test("find an album named after a year by its name, without the fallback", async () => {
+    const { calls } = routeFetch({
+      mbRelease: [
+        json({
+          releases: [
+            {
+              id: "prince-1999-release",
+              title: "1999",
+              date: "1982-10-27",
+              "artist-credit": [{ name: "Prince", artist: { id: "prince-artist-id" } }],
+              "release-group": { id: "prince-1999-group", "primary-type": "Album" },
+            },
+          ],
+        }),
+      ],
+    });
+
+    const result = await resolveMusicBrainz({ artist: "Prince", title: "1999" });
+
+    expect(result.kind).toBe("found");
+    expect(calls).toHaveLength(1);
+  });
+
+  test("never put an ordinary title through the self-titled reading", async () => {
+    const { calls } = routeFetch({});
+
+    await resolveMusicBrainz(QUERY);
+
+    expect(calls.some((url) => asked(url).includes('release:"The Earons"'))).toBe(false);
+  });
+
+  test("hold Discogs to the same year", async () => {
+    const discogsHit = (id: number, year: string) => ({
+      id,
+      master_id: 2_101_973,
+      title: "Rosinha De Valença - Rosinha De Valença",
+      year,
+      country: "Brazil",
+    });
+    routeFetch({
+      discogs: [
+        json({ results: [] }),
+        json({ results: [] }),
+        json({ results: [discogsHit(9_000_005, "2005"), discogsHit(9_001_973, "1973")] }),
+      ],
+    });
+
+    const result = await resolveDiscogs(ROSINHA);
+
+    expect(result.kind).toBe("found");
+    expect(result.kind === "found" && result.value.releaseId).toBe(9_001_973);
   });
 });
