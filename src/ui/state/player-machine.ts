@@ -58,6 +58,11 @@ export interface PlayerContext extends PlayerEffects {
    * release keep an identical `src`, so PlayerWindow keys its embeds on this
    * to force a remount — without it the ended player would just sit there. */
   playbackSeq: number;
+  /** True only for playbacks a queue advance started (manual next, play-now,
+   * or natural end). YouTube embeds use it to autoplay the src, so the next
+   * release starts playing instead of sitting on its poster waiting for a
+   * click. Never persisted — it only matters while the embed loads. */
+  autoplay: boolean;
 }
 
 export type PlayerEvent =
@@ -212,6 +217,7 @@ export const playerMachine = setup({
           playerType: entry.target.playerType,
           minimized: false,
           playbackSeq: context.playbackSeq + 1,
+          autoplay: false,
         };
       }
       return {
@@ -222,6 +228,7 @@ export const playerMachine = setup({
         playerType: "audio" as const,
         minimized: false,
         playbackSeq: context.playbackSeq + 1,
+        autoplay: false,
       };
     }),
     appendToQueue: assign(({ context, event }) => {
@@ -245,6 +252,9 @@ export const playerMachine = setup({
           playerType: head.target.playerType,
           minimized: false,
           playbackSeq: context.playbackSeq + 1,
+          // An advance is an instruction to play, whatever started it: the
+          // embed (YouTube today) is allowed to start on its own.
+          autoplay: true,
         };
       }
       return {
@@ -256,6 +266,7 @@ export const playerMachine = setup({
         playerType: "audio" as const,
         minimized: false,
         playbackSeq: context.playbackSeq + 1,
+        autoplay: true,
       };
     }),
     resetNowPlaying: assign({
@@ -265,6 +276,7 @@ export const playerMachine = setup({
       itemId: null,
       playerType: "audio" as const,
       minimized: false,
+      autoplay: false,
     }),
   },
   guards: {
@@ -286,6 +298,7 @@ export const playerMachine = setup({
     queue: input?.initialQueue ?? [],
     queueWindowVisible: false,
     playbackSeq: 0,
+    autoplay: false,
     playAppleMusic: input?.playAppleMusic ?? noop,
     stopAppleMusic: input?.stopAppleMusic ?? noop,
   }),
@@ -306,6 +319,7 @@ export const playerMachine = setup({
         playerType: event.playerType,
         minimized: false,
         playbackSeq: context.playbackSeq + 1,
+        autoplay: false,
       })),
     },
     LOAD_APPLE_MUSIC: {
@@ -318,6 +332,7 @@ export const playerMachine = setup({
         playerType: "audio" as const,
         minimized: false,
         playbackSeq: context.playbackSeq + 1,
+        autoplay: false,
       })),
     },
     // ADVANCE serves both natural end-of-playback (MusicKit / YouTube end

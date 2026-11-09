@@ -109,6 +109,7 @@ describe("player machine — queue", () => {
     expect(snap.matches("iframe")).toBe(true);
     expect(snap.context.src).toBe("https://bandcamp.com/embed/5");
     expect(snap.context.apple).toBeNull();
+    expect(snap.context.autoplay).toBe(true);
     expect(queueOf(actor)).toEqual([appleEntry(6)]);
     expect(effects).toEqual(["play:album:1", "stop"]);
 
@@ -154,6 +155,37 @@ describe("player machine — queue", () => {
     expect(actor.getSnapshot().matches("iframe")).toBe(true);
     expect(actor.getSnapshot().context.itemId).toBe(1);
     expect(queueOf(actor)).toEqual([appleEntry(2)]);
+  });
+
+  it("marks only advance-started playbacks as autoplay", () => {
+    const { actor } = makePlayer();
+
+    // A play the user started: no autoplay.
+    actor.send({
+      type: "LOAD_IFRAME",
+      src: "https://www.youtube-nocookie.com/embed/now",
+      label: "Now",
+      playerType: "video",
+    });
+    expect(actor.getSnapshot().context.autoplay).toBe(false);
+
+    // Queuing while idle starts the entry directly — still a user-initiated
+    // play, so no autoplay either.
+    actor.send({ type: "STOP" });
+    actor.send({ type: "ENQUEUE", entry: youtubeEntry(1) });
+    expect(actor.getSnapshot().matches("iframe")).toBe(true);
+    expect(actor.getSnapshot().context.autoplay).toBe(false);
+
+    // The queue advancing to the next release is an instruction to play.
+    actor.send({ type: "ENQUEUE", entry: youtubeEntry(2) });
+    actor.send({ type: "ADVANCE" });
+    expect(actor.getSnapshot().context.autoplay).toBe(true);
+
+    // Stopping resets the mark, and an advance into an empty queue keeps it off.
+    actor.send({ type: "STOP" });
+    expect(actor.getSnapshot().context.autoplay).toBe(false);
+    actor.send({ type: "ADVANCE" });
+    expect(actor.getSnapshot().context.autoplay).toBe(false);
   });
 
   it("CLEAR_QUEUE empties the queue without stopping playback", () => {

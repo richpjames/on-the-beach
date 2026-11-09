@@ -104,6 +104,10 @@ export const player = {
   get playbackSeq() {
     return snapshot.context.playbackSeq;
   },
+  /** True when a queue advance started this playback; YouTube embeds autoplay. */
+  get autoplay() {
+    return snapshot.context.autoplay;
+  },
   /** Link back to the release that started playback, or null if unknown. */
   get releaseHref() {
     const id = snapshot.context.itemId;
