@@ -95,7 +95,9 @@
   // (and a fresh watcher) starts each time — a stale player can never land an
   // ADVANCE for playback that is over, and an identical src queued twice still
   // reloads instead of leaving the ended player on screen.
-  const videoSrc = $derived(player.src !== null ? enableYouTubeJsApi(player.src) : "");
+  const videoSrc = $derived(
+    player.src !== null ? enableYouTubeJsApi(player.src, { autoplay: player.autoplay }) : "",
+  );
 
   $effect(() => {
     const iframe = videoIframe;

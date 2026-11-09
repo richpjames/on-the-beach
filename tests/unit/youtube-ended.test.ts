@@ -75,6 +75,12 @@ describe("enableYouTubeJsApi", () => {
     expect(out.origin).toBe(YT);
     expect(out.searchParams.get("enablejsapi")).toBe("1");
     expect(out.searchParams.get("origin")).toBe("http://localhost:4173");
+    expect(out.searchParams.get("autoplay")).toBeNull();
+  });
+
+  it("adds autoplay when asked (queue-advanced embeds)", () => {
+    const out = new URL(enableYouTubeJsApi(`${YT}/embed/abc`, { autoplay: true }));
+    expect(out.searchParams.get("autoplay")).toBe("1");
   });
 
   it("treats youtube-nocookie as a YouTube embed", () => {
@@ -84,11 +90,11 @@ describe("enableYouTubeJsApi", () => {
 });
 
 describe("watchYouTubeEnd", () => {
-  it("answers the player's first message with the listening handshake", () => {
+  it("sends listening immediately — the player speaks only to parents that do", () => {
     const { el, posts } = makeIframe("vid-1");
     const dispose = watchYouTubeEnd(el, () => {});
-    message({ origin: YT, source: el.contentWindow, data: { event: "onReady" } });
 
+    // No message from the player yet; the hello goes out on its own.
     expect(posts).toHaveLength(1);
     expect(posts[0].targetOrigin).toBe("*");
     expect(JSON.parse(posts[0].data)).toEqual({
@@ -102,9 +108,42 @@ describe("watchYouTubeEnd", () => {
   it("uses a stable fallback id when the iframe has none", () => {
     const { el, posts } = makeIframe();
     const dispose = watchYouTubeEnd(el, () => {});
-    message({ origin: YT, source: el.contentWindow, data: { event: "onReady" } });
     expect(JSON.parse(posts[0].data).id).toBe("otb-player");
     dispose();
+  });
+
+  it("keeps repeating listening until the player answers, then stops", async () => {
+    const { el, posts } = makeIframe("vid-1");
+    const dispose = watchYouTubeEnd(el, () => {});
+
+    expect(posts).toHaveLength(1);
+    await new Promise((resolve) => setTimeout(resolve, 600));
+    expect(posts.length).toBeGreaterThan(1);
+    for (const post of posts) {
+      expect(JSON.parse(post.data).event).toBe("listening");
+    }
+
+    // The player's first message completes the handshake: the poll stops and
+    // the onStateChange subscription goes out (synchronously with the message).
+    const beforeHandshake = posts.length;
+    message({ origin: YT, source: el.contentWindow, data: { event: "initialDelivery", info: {} } });
+    expect(posts).toHaveLength(beforeHandshake + 1);
+    expect(JSON.parse(posts[posts.length - 1].data)).toEqual({
+      event: "command",
+      func: "addEventListener",
+      args: ["onStateChange"],
+    });
+    await new Promise((resolve) => setTimeout(resolve, 600));
+    expect(posts).toHaveLength(beforeHandshake + 1);
+    dispose();
+  });
+
+  it("stops polling once disposed", async () => {
+    const { el, posts } = makeIframe();
+    const dispose = watchYouTubeEnd(el, () => {});
+    dispose();
+    await new Promise((resolve) => setTimeout(resolve, 600));
+    expect(posts).toHaveLength(1);
   });
 
   it("ignores messages from other origins", () => {
@@ -117,7 +156,8 @@ describe("watchYouTubeEnd", () => {
       data: { event: "onStateChange", info: 0 },
     });
     expect(ended).toBe(0);
-    expect(posts).toHaveLength(0);
+    // Only the proactive listening hello went out — the stranger got no reply.
+    expect(posts).toHaveLength(1);
     dispose();
   });
 
@@ -131,7 +171,7 @@ describe("watchYouTubeEnd", () => {
       data: { event: "onStateChange", info: 0 },
     });
     expect(ended).toBe(0);
-    expect(posts).toHaveLength(0);
+    expect(posts).toHaveLength(1);
     dispose();
   });
 
@@ -152,6 +192,57 @@ describe("watchYouTubeEnd", () => {
     const { el } = makeIframe();
     let ended = 0;
     const dispose = watchYouTubeEnd(el, () => ended++);
+    message({ origin: YT, source: el.contentWindow, data: { event: "onStateChange", info: 0 } });
+    expect(ended).toBe(1);
+    dispose();
+  });
+
+  it("fires onEnded for an infoDelivery reporting playerState 0", () => {
+    const { el } = makeIframe();
+    let ended = 0;
+    const dispose = watchYouTubeEnd(el, () => ended++);
+    message({
+      origin: YT,
+      source: el.contentWindow,
+      data: {
+        event: "infoDelivery",
+        info: { playerState: 0, currentTime: 19.021, duration: 19 },
+      },
+    });
+    expect(ended).toBe(1);
+    dispose();
+  });
+
+  it("does not fire for infoDelivery with other player states", () => {
+    const { el } = makeIframe();
+    let ended = 0;
+    const dispose = watchYouTubeEnd(el, () => ended++);
+    for (const playerState of [-1, 1, 2, 3, 5]) {
+      message({
+        origin: YT,
+        source: el.contentWindow,
+        data: { event: "infoDelivery", info: { playerState, currentTime: 1 } },
+      });
+    }
+    // Volume/progress reports carry no playerState at all.
+    message({
+      origin: YT,
+      source: el.contentWindow,
+      data: { event: "infoDelivery", info: { muted: false, volume: 100 } },
+    });
+    expect(ended).toBe(0);
+    dispose();
+  });
+
+  it("fires onEnded once even when both event shapes report the end", () => {
+    const { el } = makeIframe();
+    let ended = 0;
+    const dispose = watchYouTubeEnd(el, () => ended++);
+    message({
+      origin: YT,
+      source: el.contentWindow,
+      data: { event: "infoDelivery", info: { playerState: 0, currentTime: 19 } },
+    });
     message({ origin: YT, source: el.contentWindow, data: { event: "onStateChange", info: 0 } });
     expect(ended).toBe(1);
     dispose();

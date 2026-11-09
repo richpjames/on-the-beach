@@ -48,11 +48,15 @@ The facade (`src/lib/player.svelte.ts`) owns the single client-side actor and pe
 
 ### Auto-advance matrix
 
-| Source | End signal | Auto-advances? |
-| --- | --- | --- |
-| Apple Music (MusicKit) | `playbackStateDidChange` → `ended` (defensive `PlaybackStates` lookup, see `musickit.svelte.ts`) | yes |
-| YouTube embed | postMessage `onStateChange` info `0` (`src/lib/youtube-ended.ts`, requires `enablejsapi=1` + `origin` on the src) | yes |
-| Bandcamp / SoundCloud / Mixcloud / Apple Music preview iframe | none | no — manual next button only |
+| Source                                                        | End signal                                                                                                                                            | Auto-advances?               |
+| ------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------- |
+| Apple Music (MusicKit)                                        | `playbackStateDidChange` → `ended` (defensive `PlaybackStates` lookup, see `musickit.svelte.ts`)                                                      | yes                          |
+| YouTube embed                                                 | postMessage `onStateChange` info `0` or `infoDelivery` `playerState` `0` (`src/lib/youtube-ended.ts`, requires `enablejsapi=1` + `origin` on the src) | yes                          |
+| Bandcamp / SoundCloud / Mixcloud / Apple Music preview iframe | none                                                                                                                                                  | no — manual next button only |
+
+The YouTube watcher speaks the embed's postMessage protocol as a parent (verified against a live embed): the player posts **nothing** to a parent that has not first sent `listening` (repeated until the player answers), and only posts `onStateChange` after the parent sends the `addEventListener` command — state otherwise arrives as `infoDelivery` `playerState` updates, which count as the end signal too.
+
+Playbacks a queue advance starts carry `autoplay: true` in the machine context, so the YouTube src gains `autoplay=1` and the next release starts playing instead of sitting on its poster. Plays the user starts directly (`LOAD_*`, enqueue-while-idle) don't.
 
 Both end signals are generation-guarded: MusicKit's detector bumps a playback generation on every `playResource`/`stop`, and the YouTube watcher's window-level listener is torn down with the iframe it belongs to — so a teardown or a stale player can't masquerade as natural completion and double-advance. Queue rows that can't auto-advance carry a hint glyph in the queue window.
 
