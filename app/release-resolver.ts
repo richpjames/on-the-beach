@@ -14,6 +14,7 @@ import {
   type MbReleaseSearchQuery,
 } from "../adapters/musicbrainz/index";
 import { pickArtistFromSearch } from "./artist-identity";
+import { bareReleaseYear } from "../domain/release-dates";
 import { editDistance } from "../domain/title-similarity";
 import type { ItemType } from "../domain/types";
 
@@ -513,6 +514,43 @@ function musicbrainzVariants(query: ReleaseQuery, maxVariants: number): MbReleas
 }
 
 /**
+ * A second reading for a title that is only a year: the artist's self-titled
+ * record, accepted only when it is dated that very year.
+ *
+ * Such a title is ambiguous, and the ordinary cascade has already tried the
+ * literal reading. "Prince - 1999" is an album called 1999, and that cascade
+ * finds it. But "Rosinha de Valença - 1973" is her self-titled 1973 album —
+ * uploaders name a record by its year when its title would only repeat the
+ * artist — and taken literally it matches nothing.
+ *
+ * The year is all the evidence the title offers, so it must match exactly, and
+ * candidates from any other year are discarded before verification. Without
+ * that, a year-named album the literal search happened to miss would be
+ * answered by whatever self-titled record the artist made — "Prince - 1999"
+ * by his 1979 album "Prince".
+ */
+async function resolveSelfTitledByYear<Query, Candidate>(
+  query: ReleaseQuery,
+  variantsFor: (selfTitled: ReleaseQuery) => Query[],
+  search: (variant: Query) => Promise<Candidate[]>,
+  toScorable: (candidate: Candidate) => Scorable<Candidate>,
+  thresholds: MatchThresholds,
+): Promise<ProviderResult<Candidate>> {
+  const year = bareReleaseYear(query.title);
+  if (year === null) return { kind: "absent" };
+
+  const selfTitled: ReleaseQuery = { artist: query.artist, title: query.artist, year };
+  return runCascade(
+    selfTitled,
+    variantsFor(selfTitled),
+    async (variant) =>
+      (await search(variant)).filter((candidate) => toScorable(candidate).year === year),
+    toScorable,
+    thresholds,
+  );
+}
+
+/**
  * Last resort for a record MusicBrainz files under Various Artists: search the
  * title against the Various Artists entity, then confirm the compilation
  * actually contains the act asked for.
@@ -605,22 +643,33 @@ function withDefaults(options: ResolverOptions = {}): ResolvedOptions {
   };
 }
 
-export function resolveDiscogs(
+export async function resolveDiscogs(
   query: ReleaseQuery,
   options: ResolverOptions = {},
 ): Promise<ProviderResult<DiscogsReleaseCandidate>> {
   const resolved = withDefaults(options);
-  return runCascade(
+  const search = (variant: DiscogsSearchQuery) => searchReleases(variant, resolved.candidateLimit);
+  const toScorable = (c: DiscogsReleaseCandidate): Scorable<DiscogsReleaseCandidate> => ({
+    artist: c.artist,
+    title: c.title,
+    year: c.year,
+    itemType: c.itemType,
+    value: c,
+  });
+
+  const main = await runCascade(
     query,
     discogsVariants(query, resolved.maxVariants),
-    (variant) => searchReleases(variant, resolved.candidateLimit),
-    (c) => ({
-      artist: c.artist,
-      title: c.title,
-      year: c.year,
-      itemType: c.itemType,
-      value: c,
-    }),
+    search,
+    toScorable,
+    resolved.thresholds,
+  );
+  if (main.kind !== "absent" || resolved.maxVariants < Number.MAX_SAFE_INTEGER) return main;
+  return resolveSelfTitledByYear(
+    query,
+    (selfTitled) => discogsVariants(selfTitled, resolved.maxVariants),
+    search,
+    toScorable,
     resolved.thresholds,
   );
 }
@@ -630,20 +679,33 @@ export async function resolveMusicBrainz(
   options: ResolverOptions = {},
 ): Promise<ProviderResult<MbReleaseCandidate>> {
   const resolved = withDefaults(options);
+  const search = (variant: MbReleaseSearchQuery) =>
+    searchReleaseCandidates({ ...variant, limit: resolved.candidateLimit });
+  const toScorable = (c: MbReleaseCandidate): Scorable<MbReleaseCandidate> => ({
+    artist: c.artistCredit,
+    title: c.title,
+    year: yearFromDate(c.date),
+    itemType: c.itemType,
+    value: c,
+  });
+
   const main = await runCascade(
     query,
     musicbrainzVariants(query, resolved.maxVariants),
-    (variant) => searchReleaseCandidates({ ...variant, limit: resolved.candidateLimit }),
-    (c) => ({
-      artist: c.artistCredit,
-      title: c.title,
-      year: yearFromDate(c.date),
-      itemType: c.itemType,
-      value: c,
-    }),
+    search,
+    toScorable,
     resolved.thresholds,
   );
   if (main.kind !== "absent" || resolved.maxVariants < Number.MAX_SAFE_INTEGER) return main;
+
+  const selfTitled = await resolveSelfTitledByYear(
+    query,
+    (reading) => musicbrainzVariants(reading, resolved.maxVariants),
+    search,
+    toScorable,
+    resolved.thresholds,
+  );
+  if (selfTitled.kind !== "absent") return selfTitled;
   return resolveMusicBrainzCompilation(query, resolved.candidateLimit);
 }
 
