@@ -3192,8 +3192,10 @@ a:where(:hover) {
 
 /* A fixed-height play bar (Mixcloud's widget). The widget's page paints its
    own background under the bar whatever height it's given, so the window
-   shrink-wraps the bar instead of stretching a gray void below it. 60px is
-   the bar's own height — the height the release page's old inline embed used. */
+   shrink-wraps the bar instead of stretching a gray void below it. 125px is
+   the smallest height the widget shows its seek-bar layout at (title row plus
+   the progress row: it switches between 118px and 122px, and renders nothing
+   at all around 115–120px). */
 .player-window--bar {
   height: auto;
   min-height: 0;
@@ -3201,7 +3203,7 @@ a:where(:hover) {
 }
 
 .player-window--bar .player-window__body iframe {
-  height: 60px;
+  height: 125px;
 }
 
 /* ─── Release Permalink Page ────────────────────────────────────────────── */

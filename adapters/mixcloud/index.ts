@@ -234,9 +234,11 @@ export function extractMixcloudEmbedUrl(html: string): string | null {
 /**
  * The player for a Mixcloud show, as the release page embeds it.
  *
- * The widget takes the show's path — not its full URL — in a `feed` parameter,
- * and `hide_cover` drops the artwork the page is already showing above it.
- * Returns null for anything that isn't a Mixcloud URL.
+ * The widget takes the show's path — not its full URL — in a `feed` parameter.
+ * `hide_cover` and `hide_artwork` drop the cover the page is already showing
+ * above the player. The artwork flag is what matters: without it the widget's
+ * seek-bar layout (the only one with a progress bar) re-introduces the cover
+ * on its left. Returns null for anything that isn't a Mixcloud URL.
  */
 export function mixcloudWidgetSrc(mixcloudUrl: string | null | undefined): string | null {
   if (!mixcloudUrl) return null;
@@ -250,7 +252,7 @@ export function mixcloudWidgetSrc(mixcloudUrl: string | null | undefined): strin
     return null;
   }
 
-  return `https://www.mixcloud.com/widget/iframe/?hide_cover=1&feed=${encodeURIComponent(pathname)}`;
+  return `https://www.mixcloud.com/widget/iframe/?hide_cover=1&hide_artwork=1&feed=${encodeURIComponent(pathname)}`;
 }
 
 /**

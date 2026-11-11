@@ -4,7 +4,7 @@ import { expect, test } from "./fixtures/parallel-test";
 // from the link's own URL — nothing is scraped, nothing can come up empty —
 // so the show is playable the moment the link is added.
 const MIXCLOUD_URL = "https://www.mixcloud.com/nozwon/light-sleeper-radio-021/";
-const WIDGET_SRC = `https://www.mixcloud.com/widget/iframe/?hide_cover=1&feed=${encodeURIComponent(
+const WIDGET_SRC = `https://www.mixcloud.com/widget/iframe/?hide_cover=1&hide_artwork=1&feed=${encodeURIComponent(
   "/nozwon/light-sleeper-radio-021/",
 )}`;
 
