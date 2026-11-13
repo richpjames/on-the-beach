@@ -1,5 +1,6 @@
 <script lang="ts">
   import { player } from "../player.svelte";
+  import { clampWindowPosition } from "../../ui/logic/player-window-position";
   import { enableYouTubeJsApi, watchYouTubeEnd } from "../youtube-ended";
   import {
     musickit,
@@ -31,6 +32,11 @@
     dragged = false;
     e.preventDefault();
 
+    // Measured once per drag: reading `offsetWidth` after the moves below write
+    // `style.left`/`style.top` would force a synchronous reflow on every
+    // mousemove. The width cannot change mid-drag.
+    const dragWidth = el.offsetWidth;
+
     const onMove = (ev: MouseEvent): void => {
       if (
         Math.abs(ev.clientX - startX) > DRAG_THRESHOLD_PX ||
@@ -38,8 +44,19 @@
       ) {
         dragged = true;
       }
-      el.style.left = `${startLeft + (ev.clientX - startX)}px`;
-      el.style.top = `${startTop + (ev.clientY - startY)}px`;
+      // Clamped so the window can never leave the screen entirely — an
+      // unclamped drag could strand it (still playing) with its titlebar and
+      // close button out of reach.
+      const { left, top } = clampWindowPosition(
+        { left: startLeft + (ev.clientX - startX), top: startTop + (ev.clientY - startY) },
+        {
+          width: dragWidth,
+          viewportWidth: window.innerWidth,
+          viewportHeight: window.innerHeight,
+        },
+      );
+      el.style.left = `${left}px`;
+      el.style.top = `${top}px`;
       el.style.bottom = "auto";
       el.style.right = "auto";
     };
@@ -67,6 +84,44 @@
       windowEl.style.removeProperty("right");
     }
   }
+
+  // A drag pins the window to viewport coordinates, so a viewport that shrinks
+  // afterwards — window resized, phone rotated, another display — could leave
+  // it stranded off screen with playback still running. Re-clamp on resize; a
+  // window that was never dragged is anchored by CSS (bottom/right) and the
+  // browser keeps that on screen by itself.
+  $effect(() => {
+    void windowEl;
+    // Re-clamping is idempotent, so it is safe to run whenever the viewport
+    // or the window's own layout changes. A hidden window (minimised) has no
+    // layout — offsetWidth reads 0 — and clamping against a zero-width
+    // window would teleport a legitimately stored position, so it stays
+    // skipped; the observer catches up once the window has layout again.
+    const reclamp = (): void => {
+      const el = windowEl;
+      if (!el || el.offsetWidth === 0 || el.style.left === "" || el.style.top === "") return;
+      const { left, top } = clampWindowPosition(
+        { left: parseFloat(el.style.left), top: parseFloat(el.style.top) },
+        {
+          width: el.offsetWidth,
+          viewportWidth: window.innerWidth,
+          viewportHeight: window.innerHeight,
+        },
+      );
+      el.style.left = `${left}px`;
+      el.style.top = `${top}px`;
+    };
+    window.addEventListener("resize", reclamp);
+    // A resize while the window was minimised is skipped above, so the stored
+    // position can go stale; this fires when its size changes from 0 — i.e.
+    // when it is shown again — and pulls it back on screen.
+    const observer = new ResizeObserver(reclamp);
+    if (windowEl) observer.observe(windowEl);
+    return () => {
+      window.removeEventListener("resize", reclamp);
+      observer.disconnect();
+    };
+  });
 
   // ── Apple Music (MusicKit) transport ──────────────────────────────────────
   // Prefer MusicKit's own now-playing metadata once it resolves, falling back
