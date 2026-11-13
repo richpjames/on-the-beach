@@ -222,7 +222,7 @@ test("captures the listen row", async ({ page, request }) => {
 // fills its frame differently. The widgets themselves are third parties the
 // test machine may or may not reach, so each is stood in for by a flat page
 // that fills the frame the same way the real one does — a solid block for
-// the players that stretch, and for Mixcloud a 60px bar over the page's own
+// the players that stretch, and for Mixcloud a 125px bar over the page's own
 // gray, so a wrongly-sized window leaves the same void in the baseline it
 // would leave on screen.
 type PlayerWindowCase = {
@@ -238,11 +238,11 @@ function solidStandIn(color: string): string {
   return `<!doctype html><html><body style="margin:0"><div style="position:absolute;inset:0;background:${color}"></div></body></html>`;
 }
 
-// The bar's 60px is duplicated here from the window CSS
+// The bar's 125px is duplicated here from the window CSS
 // (.player-window--bar .player-window__body iframe in src/styles/main.css):
 // the window crop (overflow: hidden) and the stand-in must move together if
 // Mixcloud ever changes its bar height — no baseline can catch the drift.
-const MIXCLOUD_BAR_STAND_IN = `<!doctype html><html><body style="margin:0;background:#e8e8e8"><div style="height:60px;background:#323234"></div></body></html>`;
+const MIXCLOUD_BAR_STAND_IN = `<!doctype html><html><body style="margin:0;background:#e8e8e8"><div style="height:125px;background:#323234"></div></body></html>`;
 
 const PLAYER_WINDOW_CASES: PlayerWindowCase[] = [
   {

@@ -122,7 +122,7 @@ describe("extractMixcloudEmbedUrl", () => {
 describe("mixcloudWidgetSrc", () => {
   test("points the widget at the show's path", () => {
     expect(mixcloudWidgetSrc("https://www.mixcloud.com/nozwon/light-sleeper-radio-021/")).toBe(
-      "https://www.mixcloud.com/widget/iframe/?hide_cover=1&feed=%2Fnozwon%2Flight-sleeper-radio-021%2F",
+      "https://www.mixcloud.com/widget/iframe/?hide_cover=1&hide_artwork=1&feed=%2Fnozwon%2Flight-sleeper-radio-021%2F",
     );
   });
 
