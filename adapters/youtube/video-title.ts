@@ -166,6 +166,9 @@ interface NoiseReading {
 
 function readNoise(text: string): NoiseReading {
   const tokens = noiseKey(text).split(" ").filter(Boolean);
+  // Text with words in a script noiseKey keeps no letters for — Japanese,
+  // Korean, Cyrillic, Greek — still says something; only empty text is noise.
+  if (tokens.length === 0) return { isNoise: !text.trim(), recordMarker: false, onlyYear: false };
   let year: number | undefined;
   let recordMarker = false;
   let i = 0;
@@ -282,8 +285,9 @@ export interface ClassifiedVideo {
   artist?: string;
   title?: string;
   /**
-   * A release year the uploader set beside a real title — "(1973)", "- 1973".
-   * Never set when a year is all the title has: see `classifyYouTubeVideo`.
+   * A release year the uploader set beside the record's name — "Title (1973)",
+   * "- 1973" — never one set beside the artist alone. Not set when a year is
+   * all the title has: see `classifyYouTubeVideo`.
    */
   year?: number;
 }
@@ -294,7 +298,8 @@ export interface ClassifiedVideo {
  *   1. A pipe hangs extra matter off a title — "| Full Album | 1973", "| Some
  *      Label" — so only the first part that isn't dressing is read.
  *   2. Brackets made of dressing go: "(Official Video)", "[Full Album]",
- *      "(1973)". A year found in one is kept.
+ *      "(1973)". A year found in one is kept only where it sits beside the
+ *      part that names the record.
  *   3. A "<Artist> - Topic" channel names the artist outright, and its videos
  *      are titled with the track alone. A dash in that title ("Harvest Moon -
  *      Remastered 2009") is part of the track's name, so it is only split when
@@ -339,9 +344,12 @@ export function classifyYouTubeVideo(
     else if (!main) main = part;
   }
 
-  const segments = splitOutsideBrackets(main, DASH).map((segment) =>
-    trimSeparators(stripNoiseBrackets(segment, offerYear)),
-  );
+  const pieces = splitOutsideBrackets(main, DASH).map((segment) => {
+    let found: number | undefined;
+    const text = trimSeparators(stripNoiseBrackets(segment, (y) => (found ??= y)));
+    return { text, year: found };
+  });
+  const segments = pieces.map((piece) => piece.text);
 
   const finish = (artist: string | undefined, title: string): ClassifiedVideo => {
     const named = trimSeparators(title.replace(TRAILING_RECORD_MARKER, ""));
@@ -352,11 +360,18 @@ export function classifyYouTubeVideo(
     return { artist, title: artist };
   };
 
+  // A year counts only where the uploader set it beside the record's name;
+  // "Bad Brains (1979) - I Against I" is not a 1979 record.
+  const offerTitleYears = (from: number): void => {
+    for (const piece of pieces.slice(from)) offerYear(piece.year);
+  };
+
   const topicArtist = topicChannelName(channel);
   if (topicArtist) {
     const leadsWithArtist =
       segments.length > 1 && normalizeForMatch(segments[0]!) === normalizeForMatch(topicArtist);
     const trackParts = leadsWithArtist ? segments.slice(1) : segments;
+    offerTitleYears(leadsWithArtist ? 1 : 0);
     return finish(topicArtist, trackParts.filter(Boolean).join(" - "));
   }
 
@@ -371,6 +386,7 @@ export function classifyYouTubeVideo(
 
   if (segments.length < 2) {
     const only = segments[0] ?? "";
+    offerTitleYears(pieces.length - 1);
     const reading = readNoise(only);
     if (isPlaceholder(reading, only)) {
       offerYear(reading.year);
@@ -380,6 +396,7 @@ export function classifyYouTubeVideo(
   }
 
   const [artistPart, ...titleParts] = segments as [string, ...string[]];
+  offerTitleYears(pieces.length - segments.length + 1);
 
   while (titleParts.length > 1) {
     const reading = readNoise(titleParts[titleParts.length - 1]!);
