@@ -89,7 +89,10 @@
     void windowEl;
     const onResize = (): void => {
       const el = windowEl;
-      if (!el || el.style.left === "" || el.style.top === "") return;
+      // A hidden window (minimised) has no layout — offsetWidth reads 0 — and
+      // clamping against a zero-width window would teleport a legitimately
+      // stored position when it is shown again.
+      if (!el || el.offsetWidth === 0 || el.style.left === "" || el.style.top === "") return;
       const { left, top } = clampWindowPosition(
         { left: parseFloat(el.style.left), top: parseFloat(el.style.top) },
         {

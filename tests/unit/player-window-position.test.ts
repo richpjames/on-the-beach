@@ -64,4 +64,13 @@ describe("clampWindowPosition", () => {
     // And the two bounds still describe a usable range, not an inverted one.
     expect(-(BOUNDS.width - MIN_VISIBLE_PX)).toBeLessThan(320 - MIN_VISIBLE_PX);
   });
+
+  it("teleports a stored position against a zero-width window", () => {
+    // A minimised window reports no width, and clamping against one moves a
+    // legitimately dragged-off-left position to MIN_VISIBLE_PX from the left
+    // edge — which is why the component skips the re-clamp while its window
+    // has no layout.
+    const hidden = clampWindowPosition({ left: -400, top: 100 }, { ...BOUNDS, width: 0 });
+    expect(hidden.left).toBe(MIN_VISIBLE_PX);
+  });
 });
