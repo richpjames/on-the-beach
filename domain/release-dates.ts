@@ -18,6 +18,18 @@ export function parseReleaseYear(date: string | null): number | null {
   return Number.isFinite(year) ? year : null;
 }
 
+/**
+ * Text that is a release year and nothing more — "1973", but not "1973-05",
+ * "Guaco 76" or "Summer 1973". Bounded to 1900 through next year, so a number
+ * outside that range ("1349", Rush's "2112") is left to be a name.
+ */
+export function bareReleaseYear(text: string, now: Date = new Date()): number | null {
+  const trimmed = text.trim();
+  if (!/^(?:19|20)\d{2}$/.test(trimmed)) return null;
+  const year = Number(trimmed);
+  return year <= now.getFullYear() + 1 ? year : null;
+}
+
 /** The earliest instant a partial date could refer to. */
 export function earliestInstant(date: string | null): Date | null {
   const year = parseReleaseYear(date);
