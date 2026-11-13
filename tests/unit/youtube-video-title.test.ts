@@ -97,6 +97,13 @@ describe("classifyYouTubeVideo", () => {
       // one: a song called "Audio" and an album called "Album" both exist.
       ["LSD - Audio (Official Video)", { artist: "LSD", title: "Audio" }],
       ["PiL - Album", { artist: "PiL", title: "Album" }],
+      // Words in a script the dressing lists don't speak still name something:
+      // noiseKey keeps no letters for them, but they are not noise.
+      ["Кино - Группа крови", { artist: "Кино", title: "Группа крови" }],
+      [
+        "Elis Regina - Falso Brilhante (追憶)",
+        { artist: "Elis Regina", title: "Falso Brilhante (追憶)" },
+      ],
     ];
 
     test.each(cases)("%s", (videoTitle, expected) => {
@@ -127,6 +134,23 @@ describe("classifyYouTubeVideo", () => {
       expect(classifyYouTubeVideo("Rosinha de Valença - Full Album (1973)", "Vinyl Rips")).toEqual({
         artist: "Rosinha de Valença",
         title: "1973",
+      });
+    });
+  });
+
+  describe("the year", () => {
+    test("is read from beside the record's name, not beside the artist's", () => {
+      // The bracket dates the artist's career, not the record — kept, it would
+      // make the resolver insist on the wrong year.
+      expect(classifyYouTubeVideo("Bad Brains (1979) - I Against I", "Cesar b costa")).toEqual({
+        artist: "Bad Brains",
+        title: "I Against I",
+      });
+      expect(
+        classifyYouTubeVideo("Neil Young (1945) - Harvest Moon", "Neil Young - Topic"),
+      ).toEqual({
+        artist: "Neil Young",
+        title: "Harvest Moon",
       });
     });
   });
