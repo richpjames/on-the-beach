@@ -32,6 +32,11 @@
     dragged = false;
     e.preventDefault();
 
+    // Measured once per drag: reading `offsetWidth` after the moves below write
+    // `style.left`/`style.top` would force a synchronous reflow on every
+    // mousemove. The width cannot change mid-drag.
+    const dragWidth = el.offsetWidth;
+
     const onMove = (ev: MouseEvent): void => {
       if (
         Math.abs(ev.clientX - startX) > DRAG_THRESHOLD_PX ||
@@ -45,7 +50,7 @@
       const { left, top } = clampWindowPosition(
         { left: startLeft + (ev.clientX - startX), top: startTop + (ev.clientY - startY) },
         {
-          width: el.offsetWidth,
+          width: dragWidth,
           viewportWidth: window.innerWidth,
           viewportHeight: window.innerHeight,
         },
@@ -87,11 +92,13 @@
   // browser keeps that on screen by itself.
   $effect(() => {
     void windowEl;
-    const onResize = (): void => {
+    // Re-clamping is idempotent, so it is safe to run whenever the viewport
+    // or the window's own layout changes. A hidden window (minimised) has no
+    // layout — offsetWidth reads 0 — and clamping against a zero-width
+    // window would teleport a legitimately stored position, so it stays
+    // skipped; the observer catches up once the window has layout again.
+    const reclamp = (): void => {
       const el = windowEl;
-      // A hidden window (minimised) has no layout — offsetWidth reads 0 — and
-      // clamping against a zero-width window would teleport a legitimately
-      // stored position when it is shown again.
       if (!el || el.offsetWidth === 0 || el.style.left === "" || el.style.top === "") return;
       const { left, top } = clampWindowPosition(
         { left: parseFloat(el.style.left), top: parseFloat(el.style.top) },
@@ -104,8 +111,16 @@
       el.style.left = `${left}px`;
       el.style.top = `${top}px`;
     };
-    window.addEventListener("resize", onResize);
-    return () => window.removeEventListener("resize", onResize);
+    window.addEventListener("resize", reclamp);
+    // A resize while the window was minimised is skipped above, so the stored
+    // position can go stale; this fires when its size changes from 0 — i.e.
+    // when it is shown again — and pulls it back on screen.
+    const observer = new ResizeObserver(reclamp);
+    if (windowEl) observer.observe(windowEl);
+    return () => {
+      window.removeEventListener("resize", reclamp);
+      observer.disconnect();
+    };
   });
 
   // ── Apple Music (MusicKit) transport ──────────────────────────────────────
