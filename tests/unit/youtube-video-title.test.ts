@@ -204,6 +204,20 @@ describe("classifyYouTubeVideo", () => {
       });
     });
 
+    test("the year follows the record's name across that swap", () => {
+      expect(classifyYouTubeVideo("Harvest Moon (1992) - Neil Young", "Neil Young")).toEqual({
+        artist: "Neil Young",
+        title: "Harvest Moon",
+        year: 1992,
+      });
+      // A year beside the artist is not the record's, whichever side of the
+      // dash the artist ends up on.
+      expect(classifyYouTubeVideo("Harvest Moon - Neil Young (1945)", "Neil Young")).toEqual({
+        artist: "Neil Young",
+        title: "Harvest Moon",
+      });
+    });
+
     test("a stranger's channel leaves the artist in front of the dash", () => {
       // Nothing says the halves are reversed, so the usual order stands.
       expect(classifyYouTubeVideo("Harvest Moon - Neil Young", "Cesar b costa")).toEqual({

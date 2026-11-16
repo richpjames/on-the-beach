@@ -423,13 +423,21 @@ export function classifyYouTubeVideo(
   let title = titleParts.filter(Boolean).join(" - ");
 
   const channelNorm = normalizeForMatch(channel);
+  let swapped = false;
   if (
     title &&
     channelBelongsToArtist(channelNorm, normalizeForMatch(title)) &&
     !channelBelongsToArtist(channelNorm, normalizeForMatch(artist))
   ) {
     [artist, title] = [title, artist];
+    swapped = true;
   }
+
+  // The swap settles which side of the dash names the record, so the year is
+  // read only now: keep one set beside the leading part ("Harvest Moon (1992)
+  // - Neil Young" on Neil Young's channel) and drop any gathered beside the
+  // trailing part, which turns out to be the artist ("... - Neil Young (1945)").
+  if (swapped) year = pieces[pieces.length - segments.length]?.year;
 
   return finish(artist, title);
 }
