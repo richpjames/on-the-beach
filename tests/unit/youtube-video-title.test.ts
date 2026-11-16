@@ -123,6 +123,22 @@ describe("classifyYouTubeVideo", () => {
       });
     });
 
+    test("also when the dressing led and only the artist's name is left", () => {
+      // The mirror of "Los Jaivas - Full Album": the one name is the artist's,
+      // not a title the rip channel gets credited with.
+      expect(classifyYouTubeVideo("[Full Album] - Novos Baianos", "Vinyl Rips")).toEqual({
+        artist: "Novos Baianos",
+        title: "Novos Baianos",
+      });
+    });
+
+    test("a year inside the set-aside dressing still names the record", () => {
+      expect(classifyYouTubeVideo("[1972] Full Album - Los Jaivas", "Vinyl Rips")).toEqual({
+        artist: "Los Jaivas",
+        title: "1972",
+      });
+    });
+
     test("unless a year is all that's left, which stays the title as written", () => {
       // "Prince - 1999" is an album called 1999. Reading it as self-titled would
       // hand the resolver "Prince" by Prince — a different record — so the year

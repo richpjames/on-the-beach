@@ -381,6 +381,9 @@ export function classifyYouTubeVideo(
     const reading = readNoise(segments[0]!);
     if (!isPlaceholder(reading, segments[0]!)) break;
     offerYear(reading.year);
+    // A year can sit in a bracket inside the part being set aside, where
+    // readNoise of the stripped text can no longer see it.
+    offerYear(pieces[pieces.length - segments.length]?.year);
     segments.shift();
   }
 
@@ -392,6 +395,10 @@ export function classifyYouTubeVideo(
       offerYear(reading.year);
       return finish(channel || undefined, "");
     }
+    // "[Full Album] - Novos Baianos": a leading placeholder was set aside, so
+    // the one name left is the artist of a self-titled record — the mirror of
+    // "Novos Baianos - Full Album" — not a title credited to the channel.
+    if (pieces.length > 1) return finish(only, "");
     return finish(channel || undefined, only);
   }
 
