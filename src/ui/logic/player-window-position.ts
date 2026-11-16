@@ -29,9 +29,10 @@ export type WindowBounds = {
 };
 
 /**
- * Least of the window that must stay visible horizontally. From the right that
- * is the titlebar buttons (minimise, close); from the left, the icon and label.
- * Either way it includes titlebar the drag handle needs to pull it back.
+ * Least of the window that must stay visible horizontally. Pushed off the left
+ * edge that is the titlebar buttons (minimise, close); pushed off the right,
+ * the icon and label. Either way it includes titlebar the drag handle needs to
+ * pull it back.
  */
 export const MIN_VISIBLE_PX = 80;
 

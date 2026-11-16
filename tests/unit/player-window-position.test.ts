@@ -20,8 +20,9 @@ describe("clampWindowPosition", () => {
   it("keeps part of the window visible when dragged past the right edge", () => {
     const { left } = clampWindowPosition({ left: 1276, top: 100 }, BOUNDS);
     expect(left).toBe(BOUNDS.viewportWidth - MIN_VISIBLE_PX);
-    // The right of the window is where the titlebar buttons live, so those stay
-    // on screen and the close button stays reachable.
+    // The window's left strip stays visible: icon, label and titlebar. The
+    // buttons on the window's right are off screen here — it is the titlebar
+    // drag handle that keeps the window recoverable.
     expect(left + BOUNDS.width).toBeGreaterThan(BOUNDS.viewportWidth);
     expect(left + MIN_VISIBLE_PX).toBe(BOUNDS.viewportWidth);
   });
