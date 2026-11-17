@@ -322,6 +322,24 @@ describe("scrapeUnknownWebPage — OG fallback", () => {
     expect(fetchSpy).toHaveBeenCalledTimes(1);
   });
 
+  test("an embed-only page with no title says what is missing, not that nothing was found", async () => {
+    const html = `
+      <html><head>
+        <meta property="og:title" content="Example Blog" />
+        <meta property="og:site_name" content="Example Blog" />
+      </head><body>
+        <h1>Welcome to our blog</h1>
+        <iframe src="https://www.mixcloud.com/widget/iframe/?feed=%2FDJExample%2Fguest-mix-042%2F"></iframe>
+      </body></html>
+    `;
+    spyOn(globalThis, "fetch").mockResolvedValueOnce(htmlResponse(html));
+
+    await expectUnsupported(
+      scrapeUnknownWebPage("https://example-blog.net/guest-mix", 5000),
+      "This page only carries a Mixcloud player and has no title to name the show",
+    );
+  });
+
   test("still rejects pages that aren't about music", async () => {
     spyOn(globalThis, "fetch").mockResolvedValueOnce(
       htmlResponse("<html><body><h1>Spring sale</h1><p>Big discounts on bags.</p></body></html>"),

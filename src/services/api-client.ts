@@ -77,13 +77,9 @@ export function withCsrf(init?: RequestInit): RequestInit | undefined {
 }
 
 /** The server's own error message when it sent one — a bare status says nothing. */
-async function responseErrorMessage(response: Response, fallback: string): Promise<string> {
-  try {
-    const body = (await response.json()) as { error?: unknown };
-    if (typeof body?.error === "string" && body.error.trim()) return body.error;
-  } catch {
-    // Not JSON — keep the fallback.
-  }
+function responseErrorMessage(body: unknown, fallback: string): string {
+  const error = body && typeof body === "object" ? (body as { error?: unknown }).error : undefined;
+  if (typeof error === "string" && error.trim()) return error;
   return fallback;
 }
 
@@ -145,25 +141,32 @@ export class ApiClient {
       this.buildUrl("/api/music-items"),
       withCsrf(this.jsonRequest("POST", input)),
     );
-    if (response.status === 409) {
-      const body = (await response.json()) as Partial<AmbiguousLinkPayload> &
-        Partial<DuplicateItemPayload>;
-      if (
-        body.kind === "ambiguous_link" &&
-        typeof body.url === "string" &&
-        Array.isArray(body.candidates)
-      ) {
-        throw new AmbiguousLinkApiError(body as AmbiguousLinkPayload);
-      }
-      if (body.kind === "duplicate_item" && Array.isArray(body.items)) {
-        throw new DuplicateItemApiError(body as DuplicateItemPayload);
-      }
-    }
 
     if (!response.ok) {
-      throw new Error(
-        await responseErrorMessage(response, `createMusicItem failed: ${response.status}`),
-      );
+      // One read of the body: the 409 payloads and the error message all come
+      // from it, and a fetch body can only be read once.
+      let body: unknown = null;
+      try {
+        body = await response.json();
+      } catch {
+        // Not JSON — the status fallback below says all there is to say.
+      }
+
+      if (response.status === 409) {
+        const payload = body as Partial<AmbiguousLinkPayload> & Partial<DuplicateItemPayload>;
+        if (
+          payload?.kind === "ambiguous_link" &&
+          typeof payload.url === "string" &&
+          Array.isArray(payload.candidates)
+        ) {
+          throw new AmbiguousLinkApiError(payload as AmbiguousLinkPayload);
+        }
+        if (payload?.kind === "duplicate_item" && Array.isArray(payload.items)) {
+          throw new DuplicateItemApiError(payload as DuplicateItemPayload);
+        }
+      }
+
+      throw new Error(responseErrorMessage(body, `createMusicItem failed: ${response.status}`));
     }
 
     return (await response.json()) as MusicItemFull;

@@ -136,6 +136,41 @@ describe("ApiClient.createMusicItem", () => {
       "createMusicItem failed: 502",
     );
   });
+
+  test("surfaces the error message even when a 409 payload is neither known kind", async () => {
+    // The body is read once for both the 409 checks and the error message —
+    // a second read would fail in a browser and hide the server's reason.
+    spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({ kind: "something_else", error: "The link could not be read" }),
+        {
+          status: 409,
+          headers: { "content-type": "application/json" },
+        },
+      ),
+    );
+
+    const client = new ApiClient();
+
+    await expect(client.createMusicItem({ url: "https://example.com/album" })).rejects.toThrow(
+      "The link could not be read",
+    );
+  });
+
+  test("falls back to the status when a 409 body isn't JSON", async () => {
+    spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      new Response("<html>Conflict</html>", {
+        status: 409,
+        headers: { "content-type": "text/html" },
+      }),
+    );
+
+    const client = new ApiClient();
+
+    await expect(client.createMusicItem({ url: "https://example.com/album" })).rejects.toThrow(
+      "createMusicItem failed: 409",
+    );
+  });
 });
 
 describe("ApiClient.listMusicItems", () => {
