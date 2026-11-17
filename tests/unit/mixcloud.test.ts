@@ -123,6 +123,23 @@ describe("extractMixcloudEmbedUrl", () => {
     expect(extractMixcloudEmbedUrl(html)).toBe("https://www.mixcloud.com/DJ/my-mix/");
   });
 
+  test("finds a show URL written in prose, trailing punctuation and all", () => {
+    expect(extractMixcloudEmbedUrl(`<p>Listen at https://www.mixcloud.com/DJ/my-mix/.</p>`)).toBe(
+      "https://www.mixcloud.com/DJ/my-mix/",
+    );
+    expect(
+      extractMixcloudEmbedUrl(`<p>See https://www.mixcloud.com/DJ/my-mix/, plus more.</p>`),
+    ).toBe("https://www.mixcloud.com/DJ/my-mix/");
+    expect(extractMixcloudEmbedUrl(`<p>(https://www.mixcloud.com/DJ/my-mix/)</p>`)).toBe(
+      "https://www.mixcloud.com/DJ/my-mix/",
+    );
+  });
+
+  test("ignores entity-encoded query suffixes on a show link", () => {
+    const html = `<a href="https://www.mixcloud.com/DJ/my-mix/?commentId=1&amp;utm_source=x">show</a>`;
+    expect(extractMixcloudEmbedUrl(html)).toBe("https://www.mixcloud.com/DJ/my-mix/");
+  });
+
   test("finds a show URL inside escaped-quote JSON, as SPAs stream it", () => {
     const html = `<script>self.__next_f.push([1,"{\\"url\\":\\"https://www.mixcloud.com/worldwidefm/santa-leticia-woh-2026-22-08-26/\\",\\"player\\":\\"https://www.mixcloud.com/worldwidefm/santa-leticia-woh-2026-22-08-26/\\"}"])</script>`;
     expect(extractMixcloudEmbedUrl(html)).toBe(
