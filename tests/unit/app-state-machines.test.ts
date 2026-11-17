@@ -382,6 +382,77 @@ describe("add form machine — async submit flow", () => {
 
     expect(actor.getSnapshot().value).toBe("idle");
     expect(actor.getSnapshot().context.submitState).toBe("error");
+    expect(actor.getSnapshot().context.submitError).toBe("Network error");
+  });
+
+  it("keeps the server's own rejection message for the form to show", async () => {
+    const api = makeMockApi({
+      createMusicItem: async () => {
+        throw new Error(
+          "This server can't read unknown links: no extraction key (MISTRAL_API_KEY) is configured",
+        );
+      },
+    }) as any;
+    const actor = createActor(addFormMachine, { input: { api } }).start();
+
+    actor.send({ type: "SUBMIT_CLICKED", url: "https://example.com", pendingValues });
+    await waitFor(actor, (snapshot) => snapshot.value !== "submitting", { timeout: 5000 });
+
+    expect(actor.getSnapshot().context.submitError).toBe(
+      "This server can't read unknown links: no extraction key (MISTRAL_API_KEY) is configured",
+    );
+
+    actor.send({ type: "SUBMIT_ERROR_CONSUMED" });
+    expect(actor.getSnapshot().context.submitError).toBeNull();
+  });
+
+  it("clears submitError when a new submit starts", async () => {
+    let callCount = 0;
+    const api = makeMockApi({
+      createMusicItem: async () => {
+        callCount++;
+        if (callCount === 1) throw new Error("Network error");
+        return {
+          id: 42,
+          title: "Test",
+          artist: "Artist",
+          itemType: "album",
+          listenStatus: "to-listen",
+          createdAt: "",
+          updatedAt: "",
+        };
+      },
+    }) as any;
+    const actor = createActor(addFormMachine, { input: { api } }).start();
+
+    actor.send({ type: "SUBMIT_CLICKED", url: "https://example.com", pendingValues });
+    await waitFor(actor, (snapshot) => snapshot.value !== "submitting", { timeout: 5000 });
+    expect(actor.getSnapshot().context.submitError).toBe("Network error");
+
+    actor.send({ type: "SUBMIT_CLICKED", url: "https://example.com", pendingValues });
+    expect(actor.getSnapshot().value).toBe("submitting");
+    expect(actor.getSnapshot().context.submitError).toBeNull();
+
+    await waitFor(actor, (snapshot) => snapshot.value !== "submitting", { timeout: 5000 });
+    expect(actor.getSnapshot().context.createdItemId).toBe(42);
+    expect(actor.getSnapshot().context.submitError).toBeNull();
+  });
+
+  it("clears submitError on FORM_RESET", async () => {
+    const api = makeMockApi({
+      createMusicItem: async () => {
+        throw new Error("Network error");
+      },
+    }) as any;
+    const actor = createActor(addFormMachine, { input: { api } }).start();
+
+    actor.send({ type: "SUBMIT_CLICKED", url: "https://example.com", pendingValues });
+    await waitFor(actor, (snapshot) => snapshot.value !== "submitting", { timeout: 5000 });
+    expect(actor.getSnapshot().context.submitError).toBe("Network error");
+
+    actor.send({ type: "FORM_RESET" });
+    expect(actor.getSnapshot().context.submitError).toBeNull();
+    expect(actor.getSnapshot().context.submitState).toBe("idle");
   });
 
   it("submits from enteringManually state", async () => {

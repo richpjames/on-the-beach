@@ -7,13 +7,15 @@ const MAX_AI_TEXT_CHARS = 20_000;
 
 const WEB_RELEASE_PROMPT =
   "You are extracting music release data from a web page snippet. " +
+  "The page may be about a release (album, EP, single, track or compilation), a DJ mix, or a radio show or episode. " +
   "Respond with JSON only using this shape: " +
   '{"releases":[{"artist":"string|null","title":"string|null","itemType":"album|ep|single|track|mix|compilation|null","confidence":"number|null","evidence":"string|null","isPrimary":"boolean|null"}]}. ' +
-  "Return every distinct music release clearly described in the snippet. " +
-  "Mark isPrimary true only when the page is mainly about that one release, such as a product page or dedicated release page. " +
+  "Return every distinct music release, mix or show clearly described in the snippet. " +
+  "A page dedicated to one radio show or episode is about that one show: return it as a single candidate with itemType 'mix', the show or episode name as the title, and the presenter or DJ as the artist when named; ignore related or recommended shows listed around it. " +
+  "Mark isPrimary true only when the page is mainly about that one release, mix or show, such as a product page, dedicated release page or episode page. " +
   "Use evidence for a short reason like 'product title', 'headline', or 'release section'. " +
   "If a release is self-titled or has no distinct title, use the artist name as the title. " +
-  "Do not invent releases. Return an empty releases array when the snippet is music-related but no concrete release can be extracted.";
+  "Do not invent releases. Return an empty releases array when the snippet is music-related but no concrete release, mix or show can be extracted.";
 
 interface TextChunkLike {
   type?: unknown;
@@ -40,7 +42,7 @@ function slugifySegment(value: string | undefined): string {
     .slice(0, 48);
 }
 
-function buildCandidateId(artist: string | undefined, title: string, index: number): string {
+export function buildCandidateId(artist: string | undefined, title: string, index: number): string {
   const artistPart = slugifySegment(artist) || "unknown-artist";
   const titlePart = slugifySegment(title) || "unknown-title";
   return `cand-${index + 1}-${artistPart}-${titlePart}`;
@@ -144,7 +146,8 @@ function parseReleaseCandidate(value: unknown, index: number): ExtractedReleaseC
   };
 }
 
-export function parseReleaseCandidatesJson(rawContent: string): ExtractedReleaseCandidate[] {
+/** Like `parseReleaseCandidatesJson`, but null when the answer wasn't readable JSON at all. */
+function tryParseReleaseCandidatesJson(rawContent: string): ExtractedReleaseCandidate[] | null {
   const trimmed = rawContent.trim();
   const fenced = trimmed.match(/^```(?:json)?\s*([\s\S]*?)\s*```$/i);
   const jsonCandidate = fenced ? fenced[1].trim() : trimmed;
@@ -157,7 +160,7 @@ export function parseReleaseCandidatesJson(rawContent: string): ExtractedRelease
         : null;
 
     if (!root) {
-      return [];
+      return null;
     }
 
     const releases = Array.isArray(root.releases) ? root.releases : [];
@@ -181,8 +184,12 @@ export function parseReleaseCandidatesJson(rawContent: string): ExtractedRelease
 
     return normalized;
   } catch {
-    return [];
+    return null;
   }
+}
+
+export function parseReleaseCandidatesJson(rawContent: string): ExtractedReleaseCandidate[] {
+  return tryParseReleaseCandidatesJson(rawContent) ?? [];
 }
 
 function normalizeSearchText(value: string): string {
@@ -258,18 +265,37 @@ export function pickPrimaryReleaseCandidate(
   return null;
 }
 
+/** Why the extraction stage produced nothing — unset when it ran and simply found nothing. */
+export type LinkExtractionFailure = "no-key" | "api-error" | "bad-response";
+
+export interface LinkExtractionResult {
+  releases: ExtractedReleaseCandidate[];
+  failure?: LinkExtractionFailure;
+  /** A short human-readable detail of the failure, e.g. the API's own message. */
+  failureDetail?: string;
+}
+
+const MAX_FAILURE_DETAIL_CHARS = 200;
+
+function failureDetailOf(err: unknown): string {
+  const message = err instanceof Error ? err.message : String(err);
+  return message.length > MAX_FAILURE_DETAIL_CHARS
+    ? `${message.slice(0, MAX_FAILURE_DETAIL_CHARS)}…`
+    : message;
+}
+
 export async function extractReleaseCandidatesFromWebText(
   url: string,
   pageText: string,
-): Promise<ExtractedReleaseCandidate[] | null> {
+): Promise<LinkExtractionResult> {
   const apiKey = process.env.MISTRAL_API_KEY;
   if (!apiKey) {
-    return null;
+    return { releases: [], failure: "no-key" };
   }
 
   const snippet = pageText.trim().slice(0, MAX_AI_TEXT_CHARS);
   if (!snippet) {
-    return [];
+    return { releases: [] };
   }
 
   const client = new Mistral({ apiKey });
@@ -297,13 +323,19 @@ export async function extractReleaseCandidatesFromWebText(
     const textContent = contentToText(message);
     if (!textContent) {
       console.error("[scraper] Mistral link extraction returned no text content");
-      return [];
+      return { releases: [], failure: "bad-response" };
     }
 
-    return parseReleaseCandidatesJson(textContent);
+    const releases = tryParseReleaseCandidatesJson(textContent);
+    if (releases === null) {
+      console.error("[scraper] Mistral link extraction returned unreadable JSON:", textContent);
+      return { releases: [], failure: "bad-response" };
+    }
+
+    return { releases };
   } catch (err) {
     console.error("[scraper] Mistral link extraction failed:", err);
-    return [];
+    return { releases: [], failure: "api-error", failureDetail: failureDetailOf(err) };
   }
 }
 

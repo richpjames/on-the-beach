@@ -76,6 +76,17 @@ export function withCsrf(init?: RequestInit): RequestInit | undefined {
   };
 }
 
+/** The server's own error message when it sent one — a bare status says nothing. */
+async function responseErrorMessage(response: Response, fallback: string): Promise<string> {
+  try {
+    const body = (await response.json()) as { error?: unknown };
+    if (typeof body?.error === "string" && body.error.trim()) return body.error;
+  } catch {
+    // Not JSON — keep the fallback.
+  }
+  return fallback;
+}
+
 export class ApiClient {
   constructor(private baseUrl: string = "") {}
 
@@ -150,7 +161,9 @@ export class ApiClient {
     }
 
     if (!response.ok) {
-      throw new Error(`createMusicItem failed: ${response.status}`);
+      throw new Error(
+        await responseErrorMessage(response, `createMusicItem failed: ${response.status}`),
+      );
     }
 
     return (await response.json()) as MusicItemFull;

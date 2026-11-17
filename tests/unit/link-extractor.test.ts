@@ -1,5 +1,6 @@
-import { describe, expect, test } from "bun:test";
+import { afterEach, describe, expect, mock, spyOn, test } from "bun:test";
 import {
+  extractReleaseCandidatesFromWebText,
   parseReleaseCandidatesJson,
   pickPrimaryReleaseCandidate,
 } from "../../adapters/web/link-extractor";
@@ -119,5 +120,132 @@ describe("pickPrimaryReleaseCandidate", () => {
     );
 
     expect(result).toBeNull();
+  });
+});
+
+function mockChatCompletionResponse(content: unknown): Response {
+  return new Response(
+    JSON.stringify({
+      id: "cmpl_test_1",
+      object: "chat.completion",
+      created: 1,
+      model: "mistral-small-latest",
+      usage: { prompt_tokens: 10, completion_tokens: 5, total_tokens: 15 },
+      choices: [{ index: 0, finish_reason: "stop", message: { role: "assistant", content } }],
+    }),
+    { headers: { "content-type": "application/json" } },
+  );
+}
+
+describe("extractReleaseCandidatesFromWebText — failure taxonomy", () => {
+  const originalEnv = { ...process.env };
+  const url = "https://example-radio.net/episode/late-night-jazz";
+  const pageText = "Listen back to the late night jazz show. Tracklist below.";
+
+  afterEach(() => {
+    mock.restore();
+    process.env = { ...originalEnv };
+  });
+
+  test("reports no-key without calling the service", async () => {
+    delete process.env.MISTRAL_API_KEY;
+    const fetchSpy = spyOn(globalThis, "fetch");
+
+    const result = await extractReleaseCandidatesFromWebText(url, pageText);
+
+    expect(result).toEqual({ releases: [], failure: "no-key" });
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  test("reports nothing found, without a failure, when the answer names no releases", async () => {
+    process.env.MISTRAL_API_KEY = "test-key";
+    spyOn(globalThis, "fetch").mockResolvedValueOnce(mockChatCompletionResponse('{"releases":[]}'));
+
+    const result = await extractReleaseCandidatesFromWebText(url, pageText);
+
+    expect(result).toEqual({ releases: [] });
+  });
+
+  test("reports nothing found, without a failure, for an empty snippet", async () => {
+    process.env.MISTRAL_API_KEY = "test-key";
+    const fetchSpy = spyOn(globalThis, "fetch");
+
+    const result = await extractReleaseCandidatesFromWebText(url, "   ");
+
+    expect(result).toEqual({ releases: [] });
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  test("reports api-error with the service's own detail", async () => {
+    process.env.MISTRAL_API_KEY = "test-key";
+    spyOn(console, "error").mockImplementation(() => {});
+    // 401 is not retried by the SDK, so one mocked response is enough.
+    spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      new Response(JSON.stringify({ error: { message: "Invalid API key" } }), {
+        status: 401,
+        headers: { "content-type": "application/json" },
+      }),
+    );
+
+    const result = await extractReleaseCandidatesFromWebText(url, pageText);
+
+    expect(result.releases).toEqual([]);
+    expect(result.failure).toBe("api-error");
+    expect(result.failureDetail).toContain("401");
+  });
+
+  test("truncates a long failure detail", async () => {
+    process.env.MISTRAL_API_KEY = "test-key";
+    spyOn(console, "error").mockImplementation(() => {});
+    spyOn(globalThis, "fetch").mockRejectedValueOnce(new Error("x".repeat(500)));
+
+    const result = await extractReleaseCandidatesFromWebText(url, pageText);
+
+    expect(result.failure).toBe("api-error");
+    expect(result.failureDetail!.length).toBeLessThanOrEqual(201);
+    expect(result.failureDetail!.endsWith("…")).toBe(true);
+  });
+
+  test("reports bad-response for an unreadable answer", async () => {
+    process.env.MISTRAL_API_KEY = "test-key";
+    spyOn(console, "error").mockImplementation(() => {});
+    spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      mockChatCompletionResponse("Sorry, I can't help with that."),
+    );
+
+    const result = await extractReleaseCandidatesFromWebText(url, pageText);
+
+    expect(result).toEqual({ releases: [], failure: "bad-response" });
+  });
+
+  test("reports bad-response when the answer carries no text", async () => {
+    process.env.MISTRAL_API_KEY = "test-key";
+    spyOn(console, "error").mockImplementation(() => {});
+    spyOn(globalThis, "fetch").mockResolvedValueOnce(mockChatCompletionResponse(null));
+
+    const result = await extractReleaseCandidatesFromWebText(url, pageText);
+
+    expect(result).toEqual({ releases: [], failure: "bad-response" });
+  });
+
+  test("returns the candidates without a failure when the answer is readable", async () => {
+    process.env.MISTRAL_API_KEY = "test-key";
+    spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      mockChatCompletionResponse(
+        '{"releases":[{"artist":"DJ Example","title":"Late Night Jazz","itemType":"mix"}]}',
+      ),
+    );
+
+    const result = await extractReleaseCandidatesFromWebText(url, pageText);
+
+    expect(result.failure).toBeUndefined();
+    expect(result.releases).toEqual([
+      {
+        candidateId: "cand-1-dj-example-late-night-jazz",
+        artist: "DJ Example",
+        title: "Late Night Jazz",
+        itemType: "mix",
+      },
+    ]);
   });
 });

@@ -98,6 +98,44 @@ describe("ApiClient.createMusicItem", () => {
     expect(payload.items).toHaveLength(1);
     expect(payload.items[0]!.title).toBe("Some Album");
   });
+
+  test("throws the server's own error message, not a bare status", async () => {
+    spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          error:
+            "This server can't read unknown links: no extraction key (MISTRAL_API_KEY) is configured",
+        }),
+        {
+          status: 400,
+          headers: { "content-type": "application/json" },
+        },
+      ),
+    );
+
+    const client = new ApiClient();
+
+    await expect(
+      client.createMusicItem({ url: "https://www.worldwidefm.net/episode/some-show" }),
+    ).rejects.toThrow(
+      "This server can't read unknown links: no extraction key (MISTRAL_API_KEY) is configured",
+    );
+  });
+
+  test("falls back to the status when the error body isn't JSON", async () => {
+    spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      new Response("<html>Bad Gateway</html>", {
+        status: 502,
+        headers: { "content-type": "text/html" },
+      }),
+    );
+
+    const client = new ApiClient();
+
+    await expect(client.createMusicItem({ url: "https://example.com/album" })).rejects.toThrow(
+      "createMusicItem failed: 502",
+    );
+  });
 });
 
 describe("ApiClient.listMusicItems", () => {

@@ -51,6 +51,8 @@ export interface AddFormContext {
   scanResult: ScanResultData | null;
   scanError: string | null;
   recognizeError: string | null;
+  /** The server's reason the last submit failed — shown once, then consumed. */
+  submitError: string | null;
 }
 
 export type AddFormEvent =
@@ -82,7 +84,8 @@ export type AddFormEvent =
   | { type: "STOP_RECORDING" }
   | { type: "AUDIO_CAPTURED"; audioBase64: string; mimeType: string }
   | { type: "MIC_DENIED" }
-  | { type: "RECOGNIZE_ERROR_CONSUMED" };
+  | { type: "RECOGNIZE_ERROR_CONSUMED" }
+  | { type: "SUBMIT_ERROR_CONSUMED" };
 
 export const addFormMachine = setup({
   types: {} as {
@@ -299,6 +302,7 @@ export const addFormMachine = setup({
     scanResult: null,
     scanError: null,
     recognizeError: null,
+    submitError: null,
   }),
   initial: "idle",
   on: {
@@ -354,6 +358,7 @@ export const addFormMachine = setup({
         scanError: null,
         recognizeState: "idle" as const,
         recognizeError: null,
+        submitError: null,
       }),
     },
     SCAN_FILE_SELECTED: {
@@ -369,6 +374,9 @@ export const addFormMachine = setup({
     },
     RECOGNIZE_ERROR_CONSUMED: {
       actions: assign({ recognizeError: null }),
+    },
+    SUBMIT_ERROR_CONSUMED: {
+      actions: assign({ submitError: null }),
     },
   },
   states: {
@@ -391,6 +399,7 @@ export const addFormMachine = setup({
               pendingValues: event.pendingValues ? [event.pendingValues] : null,
               submitState: "submitting" as const,
               forceDuplicate: false,
+              submitError: null,
             })),
           },
         ],
@@ -423,6 +432,7 @@ export const addFormMachine = setup({
             pendingValues: event.pendingValues ? [event.pendingValues] : null,
             submitState: "submitting" as const,
             forceDuplicate: false,
+            submitError: null,
           })),
         },
         LINK_PICKER_OPENED: {
@@ -487,6 +497,7 @@ export const addFormMachine = setup({
               submitState: "submitting" as const,
               forceDuplicate: false,
               linkPicker: null,
+              submitError: null,
             };
           }),
         },
@@ -508,6 +519,7 @@ export const addFormMachine = setup({
             submitState: "submitting" as const,
             forceDuplicate: true,
             duplicateWarning: null,
+            submitError: null,
           }),
         },
         DUPLICATE_CANCELLED: {
@@ -616,7 +628,10 @@ export const addFormMachine = setup({
           },
           {
             target: "idle",
-            actions: assign({ submitState: "error" as const }),
+            actions: assign(({ event }) => ({
+              submitState: "error" as const,
+              submitError: event.error instanceof Error ? event.error.message : String(event.error),
+            })),
           },
         ],
       },
@@ -680,6 +695,7 @@ export const addFormMachine = setup({
                 pendingAudioMimeType: null,
                 submitState: "submitting" as const,
                 forceDuplicate: false,
+                submitError: null,
                 pendingValues: [
                   {
                     url: "",

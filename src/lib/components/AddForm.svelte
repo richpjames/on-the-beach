@@ -170,6 +170,12 @@
     form.send({ type: "RECOGNIZE_ERROR_CONSUMED" });
   });
 
+  $effect(() => {
+    if (!ctx.submitError) return;
+    alert(ctx.submitError);
+    form.send({ type: "SUBMIT_ERROR_CONSUMED" });
+  });
+
   // On successful create the page machine refreshes the list; the form resets.
   $effect(() => {
     if (ctx.createdItemId == null) return;

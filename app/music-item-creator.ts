@@ -395,7 +395,13 @@ async function resolveReleaseCandidates(
   });
 
   if (extractedCandidates.length === 0) {
-    throw new UnsupportedMusicLinkError("Couldn't extract a release from this link");
+    // A null scrape means the page never answered; anything else named nothing
+    // the extractor could use. Say which, rather than one message for both.
+    throw new UnsupportedMusicLinkError(
+      scraped === null
+        ? "Couldn't fetch this link's page to read it"
+        : "Couldn't extract a release from this link",
+    );
   }
 
   const selectedCandidates = resolveSelectedCandidates(extractedCandidates, overrides);

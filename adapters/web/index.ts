@@ -18,7 +18,10 @@ import { fetchPageHtml, MAX_HEAD_BYTES, MAX_BODY_BYTES } from "./fetch-page";
 import {
   extractPageLinks,
   extractReleaseCandidatesFromWebText,
+  buildCandidateId,
   matchReleaseUrls,
+  type ExtractedReleaseCandidate,
+  type LinkExtractionFailure,
 } from "./link-extractor";
 import { extractMixcloudEmbedUrl } from "../mixcloud";
 
@@ -150,13 +153,62 @@ export function parseCanonicalUrl(html: string): string | undefined {
   return match?.[1]?.trim() || undefined;
 }
 
+/** The page title with the site's own name dropped off the end ("Show - Site" → "Show"). */
+export function stripSiteSuffix(title: string, siteName?: string): string {
+  const trimmed = title.trim();
+  const site = siteName?.trim();
+  if (!site) return trimmed;
+  const escaped = site.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const stripped = trimmed.replace(new RegExp(`\\s*[-|–—]\\s*${escaped}\\s*$`, "i"), "").trim();
+  // A title that is only the site's own name names nothing of its own.
+  return stripped.toLowerCase() === site.toLowerCase() ? "" : stripped;
+}
+
 /**
- * Scrape a page we don't have a source for: establish it is music-related,
- * then let the LLM extraction name the release(s) it carries.
+ * The page itself as a candidate, for when the extraction stage named nothing.
+ * A music page with a title is worth keeping even when no release, mix or show
+ * could be lifted off it — filed as a mix, the way radio episodes are. A title
+ * that is only the site's own name strips to nothing and answers null.
+ */
+export function ogFallbackCandidate(og: OgData): ExtractedReleaseCandidate | null {
+  const title = stripSiteSuffix(og.ogTitle || og.title || "", og.ogSiteName);
+  if (!title) return null;
+  return {
+    candidateId: buildCandidateId(undefined, title, 0),
+    title,
+    itemType: "mix",
+    isPrimary: true,
+    evidence: "page title",
+  };
+}
+
+/** Why nothing could be extracted, in words the person adding the link can use. */
+function extractionFailureMessage(failure?: LinkExtractionFailure, detail?: string): string {
+  switch (failure) {
+    case "no-key":
+      return "This server can't read unknown links: no extraction key (MISTRAL_API_KEY) is configured";
+    case "api-error":
+      return `The extraction service failed while reading this link${detail ? `: ${detail}` : ""}`;
+    case "bad-response":
+      return "The extraction service returned an unreadable answer for this link";
+    default:
+      return "Couldn't find a release, mix or radio show on this page";
+  }
+}
+
+/**
+ * Scrape a page we don't have a source for: establish it is about music at all,
+ * then let the LLM extraction name the release(s), mix(es) or show(s) it carries.
  *
- * A page with nothing but a Mixcloud embed in it is still worth keeping — the
- * embed is a playable link even when the surrounding text says nothing the
- * extraction can use.
+ * When the extraction names nothing — unavailable, failed, or the page simply
+ * isn't about one identifiable work — the page itself is the fallback: its OG
+ * title and picture become a single mix candidate, so a radio episode or any
+ * other music page from an unmodelled source is still addable. Only a page with
+ * no usable title of its own is rejected, with the reason why.
+ *
+ * A Mixcloud player on the page is kept as embed metadata either way — and is
+ * itself proof the page is about music, even when the text says nothing the
+ * vocabulary check recognises.
  */
 export async function scrapeUnknownWebPage(
   url: string,
@@ -172,22 +224,30 @@ export async function scrapeUnknownWebPage(
   const mixcloudUrl = extractMixcloudEmbedUrl(html);
   try {
     const signal = detectMusicRelatedHtml(html, { url, og });
-    if (!signal.isMusicRelated) {
+    if (!signal.isMusicRelated && !mixcloudUrl) {
       throw new UnsupportedMusicLinkError("Link does not appear to be music-related");
     }
 
-    const releases = await extractReleaseCandidatesFromWebText(
-      url,
-      buildUnknownPageSnippet(url, html),
-    );
-    if (releases === null) {
-      throw new UnsupportedMusicLinkError(
-        "Unsupported music-link extraction is unavailable on this server",
+    let releases: ExtractedReleaseCandidate[] = [];
+    let failure: LinkExtractionFailure | undefined;
+    let failureDetail: string | undefined;
+    // An embed-only page skips the LLM: the player already says what it is.
+    if (signal.isMusicRelated) {
+      const extraction = await extractReleaseCandidatesFromWebText(
+        url,
+        buildUnknownPageSnippet(url, html),
       );
+      releases = extraction.releases;
+      failure = extraction.failure;
+      failureDetail = extraction.failureDetail;
     }
 
     if (releases.length === 0) {
-      throw new UnsupportedMusicLinkError("Couldn't extract a release from this link");
+      const fallback = ogFallbackCandidate(og);
+      if (!fallback) {
+        throw new UnsupportedMusicLinkError(extractionFailureMessage(failure, failureDetail));
+      }
+      releases = [fallback];
     }
 
     // A page naming one release is that release's page — its own URL is the right
@@ -210,13 +270,6 @@ export async function scrapeUnknownWebPage(
     }
     return result;
   } catch (err) {
-    if (err instanceof UnsupportedMusicLinkError && mixcloudUrl) {
-      return {
-        potentialTitle: og.ogTitle || og.title || undefined,
-        imageUrl: og.ogImage,
-        embedMetadata: { mixcloud_url: mixcloudUrl },
-      };
-    }
     if (err instanceof UnsupportedMusicLinkError) {
       throw err;
     }

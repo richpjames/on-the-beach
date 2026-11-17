@@ -1,0 +1,4 @@
+# Captured page data, kept byte-faithful to what the source served —
+# reformatting it (e.g. normalising escaped quotes inside streamed RSC
+# JSON) would destroy what the tests exercise.
+tests/fixtures/

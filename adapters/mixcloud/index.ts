@@ -212,6 +212,50 @@ export async function fetchMixcloudOEmbed(
   }
 }
 
+/** Path segments that are Mixcloud's own pages rather than a user's show. */
+const MIXCLOUD_RESERVED_SEGMENTS = new Set([
+  "widget",
+  "upload",
+  "login",
+  "signup",
+  "discover",
+  "about",
+  "help",
+  "support",
+  "terms",
+  "privacy",
+  "settings",
+  "notifications",
+  "messages",
+  "search",
+  "tag",
+  "tags",
+  "playlist",
+  "playlists",
+  "feed",
+  "home",
+  "pro",
+  "blog",
+  "jobs",
+  "press",
+  "developers",
+  "api",
+  "contact",
+  "upgrade",
+  "gift",
+  "redeem",
+  "apps",
+  "mobile",
+]);
+
+/**
+ * The one Mixcloud show a page embeds or links to, or null.
+ *
+ * The widget iframe is the explicit form. A page naming exactly one show URL
+ * anywhere else — an anchor, or a JSON payload a SPA renders from — is about
+ * that show too. Several different shows means a listing, which says nothing
+ * about any one of them, so it answers null.
+ */
 export function extractMixcloudEmbedUrl(html: string): string | null {
   const iframeRegex =
     /<iframe[^>]+src=["'](https?:\/\/(?:www\.)?mixcloud\.com\/widget\/iframe\/\?[^"']*)["']/gi;
@@ -228,6 +272,27 @@ export function extractMixcloudEmbedUrl(html: string): string | null {
       // ignore invalid URLs
     }
   }
+
+  // JSON payloads escape slashes; unescape them so one pattern reads both forms.
+  const text = html.replace(/\\\//g, "/");
+  const showUrlRegex = /https?:\/\/(?:www\.)?mixcloud\.com\/([^"'\s<>\\]+)/gi;
+  const shows = new Map<string, string>();
+  while ((match = showUrlRegex.exec(text)) !== null) {
+    const segments = (match[1] ?? "").split(/[?#]/)[0]!.split("/").filter(Boolean);
+    // A show page is exactly /<user>/<show>/ — profiles and deeper pages aren't.
+    if (segments.length !== 2) continue;
+    const [user, show] = segments as [string, string];
+    if (
+      MIXCLOUD_RESERVED_SEGMENTS.has(user.toLowerCase()) ||
+      MIXCLOUD_RESERVED_SEGMENTS.has(show.toLowerCase())
+    ) {
+      continue;
+    }
+    const key = `${user.toLowerCase()}/${show.toLowerCase()}`;
+    if (!shows.has(key)) shows.set(key, `https://www.mixcloud.com/${user}/${show}/`);
+  }
+
+  if (shows.size === 1) return [...shows.values()][0]!;
   return null;
 }
 
