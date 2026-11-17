@@ -183,12 +183,15 @@ export function ogFallbackCandidate(og: OgData): ExtractedReleaseCandidate | nul
 }
 
 /** Why nothing could be extracted, in words the person adding the link can use. */
-function extractionFailureMessage(failure?: LinkExtractionFailure, detail?: string): string {
+function extractionFailureMessage(failure?: LinkExtractionFailure): string {
   switch (failure) {
     case "no-key":
       return "This server can't read unknown links: no extraction key (MISTRAL_API_KEY) is configured";
     case "api-error":
-      return `The extraction service failed while reading this link${detail ? `: ${detail}` : ""}`;
+      // Raw provider errors can leak internal endpoints or account state to
+      // whoever submitted the link — the full detail is already logged
+      // server-side in extractReleaseCandidatesFromWebText.
+      return "The extraction service failed while reading this link";
     case "bad-response":
       return "The extraction service returned an unreadable answer for this link";
     default:
@@ -230,7 +233,6 @@ export async function scrapeUnknownWebPage(
 
     let releases: ExtractedReleaseCandidate[] = [];
     let failure: LinkExtractionFailure | undefined;
-    let failureDetail: string | undefined;
     // An embed-only page skips the LLM: the player already says what it is.
     if (signal.isMusicRelated) {
       const extraction = await extractReleaseCandidatesFromWebText(
@@ -239,7 +241,6 @@ export async function scrapeUnknownWebPage(
       );
       releases = extraction.releases;
       failure = extraction.failure;
-      failureDetail = extraction.failureDetail;
     }
 
     if (releases.length === 0) {
@@ -249,7 +250,7 @@ export async function scrapeUnknownWebPage(
         // show, so say what's actually missing — a title to name it with.
         throw new UnsupportedMusicLinkError(
           signal.isMusicRelated
-            ? extractionFailureMessage(failure, failureDetail)
+            ? extractionFailureMessage(failure)
             : "This page only carries a Mixcloud player and has no title to name the show",
         );
       }

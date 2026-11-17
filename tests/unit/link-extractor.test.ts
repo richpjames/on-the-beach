@@ -176,7 +176,7 @@ describe("extractReleaseCandidatesFromWebText — failure taxonomy", () => {
     expect(fetchSpy).not.toHaveBeenCalled();
   });
 
-  test("reports api-error with the service's own detail", async () => {
+  test("reports api-error when the service rejects the call", async () => {
     process.env.MISTRAL_API_KEY = "test-key";
     spyOn(console, "error").mockImplementation(() => {});
     // 401 is not retried by the SDK, so one mocked response is enough.
@@ -189,21 +189,18 @@ describe("extractReleaseCandidatesFromWebText — failure taxonomy", () => {
 
     const result = await extractReleaseCandidatesFromWebText(url, pageText);
 
-    expect(result.releases).toEqual([]);
-    expect(result.failure).toBe("api-error");
-    expect(result.failureDetail).toContain("401");
+    // The raw provider error stays in the server log, not in the result.
+    expect(result).toEqual({ releases: [], failure: "api-error" });
   });
 
-  test("truncates a long failure detail", async () => {
+  test("reports api-error when the service can't be reached", async () => {
     process.env.MISTRAL_API_KEY = "test-key";
     spyOn(console, "error").mockImplementation(() => {});
-    spyOn(globalThis, "fetch").mockRejectedValueOnce(new Error("x".repeat(500)));
+    spyOn(globalThis, "fetch").mockRejectedValueOnce(new Error("connection reset"));
 
     const result = await extractReleaseCandidatesFromWebText(url, pageText);
 
-    expect(result.failure).toBe("api-error");
-    expect(result.failureDetail!.length).toBeLessThanOrEqual(201);
-    expect(result.failureDetail!.endsWith("…")).toBe(true);
+    expect(result).toEqual({ releases: [], failure: "api-error" });
   });
 
   test("reports bad-response for an unreadable answer", async () => {
