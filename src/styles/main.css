@@ -452,13 +452,20 @@ select.input {
   padding: 3px 11px 1px 13px;
 }
 
+/* Primary actions wear the design system's deep fill with a foam label
+   (9.5:1), so they read apart from the chrome buttons around them. */
 .btn--primary {
-  background: var(--chrome);
-  color: #000000;
+  background: var(--btn-primary-bg);
+  color: var(--btn-primary-text);
+  border-color: var(--deep-mid) var(--deep-deep) var(--deep-deep) var(--deep-mid);
 }
 
 .btn--primary:hover {
-  background: var(--chrome-light);
+  background: var(--deep-mid);
+}
+
+.btn--primary:active {
+  border-color: var(--deep-deep) var(--deep-mid) var(--deep-mid) var(--deep-deep);
 }
 
 .btn:disabled {
@@ -698,7 +705,24 @@ select.input {
   border-color: var(--bevel-raised);
 }
 
-.btn--danger:hover {
+/* Danger buttons wear the design system's signal-deep fill with a foam
+   label (7:1). Ghost danger buttons (the list-row removes) stay chrome and
+   only redden their label on hover. */
+.btn--danger:not(.btn--ghost) {
+  background: var(--btn-danger-bg);
+  color: var(--btn-danger-text);
+  border-color: var(--signal) var(--signal-deep) var(--signal-deep) var(--signal);
+}
+
+.btn--danger:not(.btn--ghost):hover {
+  background: var(--btn-danger-bg);
+}
+
+.btn--danger:not(.btn--ghost):active {
+  border-color: var(--signal-deep) var(--signal) var(--signal) var(--signal-deep);
+}
+
+.btn--ghost.btn--danger:hover {
   color: var(--danger);
 }
 
@@ -1013,7 +1037,7 @@ select.input {
 
 .pick-random__menu-heading {
   padding: 3px 8px 4px;
-  font-size: var(--text-sm, 0.75rem);
+  font-size: var(--text-md);
   font-weight: bold;
   color: #000000;
   border-bottom: 1px solid var(--bevel-sunken);
@@ -1049,7 +1073,7 @@ select.input {
 .pick-random__menu-label {
   margin-left: auto;
   color: var(--chrome-dark, #555);
-  font-size: var(--text-sm, 0.75rem);
+  font-size: var(--text-md);
 }
 
 .browse-tools {
@@ -1107,10 +1131,15 @@ select.input {
   display: contents;
 }
 
-.btn--saved {
-  background: #5a9;
-  border-color: #4a8;
-  color: #fff;
+/* "Saved!" reads as a held-down toggle — sunken bevel, bold label — not a
+   green flash: there is no green in this system, and white on green failed
+   contrast at button size anyway. */
+.btn.btn--saved,
+.btn.btn--saved:hover {
+  background: var(--chrome-light);
+  border-color: var(--bevel-sunken);
+  color: var(--chrome-black);
+  font-weight: bold;
 }
 
 .browse-tools__sort {
@@ -2792,7 +2821,7 @@ a:where(:hover) {
 }
 
 .am-player__artist {
-  font-size: var(--text-sm);
+  font-size: var(--text-md);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -2848,7 +2877,7 @@ a:where(:hover) {
 .am-player__skip {
   width: 32px;
   height: 28px;
-  font-size: var(--text-sm);
+  font-size: var(--text-md);
   background: var(--chrome);
   border: 2px solid;
   border-color: var(--bevel-raised);
@@ -2871,7 +2900,7 @@ a:where(:hover) {
 .am-player__signin {
   flex: 1;
   height: 28px;
-  font-size: var(--text-sm);
+  font-size: var(--text-md);
   background: var(--chrome);
   border: 2px solid;
   border-color: var(--bevel-raised);
@@ -2910,7 +2939,7 @@ a:where(:hover) {
   padding: 3px 5px;
   border: 0;
   background: transparent;
-  font-size: var(--text-sm);
+  font-size: var(--text-md);
   text-align: left;
   cursor: pointer;
   color: inherit;
@@ -3070,7 +3099,7 @@ a:where(:hover) {
   align-items: center;
   gap: var(--space-2);
   padding: 2px 3px;
-  font-size: var(--text-sm);
+  font-size: var(--text-md);
   cursor: pointer;
 }
 
@@ -3160,7 +3189,7 @@ a:where(:hover) {
 
 .queue-window__empty {
   padding: var(--space-3);
-  font-size: var(--text-sm);
+  font-size: var(--text-md);
   color: var(--chrome-dark);
 }
 
@@ -3250,13 +3279,6 @@ a:where(:hover) {
   flex: 0 0 auto;
 }
 
-#release-view {
-  background: var(--chrome);
-  padding: var(--space-2) var(--space-2) 0;
-  display: block;
-  flex: 0 0 auto;
-}
-
 .release-page {
   display: flex;
   flex-direction: column;
@@ -3267,7 +3289,7 @@ a:where(:hover) {
 
 .release-page__nav {
   display: flex;
-  justify-content: space-between;
+  justify-content: flex-start;
   align-items: center;
 }
 
@@ -3292,21 +3314,36 @@ a:where(:hover) {
   margin: 0 auto;
   border: 2px solid var(--chrome-dark);
   border-color: var(--bevel-field);
-  box-shadow: 0 8px 40px rgba(0, 0, 0, 0.4);
+  /* Hard offset like every other shadow in the chrome — no soft blur. */
+  box-shadow: var(--shadow-window);
 }
 
+/* The artwork is a play button where the internal player exists. It keeps
+   the sleeve's own bevel; hovering raises that bevel so the click target
+   reads as a control, and keyboard focus gets the dotted marquee. */
 .release-page__artwork-play {
-  all: unset;
-  cursor: pointer;
   display: block;
   margin: 0 auto;
+  padding: 0;
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+
+.release-page__artwork-play:hover .release-page__artwork {
+  border-color: var(--bevel-raised);
+}
+
+.release-page__artwork-play:focus-visible {
+  outline: 1px dotted var(--chrome-black);
+  outline-offset: 3px;
 }
 
 /* ── View mode info panel ── */
 .release-page #view-mode {
   display: flex;
   flex-direction: column;
-  gap: var(--space-2);
+  gap: var(--space-3);
   padding: var(--space-4);
   border-width: 2px;
   border-style: solid;
@@ -3354,7 +3391,6 @@ a:where(:hover) {
 .release-page__meta {
   color: var(--chrome-darker);
   font-size: var(--text-base);
-  margin-top: var(--space-2);
 }
 
 .release-page__label {
@@ -3370,27 +3406,31 @@ a:where(:hover) {
   font-style: italic;
 }
 
+/* Catalogue links sit on the light panel, so they wear the light-surface
+   link ink (6:1 on foam) — not the electric blue meant for the playlist. */
+.release-page__resolution-link {
+  color: var(--link);
+}
+
+.release-page__resolution-link:hover {
+  color: var(--link-hover);
+}
+
 .release-page__notes {
   color: var(--chrome-black);
   font-size: var(--text-md);
   white-space: pre-wrap;
-  margin-top: var(--space-2);
 }
 
 .release-page__notes-section {
-  margin-top: var(--space-2);
   display: flex;
   flex-direction: column;
   align-items: flex-start;
   gap: var(--space-2);
 }
 
-.release-page__notes-section .release-page__notes {
-  margin-top: 0;
-}
-
 .release-page__notes-btn {
-  font-size: var(--text-sm);
+  font-size: var(--text-xs);
 }
 
 .release-page__notes-editor {
@@ -3402,12 +3442,6 @@ a:where(:hover) {
 .release-page__notes-actions {
   display: flex;
   gap: var(--space-2);
-}
-
-.release-page__rating {
-  color: var(--chrome-black);
-  font-size: var(--text-lg);
-  letter-spacing: 2px;
 }
 
 /* ── Edit mode form panel ── */
@@ -3431,8 +3465,30 @@ a:where(:hover) {
   min-width: 0;
 }
 
-.release-page__edit-fields > .input {
+/* Every field carries a visible micro-label above the input — the same
+   voice as the Status and reminder labels, in the uppercase micro style
+   the rest of the chrome uses for small headings. */
+.release-page__field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.release-page__field .input {
   width: 100%;
+}
+
+.release-page__field--grow {
+  flex: 1;
+}
+
+.release-page__micro-label {
+  font-size: var(--text-2xs);
+  font-weight: bold;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--chrome-darker);
 }
 
 .release-page__edit-fields textarea.input {
@@ -3440,7 +3496,7 @@ a:where(:hover) {
   resize: vertical;
 }
 
-.release-page__edit-stacks {
+.release-page__stacks-panel {
   display: flex;
   flex-direction: column;
   border-width: 2px;
@@ -3452,7 +3508,7 @@ a:where(:hover) {
   max-height: calc(100vh - 100px);
 }
 
-.release-page__edit-stacks-header {
+.release-page__panel-header {
   font-size: var(--text-base);
   padding: var(--space-2) var(--space-3);
   background: var(--chrome);
@@ -3470,13 +3526,13 @@ a:where(:hover) {
   min-height: 24px;
 }
 
-.release-page__edit-stacks-list {
+.release-page__stacks-panel-list {
   flex: 1;
   overflow-y: auto;
   max-height: 300px;
 }
 
-.release-page__edit-stacks-new {
+.release-page__stacks-panel-new {
   border-top: 1px solid var(--chrome-dark);
   padding: var(--space-2);
 }
@@ -3486,28 +3542,32 @@ a:where(:hover) {
   gap: var(--space-4);
 }
 
-.release-page__edit-row .input {
+.release-page__edit-row .release-page__field {
   flex: 1;
   min-width: 0;
 }
 
-/* The catalogue-match pair sits on one line where there's room; on a phone
-   the two long-URL fields each need the full width. */
+/* Multi-field rows sit on one line where there's room; on a phone each
+   field needs the full width. The add-link row wraps the same way: the
+   source picker takes a row of its own, URL and Add share the next. */
 @media (max-width: 480px) {
-  .release-page__edit-row--match {
+  .release-page__edit-row {
     flex-direction: column;
+  }
+
+  .release-page__edit-link-add {
+    flex-wrap: wrap;
+  }
+
+  .release-page__source-picker {
+    flex: 1 1 100%;
   }
 }
 
 .release-page__edit-artwork {
   display: flex;
-  align-items: center;
+  align-items: flex-end;
   gap: var(--space-2);
-}
-
-.release-page__edit-artwork .input {
-  flex: 1;
-  min-width: 0;
 }
 
 .release-page__edit-artwork .btn {
@@ -3558,66 +3618,20 @@ a:where(:hover) {
   flex-wrap: wrap;
   gap: var(--space-3);
   align-items: center;
-  margin-top: var(--space-4);
 }
 
 .release-page__actions:empty {
   display: none;
 }
 
-.release-page__listen-btn,
-.release-page__queue-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-3);
-  padding: var(--space-2) var(--space-5);
-  font-size: var(--text-base);
-  background: var(--chrome);
-  border-width: 2px;
-  border-style: solid;
-  border-color: var(--bevel-raised);
-  cursor: pointer;
-  color: #000000;
-}
-
-.release-page__listen-btn:hover,
-.release-page__queue-btn:hover {
-  background: var(--chrome-light);
-}
-
-.release-page__listen-btn:active,
-.release-page__queue-btn:active {
-  border-color: var(--bevel-sunken);
-  /* Base padding is 4px 12px; shift the label 1px down-right without
-     changing the button's outer size. */
-  padding: 5px 11px 3px 13px;
-}
-
-/* An external link ("Bandcamp", "Pitchfork") sits in the same row as the
-   "listen here" button: the service's mark beside its name, since following it
-   leaves the page rather than playing here. */
+/* "Listen here", "Queue" and the external links are .btn first — height,
+   bevels, hover, press and the focus marquee all come from the shared
+   button, so every control in the row agrees. An external link ("Bandcamp",
+   "Pitchfork") carries the service's mark beside its name, since following
+   it leaves the page rather than playing here. */
 .release-page__link-btn {
-  display: inline-flex;
-  align-items: center;
   gap: var(--space-2);
-  padding: var(--space-2) var(--space-3);
-  font-size: var(--text-base);
   line-height: 1;
-  text-decoration: none;
-  background: var(--chrome);
-  border-width: 2px;
-  border-style: solid;
-  border-color: var(--bevel-raised);
-  cursor: pointer;
-  color: #000000;
-}
-
-.release-page__link-btn:hover {
-  background: var(--chrome-light);
-}
-
-.release-page__link-btn:active {
-  border-color: var(--bevel-sunken);
 }
 
 /* Block, so the icon carries no text baseline gap under it. Sized to sit at
@@ -3897,16 +3911,9 @@ a:where(:hover) {
   background: var(--chrome-light);
 }
 
+/* The source name wears the same dark-well chip as the stacks (the
+   .stack-chip class in the markup) — one name-tag recipe on the page. */
 .release-page__link-source {
-  display: inline-flex;
-  align-items: center;
-  padding: 1px 5px;
-  background: var(--chrome);
-  color: #000000;
-  border-width: 1px;
-  border-style: solid;
-  border-color: var(--bevel-field);
-  font-size: var(--text-xs);
   white-space: nowrap;
   flex-shrink: 0;
 }
@@ -3914,7 +3921,7 @@ a:where(:hover) {
 .release-page__link-url {
   font-size: var(--text-xs);
   font-family: var(--font-mono);
-  color: #000080;
+  color: var(--link);
   text-decoration: none;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -3923,7 +3930,7 @@ a:where(:hover) {
 }
 
 .release-page__link-url:hover {
-  color: #0000cc;
+  color: var(--link-hover);
   text-decoration: underline;
   text-underline-offset: 2px;
 }
@@ -3950,7 +3957,7 @@ a:where(:hover) {
 
 .release-page__edit-link-add {
   display: flex;
-  align-items: center;
+  align-items: flex-end;
   gap: var(--space-2);
   padding: var(--space-2) var(--space-3);
   background: var(--chrome);
@@ -3961,10 +3968,6 @@ a:where(:hover) {
   position: relative;
   flex: 0 0 130px;
   min-width: 0;
-}
-
-.release-page__source-picker #link-source-input {
-  width: 100%;
 }
 
 .release-page__source-dropdown {
@@ -3998,12 +4001,8 @@ a:where(:hover) {
   color: #ffffff;
 }
 
-/* source picker width is set on .release-page__source-picker above */
-
-.release-page__edit-link-add #link-url-input {
-  flex: 1;
-  min-width: 0;
-}
+/* source picker width is set on .release-page__source-picker above; the
+   URL field grows via .release-page__field--grow */
 
 .release-page__edit-link-add .btn {
   flex-shrink: 0;
@@ -4253,7 +4252,7 @@ a:where(:hover) {
 
 .settings__hint {
   margin: 0;
-  font-size: var(--text-sm);
+  font-size: var(--text-md);
   color: var(--chrome-dark);
 }
 
@@ -4273,7 +4272,7 @@ a:where(:hover) {
 .settings__status {
   margin: 0;
   min-height: 1.2em;
-  font-size: var(--text-sm);
+  font-size: var(--text-md);
   color: var(--chrome-darker);
 }
 
@@ -4342,7 +4341,7 @@ a:where(:hover) {
 
 .alerts__hint {
   margin: 0;
-  font-size: var(--text-sm);
+  font-size: var(--text-md);
   color: var(--chrome-dark);
 }
 

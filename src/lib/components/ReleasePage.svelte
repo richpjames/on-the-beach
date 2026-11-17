@@ -449,6 +449,37 @@
       : allSources,
   );
 
+  // Keyboard support for the source dropdown, so picking a source works the
+  // same way as the checkbox list below it: arrows move the highlight, Enter
+  // picks, Escape closes. The index is clamped to the matches in case the
+  // query narrows the list while it's open.
+  let sourceActiveIndex = $state(0);
+  const sourceActive = $derived(Math.min(sourceActiveIndex, Math.max(0, sourceMatches.length - 1)));
+  const sourceDropdownExpanded = $derived(sourceDropdownOpen && sourceMatches.length > 0);
+
+  function pickSource(name: string): void {
+    sourceQuery = name;
+    sourceDropdownOpen = false;
+  }
+
+  function onSourceKeydown(event: KeyboardEvent): void {
+    if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+      event.preventDefault();
+      sourceDropdownOpen = true;
+      if (sourceMatches.length === 0) return;
+      const delta = event.key === "ArrowDown" ? 1 : -1;
+      sourceActiveIndex =
+        (sourceActive + delta + sourceMatches.length) % sourceMatches.length;
+    } else if (event.key === "Enter") {
+      if (sourceDropdownExpanded) {
+        event.preventDefault();
+        pickSource(sourceMatches[sourceActive]!.displayName);
+      }
+    } else if (event.key === "Escape") {
+      sourceDropdownOpen = false;
+    }
+  }
+
   // The play buttons and the source link are built server-side from the
   // *primary* link, so editing the link list has to re-run the page load for
   // view mode to catch up. Re-running it (rather than reloading the window)
@@ -663,14 +694,14 @@
 <main class="main">
   <div class="release-page">
     <div class="release-page__nav">
-      <a href={data.backHref} class="btn">◄</a>
+      <a href={data.backHref} class="btn btn--ghost">◄ Back</a>
     </div>
 
     <div class="release-page__body">
       {#if data.artworkUrl}
         {#if !coarsePointer && hereTarget}
           <button
-            class="release-page__artwork-play release-page__listen-btn"
+            class="release-page__artwork-play"
             title={hereTarget.service}
             aria-label={`Listen on ${hereTarget.service}`}
             onclick={hereTarget.play}
@@ -728,10 +759,10 @@
           {/if}
           <div class="release-page__notes-section">
             {#if notesState === "editing" || notesState === "saving"}
+              <label class="release-page__micro-label" for="inline-notes">Notes</label>
               <textarea
                 class="input release-page__notes-editor"
                 id="inline-notes"
-                placeholder="Notes"
                 bind:value={notesDraft}
               ></textarea>
               <div class="release-page__notes-actions">
@@ -773,7 +804,7 @@
           <div class="release-page__actions">
             {#if !coarsePointer && hereTarget}
               <button
-                class="release-page__listen-btn"
+                class="btn release-page__listen-btn"
                 data-src={hereTarget.src}
                 data-title={item.title}
                 data-artist={item.artist_name ?? ""}
@@ -782,20 +813,20 @@
                 data-href={hereTarget.href}
                 title={hereTarget.service}
                 aria-label={`Listen on ${hereTarget.service}`}
-                onclick={hereTarget.play}>listen here</button
+                onclick={hereTarget.play}>Listen here</button
               >
               <button
-                class="release-page__queue-btn"
+                class="btn release-page__queue-btn"
                 id="queue-release-btn"
                 data-src={hereTarget.src}
                 title={`Queue on ${hereTarget.service}`}
                 aria-label={`Queue on ${hereTarget.service}`}
-                onclick={hereTarget.enqueue}>queue</button
+                onclick={hereTarget.enqueue}>Queue</button
               >
             {/if}
             {#each externalLinks as link (link.key)}
               <a
-                class="release-page__link-btn"
+                class="btn release-page__link-btn"
                 href={link.href}
                 target="_blank"
                 rel="noopener noreferrer"
@@ -811,54 +842,71 @@
 
         <div id="edit-mode" hidden={!editMode}>
           <div class="release-page__edit-fields">
-            <input class="input" type="text" id="edit-title" placeholder="Title" bind:value={editTitle} />
-            <input class="input" type="text" id="edit-artist" placeholder="Artist" bind:value={editArtist} />
+            <div class="release-page__field">
+              <label class="release-page__micro-label" for="edit-title">Title</label>
+              <input class="input" type="text" id="edit-title" bind:value={editTitle} />
+            </div>
+            <div class="release-page__field">
+              <label class="release-page__micro-label" for="edit-artist">Artist</label>
+              <input class="input" type="text" id="edit-artist" bind:value={editArtist} />
+            </div>
             <div class="release-page__edit-row">
-              <input
-                class="input"
-                type="number"
-                id="edit-year"
-                placeholder="Year"
-                min="1900"
-                max="2099"
-                bind:value={editYear}
-              />
-              <input class="input" type="text" id="edit-label" placeholder="Label" bind:value={editLabel} />
-              <input
-                class="input"
-                type="text"
-                id="edit-country"
-                placeholder="Country"
-                bind:value={editCountry}
-              />
+              <div class="release-page__field">
+                <label class="release-page__micro-label" for="edit-year">Year</label>
+                <input
+                  class="input"
+                  type="number"
+                  id="edit-year"
+                  min="1900"
+                  max="2099"
+                  bind:value={editYear}
+                />
+              </div>
+              <div class="release-page__field">
+                <label class="release-page__micro-label" for="edit-label">Label</label>
+                <input class="input" type="text" id="edit-label" bind:value={editLabel} />
+              </div>
+              <div class="release-page__field">
+                <label class="release-page__micro-label" for="edit-country">Country</label>
+                <input class="input" type="text" id="edit-country" bind:value={editCountry} />
+              </div>
             </div>
-            <input class="input" type="text" id="edit-genre" placeholder="Genre" bind:value={editGenre} />
-            <input
-              class="input"
-              type="text"
-              id="edit-catalogue"
-              placeholder="Catalogue number"
-              bind:value={editCatalogue}
-            />
-            <div class="release-page__edit-row release-page__edit-row--match">
-              <input
-                class="input"
-                type="text"
-                id="edit-discogs"
-                placeholder="Discogs link or number"
-                inputmode="url"
-                bind:value={editDiscogs}
-              />
-              <input
-                class="input"
-                type="text"
-                id="edit-mb-release"
-                placeholder="MusicBrainz link or id"
-                inputmode="url"
-                bind:value={editMbRelease}
-              />
+            <div class="release-page__field">
+              <label class="release-page__micro-label" for="edit-genre">Genre</label>
+              <input class="input" type="text" id="edit-genre" bind:value={editGenre} />
             </div>
-            <textarea class="input" id="edit-notes" placeholder="Notes" bind:value={editNotes}></textarea>
+            <div class="release-page__field">
+              <label class="release-page__micro-label" for="edit-catalogue">Catalogue number</label>
+              <input class="input" type="text" id="edit-catalogue" bind:value={editCatalogue} />
+            </div>
+            <div class="release-page__edit-row">
+              <div class="release-page__field">
+                <label class="release-page__micro-label" for="edit-discogs">Discogs</label>
+                <input
+                  class="input"
+                  type="text"
+                  id="edit-discogs"
+                  placeholder="Link or number"
+                  inputmode="url"
+                  bind:value={editDiscogs}
+                />
+              </div>
+              <div class="release-page__field">
+                <label class="release-page__micro-label" for="edit-mb-release">MusicBrainz</label>
+                <input
+                  class="input"
+                  type="text"
+                  id="edit-mb-release"
+                  placeholder="Link or id"
+                  inputmode="url"
+                  bind:value={editMbRelease}
+                />
+              </div>
+            </div>
+            <div class="release-page__field">
+              <label class="release-page__micro-label" for="edit-notes">Notes</label>
+              <textarea class="input" id="edit-notes" bind:value={editNotes}></textarea>
+            </div>
             <div class="release-page__edit-artwork">
               <input
                 type="file"
@@ -876,20 +924,17 @@
                 onclick={() => artworkFileInput?.click()}
                 >{artworkUploading ? "Uploading…" : "Replace image"}</button
               >
-              <input
-                class="input"
-                type="text"
-                id="edit-artwork-url"
-                placeholder="Artwork URL"
-                bind:value={editArtworkUrl}
-              />
+              <div class="release-page__field release-page__field--grow">
+                <label class="release-page__micro-label" for="edit-artwork-url">Artwork URL</label>
+                <input class="input" type="text" id="edit-artwork-url" bind:value={editArtworkUrl} />
+              </div>
             </div>
             <div class="release-page__edit-links">
-              <div class="release-page__edit-stacks-header">Links</div>
+              <div class="release-page__panel-header">Links</div>
               <div id="link-list">
                 {#each itemLinks as link (link.id)}
                   <div class="release-page__link-row">
-                    <span class="release-page__link-source"
+                    <span class="stack-chip release-page__link-source"
                       >{link.display_name || link.source_name || "Link"}</span
                     >
                     <a
@@ -909,42 +954,64 @@
                 {/each}
               </div>
               <div class="release-page__edit-link-add">
-                <div class="release-page__source-picker">
+                <div class="release-page__field release-page__source-picker">
+                  <label class="release-page__micro-label" for="link-source-input">Source</label>
                   <input
                     class="input"
                     type="text"
                     id="link-source-input"
-                    placeholder="Source"
                     autocomplete="off"
+                    role="combobox"
+                    aria-expanded={sourceDropdownExpanded}
+                    aria-controls="source-dropdown"
+                    aria-activedescendant={sourceDropdownExpanded
+                      ? `source-option-${sourceActive}`
+                      : undefined}
                     bind:value={sourceQuery}
-                    oninput={() => (sourceDropdownOpen = true)}
+                    oninput={() => {
+                      sourceDropdownOpen = true;
+                      sourceActiveIndex = 0;
+                    }}
                     onfocus={() => (sourceDropdownOpen = true)}
                     onblur={() => setTimeout(() => (sourceDropdownOpen = false), 150)}
+                    onkeydown={onSourceKeydown}
                   />
                   <div
                     id="source-dropdown"
                     class="release-page__source-dropdown"
-                    hidden={!sourceDropdownOpen || sourceMatches.length === 0}
+                    role="listbox"
+                    aria-label="Source"
+                    hidden={!sourceDropdownExpanded}
                   >
-                    {#each sourceMatches as source (source.displayName)}
+                    {#each sourceMatches as source, i (source.displayName)}
                       <div
                         class="release-page__source-dropdown-item"
+                        id={`source-option-${i}`}
                         data-value={source.displayName}
                         role="option"
-                        aria-selected="false"
+                        aria-selected={i === sourceActive}
                         tabindex="-1"
                         onmousedown={(e) => {
                           e.preventDefault();
-                          sourceQuery = source.displayName;
-                          sourceDropdownOpen = false;
+                          pickSource(source.displayName);
                         }}
+                        onmouseenter={() => (sourceActiveIndex = i)}
                       >
                         {source.displayName}
                       </div>
                     {/each}
                   </div>
                 </div>
-                <input class="input" type="url" id="link-url-input" placeholder="URL" bind:value={linkUrl} />
+                <div class="release-page__field release-page__field--grow">
+                  <label class="release-page__micro-label" for="link-url-input">URL</label>
+                  <input
+                    class="input"
+                    type="url"
+                    id="link-url-input"
+                    placeholder="https://…"
+                    bind:value={linkUrl}
+                  />
+                </div>
                 <button type="button" class="btn" id="add-link-btn" onclick={addLink}>Add</button>
               </div>
             </div>
@@ -987,8 +1054,8 @@
           {/if}
         </div>
 
-        <div class="release-page__edit-stacks">
-          <div class="release-page__edit-stacks-header">Stacks</div>
+        <div class="release-page__stacks-panel">
+          <div class="release-page__panel-header">Stacks</div>
           <div id="stack-chips" class="release-page__stacks release-page__stacks--inline">
             {#each assignedStacks as stack (stack.id)}
               <span class="stack-chip"
@@ -1002,7 +1069,7 @@
               >
             {/each}
           </div>
-          <div id="stack-picker-list" class="release-page__edit-stacks-list">
+          <div id="stack-picker-list" class="release-page__stacks-panel-list">
             {#each visibleStacks as stack (stack.id)}
               <!-- svelte-ignore a11y_click_events_have_key_events -->
               <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
@@ -1026,15 +1093,18 @@
               </label>
             {/each}
           </div>
-          <div class="release-page__edit-stacks-new">
-            <input
-              type="text"
-              class="input stack-dropdown__new-input"
-              id="new-stack-input"
-              placeholder="New stack…"
-              bind:value={stackQuery}
-              onkeydown={onNewStackKeydown}
-            />
+          <div class="release-page__stacks-panel-new">
+            <div class="release-page__field">
+              <label class="release-page__micro-label" for="new-stack-input">New stack</label>
+              <input
+                type="text"
+                class="input stack-dropdown__new-input"
+                id="new-stack-input"
+                placeholder="Press Enter to add"
+                bind:value={stackQuery}
+                onkeydown={onNewStackKeydown}
+              />
+            </div>
           </div>
         </div>
 
@@ -1042,8 +1112,12 @@
           <button type="button" class="btn" id="edit-btn" hidden={editMode} onclick={() => (editMode = true)}
             >Edit</button
           >
-          <button type="button" class="btn" id="delete-btn" hidden={editMode} onclick={deleteItem}
-            >Delete</button
+          <button
+            type="button"
+            class="btn btn--danger"
+            id="delete-btn"
+            hidden={editMode}
+            onclick={deleteItem}>Delete</button
           >
         </div>
       </div>
