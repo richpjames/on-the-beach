@@ -454,6 +454,9 @@
   // picks, Escape closes. The index is clamped to the matches in case the
   // query narrows the list while it's open.
   let sourceActiveIndex = $state(0);
+  // Blur closes the dropdown a beat later so option clicks land first;
+  // refocusing inside that window cancels the pending close.
+  let sourceBlurTimer: ReturnType<typeof setTimeout> | undefined;
   const sourceActive = $derived(Math.min(sourceActiveIndex, Math.max(0, sourceMatches.length - 1)));
   const sourceDropdownExpanded = $derived(sourceDropdownOpen && sourceMatches.length > 0);
 
@@ -962,6 +965,7 @@
                     id="link-source-input"
                     autocomplete="off"
                     role="combobox"
+                    aria-autocomplete="list"
                     aria-expanded={sourceDropdownExpanded}
                     aria-controls="source-dropdown"
                     aria-activedescendant={sourceDropdownExpanded
@@ -972,8 +976,12 @@
                       sourceDropdownOpen = true;
                       sourceActiveIndex = 0;
                     }}
-                    onfocus={() => (sourceDropdownOpen = true)}
-                    onblur={() => setTimeout(() => (sourceDropdownOpen = false), 150)}
+                    onfocus={() => {
+                      clearTimeout(sourceBlurTimer);
+                      sourceDropdownOpen = true;
+                    }}
+                    onblur={() =>
+                      (sourceBlurTimer = setTimeout(() => (sourceDropdownOpen = false), 150))}
                     onkeydown={onSourceKeydown}
                   />
                   <div
