@@ -23,7 +23,7 @@ import {
   type ExtractedReleaseCandidate,
   type LinkExtractionFailure,
 } from "./link-extractor";
-import { extractMixcloudEmbedUrl } from "../mixcloud";
+import { containsMixcloudPlayer, extractMixcloudEmbedUrl } from "../mixcloud";
 
 export class UnsupportedMusicLinkError extends Error {
   constructor(message: string) {
@@ -227,7 +227,9 @@ export async function scrapeUnknownWebPage(
   const mixcloudUrl = extractMixcloudEmbedUrl(html);
   try {
     const signal = detectMusicRelatedHtml(html, { url, og });
-    if (!signal.isMusicRelated && !mixcloudUrl) {
+    // A widget player on the page is proof it is about music; a page that
+    // merely mentions one Mixcloud show link in passing is not.
+    if (!signal.isMusicRelated && !containsMixcloudPlayer(html)) {
       throw new UnsupportedMusicLinkError("Link does not appear to be music-related");
     }
 

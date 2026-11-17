@@ -249,6 +249,15 @@ const MIXCLOUD_RESERVED_SEGMENTS = new Set([
 ]);
 
 /**
+ * Whether the page carries a Mixcloud widget player — as a tag in the markup
+ * or as a URL in JSON a SPA renders it from. A player is proof the page is
+ * about music; a passing mention of a show link is not.
+ */
+export function containsMixcloudPlayer(html: string): boolean {
+  return /mixcloud\.com\/widget\/iframe\/\?/i.test(html.replace(/\\\//g, "/"));
+}
+
+/**
  * The one Mixcloud show a page embeds or links to, or null.
  *
  * The widget iframe is the explicit form, whether it sits in the markup as a
