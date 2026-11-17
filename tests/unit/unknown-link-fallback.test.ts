@@ -317,6 +317,48 @@ describe("scrapeUnknownWebPage — OG fallback", () => {
     expect(fetchSpy).toHaveBeenCalledTimes(1);
   });
 
+  test("a lone show mention doesn't make a non-music page addable", async () => {
+    const html = `
+      <html><head>
+        <meta property="og:title" content="Fresh Bread Every Day - Example Bakery" />
+        <meta property="og:site_name" content="Example Bakery" />
+      </head><body>
+        <h1>Welcome to our bakery</h1>
+        <p>Sourdough, croissants and coffee, baked fresh every morning.</p>
+        <footer><a href="https://www.mixcloud.com/ExampleBakery/our-interview/">Hear our story on Mixcloud</a></footer>
+      </body></html>
+    `;
+    spyOn(globalThis, "fetch").mockResolvedValueOnce(htmlResponse(html));
+
+    await expectUnsupported(
+      scrapeUnknownWebPage("https://example-bakery.com", 5000),
+      "Link does not appear to be music-related",
+    );
+  });
+
+  test("a JSON widget player on a textless page skips the extraction and keeps the player", async () => {
+    process.env.MISTRAL_API_KEY = "test-key";
+    const html = `
+      <html><head>
+        <meta property="og:title" content="Guest Mix 042 - Example Blog" />
+        <meta property="og:site_name" content="Example Blog" />
+      </head><body>
+        <h1>Welcome to our blog</h1>
+        <script>{"player":"https:\\/\\/www.mixcloud.com\\/widget\\/iframe\\/?feed=%2FDJExample%2Fguest-mix-042%2F"}</script>
+      </body></html>
+    `;
+    const fetchSpy = spyOn(globalThis, "fetch").mockResolvedValueOnce(htmlResponse(html));
+
+    const result = await scrapeUnknownWebPage("https://example-blog.net/guest-mix", 5000);
+
+    expect(result!.potentialTitle).toBe("Guest Mix 042");
+    expect(result!.itemType).toBe("mix");
+    expect(result!.embedMetadata).toEqual({
+      mixcloud_url: "https://www.mixcloud.com/DJExample/guest-mix-042/",
+    });
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+  });
+
   test("an embed-only page with no title says what is missing, not that nothing was found", async () => {
     const html = `
       <html><head>

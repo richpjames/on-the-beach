@@ -1,6 +1,7 @@
 import { describe, test, expect, spyOn, mock } from "bun:test";
 import { scrapeUrl } from "../../app/scrape";
 import {
+  containsMixcloudPlayer,
   extractMixcloudEmbedUrl,
   mixcloudWidgetSrc,
   parseMixcloudJsonLd,
@@ -217,6 +218,25 @@ describe("extractMixcloudEmbedUrl", () => {
       <a href="https://www.mixcloud.com/DJ/my-mix/comments/">Comments</a>
     `;
     expect(extractMixcloudEmbedUrl(html)).toBe("https://www.mixcloud.com/DJ/my-mix/");
+  });
+});
+
+describe("containsMixcloudPlayer", () => {
+  test("sees a widget iframe in the markup", () => {
+    const html = `<iframe src="https://www.mixcloud.com/widget/iframe/?feed=%2FDJ%2Fmy-mix%2F"></iframe>`;
+    expect(containsMixcloudPlayer(html)).toBe(true);
+  });
+
+  test("sees a widget player streamed as escaped JSON", () => {
+    const html = `<script>{"player":"https:\\/\\/www.mixcloud.com\\/widget\\/iframe\\/?feed=%2FDJ%2Fmy-mix%2F"}</script>`;
+    expect(containsMixcloudPlayer(html)).toBe(true);
+  });
+
+  test("a plain show mention is not a player", () => {
+    expect(containsMixcloudPlayer(`<a href="https://www.mixcloud.com/DJ/my-mix/">Listen</a>`)).toBe(
+      false,
+    );
+    expect(containsMixcloudPlayer("")).toBe(false);
   });
 });
 
