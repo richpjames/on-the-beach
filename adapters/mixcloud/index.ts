@@ -278,8 +278,11 @@ export function extractMixcloudEmbedUrl(html: string): string | null {
   const showUrlRegex = /https?:\/\/(?:www\.)?mixcloud\.com\/([^"'\s<>\\]+)/gi;
   const shows = new Map<string, string>();
   while ((match = showUrlRegex.exec(text)) !== null) {
-    const segments = (match[1] ?? "").split(/[?#]/)[0]!.split("/").filter(Boolean);
+    // Prose links carry trailing punctuation, and entity-encoded queries carry
+    // &amp; — both would read as a bogus extra path segment.
+    const path = (match[1] ?? "").split(/[?#&]/)[0]!.replace(/[.,;:!?)\]]+$/, "");
     // A show page is exactly /<user>/<show>/ — profiles and deeper pages aren't.
+    const segments = path.split("/").filter(Boolean);
     if (segments.length !== 2) continue;
     const [user, show] = segments as [string, string];
     if (
