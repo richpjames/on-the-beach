@@ -245,7 +245,13 @@ export async function scrapeUnknownWebPage(
     if (releases.length === 0) {
       const fallback = ogFallbackCandidate(og);
       if (!fallback) {
-        throw new UnsupportedMusicLinkError(extractionFailureMessage(failure, failureDetail));
+        // An embed-only page never ran the extraction: the player found the
+        // show, so say what's actually missing — a title to name it with.
+        throw new UnsupportedMusicLinkError(
+          signal.isMusicRelated
+            ? extractionFailureMessage(failure, failureDetail)
+            : "This page only carries a Mixcloud player and has no title to name the show",
+        );
       }
       releases = [fallback];
     }
