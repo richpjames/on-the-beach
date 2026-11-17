@@ -117,6 +117,62 @@ describe("extractMixcloudEmbedUrl", () => {
     const html = `<iframe src="https://www.mixcloud.com/widget/iframe/?feed=%2FDJ%2Fmy-mix%2F"></iframe>`;
     expect(extractMixcloudEmbedUrl(html)).toBe("https://www.mixcloud.com/DJ/my-mix/");
   });
+
+  test("finds the one show a page links to, without an iframe", () => {
+    const html = `<p>Listen on <a href="https://www.mixcloud.com/DJ/my-mix/">Mixcloud</a>.</p>`;
+    expect(extractMixcloudEmbedUrl(html)).toBe("https://www.mixcloud.com/DJ/my-mix/");
+  });
+
+  test("finds a show URL inside escaped-quote JSON, as SPAs stream it", () => {
+    const html = `<script>self.__next_f.push([1,"{\\"url\\":\\"https://www.mixcloud.com/worldwidefm/santa-leticia-woh-2026-22-08-26/\\",\\"player\\":\\"https://www.mixcloud.com/worldwidefm/santa-leticia-woh-2026-22-08-26/\\"}"])</script>`;
+    expect(extractMixcloudEmbedUrl(html)).toBe(
+      "https://www.mixcloud.com/worldwidefm/santa-leticia-woh-2026-22-08-26/",
+    );
+  });
+
+  test("finds a show URL whose slashes are escaped too", () => {
+    const html = `<script>var data = {"url":"https:\\/\\/www.mixcloud.com\\/DJ\\/my-mix\\/"};</script>`;
+    expect(extractMixcloudEmbedUrl(html)).toBe("https://www.mixcloud.com/DJ/my-mix/");
+  });
+
+  test("counts the same show once however often it is named", () => {
+    const html = `
+      <a href="https://www.mixcloud.com/WorldwideFM/my-show/">My Show</a>
+      <script>{"player":"https://www.mixcloud.com/worldwidefm/my-show/"}</script>
+      <a href="https://www.mixcloud.com/worldwidefm/my-show/?commentId=123">comment</a>
+    `;
+    expect(extractMixcloudEmbedUrl(html)).toBe("https://www.mixcloud.com/WorldwideFM/my-show/");
+  });
+
+  test("returns null when the page names several different shows", () => {
+    const html = `
+      <a href="https://www.mixcloud.com/DJ/first-mix/">First</a>
+      <a href="https://www.mixcloud.com/DJ/second-mix/">Second</a>
+    `;
+    expect(extractMixcloudEmbedUrl(html)).toBeNull();
+  });
+
+  test("ignores profile pages, deep pages and Mixcloud's own pages", () => {
+    expect(
+      extractMixcloudEmbedUrl(`<a href="https://www.mixcloud.com/DJ/">Profile</a>`),
+    ).toBeNull();
+    expect(
+      extractMixcloudEmbedUrl(
+        `<a href="https://www.mixcloud.com/DJ/my-mix/comments/">Comments</a>`,
+      ),
+    ).toBeNull();
+    expect(
+      extractMixcloudEmbedUrl(`<a href="https://www.mixcloud.com/discover/jazz/">Discover</a>`),
+    ).toBeNull();
+  });
+
+  test("a show plus its own comments page is still one show", () => {
+    const html = `
+      <a href="https://www.mixcloud.com/DJ/my-mix/">My Mix</a>
+      <a href="https://www.mixcloud.com/DJ/my-mix/comments/">Comments</a>
+    `;
+    expect(extractMixcloudEmbedUrl(html)).toBe("https://www.mixcloud.com/DJ/my-mix/");
+  });
 });
 
 describe("mixcloudWidgetSrc", () => {
