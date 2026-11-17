@@ -251,10 +251,11 @@ const MIXCLOUD_RESERVED_SEGMENTS = new Set([
 /**
  * The one Mixcloud show a page embeds or links to, or null.
  *
- * The widget iframe is the explicit form. A page naming exactly one show URL
- * anywhere else — an anchor, or a JSON payload a SPA renders from — is about
- * that show too. Several different shows means a listing, which says nothing
- * about any one of them, so it answers null.
+ * The widget iframe is the explicit form, whether it sits in the markup as a
+ * tag or in a JSON payload a SPA renders it from. A page naming exactly one
+ * show URL anywhere else — an anchor, or more JSON — is about that show too.
+ * Several different shows means a listing, which says nothing about any one
+ * of them, so it answers null.
  */
 export function extractMixcloudEmbedUrl(html: string): string | null {
   const iframeRegex =
@@ -275,6 +276,23 @@ export function extractMixcloudEmbedUrl(html: string): string | null {
 
   // JSON payloads escape slashes; unescape them so one pattern reads both forms.
   const text = html.replace(/\\\//g, "/");
+
+  // A widget player streamed as JSON data (no literal <iframe> tag) is just as
+  // explicit an embed as the tag form — its feed names the show directly.
+  const feedMatch =
+    /mixcloud\.com\/widget\/iframe\/\?(?:[^"'\s<>\\]*?&)?feed=([^"'\s<>\\&]+)/i.exec(text);
+  if (feedMatch) {
+    try {
+      const feed = decodeURIComponent(feedMatch[1] ?? "");
+      if (/^\/[^/]+\/[^/]+/.test(feed)) {
+        const normalized = feed.endsWith("/") ? feed : `${feed}/`;
+        return `https://www.mixcloud.com${normalized}`;
+      }
+    } catch {
+      // ignore invalid feeds
+    }
+  }
+
   const showUrlRegex = /https?:\/\/(?:www\.)?mixcloud\.com\/([^"'\s<>\\]+)/gi;
   const shows = new Map<string, string>();
   while ((match = showUrlRegex.exec(text)) !== null) {

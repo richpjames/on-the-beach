@@ -241,7 +241,7 @@ describe("scrapeUnknownWebPage — OG fallback", () => {
     );
   });
 
-  test("rejects a titleless music page with the service's own failure detail", async () => {
+  test("rejects a titleless music page when the extraction service fails", async () => {
     process.env.MISTRAL_API_KEY = "test-key";
     spyOn(console, "error").mockImplementation(() => {});
     const fetchSpy = spyOn(globalThis, "fetch");
@@ -255,17 +255,12 @@ describe("scrapeUnknownWebPage — OG fallback", () => {
       }),
     );
 
-    let thrown: unknown;
-    try {
-      await scrapeUnknownWebPage(url, 5000);
-    } catch (error) {
-      thrown = error;
-    }
-    expect(thrown).toBeInstanceOf(UnsupportedMusicLinkError);
-    expect((thrown as Error).message).toStartWith(
-      "The extraction service failed while reading this link:",
+    // The taxonomy alone reaches the person adding the link — the provider's
+    // raw error stays in the server log.
+    await expectUnsupported(
+      scrapeUnknownWebPage(url, 5000),
+      "The extraction service failed while reading this link",
     );
-    expect((thrown as Error).message).toContain("401");
   });
 
   test("rejects a titleless music page when the answer is unreadable", async () => {

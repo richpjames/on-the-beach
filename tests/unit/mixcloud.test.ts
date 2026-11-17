@@ -140,6 +140,34 @@ describe("extractMixcloudEmbedUrl", () => {
     expect(extractMixcloudEmbedUrl(html)).toBe("https://www.mixcloud.com/DJ/my-mix/");
   });
 
+  test("finds a widget player streamed as escaped JSON, without an iframe tag", () => {
+    const html = `<script>self.__next_f.push([1,"{\\"player\\":\\"https:\\/\\/www.mixcloud.com\\/widget\\/iframe\\/?feed=%2FDJ%2Fmy-mix%2F\\"}"])</script>`;
+    expect(extractMixcloudEmbedUrl(html)).toBe("https://www.mixcloud.com/DJ/my-mix/");
+  });
+
+  test("finds a JSON widget feed that follows other parameters", () => {
+    const html = `<script>{"embed":"https://www.mixcloud.com/widget/iframe/?hide_cover=1&feed=%2FDJ%2Fmy-mix%2F"}</script>`;
+    expect(extractMixcloudEmbedUrl(html)).toBe("https://www.mixcloud.com/DJ/my-mix/");
+  });
+
+  test("appends the trailing slash to a JSON widget feed that lacks one", () => {
+    const html = `<script>{"embed":"https://www.mixcloud.com/widget/iframe/?feed=%2FDJ%2Fmy-mix"}</script>`;
+    expect(extractMixcloudEmbedUrl(html)).toBe("https://www.mixcloud.com/DJ/my-mix/");
+  });
+
+  test("ignores a JSON widget feed that is malformed or names no show", () => {
+    expect(
+      extractMixcloudEmbedUrl(
+        `<script>{"embed":"https://www.mixcloud.com/widget/iframe/?feed=%2FDJ%2Fmy-mix%2"}</script>`,
+      ),
+    ).toBeNull();
+    expect(
+      extractMixcloudEmbedUrl(
+        `<script>{"embed":"https://www.mixcloud.com/widget/iframe/?feed=%2FDJ%2F"}</script>`,
+      ),
+    ).toBeNull();
+  });
+
   test("finds a show URL inside escaped-quote JSON, as SPAs stream it", () => {
     const html = `<script>self.__next_f.push([1,"{\\"url\\":\\"https://www.mixcloud.com/worldwidefm/santa-leticia-woh-2026-22-08-26/\\",\\"player\\":\\"https://www.mixcloud.com/worldwidefm/santa-leticia-woh-2026-22-08-26/\\"}"])</script>`;
     expect(extractMixcloudEmbedUrl(html)).toBe(

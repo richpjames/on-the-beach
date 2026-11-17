@@ -271,17 +271,6 @@ export type LinkExtractionFailure = "no-key" | "api-error" | "bad-response";
 export interface LinkExtractionResult {
   releases: ExtractedReleaseCandidate[];
   failure?: LinkExtractionFailure;
-  /** A short human-readable detail of the failure, e.g. the API's own message. */
-  failureDetail?: string;
-}
-
-const MAX_FAILURE_DETAIL_CHARS = 200;
-
-function failureDetailOf(err: unknown): string {
-  const message = err instanceof Error ? err.message : String(err);
-  return message.length > MAX_FAILURE_DETAIL_CHARS
-    ? `${message.slice(0, MAX_FAILURE_DETAIL_CHARS)}…`
-    : message;
 }
 
 export async function extractReleaseCandidatesFromWebText(
@@ -334,8 +323,10 @@ export async function extractReleaseCandidatesFromWebText(
 
     return { releases };
   } catch (err) {
+    // The full error stays in the server log; the caller only needs to know
+    // the service failed — raw provider errors can carry internal details.
     console.error("[scraper] Mistral link extraction failed:", err);
-    return { releases: [], failure: "api-error", failureDetail: failureDetailOf(err) };
+    return { releases: [], failure: "api-error" };
   }
 }
 
