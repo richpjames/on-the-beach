@@ -473,9 +473,6 @@
       const delta = event.key === "ArrowDown" ? 1 : -1;
       const next = (sourceActive + delta + sourceMatches.length) % sourceMatches.length;
       sourceActiveIndex = next;
-      // The dropdown scrolls, so arrowing past its visible height would
-      // otherwise move the highlight off-screen: keep it in view.
-      document.getElementById(`source-option-${next}`)?.scrollIntoView({ block: "nearest" });
     } else if (event.key === "Enter") {
       if (sourceDropdownExpanded) {
         event.preventDefault();
@@ -485,6 +482,19 @@
       sourceDropdownOpen = false;
     }
   }
+
+  // Keep the highlighted option inside the dropdown's visible height. This
+  // must run as an effect: Svelte flushes the DOM after the keydown handler,
+  // so scrolling in the handler would hit a still-hidden list on the arrow
+  // press that reopens it (scrollIntoView is a no-op on display:none), and a
+  // click reopen would leave a deep highlight out of view, pickable unseen.
+  $effect(() => {
+    if (sourceDropdownExpanded) {
+      document
+        .getElementById(`source-option-${sourceActive}`)
+        ?.scrollIntoView({ block: "nearest" });
+    }
+  });
 
   // The play buttons and the source link are built server-side from the
   // *primary* link, so editing the link list has to re-run the page load for
