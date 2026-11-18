@@ -106,9 +106,10 @@ The shared button variants have migrated: `.btn--primary` wears `--btn-primary-b
 `--btn-primary-text` (deep fill, foam label) and `.btn--danger` wears `--btn-danger-bg` /
 `--btn-danger-text` (signal-deep fill, foam label), with bevels built from the matching
 ramps — the same recipes the style guide renders as `ds-btn--primary` / `ds-btn--danger`.
-Ghost danger buttons (`.btn--ghost.btn--danger`, the list-row removes) stay chrome and
-only redden their label on hover. Links on light chrome surfaces (the release page's
-catalogue and link-list URLs) use `--link` / `--link-hover`.
+Hover steps one tone up the ramp (`--deep-mid`, `--signal-mid`), keeping the foam label
+above the 4.5:1 small-text gate. Ghost danger buttons (`.btn--ghost.btn--danger`, the
+list-row removes) stay chrome and only redden their label on hover. Links on light chrome
+surfaces (the release page's catalogue and link-list URLs) use `--link` / `--link-hover`.
 
 ## Where things live
 

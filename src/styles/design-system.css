@@ -37,6 +37,7 @@
   --foam-line: #c9c9c9; /* hairlines on light */
 
   --signal-soft: #fda3a2; /* alert washes */
+  --signal-mid: #b81513; /* brighter red for hover on danger fills (6.2:1 on foam) */
   --signal-deep: #a81412; /* danger text and danger fills (7:1 on foam) */
 
   --sun-soft: #fcd48a; /* highlight washes */

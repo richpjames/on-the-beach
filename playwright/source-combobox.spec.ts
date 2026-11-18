@@ -4,9 +4,10 @@ test.beforeEach(async ({ request }) => {
   await request.post("/api/__test__/reset");
 });
 
-// The source picker is a combobox: arrows move the highlight, Enter picks,
-// Escape closes, and typing narrows the list. Picking by mouse is covered by
-// the link specs; this walks the same flow without touching the mouse.
+// The source picker is a combobox: arrows move the highlight (and keep it in
+// view), Enter picks, Escape closes, typing narrows the list, and a click
+// reopens it while focus is retained. Picking by mouse is covered by the link
+// specs; this walks the keyboard flow and the reopen click.
 test("the link source picker works from the keyboard", async ({ page, request }) => {
   const res = await request.post("/api/music-items", {
     data: { title: "Keyboard Picker", artistName: "Combo Box" },
@@ -32,6 +33,29 @@ test("the link source picker works from the keyboard", async ({ page, request })
   await expect(input).toHaveValue(thirdName!);
   await expect(dropdown).toBeHidden();
   await expect(input).toHaveAttribute("aria-expanded", "false");
+
+  // The input keeps focus after a pick or an Escape, so clicking it again
+  // must reopen the list — focus alone would never fire a second time.
+  await input.click();
+  await expect(dropdown).toBeVisible();
+  await input.press("Escape");
+  await expect(dropdown).toBeHidden();
+  await input.click();
+  await expect(dropdown).toBeVisible();
+
+  // Arrows walk to the far end of the list; the highlight stays inside the
+  // dropdown's visible height instead of scrolling out of sight.
+  const optionCount = await dropdown.locator("[role=option]").count();
+  for (let i = 0; i < optionCount - 3; i++) await input.press("ArrowDown");
+  const highlightInView = await page.evaluate(() => {
+    const field = document.getElementById("link-source-input")!;
+    const list = document.getElementById("source-dropdown")!;
+    const option = document.getElementById(field.getAttribute("aria-activedescendant")!)!;
+    const listBox = list.getBoundingClientRect();
+    const optionBox = option.getBoundingClientRect();
+    return optionBox.top >= listBox.top && optionBox.bottom <= listBox.bottom;
+  });
+  expect(highlightInView).toBe(true);
 
   // Typeahead narrows the list to the one match; Escape closes without picking.
   await input.fill("discogs");
