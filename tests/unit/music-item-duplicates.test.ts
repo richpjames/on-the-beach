@@ -1,8 +1,10 @@
-import { afterEach, afterAll, describe, expect, mock, spyOn, test } from "bun:test";
+import { afterEach, afterAll, beforeEach, describe, expect, mock, spyOn, test } from "bun:test";
 import { Hono } from "hono";
 import { createMusicItemsFromUrl } from "../../app/music-item-creator";
 import { createMusicItemDirect, DuplicateItemSelectionError } from "../../app/music-item-store";
 import { musicItemRoutes } from "../../server/routes/music-items";
+import { db } from "../../adapters/db/index";
+import { musicItems } from "../../adapters/db/schema";
 
 // Same setup as creator-release-links.test.ts: the Mistral client reads its
 // key when this file's imports evaluate, so the env has to be set at module
@@ -76,6 +78,13 @@ async function addMixcloudShows(): Promise<void> {
 
 afterEach(() => {
   mock.restore();
+});
+
+// The payloads are asserted item-by-item, so a stray row from an earlier file
+// sharing a release id would join the match and take the first slot. Start
+// every case from an empty library, like item-origin's seed test does.
+beforeEach(async () => {
+  await db.delete(musicItems);
 });
 
 describe("warn-mode duplicate detection", () => {

@@ -123,6 +123,9 @@ beforeEach(() => {
 // Held rows keep a live reminder, and a later file's cron run — with the real
 // checker and the real clock — would sweep them up. Take them with us.
 afterEach(async () => {
+  // Set in beforeEach; bun runs the whole suite in one process, so it must
+  // not leak into the next file's lookups.
+  delete process.env.OTB_DISABLE_EXTERNAL_LOOKUPS;
   for (const { itemId, artistId } of created) {
     await db.delete(releaseAlerts).where(eq(releaseAlerts.musicItemId, itemId));
     await db.delete(artistReleases).where(eq(artistReleases.artistId, artistId));
