@@ -5,9 +5,10 @@ test.beforeEach(async ({ request }) => {
 });
 
 // The source picker is a combobox: arrows move the highlight (and keep it in
-// view), Enter picks, Escape closes, typing narrows the list, and a click
-// reopens it while focus is retained. Picking by mouse is covered by the link
-// specs; this walks the keyboard flow and the reopen click.
+// view, including on the press that reopens the list), Enter picks, Escape
+// closes, typing narrows the list, and a click reopens it while focus is
+// retained. Picking by mouse is covered by the link specs; this walks the
+// keyboard flow and the reopen paths.
 test("the link source picker works from the keyboard", async ({ page, request }) => {
   const res = await request.post("/api/music-items", {
     data: { title: "Keyboard Picker", artistName: "Combo Box" },
@@ -20,6 +21,19 @@ test("the link source picker works from the keyboard", async ({ page, request })
 
   const input = page.locator("#link-source-input");
   const dropdown = page.locator("#source-dropdown");
+
+  async function expectHighlightInView(): Promise<void> {
+    const inView = await page.evaluate(() => {
+      const field = document.getElementById("link-source-input")!;
+      const list = document.getElementById("source-dropdown")!;
+      const option = document.getElementById(field.getAttribute("aria-activedescendant")!)!;
+      const listBox = list.getBoundingClientRect();
+      const optionBox = option.getBoundingClientRect();
+      return optionBox.top >= listBox.top && optionBox.bottom <= listBox.bottom;
+    });
+    expect(inView).toBe(true);
+  }
+
   await input.focus();
   await expect(dropdown).toBeVisible();
   await expect(input).toHaveAttribute("aria-expanded", "true");
@@ -47,15 +61,25 @@ test("the link source picker works from the keyboard", async ({ page, request })
   // dropdown's visible height instead of scrolling out of sight.
   const optionCount = await dropdown.locator("[role=option]").count();
   for (let i = 0; i < optionCount - 3; i++) await input.press("ArrowDown");
-  const highlightInView = await page.evaluate(() => {
-    const field = document.getElementById("link-source-input")!;
-    const list = document.getElementById("source-dropdown")!;
-    const option = document.getElementById(field.getAttribute("aria-activedescendant")!)!;
-    const listBox = list.getBoundingClientRect();
-    const optionBox = option.getBoundingClientRect();
-    return optionBox.top >= listBox.top && optionBox.bottom <= listBox.bottom;
-  });
-  expect(highlightInView).toBe(true);
+  await expectHighlightInView();
+
+  // Escape closes but keeps focus and the deep highlight. The next arrow
+  // press reopens the list, and the scroll must land after the DOM un-hides
+  // it — a synchronous scroll in the handler would hit a display:none list.
+  // ArrowUp keeps the highlight deep (ArrowDown would wrap to the top).
+  await input.press("Escape");
+  await expect(dropdown).toBeHidden();
+  await input.press("ArrowUp");
+  await expect(dropdown).toBeVisible();
+  await expectHighlightInView();
+
+  // A click reopen also comes back scrolled to the top with the deep
+  // highlight kept — it must be scrolled back into view without any arrow.
+  await input.press("Escape");
+  await expect(dropdown).toBeHidden();
+  await input.click();
+  await expect(dropdown).toBeVisible();
+  await expectHighlightInView();
 
   // Typeahead narrows the list to the one match; Escape closes without picking.
   await input.fill("discogs");
