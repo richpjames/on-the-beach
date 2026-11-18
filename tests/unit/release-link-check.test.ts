@@ -27,14 +27,17 @@ const APPLE_HIT: ServiceSearchResult = {
   artworkUrl: "https://example.test/cover.jpg",
 };
 
-// The gate is a no-op with external lookups switched off (see the module note),
-// and every other test file in the suite leaves it set.
+// The gate is a no-op with external lookups switched off (see the module note).
+// The flag is cleared around every test in both directions: bun runs the whole
+// suite in one process, and files like release-route.test.ts need it unset —
+// a leak here would silently disable their lookups.
 beforeEach(() => {
   delete process.env.OTB_DISABLE_EXTERNAL_LOOKUPS;
 });
 
 afterEach(() => {
   mock.restore();
+  delete process.env.OTB_DISABLE_EXTERNAL_LOOKUPS;
 });
 
 describe("pickExternalLink", () => {
