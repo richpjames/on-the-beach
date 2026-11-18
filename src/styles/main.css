@@ -715,7 +715,7 @@ select.input {
 }
 
 .btn--danger:not(.btn--ghost):hover {
-  background: var(--btn-danger-bg);
+  background: var(--signal-mid);
 }
 
 .btn--danger:not(.btn--ghost):active {

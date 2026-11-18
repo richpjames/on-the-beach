@@ -471,8 +471,11 @@
       sourceDropdownOpen = true;
       if (sourceMatches.length === 0) return;
       const delta = event.key === "ArrowDown" ? 1 : -1;
-      sourceActiveIndex =
-        (sourceActive + delta + sourceMatches.length) % sourceMatches.length;
+      const next = (sourceActive + delta + sourceMatches.length) % sourceMatches.length;
+      sourceActiveIndex = next;
+      // The dropdown scrolls, so arrowing past its visible height would
+      // otherwise move the highlight off-screen: keep it in view.
+      document.getElementById(`source-option-${next}`)?.scrollIntoView({ block: "nearest" });
     } else if (event.key === "Enter") {
       if (sourceDropdownExpanded) {
         event.preventDefault();
@@ -980,6 +983,7 @@
                       clearTimeout(sourceBlurTimer);
                       sourceDropdownOpen = true;
                     }}
+                    onclick={() => (sourceDropdownOpen = true)}
                     onblur={() =>
                       (sourceBlurTimer = setTimeout(() => (sourceDropdownOpen = false), 150))}
                     onkeydown={onSourceKeydown}
