@@ -157,6 +157,32 @@ test("captures main and release views", async ({ page }) => {
   await captureSnapshot(page, "release-page-view");
 });
 
+test("captures the default home view", async ({ page, request }) => {
+  // The view users actually land on: no filter pinned in the URL, so the
+  // home page must open on Listened. Snapshot it empty and populated — the
+  // pinned To Listen baselines above can't catch a regression here.
+  await page.goto("/");
+  await expect(page.getByPlaceholder("search or paste a link")).toBeVisible();
+  await expect(page.locator(".filter-btn.active")).toHaveText("Listened");
+  await expect(page.locator(".music-card")).toHaveCount(0);
+  await expect(page.locator(".empty-state")).toBeVisible();
+  await captureSnapshot(page, "default-home-empty-view");
+
+  for (const item of [
+    { title: "Harbour Line", artistName: "Tape Anchor" },
+    { title: "Night Ferry", artistName: "Kite Array" },
+  ]) {
+    const response = await request.post("/api/music-items", {
+      data: { ...item, itemType: "album", listenStatus: "listened" },
+    });
+    expect(response.ok()).toBe(true);
+  }
+
+  await page.goto("/");
+  await expect(page.locator(".music-card")).toHaveCount(2);
+  await captureSnapshot(page, "default-home-view");
+});
+
 test("captures the listen row", async ({ page, request }) => {
   // A release whose first link is a YouTube page, so "listen here" has a
   // playable embed, plus a review and a database for the named ways out.
