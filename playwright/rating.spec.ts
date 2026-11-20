@@ -5,7 +5,7 @@ test.beforeEach(async ({ request }) => {
 });
 
 test("star rating appears on to-listen items and persists", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/?filter=to-listen");
 
   // Add an item manually via the title field (no URL)
   await page.getByRole("button", { name: "Add" }).click(); // reveals artist/release fields
@@ -45,7 +45,7 @@ test("star rating appears on to-listen items and persists", async ({ page }) => 
 });
 
 test("half stars preview live while hovering, before any click", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/?filter=to-listen");
 
   await page.getByRole("button", { name: "Add" }).click();
   await page.locator('input[name="title"]').fill("Hover Release");
@@ -79,7 +79,7 @@ test("star count is configurable and ratings keep accuracy across scale changes"
   });
   expect(settings.ok()).toBe(true);
 
-  await page.goto("/");
+  await page.goto("/?filter=to-listen");
   await page.getByRole("button", { name: "Add" }).click();
   await page.locator('input[name="title"]').fill("Ten Scale Release");
   await page.getByRole("button", { name: "Add" }).click();
@@ -118,7 +118,7 @@ test("ratings can be switched off entirely", async ({ page, request }) => {
   });
   expect(settings.ok()).toBe(true);
 
-  await page.goto("/");
+  await page.goto("/?filter=to-listen");
   await page.getByRole("button", { name: "Add" }).click();
   await page.locator('input[name="title"]').fill("Unrated Release");
   await page.getByRole("button", { name: "Add" }).click();

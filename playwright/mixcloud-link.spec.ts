@@ -61,7 +61,7 @@ test("mixcloud link uses uploader and title metadata instead of URL slug fallbac
     }
   });
 
-  await page.goto("/");
+  await page.goto("/?filter=to-listen");
   await page.getByPlaceholder("search or paste a link").fill(mixcloudUrl);
   await page.getByRole("button", { name: "Add" }).click();
 

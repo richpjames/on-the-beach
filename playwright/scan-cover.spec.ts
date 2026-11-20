@@ -3,7 +3,7 @@ import { expect, test } from "./fixtures/parallel-test";
 
 test.beforeEach(async ({ page, request }) => {
   await request.post("/api/__test__/reset");
-  await page.goto("/");
+  await page.goto("/?filter=to-listen");
 });
 
 test("photo button is visible and triggers file input", async ({ page }) => {

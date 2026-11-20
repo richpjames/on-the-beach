@@ -433,7 +433,9 @@ musicItemRoutes.get("/", async (c) => {
 
   const enriched = hydrateItemStacks(items, stackRows);
 
-  // Apply custom sort order if one exists for this context
+  // Apply custom sort order if one exists for this context. It only belongs
+  // to the default view order (date-added, newest first, no search) — the
+  // same view the SSR renders and the only one the UI allows dragging in.
   const contextKey = buildContextKey(listenStatus, parsedStackId);
   const orderRow = await db
     .select()
@@ -442,7 +444,7 @@ musicItemRoutes.get("/", async (c) => {
     .get();
 
   let finalItems: typeof enriched = enriched;
-  if (orderRow && (requestedSort as string) === "default" && !search) {
+  if (orderRow && requestedSort === "date-added" && dir === "desc" && !search) {
     const parsed = JSON.parse(orderRow.itemIds);
     if (Array.isArray(parsed) && parsed.length > 0) {
       if (typeof parsed[0] === "number") {

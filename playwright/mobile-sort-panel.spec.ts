@@ -19,7 +19,7 @@ test("mobile sort panel opens fully on screen", async ({ page, request }) => {
     expect(res.ok()).toBeTruthy();
   }
 
-  await page.goto("/");
+  await page.goto("/?filter=to-listen");
   await expect(page.locator(".music-card").first()).toBeVisible();
 
   await page.locator("#browse-sort-toggle").click();

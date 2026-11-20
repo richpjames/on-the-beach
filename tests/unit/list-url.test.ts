@@ -18,9 +18,9 @@ function params(query: string): URLSearchParams {
 }
 
 describe("defaultListViewState", () => {
-  test("home defaults to the to-listen queue", () => {
+  test("home defaults to the listened log", () => {
     expect(defaultListViewState(null)).toEqual({
-      filter: "to-listen",
+      filter: "listened",
       search: "",
       sort: "date-added",
       sortDirection: "desc",
@@ -57,7 +57,7 @@ describe("parseListViewState", () => {
 
 describe("buildListSearch", () => {
   const state: ListViewState = {
-    filter: "listened",
+    filter: "to-listen",
     search: "  boards of canada  ",
     sort: "artist-name",
     sortDirection: "asc",
@@ -65,7 +65,7 @@ describe("buildListSearch", () => {
 
   test("serialises non-default controls and trims the search", () => {
     expect(buildListSearch(state, null)).toBe(
-      "?filter=listened&q=boards+of+canada&sort=artist-name&dir=asc",
+      "?filter=to-listen&q=boards+of+canada&sort=artist-name&dir=asc",
     );
   });
 

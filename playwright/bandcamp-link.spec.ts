@@ -8,7 +8,7 @@ test("links with protocol https", async ({ page }) => {
   const bandcampUrl =
     "https://seekersinternational.bandcamp.com/album/thewherebetweenyou-me-reissue";
 
-  await page.goto("/");
+  await page.goto("/?filter=to-listen");
   await page.getByPlaceholder("search or paste a link").fill(bandcampUrl);
   await page.getByRole("button", { name: "Add" }).click();
 
@@ -31,7 +31,7 @@ test("links without https", async ({ page }) => {
   const bandcampUrlNoProtocol = "phewjapan.bandcamp.com/album/paper-masks";
   const expectedNormalizedUrl = "https://phewjapan.bandcamp.com/album/paper-masks";
 
-  await page.goto("/");
+  await page.goto("/?filter=to-listen");
 
   const urlInput = page.getByPlaceholder("search or paste a link");
   await urlInput.fill(bandcampUrlNoProtocol);
@@ -61,7 +61,7 @@ test("a Bandcamp link added by hand is reachable from the release page", async (
 
   // A release with no link at all — the case where the added link becomes the
   // primary one, and so is left out of the secondary "🔗" list in view mode.
-  await page.goto("/");
+  await page.goto("/?filter=to-listen");
   const addButton = page.getByRole("button", { name: "Add" });
   await addButton.click(); // reveals artist/release fields
   await page.locator('input[name="title"]').fill("Hand Linked Release");

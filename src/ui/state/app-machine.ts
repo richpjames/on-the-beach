@@ -65,7 +65,7 @@ export const appMachine = createMachine({
   context: ({ input }) => ({
     currentFilter:
       input?.currentFilter ??
-      (input?.currentStack != null ? ("all" as const) : ("to-listen" as const)),
+      (input?.currentStack != null ? ("all" as const) : ("listened" as const)),
     currentStack: input?.currentStack ?? null,
     searchQuery: input?.searchQuery ?? "",
     currentSort: input?.currentSort ?? ("date-added" as const),

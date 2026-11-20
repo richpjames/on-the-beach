@@ -3,7 +3,7 @@ import { expect, test } from "./fixtures/parallel-test";
 test.describe("Stacks", () => {
   test.beforeEach(async ({ page, request }) => {
     await request.post("/api/__test__/reset");
-    await page.goto("/");
+    await page.goto("/?filter=to-listen");
     await expect(page.getByPlaceholder("search or paste a link")).toBeVisible();
   });
 
@@ -144,7 +144,7 @@ test.describe("Stacks", () => {
       }
 
       await page.setViewportSize({ width, height });
-      await page.goto("/");
+      await page.goto("/?filter=to-listen");
       await expect(page.getByPlaceholder("search or paste a link")).toBeVisible();
       await expect(page.locator(".stack-tab", { hasText: "Long Stack 30" })).toHaveCount(1);
 

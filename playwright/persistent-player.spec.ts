@@ -8,7 +8,7 @@ test.beforeEach(async ({ request }) => {
 });
 
 test("player persists when navigating back to the list", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/?filter=to-listen");
   await page.getByPlaceholder("search or paste a link").fill(BANDCAMP_URL);
   await page.getByRole("button", { name: "Add" }).click();
   await expect(page.locator(".music-card")).toHaveCount(1, { timeout: 30_000 });
@@ -26,7 +26,7 @@ test("player persists when navigating back to the list", async ({ page }) => {
   await expect(page.locator("#taskbar-np-btn")).toBeVisible();
 
   // Navigate back to the list
-  await page.locator("a[href='/']").first().click();
+  await page.locator(".release-page__nav a").first().click();
   await expect(page.locator("#main")).toBeVisible();
 
   // Player is still visible
@@ -35,7 +35,7 @@ test("player persists when navigating back to the list", async ({ page }) => {
 });
 
 test("taskbar button toggles player visibility", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/?filter=to-listen");
   await page.getByPlaceholder("search or paste a link").fill(BANDCAMP_URL);
   await page.getByRole("button", { name: "Add" }).click();
   await expect(page.locator(".music-card")).toHaveCount(1, { timeout: 30_000 });
@@ -58,7 +58,7 @@ test("taskbar button toggles player visibility", async ({ page }) => {
 });
 
 test("close button stops playback", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/?filter=to-listen");
   await page.getByPlaceholder("search or paste a link").fill(BANDCAMP_URL);
   await page.getByRole("button", { name: "Add" }).click();
   await expect(page.locator(".music-card")).toHaveCount(1, { timeout: 30_000 });
@@ -77,14 +77,17 @@ test("close button stops playback", async ({ page }) => {
 });
 
 test("player titlebar links back to the release being played", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/?filter=to-listen");
   await page.getByPlaceholder("search or paste a link").fill(BANDCAMP_URL);
   await page.getByRole("button", { name: "Add" }).click();
   await expect(page.locator(".music-card")).toHaveCount(1, { timeout: 30_000 });
 
   await page.locator(".music-card").first().locator("a.music-card__link").click();
   await expect(page).toHaveURL(/\/r\/\d+/, { timeout: 10_000 });
-  const releaseUrl = page.url();
+  // The card link carries ?from= back to the pinned to-listen view, but the
+  // player titlebar links to the plain /r/:id — compare the release, not the
+  // incidental query string.
+  const releasePath = new URL(page.url()).pathname;
   await expect(page.locator(".release-page__actions .release-page__listen-btn")).toBeVisible({
     timeout: 10_000,
   });
@@ -92,17 +95,17 @@ test("player titlebar links back to the release being played", async ({ page }) 
   await expect(page.locator("#now-playing-player")).toBeVisible();
 
   // Leave the release, then use the titlebar to come back to it.
-  await page.locator("a[href='/']").first().click();
+  await page.locator(".release-page__nav a").first().click();
   await expect(page.locator("#main")).toBeVisible();
 
   await page.locator("#player-title-text").click();
-  await expect(page).toHaveURL(releaseUrl, { timeout: 10_000 });
+  await expect(page).toHaveURL((url) => url.pathname === releasePath, { timeout: 10_000 });
   // Playback survives the trip back.
   await expect(page.locator("#now-playing-player")).toBeVisible();
 });
 
 test("dragging the player titlebar does not navigate", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/?filter=to-listen");
   await page.getByPlaceholder("search or paste a link").fill(BANDCAMP_URL);
   await page.getByRole("button", { name: "Add" }).click();
   await expect(page.locator(".music-card")).toHaveCount(1, { timeout: 30_000 });
@@ -115,7 +118,7 @@ test("dragging the player titlebar does not navigate", async ({ page }) => {
   await page.locator(".release-page__actions .release-page__listen-btn").click();
   await expect(page.locator("#now-playing-player")).toBeVisible();
 
-  await page.locator("a[href='/']").first().click();
+  await page.locator(".release-page__nav a").first().click();
   await expect(page.locator("#main")).toBeVisible();
 
   // Drag the titlebar sideways — the window moves, and the drag must not be

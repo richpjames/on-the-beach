@@ -42,8 +42,9 @@ doubles as the search box); list cards = `.music-card`; list container =
 
 ## Gotchas
 
-- Default filter on `/` is **To Listen**, so freshly created items are visible
-  but `listened` ones are not.
+- Default filter on `/` is **Listened**, so freshly created items (which land
+  in To Listen) are not visible until you switch filter or open
+  `/?filter=to-listen`.
 - With external lookups disabled, submitting free text via the Add button
   completes without a link picker or any visible result — don't read that as
   a regression.

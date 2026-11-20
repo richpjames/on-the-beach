@@ -22,7 +22,7 @@ test("initial form shows link input first, artist and release revealed after cli
 });
 
 test("can manually add a release without link or artwork", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/?filter=to-listen");
 
   const addButton = page.getByRole("button", { name: "Add" });
   await expect(addButton).toBeEnabled();
