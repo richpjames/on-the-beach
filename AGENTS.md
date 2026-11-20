@@ -25,7 +25,7 @@ If CI fails or conflicts exist, fix or surface them rather than reporting the PR
 - Always state the full PR URL prominently, on its own line, every time a PR is created or updated.
 
 ### The agent review and /fix
-The `PR-Agent review` workflow (Qodo PR-Agent, self-hosted, on the GLM model) reviews every pull request: a "PR Reviewer Guide" comment it keeps updated on each push, inline findings, and a "PR Code Suggestions" comment whose suggestions GitHub can apply on click. It only comments — reply `/fix` on the pull request and the `Pi fix` workflow applies the findings of the latest review and suggestions to the branch — same-repository pull requests only, and lint plus the unit tests must pass before anything is pushed.
+The `PR-Agent review` workflow (Qodo PR-Agent, self-hosted, on qwen4-max-preview through the Qwen Token Plan endpoint) reviews every pull request: a "PR Reviewer Guide" comment it keeps updated on each push, inline findings, and a "PR Code Suggestions" comment whose suggestions GitHub can apply on click. It only comments — reply `/fix` on the pull request and the `Pi fix` workflow applies the findings of the latest review and suggestions to the branch — same-repository pull requests only, and lint plus the unit tests must pass before anything is pushed.
 
 ### Plain terms over jargon
 Prefer the word the repo already uses for a concept over the textbook term (e.g. `--config ground-truth`, not `--config oracle`; the repo's word for a provider is "source" / `SourceName`). If a term needs a glossary entry to be understood, it probably needs renaming instead. Applies to identifiers, CLI flags, and prose in reports.
