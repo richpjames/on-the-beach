@@ -28,8 +28,8 @@ const SORTS: readonly MusicItemSort[] = [
 /** What a list page shows before the user touches any browse control. */
 export function defaultListViewState(stackId: number | null): ListViewState {
   return {
-    // Stack pages show everything in the stack; the home list is the queue.
-    filter: stackId === null ? "to-listen" : "all",
+    // Stack pages show everything in the stack; the home list is the log.
+    filter: stackId === null ? "listened" : "all",
     search: "",
     sort: "date-added",
     sortDirection: "desc",

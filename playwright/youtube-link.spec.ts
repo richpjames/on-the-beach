@@ -7,7 +7,7 @@ test.beforeEach(async ({ request }) => {
 test("youtube link shows source badge and navigates to release page on click", async ({ page }) => {
   const youtubeUrl = "https://www.youtube.com/watch?v=iS7-iBia7GE";
 
-  await page.goto("/");
+  await page.goto("/?filter=to-listen");
   await page.getByPlaceholder("search or paste a link").fill(youtubeUrl);
   await page.getByRole("button", { name: "Add" }).click();
 
@@ -32,7 +32,7 @@ test("mobile m.youtube.com link is normalised and release page is reachable", as
   const mobileUrl = "https://m.youtube.com/watch?v=iS7-iBia7GE";
   const normalizedUrl = "https://www.youtube.com/watch?v=iS7-iBia7GE";
 
-  await page.goto("/");
+  await page.goto("/?filter=to-listen");
   await page.getByPlaceholder("search or paste a link").fill(mobileUrl);
   await page.getByRole("button", { name: "Add" }).click();
 

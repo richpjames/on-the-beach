@@ -12,7 +12,7 @@ function isListenedItemsRequest(rawUrl: string): boolean {
 test("adding while Listened is selected does not re-render that tab", async ({ page }) => {
   const title = `Issue66-${Date.now()}`;
 
-  await page.goto("/");
+  await page.goto("/?filter=to-listen");
 
   await Promise.all([
     page.waitForResponse(

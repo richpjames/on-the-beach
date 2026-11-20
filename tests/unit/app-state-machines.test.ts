@@ -869,8 +869,10 @@ describe("app machine — version counters", () => {
 
   it("increments both versions on ITEM_CREATED when filter is to-listen", () => {
     const actor = createActor(appMachine, { input: {} }).start();
+    actor.send({ type: "FILTER_SELECTED", filter: "to-listen" });
+    const v0 = actor.getSnapshot().context.listVersion;
     actor.send({ type: "ITEM_CREATED" });
-    expect(actor.getSnapshot().context.listVersion).toBe(1);
+    expect(actor.getSnapshot().context.listVersion).toBe(v0 + 1);
     expect(actor.getSnapshot().context.stackBarVersion).toBe(1);
   });
 

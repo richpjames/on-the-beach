@@ -121,7 +121,9 @@ test.beforeEach(async ({ request }) => {
 });
 
 test("captures main and release views", async ({ page }) => {
-  await page.goto("/");
+  // The baselines were captured in the To Listen queue — pin it, since the
+  // home list now defaults to Listened.
+  await page.goto("/?filter=to-listen");
   await expect(page.getByPlaceholder("search or paste a link")).toBeVisible();
 
   const scanFixturePath = path.join(process.cwd(), "playwright/fixtures/cover-sample.png");
@@ -147,7 +149,8 @@ test("captures main and release views", async ({ page }) => {
     .first()
     .locator(".music-card__link")
     .click();
-  await page.waitForURL(/\/r\/\d+$/);
+  // The card link may carry ?from= back to the pinned list view.
+  await page.waitForURL(/\/r\/\d+(?:\?|$)/);
   await expect(page.locator(".release-page")).toBeVisible();
   await expect(page.locator("#view-mode")).toBeVisible();
 
@@ -350,7 +353,7 @@ for (const playerCase of PLAYER_WINDOW_CASES) {
 }
 
 test("captures add loading dialog", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/?filter=to-listen");
   await expect(page.getByPlaceholder("search or paste a link")).toBeVisible();
 
   await page.evaluate(() => {
@@ -366,7 +369,7 @@ test("captures add loading dialog", async ({ page }) => {
 test("captures main long-list view", async ({ page, request }) => {
   await seedLongList(request);
 
-  await page.goto("/");
+  await page.goto("/?filter=to-listen");
   await expect(page.locator(".music-card")).toHaveCount(LONG_LIST_FIXTURES.length);
   await expect(page.locator(".music-card__title").first()).toHaveText(
     LONG_LIST_FIXTURES.at(-1)!.title,

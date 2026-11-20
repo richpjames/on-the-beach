@@ -14,7 +14,7 @@ import { applyOrder, buildContextKey } from "../../domain/music-list-context";
 import type { FilterSelection } from "../../domain/types";
 import type { MusicItemFull, StackWithCount } from "../../domain/types";
 
-export const DEFAULT_FILTER = "to-listen" as const;
+export const DEFAULT_FILTER = "listened" as const;
 export const STACK_DEFAULT_FILTER: FilterSelection = "all";
 
 export async function fetchInitialStacks(): Promise<StackWithCount[]> {
@@ -57,8 +57,8 @@ export async function fetchInitialStacks(): Promise<StackWithCount[]> {
  * Fetch the items to render in the SSR'd music list.
  *
  * Mirrors what the client-side music list does after hydration:
- * - On `/`, the default filter is "to-listen" and there is no stack scope, so
- *   we filter strictly by `listen_status = 'to-listen'`. Listed items must
+ * - On `/`, the default filter is "listened" and there is no stack scope, so
+ *   we filter strictly by `listen_status = 'listened'`. Queued items must
  *   never appear in this view.
  * - On `/s/:id/:name`, the app machine forces `currentFilter` to "all" and
  *   scopes by `stackId`, so the SSR mirrors that: items are restricted to the
@@ -71,12 +71,12 @@ export async function fetchInitialItems(stackId: number | null): Promise<MusicIt
 
   // Apply listen-status filter only when we're not scoping by stack. On stack
   // pages the client view shows all statuses, so the SSR must too — otherwise
-  // the first paint shows global to-listen items that get replaced with the
-  // real (mixed-status) stack contents a moment later.
+  // the first paint shows global default-filter items that get replaced with
+  // the real (mixed-status) stack contents a moment later.
   //
   // Scheduled items (remind_at IS NOT NULL) are owned by the "Scheduled"
-  // filter — exclude them here so they don't double up under "To Listen" with
-  // a label the release page then contradicts.
+  // filter — exclude them here so they don't double up under a status filter
+  // with a label the release page then contradicts.
   if (filter !== "all") {
     baseQuery = baseQuery.where(
       and(eq(musicItems.listenStatus, filter), isNull(musicItems.remindAt)),

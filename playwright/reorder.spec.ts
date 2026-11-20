@@ -15,7 +15,7 @@ test.describe("Reorder (mouse)", () => {
       expect(response.ok()).toBe(true);
     }
 
-    await page.goto("/");
+    await page.goto("/?filter=to-listen");
     await expect(page.locator(".music-card")).toHaveCount(3);
   });
 
@@ -67,7 +67,7 @@ test.describe("Reorder (touch)", () => {
       expect(response.ok()).toBe(true);
     }
 
-    await page.goto("/");
+    await page.goto("/?filter=to-listen");
     await expect(page.locator(".music-card")).toHaveCount(3);
   });
 

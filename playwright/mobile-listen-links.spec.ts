@@ -19,7 +19,7 @@ test.beforeEach(async ({ request }) => {
 });
 
 test("a phone gets the listen destination as a plain link", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/?filter=to-listen");
   await page.getByPlaceholder("search or paste a link").fill(BANDCAMP_URL);
   await page.getByRole("button", { name: "Add" }).click();
   await expect(page.locator(".music-card")).toHaveCount(1, { timeout: 30_000 });

@@ -23,4 +23,4 @@
 
 ## State passed to the frontend
 
-The main page load preloads the default `to-listen` list and stack bar so the first render works without waiting for a client fetch. On stack URLs it preloads the stack's items with the `all` filter, mirroring what the app machine forces client-side. The page components seed the app machine from this data and take over interactive updates.
+The main page load preloads the default `listened` list and stack bar so the first render works without waiting for a client fetch. On stack URLs it preloads the stack's items with the `all` filter, mirroring what the app machine forces client-side. The page components seed the app machine from this data and take over interactive updates.

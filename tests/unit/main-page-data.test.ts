@@ -25,7 +25,7 @@ for (const suffix of ["", "-shm", "-wal"]) {
 void mock;
 
 describe("main page SSR data: /", () => {
-  test("returns only items with to-listen status", async () => {
+  test("returns only items with listened status", async () => {
     const { db } = await import("../../adapters/db/index.ts");
     const { musicItems } = await import("../../adapters/db/schema.ts");
     const { fetchInitialItems } = await import("../../app/queries/main-page-data.ts");
@@ -46,18 +46,18 @@ describe("main page SSR data: /", () => {
     const items = await fetchInitialItems(null);
     const returnedIds = items.map((i) => i.id);
 
-    // Sanity check: all to-listen items returned
-    for (const id of expectedToListenIds) {
+    // Sanity check: all listened items returned
+    for (const id of expectedListenedIds) {
       expect(returnedIds).toContain(id);
     }
 
-    // Bug check: NO listened items should be returned for the default route
-    for (const id of expectedListenedIds) {
+    // Bug check: NO to-listen items should be returned for the default route
+    for (const id of expectedToListenIds) {
       expect(returnedIds).not.toContain(id);
     }
   });
 
-  test("excludes scheduled items (remind_at set) from the to-listen view", async () => {
+  test("excludes scheduled items (remind_at set) from the default view", async () => {
     const { db } = await import("../../adapters/db/index.ts");
     const { musicItems } = await import("../../adapters/db/schema.ts");
     const { fetchInitialItems } = await import("../../app/queries/main-page-data.ts");
@@ -76,22 +76,29 @@ describe("main page SSR data: /", () => {
           normalizedTitle: "plaintolisten",
           listenStatus: "to-listen",
         },
+        {
+          title: "PlainListened",
+          normalizedTitle: "plainlistened",
+          listenStatus: "listened",
+        },
       ])
       .returning({ id: musicItems.id, title: musicItems.title });
 
     const scheduledId = inserted.find((i) => i.title === "ScheduledItem")!.id;
-    const plainId = inserted.find((i) => i.title === "PlainToListen")!.id;
+    const toListenId = inserted.find((i) => i.title === "PlainToListen")!.id;
+    const listenedId = inserted.find((i) => i.title === "PlainListened")!.id;
 
     const items = await fetchInitialItems(null);
     const returnedIds = items.map((i) => i.id);
 
-    expect(returnedIds).toContain(plainId);
+    expect(returnedIds).toContain(listenedId);
     expect(returnedIds).not.toContain(scheduledId);
+    expect(returnedIds).not.toContain(toListenId);
   });
 
-  test("app machine defaults to the to-listen filter without a stack scope", () => {
+  test("app machine defaults to the listened filter without a stack scope", () => {
     const actor = createActor(appMachine, { input: { currentStack: null } }).start();
-    expect(actor.getSnapshot().context.currentFilter).toBe("to-listen");
+    expect(actor.getSnapshot().context.currentFilter).toBe("listened");
     expect(actor.getSnapshot().context.currentStack).toBeNull();
     actor.stop();
   });

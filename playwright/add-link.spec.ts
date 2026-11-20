@@ -5,7 +5,7 @@ test.beforeEach(async ({ request }) => {
 });
 
 test("adding a link shows the new item", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/?filter=to-listen");
   page.on("dialog", async (dialog) => {
     await dialog.accept();
   });

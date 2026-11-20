@@ -104,11 +104,22 @@ test.describe("List view state in the URL", () => {
   }) => {
     await seedRelease(request, "Queued Release", "Queued Artist");
 
-    await page.goto("/?filter=listened");
+    await page.goto("/?filter=to-listen");
+    await expect(page.locator('.filter-btn[data-filter="to-listen"]')).toHaveClass(/active/);
+    // The seeded release is to-listen, so the queue view shows it.
+    await expect(page.locator(".music-card")).toHaveCount(1);
+    await expect(page).toHaveURL(/\/\?filter=to-listen$/);
+  });
+
+  test("the home list defaults to the listened view", async ({ page, request }) => {
+    await seedRelease(request, "Queued Release", "Queued Artist");
+
+    await page.goto("/");
     await expect(page.locator('.filter-btn[data-filter="listened"]')).toHaveClass(/active/);
     // The seeded release is still to-listen, so the listened view is empty.
     await expect(page.locator(".music-card")).toHaveCount(0);
-    await expect(page).toHaveURL(/\/\?filter=listened$/);
+    // The default view needs no query string.
+    await expect(page).toHaveURL(/\/$/);
   });
 
   test("a tampered back target falls back to the home list", async ({ page, request }) => {

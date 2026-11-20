@@ -15,7 +15,7 @@ test.beforeEach(async ({ request }) => {
 test("a Mixcloud link plays in the internal player", async ({ page }) => {
   // A release with no link at all, so the hand-added Mixcloud link becomes
   // the primary one.
-  await page.goto("/");
+  await page.goto("/?filter=to-listen");
   const addButton = page.getByRole("button", { name: "Add" });
   await addButton.click(); // reveals artist/release fields
   await page.locator('input[name="title"]').fill("Hand Linked Mixcloud");
