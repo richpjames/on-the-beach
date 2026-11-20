@@ -33,6 +33,7 @@ jobs:
       contains(fromJSON('["OWNER", "MEMBER", "COLLABORATOR"]'), github.event.comment.author_association)
     env:
       PR: ${{ github.event.issue.number }}
+      # Secret name left over from the Z.ai days; holds the Qwen Token Plan key.
       ZAI_API_KEY: ${{ secrets.ZAI_API_KEY }}
       GH_TOKEN: ${{ github.token }}
       GH_REPO: ${{ github.repository }}
@@ -102,6 +103,37 @@ jobs:
         if: steps.gate.outputs.run == 'true'
         run: npm install -g @earendil-works/pi-coding-agent@1.4.0
 
+      # pi has no built-in provider for the Token Plan endpoint, and its
+      # models.json lives only in the agent directory — so write it here.
+      # The key interpolates from the job env; nothing secret lands in the
+      # repository.
+      - name: Point pi at the Qwen Token Plan endpoint
+        if: steps.gate.outputs.run == 'true'
+        run: |
+          mkdir -p ~/.pi/agent
+          cat <<'EOF' > ~/.pi/agent/models.json
+          {
+            "providers": {
+              "qwen-token-plan": {
+                "baseUrl": "https://token-plan.maas.qwencloudapi.com/compatible-mode/v1",
+                "api": "openai-completions",
+                "apiKey": "$ZAI_API_KEY",
+                "models": [
+                  {
+                    "id": "qwen4-max-preview",
+                    "name": "qwen4-max-preview",
+                    "reasoning": true,
+                    "input": ["text"],
+                    "cost": { "input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0 },
+                    "contextWindow": 128000,
+                    "maxTokens": 16384
+                  }
+                ]
+              }
+            }
+          }
+          EOF
+
       - name: Setup Bun
         if: steps.gate.outputs.run == 'true'
         uses: oven-sh/setup-bun@v2
@@ -138,7 +170,7 @@ jobs:
           # Extensions and skills execute arbitrary code at load, whatever
           # --tools allows; applying review findings never needs them.
           pi -p --no-session \
-            --provider zai --model glm-5.3 \
+            --provider qwen-token-plan --model qwen4-max-preview \
             --tools read,edit,write,grep,find,ls \
             --no-extensions --no-skills --no-prompt-templates --no-themes \
             "@$RUNNER_TEMP/fix-prompt.md" > "$RUNNER_TEMP/fix-summary.md"
@@ -190,7 +222,7 @@ jobs:
         if: steps.changes.outputs.applied == 'true'
         run: |
           {
-            echo '#### Pi fix applied (glm-5.3)'
+            echo '#### Pi fix applied (qwen4-max-preview)'
             echo
             cat "$RUNNER_TEMP/fix-summary.md"
             echo

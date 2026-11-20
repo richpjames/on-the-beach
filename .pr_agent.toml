@@ -5,11 +5,11 @@
 # cannot say about reviewing this repository.
 
 [config]
-model = "openai/glm-5.3" # routed to Z.ai by the workflow's OPENAI_API_BASE
+model = "openai/qwen4-max-preview" # routed to the Qwen Token Plan by the workflow's OPENAI_API_BASE
 fallback_models = []
 custom_model_max_tokens = 128000
-# GLM-5.3 is a reasoning model: the improve prompts can take minutes to
-# answer, and the 120s default timed out on them.
+# qwen4-max-preview is a reasoning model: the improve prompts can take
+# minutes to answer, and the 120s default timed out on them.
 ai_timeout = 600
 
 [github_action_config]
