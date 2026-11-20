@@ -1,8 +1,11 @@
 import { afterAll, describe, expect, test } from "bun:test";
+import { eq, inArray } from "drizzle-orm";
 import { Hono } from "hono";
 import { musicItemRoutes } from "../../server/routes/music-items";
 import { createMusicItemDirect } from "../../app/music-item-store";
 import { itemOrderEntry } from "../../domain/music-list-context";
+import { db } from "../../adapters/db/index";
+import { musicItemOrder, musicItems } from "../../adapters/db/schema";
 
 // The list route must honour a saved custom order in the default view order
 // (date-added, newest first, no search) — the same view the SSR renders and
@@ -15,9 +18,18 @@ import { itemOrderEntry } from "../../domain/music-list-context";
 const LOOKUPS_BEFORE = process.env.OTB_DISABLE_EXTERNAL_LOOKUPS;
 process.env.OTB_DISABLE_EXTERNAL_LOOKUPS = "1";
 
-afterAll(() => {
+// The rows this file writes, so afterAll can take them back out: bun runs
+// every test file in one process against the same database, and a leftover
+// order row would reorder a neighbouring file's default-view list.
+const createdIds: number[] = [];
+
+afterAll(async () => {
   if (LOOKUPS_BEFORE === undefined) delete process.env.OTB_DISABLE_EXTERNAL_LOOKUPS;
   else process.env.OTB_DISABLE_EXTERNAL_LOOKUPS = LOOKUPS_BEFORE;
+  await db.delete(musicItemOrder).where(eq(musicItemOrder.contextKey, "filter:to-listen"));
+  if (createdIds.length > 0) {
+    await db.delete(musicItems).where(inArray(musicItems.id, createdIds));
+  }
 });
 
 function makeApp(): Hono {
@@ -42,6 +54,7 @@ describe("GET /api/music-items custom order", () => {
     const second = (await createMusicItemDirect({ title: "OrderRoute Second" })).item;
     const third = (await createMusicItemDirect({ title: "OrderRoute Third" })).item;
     const ids = [first.id, second.id, third.id];
+    createdIds.push(...ids);
 
     const save = await makeApp().request("http://localhost/api/music-items/order", {
       method: "PUT",
