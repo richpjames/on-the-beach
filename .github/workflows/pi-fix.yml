@@ -105,8 +105,12 @@ jobs:
 
       # pi has no built-in provider for the Token Plan endpoint, and its
       # models.json lives only in the agent directory — so write it here.
-      # The key interpolates from the job env; nothing secret lands in the
-      # repository.
+      # The heredoc is quoted on purpose: "$ZAI_API_KEY" must reach the file
+      # verbatim, because pi interpolates $NAME apiKey references from the
+      # environment at request time — nothing secret lands in the repository.
+      # The compat block matters: pi auto-detects OpenAI-style behaviour for
+      # unknown URLs and would send a developer-role system message, which
+      # this endpoint rejects (verified against the pinned pi 1.4.0).
       - name: Point pi at the Qwen Token Plan endpoint
         if: steps.gate.outputs.run == 'true'
         run: |
@@ -126,7 +130,14 @@ jobs:
                     "input": ["text"],
                     "cost": { "input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0 },
                     "contextWindow": 128000,
-                    "maxTokens": 16384
+                    "maxTokens": 16384,
+                    "compat": {
+                      "supportsStore": false,
+                      "supportsDeveloperRole": false,
+                      "supportsReasoningEffort": false,
+                      "maxTokensField": "max_tokens",
+                      "thinkingFormat": "qwen"
+                    }
                   }
                 ]
               }
