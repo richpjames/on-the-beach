@@ -332,7 +332,7 @@
   // The catalogue match is computed by `ui/logic/catalogue-match.ts` —
   // paste to correct, empty both to clear the whole match.
   async function saveChanges(): Promise<void> {
-    const matchUpdates = catalogueMatchUpdates(editDiscogs, editMbRelease, item);
+    const matchUpdates = catalogueMatchUpdates(editDiscogs, editMbRelease, catalogueItem);
     if ("error" in matchUpdates) {
       alert(matchUpdates.error);
       return;
@@ -583,6 +583,67 @@
     }
   });
 
+  // ── Catalogue resolution ───────────────────────────────────────────────────
+  // What the resolver made of this record, as the page knows it. Starts from
+  // the stored row; the on-view lookup below updates it in place when a
+  // verdict lands, so the provenance line appears without a reload.
+  let resolved = $state({
+    resolution_status: item.resolution_status,
+    musicbrainz_release_id: item.musicbrainz_release_id,
+    musicbrainz_release_group_id: item.musicbrainz_release_group_id,
+    discogs_release_id: item.discogs_release_id,
+    discogs_master_id: item.discogs_master_id,
+  });
+  let resolutionPending = $state(false);
+
+  // The item as the page knows it now — the load-time row with any verdict
+  // the on-view lookup has landed. The provenance line and the edit form's
+  // catalogue-match comparison both read this, so a match found while the
+  // page is open is neither invisible nor saved back as emptiness.
+  const catalogueItem = $derived({ ...item, ...resolved });
+
+  // Opening a release asks the catalogues what it is when nothing has asked
+  // before. The server enforces all skip rules (absent is terminal, ids from
+  // any path keep their provenance); we only avoid an obviously redundant
+  // request, the same courtesy the secondary-link lookup extends.
+  const resolutionEligible =
+    !item.musicbrainz_release_id &&
+    !item.musicbrainz_release_group_id &&
+    !item.discogs_release_id &&
+    !item.discogs_master_id &&
+    (item.resolution_status === null || item.resolution_status === "failed") &&
+    !!item.artist_name;
+
+  onMount(() => {
+    if (!resolutionEligible) return;
+    resolutionPending = true;
+    apiFetch(`/api/release/resolution-lookup/${item.id}`, { method: "POST" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((verdict) => {
+        if (!verdict || verdict.skipped || !verdict.resolutionStatus) return;
+        resolved = {
+          resolution_status: verdict.resolutionStatus,
+          musicbrainz_release_id: verdict.musicbrainzReleaseId ?? null,
+          musicbrainz_release_group_id: verdict.musicbrainzReleaseGroupId ?? null,
+          discogs_release_id: verdict.discogsReleaseId ?? null,
+          discogs_master_id: verdict.discogsMasterId ?? null,
+        };
+        // Fill the edit form's catalogue fields gap-only, as the link form
+        // fills artwork and label: a lookup that lands while the form is open
+        // must not be written back over by the form's initial emptiness.
+        if (!editDiscogs && verdict.discogsReleaseId) {
+          editDiscogs = String(verdict.discogsReleaseId);
+        }
+        if (!editMbRelease && verdict.musicbrainzReleaseId) {
+          editMbRelease = verdict.musicbrainzReleaseId;
+        }
+      })
+      .catch(() => {})
+      .finally(() => {
+        resolutionPending = false;
+      });
+  });
+
   const metaFields = $derived(
     [item.year ? String(item.year) : null, item.country, item.genre].filter(Boolean).join(" · "),
   );
@@ -613,25 +674,26 @@
   // What the catalogue resolver made of this record, in plain terms — the
   // provenance line beside "Added from a photo". The catalogue names link to
   // the entry the resolver verified, so "matched" is checkable at a glance.
-  // Hidden when resolution never ran (`resolution_status` null): rows that
-  // predate the resolver, and every non-scan entry, read exactly as before.
+  // Hidden while resolution has never run (`resolution_status` null) — but a
+  // row that predates the resolver is asked about on open, so the line tends
+  // to appear a beat after the page does.
   type ResolutionSegment = { text: string; href?: string };
   const resolutionSegments = $derived.by<ResolutionSegment[] | null>(() => {
     const catalogues: ResolutionSegment[] = [];
-    if (item.discogs_release_id) {
+    if (catalogueItem.discogs_release_id) {
       catalogues.push({
         text: "Discogs",
-        href: `https://www.discogs.com/release/${item.discogs_release_id}`,
+        href: `https://www.discogs.com/release/${catalogueItem.discogs_release_id}`,
       });
     }
-    if (item.musicbrainz_release_id) {
+    if (catalogueItem.musicbrainz_release_id) {
       catalogues.push({
         text: "MusicBrainz",
-        href: `https://musicbrainz.org/release/${item.musicbrainz_release_id}`,
+        href: `https://musicbrainz.org/release/${catalogueItem.musicbrainz_release_id}`,
       });
     }
     const names = catalogues.map((segment) => segment.text);
-    switch (item.resolution_status) {
+    switch (catalogueItem.resolution_status) {
       case "matched": {
         if (catalogues.length === 0) return [{ text: "Matched in the catalogues" }];
         const segments: ResolutionSegment[] = [{ text: "Matched in " }];
@@ -759,7 +821,11 @@
           {#if originLine}
             <p class="release-page__origin">{originLine}</p>
           {/if}
-          {#if resolutionSegments}
+          {#if resolutionPending}
+            <p class="release-page__origin release-page__resolution">
+              Looking it up in the catalogues…
+            </p>
+          {:else if resolutionSegments}
             <p class="release-page__origin release-page__resolution">
               {#each resolutionSegments as segment}
                 {#if segment.href}
