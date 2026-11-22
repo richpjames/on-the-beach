@@ -4,6 +4,7 @@ import {
   fetchReleaseGroupDetail,
   fetchReleaseGroupIdForRelease,
   fetchReleaseGroupUrlRelations,
+  fetchReleaseUrlRelations,
   fetchArtistReleaseGroups,
   searchArtistCandidates,
   searchReleaseCandidates,
@@ -596,6 +597,56 @@ describe("fetchReleaseGroupUrlRelations", () => {
     spyOn(globalThis, "fetch").mockResolvedValue(new Response("rate limited", { status: 503 }));
 
     expect(fetchReleaseGroupUrlRelations("rg1")).rejects.toThrow("503");
+  });
+});
+
+describe("fetchReleaseUrlRelations", () => {
+  afterEach(() => {
+    mock.restore();
+  });
+
+  test("reads the external links off a release", async () => {
+    const fetchSpy = spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          id: "r1",
+          relations: [
+            { type: "streaming", url: { resource: "https://music.apple.com/gb/album/6769093260" } },
+            {
+              type: "purchase for download",
+              url: { resource: "https://music.apple.com/gb/album/6769093260" },
+            },
+          ],
+        }),
+        { headers: { "content-type": "application/json" } },
+      ),
+    );
+
+    const relations = await fetchReleaseUrlRelations("r1");
+
+    const [url] = fetchSpy.mock.calls[0] as [string, RequestInit];
+    expect(url).toContain("/release/r1?");
+    expect(url).toContain("inc=url-rels");
+    expect(relations).toEqual([
+      { type: "streaming", url: "https://music.apple.com/gb/album/6769093260" },
+      { type: "purchase for download", url: "https://music.apple.com/gb/album/6769093260" },
+    ]);
+  });
+
+  test("a release with no relations is empty", async () => {
+    spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      new Response(JSON.stringify({ id: "r1" }), {
+        headers: { "content-type": "application/json" },
+      }),
+    );
+
+    expect(await fetchReleaseUrlRelations("r1")).toEqual([]);
+  });
+
+  test("throws on a non-2xx response — a throttled request is not an absence of links", async () => {
+    spyOn(globalThis, "fetch").mockResolvedValue(new Response("rate limited", { status: 503 }));
+
+    expect(fetchReleaseUrlRelations("r1")).rejects.toThrow("503");
   });
 });
 

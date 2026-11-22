@@ -41,8 +41,8 @@ team-scoped catalogue access and expires. It is served from:
 
 ## Catalogue lookup
 
-`searchAppleMusic` (in `app/scrape.ts + adapters/registry.ts`) first tries the Apple Music Catalog
-API (`adapters/apple-music-catalog.ts`) using the developer token, then falls back
+`searchAppleMusic` (in `adapters/apple-music/scrape.ts`) first tries the Apple Music Catalog
+API (`adapters/apple-music/catalog.ts`) using the developer token, then falls back
 to the iTunes Search API. Both return a `ServiceSearchResult` — the
 `music.apple.com` URL plus the release's cover `artworkUrl` when the service
 exposes one. The catalogue API path yields URLs that carry the catalogue ids
@@ -56,9 +56,33 @@ artwork and the item has none of its own, that cover is saved to the item's
 `artworkUrl` (never overwriting existing art) — so pulling a release from Apple
 Music now brings its artwork along too.
 
-When Apple Music has no match at all, the enrichment falls back to a YouTube
-search and saves a link only when that match is unambiguous — see the YouTube
-fallback section of `docs/areas/integrations/scanning-and-enrichment.md`.
+Before either search runs, the item's MusicBrainz url relations are consulted
+(`findAppleMusicUrlViaMusicBrainz`): editors attach the record's own Apple Music
+page to the release, so that link needs no fuzzy matching — and no dependence
+on the item's artist credit being the one Apple carries the record under. The
+release's own relations are asked first, then its release group's. The attached
+page is scraped for cover art and label on the same gap-only terms as a search
+hit.
+
+A release maps to a record, not one track: when a song is the best search
+match, its catalogue URL — a `?i=` deep-link into the album — is reduced to the
+album URL (`appleMusicAlbumUrl` in `domain/apple-music.ts`), so the player
+queues the whole record. The iTunes path has always answered this way, stripping
+the query off a track's collection URL. A `?i=` link the user pastes themselves
+still plays as the single track it names.
+
+When Apple Music has no match at all, the enrichment falls back to a Bandcamp
+page named in the same MusicBrainz url relations, and failing that a YouTube
+search that saves a link only when the match is unambiguous — see the fallback
+sections of `docs/areas/integrations/scanning-and-enrichment.md`.
+
+Links attached before these rules existed — the old artist-only search pass
+could link the artist's *other* release, and song matches stored track
+deep-links — are repaired by `scripts/repair-apple-music-links.ts`: the
+MusicBrainz-attached page replaces a wrong link, and a deep-link with no
+MusicBrainz page is reduced to its album. Secondary links only; `--dry-run`
+lists the planned repairs. Backfilling cannot do this — it skips items that
+already have a link.
 
 A lookup stamps `music_items.apple_music_lookup_at` on both a hit and a miss, so
 a release the catalogue doesn't carry isn't re-queried on every page view. Since
