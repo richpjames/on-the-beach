@@ -68,3 +68,37 @@ export function parseAppleMusicCatalogUrl(rawUrl: string): AppleMusicResource | 
 export function isPlayableAppleMusicUrl(url: string): boolean {
   return parseAppleMusicCatalogUrl(url) !== null;
 }
+
+/**
+ * The album URL a catalogue URL points at, when it points at one: an
+ * `/album/` path with any track deep-link (`?i=`) stripped, so the record
+ * plays whole rather than as a single track. A release maps to an album —
+ * this is how a song's deep-link becomes the record it belongs to.
+ *
+ * Returns null for song, playlist and music-video paths: those name no
+ * album in the URL itself.
+ */
+export function appleMusicAlbumUrl(rawUrl: string): string | null {
+  let url: URL;
+  try {
+    url = new URL(rawUrl);
+  } catch {
+    return null;
+  }
+
+  if (!url.hostname.toLowerCase().endsWith("music.apple.com")) return null;
+
+  const segments = url.pathname.split("/").filter(Boolean);
+  // Drop a leading two-letter storefront segment when present.
+  if (segments[0] && /^[a-z]{2}$/i.test(segments[0])) {
+    segments.shift();
+  }
+
+  if (segments[0] !== "album") return null;
+  const id = segments[segments.length - 1];
+  if (!id || !/^\d+$/.test(id)) return null;
+
+  url.search = "";
+  url.hash = "";
+  return url.toString();
+}

@@ -1,5 +1,6 @@
 import { getDeveloperToken, getStorefront, isAppleMusicConfigured } from "./token";
 import type { ServiceSearchResult } from "../../ports/service-search";
+import { appleMusicAlbumUrl } from "../../domain/apple-music";
 import { normalizeForMatch } from "./match";
 
 // ---------------------------------------------------------------------------
@@ -52,8 +53,13 @@ function resolveCatalogArtworkUrl(artwork: unknown): string | null {
 
 /** Build a search result from a matched catalogue resource, or null if it has no URL. */
 function toResult(resource: CatalogResource): ServiceSearchResult | null {
-  const url = getString(resource.attributes?.url);
-  if (!url) return null;
+  const raw = getString(resource.attributes?.url);
+  if (!raw) return null;
+  // A song's catalogue URL deep-links one track (`?i=`) inside its album, and
+  // the player queues a deep-link as that single song. A release maps to the
+  // record, so link the album — the same answer the iTunes path gives when it
+  // strips the query off a track's collection URL.
+  const url = appleMusicAlbumUrl(raw) ?? raw;
   return {
     url,
     artworkUrl: resolveCatalogArtworkUrl(resource.attributes?.artwork),

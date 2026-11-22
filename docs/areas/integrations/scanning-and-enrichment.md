@@ -30,6 +30,7 @@
 - `app/apple-music-backfill.ts` holds the shared backfill logic. `backfillAppleMusicLink` looks up a release on the iTunes Search API and saves a confident match as a secondary Apple Music link. It is idempotent: it skips releases whose primary link is already Apple Music and leaves any existing Apple Music link untouched.
 - When a non-Apple-Music item is added (via the API, email/link ingest, or photo ingest) `scheduleAppleMusicBackfill` runs the lookup in the background, so a playable Apple Music link is usually ready before the release page is opened.
 - `POST /api/release/apple-music-lookup/:id` exposes the same logic on demand and is still used as a lazy fallback from the release page for older items.
+- The shared enrichment (`app/secondary-link-enrichment.ts`) asks the item's MusicBrainz url relations for an editor-attached Apple Music page before any catalogue search, and reduces a matched song's `?i=` deep-link to its album so the release plays whole. `scripts/repair-apple-music-links.ts` applies the same two rules to links stored before them — secondary links only, `--dry-run` lists the planned repairs.
 
 ## YouTube fallback
 

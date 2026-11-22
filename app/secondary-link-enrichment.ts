@@ -3,15 +3,17 @@ import { db } from "../adapters/db/index";
 import { artists, musicItems, musicLinks, sources } from "../adapters/db/schema";
 import { parseUrl } from "../adapters/registry";
 import type { ServiceSearchResult } from "../ports/service-search";
-import { searchAppleMusic } from "../adapters/apple-music/index";
+import { scrapeAppleMusic, searchAppleMusic } from "../adapters/apple-music/index";
 import { searchSpotify } from "../adapters/spotify/index";
 import { searchYouTube } from "../adapters/youtube/index";
 import {
   fetchReleaseGroupIdForRelease,
   fetchReleaseGroupUrlRelations,
+  fetchReleaseUrlRelations,
   type MbUrlRelation,
 } from "../adapters/musicbrainz/index";
 import { scrapeBandcamp } from "../adapters/bandcamp/index";
+import { appleMusicAlbumUrl, isPlayableAppleMusicUrl } from "../domain/apple-music";
 import { getLookupService, type LookupService } from "./settings";
 
 // ---------------------------------------------------------------------------
@@ -26,13 +28,17 @@ import { getLookupService, type LookupService } from "./settings";
 //   2. Lazily, on demand, when a release page is viewed (routes/release).
 //   3. In bulk, via the one-off backfill script for pre-existing items.
 //
+// For Apple Music, the item's MusicBrainz url relations are consulted before
+// the catalogue search: editors attach the record's own Apple Music page to
+// the release, so no fuzzy matching is involved — and no dependence on the
+// item's artist credit being the one Apple carries the record under.
+//
 // When the active service has no match — common for small-label and
 // out-of-print records — two fallbacks run in order. First the item's
 // MusicBrainz release group is checked for a Bandcamp page among its url
-// relations: editors attach those links to the release itself, so no fuzzy
-// matching is involved, and the page supplies the release's own cover art
-// and record label. Then a YouTube search, which only yields a link when the
-// match is unambiguous (see server/youtube-search.ts).
+// relations, on the same editor-attached terms, and the page supplies the
+// release's own cover art and record label. Then a YouTube search, which only
+// yields a link when the match is unambiguous (see server/youtube-search.ts).
 // ---------------------------------------------------------------------------
 
 export interface ServiceConfig {
@@ -105,6 +111,8 @@ export type SearchFallbackFn = (
 ) => Promise<ServiceSearchResult | null>;
 /** Resolves the release's Bandcamp page via its MusicBrainz release group. */
 export type FindBandcampLinkFn = (item: ItemInfoForLookup) => Promise<ServiceSearchResult | null>;
+/** Resolves the release's Apple Music page via its MusicBrainz url relations. */
+export type FindAppleMusicLinkFn = (item: ItemInfoForLookup) => Promise<ServiceSearchResult | null>;
 export type SaveLinkFn = (itemId: number, url: string, sourceName: string) => Promise<void>;
 export type SaveArtworkFn = (itemId: number, artworkUrl: string) => Promise<void>;
 export type SaveLabelFn = (itemId: number, label: string) => Promise<void>;
@@ -229,6 +237,7 @@ export interface SecondaryLookupDeps {
   getExisting: GetExistingLinkFn;
   search: SearchServiceFn;
   searchFallback: SearchFallbackFn;
+  findAppleMusicLink: FindAppleMusicLinkFn;
   findBandcampLink: FindBandcampLinkFn;
   save: SaveLinkFn;
   saveArtwork: SaveArtworkFn;
@@ -242,6 +251,7 @@ export const defaultSecondaryLookupDeps: SecondaryLookupDeps = {
   getExisting: getExistingLink,
   search: defaultSearch,
   searchFallback: (title, artist) => searchYouTube(title, artist),
+  findAppleMusicLink: defaultFindAppleMusicLink,
   findBandcampLink: defaultFindBandcampLink,
   save: saveLink,
   saveArtwork,
@@ -327,6 +337,27 @@ export function pickBandcampReleaseUrl(relations: MbUrlRelation[]): string | nul
 }
 
 /**
+ * The Apple Music page among a release's url relations, or null. Like the
+ * Bandcamp pick, these are editor-attached links to the record itself — no
+ * fuzzy matching to get wrong. An album URL wins over a lone song or
+ * playlist, and a track deep-link (`?i=`) is reduced to its album: a release
+ * plays as the record, not one track. Ties keep MusicBrainz's own ordering.
+ */
+export function pickAppleMusicReleaseUrl(relations: MbUrlRelation[]): string | null {
+  const albums: string[] = [];
+  const others: string[] = [];
+  for (const relation of relations) {
+    const album = appleMusicAlbumUrl(relation.url);
+    if (album) {
+      albums.push(album);
+    } else if (isPlayableAppleMusicUrl(relation.url)) {
+      others.push(relation.url);
+    }
+  }
+  return albums[0] ?? others[0] ?? null;
+}
+
+/**
  * Resolve the release's Bandcamp page through MusicBrainz: the release group's
  * url relations often name it, attached there by MB editors, so unlike the
  * catalogue searches there is no fuzzy matching to get wrong. The page is
@@ -373,6 +404,76 @@ async function resolveReleaseGroupId(releaseId: string): Promise<string | null> 
     console.error("[secondary-link] MusicBrainz release lookup failed:", err);
     return null;
   }
+}
+
+/** The MusicBrainz ids an item carries — all a url-rels lookup needs. */
+export interface MusicBrainzIds {
+  musicbrainzReleaseId: string | null;
+  musicbrainzReleaseGroupId: string | null;
+}
+
+/**
+ * The Apple Music page MusicBrainz's url relations name for this release, or
+ * null. The release's own relations are asked first — that is where editors
+ * usually hang streaming links — and the release group's second.
+ *
+ * Failures return null (logged) rather than throwing: this runs inside
+ * background enrichment, where the catalogue search is still worth a try.
+ */
+export async function findAppleMusicUrlViaMusicBrainz(ids: MusicBrainzIds): Promise<string | null> {
+  if (process.env.OTB_DISABLE_EXTERNAL_LOOKUPS) return null;
+  if (!ids.musicbrainzReleaseId && !ids.musicbrainzReleaseGroupId) return null;
+
+  try {
+    if (ids.musicbrainzReleaseId) {
+      const url = pickAppleMusicReleaseUrl(
+        await fetchReleaseUrlRelations(ids.musicbrainzReleaseId),
+      );
+      if (url) return url;
+    }
+
+    const groupId =
+      ids.musicbrainzReleaseGroupId ??
+      (ids.musicbrainzReleaseId ? await resolveReleaseGroupId(ids.musicbrainzReleaseId) : null);
+    if (groupId) {
+      return pickAppleMusicReleaseUrl(await fetchReleaseGroupUrlRelations(groupId));
+    }
+  } catch (err) {
+    console.error("[secondary-link] MusicBrainz url-rels lookup failed:", err);
+  }
+  return null;
+}
+
+/**
+ * Resolve the release's Apple Music page through MusicBrainz and scrape it
+ * for cover art and label — an Apple Music page *is* the release's own
+ * account of itself, so like the Bandcamp fallback this hit may carry both.
+ * Editor-attached, so unlike the catalogue search it cannot be led astray by
+ * an artist credit Apple carries the record under differently.
+ */
+async function defaultFindAppleMusicLink(
+  item: ItemInfoForLookup,
+): Promise<ServiceSearchResult | null> {
+  const url = await findAppleMusicUrlViaMusicBrainz(item);
+  if (!url) return null;
+
+  const scraped = await scrapeAppleMusic(url, 8000).catch(() => null);
+  return {
+    url,
+    artworkUrl: scraped?.imageUrl ?? null,
+    label: scraped?.label ?? null,
+  };
+}
+
+/**
+ * The URL a stored secondary Apple Music link should be repaired to, or null
+ * to leave it alone: the MusicBrainz-attached page when there is one, else
+ * the album a track deep-link (`?i=`) points into. Used by the one-off
+ * repair script for links the old artist-only search pass got wrong.
+ */
+export function appleMusicRepairTarget(storedUrl: string, mbUrl: string | null): string | null {
+  const target = mbUrl ?? appleMusicAlbumUrl(storedUrl);
+  return target && target !== storedUrl ? target : null;
 }
 
 /**
@@ -428,16 +529,35 @@ async function lookupFallbackLink(
   return hit.url;
 }
 
+/** Persist a lookup hit: the link itself, plus cover art and label gap-fill. */
+async function saveHit(
+  itemId: number,
+  item: ItemInfoForLookup,
+  hit: ServiceSearchResult,
+  sourceName: string,
+  deps: SecondaryLookupDeps,
+): Promise<void> {
+  await deps.save(itemId, hit.url, sourceName);
+  if (hit.artworkUrl && !item.artworkUrl) {
+    await deps.saveArtwork(itemId, hit.artworkUrl);
+  }
+  if (hit.label && !item.label) {
+    await deps.saveLabel(itemId, hit.label);
+  }
+}
+
 /**
  * Core lookup orchestration shared by the route, the eager creation hook, and
  * the backfill script. Resolves a secondary link on the active streaming
  * service for an item that isn't already on that service, persisting a hit and
  * stamping the lookup marker on both a hit and a miss.
  *
- * When the active service has nothing, the MusicBrainz url relations are
- * checked for a Bandcamp page for the release, and failing that a YouTube
- * search runs — its (high-confidence only) hit is saved as a YouTube
- * secondary link instead.
+ * For Apple Music, the item's MusicBrainz url relations are asked first: an
+ * editor-attached link names this exact record, where the catalogue search
+ * can only guess from title and artist. When the active service has nothing,
+ * the MusicBrainz url relations are checked for a Bandcamp page for the
+ * release, and failing that a YouTube search runs — its (high-confidence
+ * only) hit is saved as a YouTube secondary link instead.
  */
 export async function lookupSecondaryLinkForItem(
   itemId: number,
@@ -461,6 +581,18 @@ export async function lookupSecondaryLinkForItem(
   // A previous attempt already came up empty — don't re-query on every view.
   if (item.lookupAttemptedAt) {
     return { kind: "skipped", reason: "already_attempted" };
+  }
+
+  // Editor-attached beats fuzzy-matched: MusicBrainz's url relations name the
+  // record itself, and don't depend on the item's artist credit being the one
+  // Apple carries it under.
+  if (service === "apple_music") {
+    const attached = await deps.findAppleMusicLink(item);
+    if (attached) {
+      await saveHit(itemId, item, attached, cfg.sourceName, deps);
+      await deps.stamp(itemId);
+      return { kind: "result", service, serviceDisplayName: cfg.displayName, url: attached.url };
+    }
   }
 
   const result = await deps.search(item.title, item.artistName, service);
@@ -490,16 +622,7 @@ export async function lookupSecondaryLinkForItem(
     return { kind: "result", service, serviceDisplayName: cfg.displayName, url: null };
   }
 
-  await deps.save(itemId, result.url, cfg.sourceName);
-
-  // Backfill cover art and the record label from the same lookup when the item
-  // has neither of its own.
-  if (result.artworkUrl && !item.artworkUrl) {
-    await deps.saveArtwork(itemId, result.artworkUrl);
-  }
-  if (result.label && !item.label) {
-    await deps.saveLabel(itemId, result.label);
-  }
+  await saveHit(itemId, item, result, cfg.sourceName, deps);
 
   return { kind: "result", service, serviceDisplayName: cfg.displayName, url: result.url };
 }

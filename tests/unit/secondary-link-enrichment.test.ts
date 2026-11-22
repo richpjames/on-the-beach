@@ -1,8 +1,12 @@
-import { beforeEach, describe, expect, mock, test } from "bun:test";
+import { afterEach, beforeEach, describe, expect, mock, spyOn, test } from "bun:test";
 import {
+  appleMusicRepairTarget,
+  defaultSecondaryLookupDeps,
   enrichSecondaryLink,
   enrichSecondaryLinkInBackground,
+  findAppleMusicUrlViaMusicBrainz,
   lookupSecondaryLinkForItem,
+  pickAppleMusicReleaseUrl,
   pickBandcampReleaseUrl,
   type ItemInfoForLookup,
   type SecondaryLookupDeps,
@@ -15,6 +19,7 @@ const fetchItem = mock();
 const getExisting = mock();
 const search = mock();
 const searchFallback = mock();
+const findAppleMusicLink = mock();
 const findBandcampLink = mock();
 const save = mock();
 const saveArtwork = mock();
@@ -27,6 +32,7 @@ const deps: SecondaryLookupDeps = {
   getExisting,
   search,
   searchFallback,
+  findAppleMusicLink,
   findBandcampLink,
   save,
   saveArtwork,
@@ -60,6 +66,7 @@ beforeEach(() => {
   getExisting.mockReset();
   search.mockReset();
   searchFallback.mockReset();
+  findAppleMusicLink.mockReset();
   findBandcampLink.mockReset();
   save.mockReset();
   saveArtwork.mockReset();
@@ -68,6 +75,7 @@ beforeEach(() => {
   getService.mockResolvedValue("apple_music" as LookupService);
   getExisting.mockResolvedValue(null);
   searchFallback.mockResolvedValue(null);
+  findAppleMusicLink.mockResolvedValue(null);
   findBandcampLink.mockResolvedValue(null);
   save.mockResolvedValue(undefined);
   saveArtwork.mockResolvedValue(undefined);
@@ -240,6 +248,85 @@ describe("lookupSecondaryLinkForItem", () => {
     expect(getExisting).toHaveBeenCalledWith(9, "spotify");
     expect(search).toHaveBeenCalledWith("Blue Lines", "Massive Attack", "spotify");
     expect(save).toHaveBeenCalledWith(9, "https://open.spotify.com/album/xyz", "spotify");
+  });
+});
+
+describe("MusicBrainz Apple Music relations", () => {
+  const attachedUrl = "https://music.apple.com/gb/album/i-wonder-if-you-know-single/6769093260";
+
+  test("an editor-attached link beats the catalogue search", async () => {
+    fetchItem.mockResolvedValue(item({ musicbrainzReleaseId: "r1" }));
+    findAppleMusicLink.mockResolvedValue(hit(attachedUrl));
+
+    const outcome = await lookupSecondaryLinkForItem(686, deps);
+
+    expect(outcome).toEqual({
+      kind: "result",
+      service: "apple_music",
+      serviceDisplayName: "Apple Music",
+      url: attachedUrl,
+    });
+    expect(findAppleMusicLink).toHaveBeenCalledWith(
+      expect.objectContaining({ musicbrainzReleaseId: "r1" }),
+    );
+    expect(search).not.toHaveBeenCalled();
+    expect(save).toHaveBeenCalledWith(686, attachedUrl, "apple_music");
+    expect(stamp).toHaveBeenCalledWith(686);
+  });
+
+  test("an attached hit may fill the item's artwork and label", async () => {
+    fetchItem.mockResolvedValue(item({ artworkUrl: null, label: null }));
+    findAppleMusicLink.mockResolvedValue(
+      hit(attachedUrl, "https://cdn/cover/1200x1200bb.jpg", "Because Music"),
+    );
+
+    await lookupSecondaryLinkForItem(686, deps);
+
+    expect(saveArtwork).toHaveBeenCalledWith(686, "https://cdn/cover/1200x1200bb.jpg");
+    expect(saveLabel).toHaveBeenCalledWith(686, "Because Music");
+  });
+
+  test("does not overwrite artwork or label the item already has", async () => {
+    fetchItem.mockResolvedValue(
+      item({ artworkUrl: "https://existing/cover.jpg", label: "Existing" }),
+    );
+    findAppleMusicLink.mockResolvedValue(
+      hit(attachedUrl, "https://cdn/cover.jpg", "Because Music"),
+    );
+
+    await lookupSecondaryLinkForItem(686, deps);
+
+    expect(saveArtwork).not.toHaveBeenCalled();
+    expect(saveLabel).not.toHaveBeenCalled();
+  });
+
+  test("falls through to the catalogue search when MusicBrainz names no page", async () => {
+    fetchItem.mockResolvedValue(item({ musicbrainzReleaseId: "r1" }));
+    findAppleMusicLink.mockResolvedValue(null);
+    search.mockResolvedValue(hit("https://music.apple.com/gb/album/blue-lines/456"));
+
+    const outcome = await lookupSecondaryLinkForItem(5, deps);
+
+    expect(search).toHaveBeenCalledWith("Blue Lines", "Massive Attack", "apple_music");
+    expect(outcome).toMatchObject({ url: "https://music.apple.com/gb/album/blue-lines/456" });
+  });
+
+  test("not consulted when the active service is Spotify", async () => {
+    getService.mockResolvedValue("spotify" as LookupService);
+    fetchItem.mockResolvedValue(item({ musicbrainzReleaseId: "r1" }));
+    search.mockResolvedValue(hit("https://open.spotify.com/album/xyz"));
+
+    await lookupSecondaryLinkForItem(9, deps);
+
+    expect(findAppleMusicLink).not.toHaveBeenCalled();
+  });
+
+  test("not consulted when a lookup was already attempted", async () => {
+    fetchItem.mockResolvedValue(item({ lookupAttemptedAt: new Date() }));
+
+    await lookupSecondaryLinkForItem(5, deps);
+
+    expect(findAppleMusicLink).not.toHaveBeenCalled();
   });
 });
 
@@ -476,6 +563,295 @@ describe("pickBandcampReleaseUrl", () => {
       { type: null, url: "https://gavsborg.bandcamp.com/track/one-song" },
     ];
     expect(pickBandcampReleaseUrl(relations)).toBe("https://gavsborg.bandcamp.com/track/one-song");
+  });
+});
+
+describe("pickAppleMusicReleaseUrl", () => {
+  test("takes the album the relations name", () => {
+    const relations: MbUrlRelation[] = [
+      { type: "streaming", url: "https://music.apple.com/gb/album/6769093260" },
+    ];
+    expect(pickAppleMusicReleaseUrl(relations)).toBe("https://music.apple.com/gb/album/6769093260");
+  });
+
+  test("prefers an album over a lone song or playlist", () => {
+    const relations: MbUrlRelation[] = [
+      { type: "streaming", url: "https://music.apple.com/gb/song/foo/2" },
+      { type: "streaming", url: "https://music.apple.com/gb/album/bar/1" },
+    ];
+    expect(pickAppleMusicReleaseUrl(relations)).toBe("https://music.apple.com/gb/album/bar/1");
+  });
+
+  test("reduces a track deep-link to its album — the release plays whole", () => {
+    const relations: MbUrlRelation[] = [
+      { type: "streaming", url: "https://music.apple.com/gb/album/my-song/952587922?i=952587944" },
+    ];
+    expect(pickAppleMusicReleaseUrl(relations)).toBe(
+      "https://music.apple.com/gb/album/my-song/952587922",
+    );
+  });
+
+  test("falls back to a song or playlist when no album is named", () => {
+    expect(
+      pickAppleMusicReleaseUrl([
+        { type: "streaming", url: "https://music.apple.com/gb/song/foo/2" },
+      ]),
+    ).toBe("https://music.apple.com/gb/song/foo/2");
+    expect(
+      pickAppleMusicReleaseUrl([
+        { type: "streaming", url: "https://music.apple.com/gb/playlist/foo/pl.u-abc" },
+      ]),
+    ).toBe("https://music.apple.com/gb/playlist/foo/pl.u-abc");
+  });
+
+  test("ignores artist pages and non-Apple-Music relations", () => {
+    const relations: MbUrlRelation[] = [
+      { type: "streaming", url: "https://open.spotify.com/album/xyz" },
+      { type: "official homepage", url: "https://music.apple.com/gb/artist/foo/111" },
+    ];
+    expect(pickAppleMusicReleaseUrl(relations)).toBeNull();
+  });
+
+  test("ties keep MusicBrainz's own ordering", () => {
+    const relations: MbUrlRelation[] = [
+      { type: "purchase for download", url: "https://music.apple.com/gb/album/first/1" },
+      { type: "streaming", url: "https://music.apple.com/gb/album/second/2" },
+    ];
+    expect(pickAppleMusicReleaseUrl(relations)).toBe("https://music.apple.com/gb/album/first/1");
+  });
+});
+
+describe("findAppleMusicUrlViaMusicBrainz", () => {
+  // The lookup no-ops under OTB_DISABLE_EXTERNAL_LOOKUPS, and a stray copy of
+  // the flag — left in the shared process by whichever test file `bun test`
+  // happened to run first — would make every assertion here read null.
+  // Guarantee it's off for these tests rather than depending on file order.
+  let flagBefore: string | undefined;
+
+  beforeEach(() => {
+    flagBefore = process.env.OTB_DISABLE_EXTERNAL_LOOKUPS;
+    delete process.env.OTB_DISABLE_EXTERNAL_LOOKUPS;
+  });
+
+  afterEach(() => {
+    mock.restore();
+    if (flagBefore === undefined) delete process.env.OTB_DISABLE_EXTERNAL_LOOKUPS;
+    else process.env.OTB_DISABLE_EXTERNAL_LOOKUPS = flagBefore;
+  });
+
+  function mbResponse(body: unknown): Response {
+    return new Response(JSON.stringify(body), {
+      headers: { "content-type": "application/json" },
+    });
+  }
+
+  test("no MusicBrainz ids means no request and no link", async () => {
+    const fetchSpy = spyOn(globalThis, "fetch");
+    const url = await findAppleMusicUrlViaMusicBrainz({
+      musicbrainzReleaseId: null,
+      musicbrainzReleaseGroupId: null,
+    });
+    expect(url).toBeNull();
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  test("no-ops under OTB_DISABLE_EXTERNAL_LOOKUPS", async () => {
+    const prev = process.env.OTB_DISABLE_EXTERNAL_LOOKUPS;
+    process.env.OTB_DISABLE_EXTERNAL_LOOKUPS = "1";
+    try {
+      const fetchSpy = spyOn(globalThis, "fetch");
+      const url = await findAppleMusicUrlViaMusicBrainz({
+        musicbrainzReleaseId: "r1",
+        musicbrainzReleaseGroupId: null,
+      });
+      expect(url).toBeNull();
+      expect(fetchSpy).not.toHaveBeenCalled();
+    } finally {
+      if (prev === undefined) delete process.env.OTB_DISABLE_EXTERNAL_LOOKUPS;
+      else process.env.OTB_DISABLE_EXTERNAL_LOOKUPS = prev;
+    }
+  });
+
+  test("asks the release's own relations first", async () => {
+    const fetchSpy = spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      mbResponse({
+        relations: [
+          { type: "streaming", url: { resource: "https://music.apple.com/gb/album/6769093260" } },
+        ],
+      }),
+    );
+
+    const url = await findAppleMusicUrlViaMusicBrainz({
+      musicbrainzReleaseId: "r1",
+      musicbrainzReleaseGroupId: "rg1",
+    });
+
+    expect(url).toBe("https://music.apple.com/gb/album/6769093260");
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    expect(fetchSpy.mock.calls[0]?.[0]).toContain("/release/r1?");
+  });
+
+  test("falls back to the release group when the release names no Apple Music page", async () => {
+    const fetchSpy = spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(
+        mbResponse({
+          relations: [
+            { type: "streaming", url: { resource: "https://open.spotify.com/album/xyz" } },
+          ],
+        }),
+      )
+      .mockResolvedValueOnce(
+        mbResponse({
+          relations: [
+            { type: "streaming", url: { resource: "https://music.apple.com/gb/album/1" } },
+          ],
+        }),
+      );
+
+    const url = await findAppleMusicUrlViaMusicBrainz({
+      musicbrainzReleaseId: "r1",
+      musicbrainzReleaseGroupId: "rg1",
+    });
+
+    expect(url).toBe("https://music.apple.com/gb/album/1");
+    expect(fetchSpy).toHaveBeenCalledTimes(2);
+    expect(fetchSpy.mock.calls[1]?.[0]).toContain("/release-group/rg1?");
+  });
+
+  test("resolves the group from the release when only the release id is known", async () => {
+    const fetchSpy = spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(mbResponse({ relations: [] }))
+      .mockResolvedValueOnce(mbResponse({ "release-group": { id: "rg1" } }))
+      .mockResolvedValueOnce(
+        mbResponse({
+          relations: [
+            { type: "streaming", url: { resource: "https://music.apple.com/gb/album/1" } },
+          ],
+        }),
+      );
+
+    const url = await findAppleMusicUrlViaMusicBrainz({
+      musicbrainzReleaseId: "r1",
+      musicbrainzReleaseGroupId: null,
+    });
+
+    expect(url).toBe("https://music.apple.com/gb/album/1");
+    expect(fetchSpy).toHaveBeenCalledTimes(3);
+    expect(fetchSpy.mock.calls[1]?.[0]).toContain("inc=release-groups");
+    expect(fetchSpy.mock.calls[2]?.[0]).toContain("/release-group/rg1?");
+  });
+
+  test("a failed request is a miss, not a throw", async () => {
+    spyOn(globalThis, "fetch").mockResolvedValue(new Response("rate limited", { status: 503 }));
+
+    const url = await findAppleMusicUrlViaMusicBrainz({
+      musicbrainzReleaseId: "r1",
+      musicbrainzReleaseGroupId: null,
+    });
+
+    expect(url).toBeNull();
+  });
+});
+
+describe("defaultFindAppleMusicLink", () => {
+  // Same stray-flag hazard as findAppleMusicUrlViaMusicBrainz above.
+  let flagBefore: string | undefined;
+
+  beforeEach(() => {
+    flagBefore = process.env.OTB_DISABLE_EXTERNAL_LOOKUPS;
+    delete process.env.OTB_DISABLE_EXTERNAL_LOOKUPS;
+  });
+
+  afterEach(() => {
+    mock.restore();
+    if (flagBefore === undefined) delete process.env.OTB_DISABLE_EXTERNAL_LOOKUPS;
+    else process.env.OTB_DISABLE_EXTERNAL_LOOKUPS = flagBefore;
+  });
+
+  test("scrapes the attached page for cover art and label", async () => {
+    const fetchSpy = spyOn(globalThis, "fetch")
+      // MusicBrainz release url-rels.
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            relations: [
+              {
+                type: "streaming",
+                url: { resource: "https://music.apple.com/gb/album/6769093260" },
+              },
+            ],
+          }),
+          { headers: { "content-type": "application/json" } },
+        ),
+      )
+      // Apple's oEmbed answers complete, so no page fetch is needed.
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            title: "I Wonder If You Know - Single",
+            author_name: "Alok & SOMETHING ELSE",
+            thumbnail_url: "https://is1-ssl.mzstatic.com/image/thumb/abc/100x100bb.jpg",
+          }),
+          { headers: { "content-type": "application/json" } },
+        ),
+      )
+      // The iTunes lookup still runs for the label oEmbed never names.
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            results: [
+              {
+                collectionName: "I Wonder If You Know - Single",
+                copyright: "℗ 2026 Because Music",
+              },
+            ],
+          }),
+          { headers: { "content-type": "application/json" } },
+        ),
+      );
+
+    const hit = await defaultSecondaryLookupDeps.findAppleMusicLink(
+      item({ musicbrainzReleaseId: "r1" }),
+    );
+
+    expect(hit).toEqual({
+      url: "https://music.apple.com/gb/album/6769093260",
+      artworkUrl: "https://is1-ssl.mzstatic.com/image/thumb/abc/1200x1200bb.jpg",
+      label: "Because Music",
+    });
+    expect(fetchSpy.mock.calls[1]?.[0]).toContain("music.apple.com/api/oembed");
+    expect(fetchSpy.mock.calls[2]?.[0]).toContain("itunes.apple.com/lookup");
+  });
+});
+
+describe("appleMusicRepairTarget", () => {
+  const stored = "https://music.apple.com/gb/album/my-song/952587922?i=952587944";
+
+  test("the MusicBrainz-attached page replaces a wrong link", () => {
+    expect(appleMusicRepairTarget(stored, "https://music.apple.com/gb/album/6769093260")).toBe(
+      "https://music.apple.com/gb/album/6769093260",
+    );
+  });
+
+  test("a link that already matches MusicBrainz is left alone", () => {
+    const url = "https://music.apple.com/gb/album/6769093260";
+    expect(appleMusicRepairTarget(url, url)).toBeNull();
+  });
+
+  test("without MusicBrainz, a track deep-link is reduced to its album", () => {
+    expect(appleMusicRepairTarget(stored, null)).toBe(
+      "https://music.apple.com/gb/album/my-song/952587922",
+    );
+  });
+
+  test("a clean album link with no MusicBrainz page is left alone", () => {
+    expect(
+      appleMusicRepairTarget("https://music.apple.com/gb/album/my-song/952587922", null),
+    ).toBeNull();
+  });
+
+  test("a song URL with no MusicBrainz page is left alone — no album to reduce to", () => {
+    expect(appleMusicRepairTarget("https://music.apple.com/gb/song/foo/2", null)).toBeNull();
   });
 });
 

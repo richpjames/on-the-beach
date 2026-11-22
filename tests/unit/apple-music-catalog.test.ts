@@ -184,6 +184,44 @@ describe("searchAppleMusicCatalog", () => {
     expect(result?.url).toBe("https://music.apple.com/gb/album/discovery/1");
   });
 
+  test("links the album a matched song belongs to, not the track deep-link", async () => {
+    configure();
+    spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      catalogResponse(
+        [],
+        [
+          {
+            name: "My Song",
+            artistName: "Labi Siffre",
+            url: "https://music.apple.com/gb/album/my-song/952587922?i=952587944",
+          },
+        ],
+      ),
+    );
+    // A song's catalogue URL deep-links one track; queued as-is it plays one
+    // song and stops. The release maps to the record, so the album URL wins.
+    const result = await searchAppleMusicCatalog("My Song", "Labi Siffre");
+    expect(result?.url).toBe("https://music.apple.com/gb/album/my-song/952587922");
+  });
+
+  test("keeps a song URL that names no album", async () => {
+    configure();
+    spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      catalogResponse(
+        [],
+        [
+          {
+            name: "Discovery",
+            artistName: "Daft Punk",
+            url: "https://music.apple.com/gb/song/discovery/2",
+          },
+        ],
+      ),
+    );
+    const result = await searchAppleMusicCatalog("Discovery", "Daft Punk");
+    expect(result?.url).toBe("https://music.apple.com/gb/song/discovery/2");
+  });
+
   test("returns null when nothing matches the artist", async () => {
     configure();
     spyOn(globalThis, "fetch").mockResolvedValueOnce(

@@ -781,19 +781,42 @@ export async function fetchReleaseTrackArtists(releaseId: string): Promise<strin
 }
 
 // ---------------------------------------------------------------------------
-// External links (release group url-rels)
+// External links (release & release-group url-rels)
 //
-// The "External links" block on a MusicBrainz release-group page: the url
-// relationships editors have attached to the work — a Bandcamp page, an Apple
-// Music or Spotify album, a Discogs master, a Wikidata item. It is the second
-// of the two pieces of evidence the New Releases gate accepts that a record
-// exists somewhere you could actually go and hear it.
+// The "External links" block on a MusicBrainz page: the url relationships
+// editors have attached to the work — a Bandcamp page, an Apple Music or
+// Spotify album, a Discogs master, a Wikidata item. It is the second of the
+// two pieces of evidence the New Releases gate accepts that a record exists
+// somewhere you could actually go and hear it. Streaming links usually hang
+// off the release; the group carries them too, less often.
 // ---------------------------------------------------------------------------
 
 export interface MbUrlRelation {
   /** MB's relationship type — "streaming", "free streaming", "discogs"… */
   type: string | null;
   url: string;
+}
+
+/**
+ * The url relationships attached to a release — where editors usually hang
+ * the streaming links, so a lookup asks here before the release group.
+ *
+ * Throws `MusicBrainzHttpError` on a non-2xx response and the underlying error
+ * on a network failure: a caller gating on "are there any links" must not read
+ * a failed request as a confident "none".
+ */
+export async function fetchReleaseUrlRelations(releaseId: string): Promise<MbUrlRelation[]> {
+  const params = new URLSearchParams({ inc: "url-rels", fmt: "json" });
+  const response = await mbFetch(`${MB_API_BASE}/release/${releaseId}?${params}`);
+  if (!response.ok) {
+    throw new MusicBrainzHttpError(
+      response.status,
+      `MusicBrainz release lookup returned ${response.status} for ${releaseId}`,
+    );
+  }
+
+  const data = (await response.json()) as { relations?: unknown[] };
+  return parseUrlRelations(data.relations);
 }
 
 /**
