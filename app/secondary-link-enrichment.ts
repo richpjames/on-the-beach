@@ -424,14 +424,22 @@ export async function findAppleMusicUrlViaMusicBrainz(ids: MusicBrainzIds): Prom
   if (process.env.OTB_DISABLE_EXTERNAL_LOOKUPS) return null;
   if (!ids.musicbrainzReleaseId && !ids.musicbrainzReleaseGroupId) return null;
 
-  try {
-    if (ids.musicbrainzReleaseId) {
+  // Each level fails on its own: a throttled or since-merged release must not
+  // take the group's answer down with it — the group often carries the same
+  // streaming links, and falling through to the fuzzy search is how the wrong
+  // record got attached in the first place.
+  if (ids.musicbrainzReleaseId) {
+    try {
       const url = pickAppleMusicReleaseUrl(
         await fetchReleaseUrlRelations(ids.musicbrainzReleaseId),
       );
       if (url) return url;
+    } catch (err) {
+      console.error("[secondary-link] MusicBrainz release url-rels lookup failed:", err);
     }
+  }
 
+  try {
     const groupId =
       ids.musicbrainzReleaseGroupId ??
       (ids.musicbrainzReleaseId ? await resolveReleaseGroupId(ids.musicbrainzReleaseId) : null);
@@ -439,7 +447,7 @@ export async function findAppleMusicUrlViaMusicBrainz(ids: MusicBrainzIds): Prom
       return pickAppleMusicReleaseUrl(await fetchReleaseGroupUrlRelations(groupId));
     }
   } catch (err) {
-    console.error("[secondary-link] MusicBrainz url-rels lookup failed:", err);
+    console.error("[secondary-link] MusicBrainz release-group url-rels lookup failed:", err);
   }
   return null;
 }
@@ -470,9 +478,15 @@ async function defaultFindAppleMusicLink(
  * to leave it alone: the MusicBrainz-attached page when there is one, else
  * the album a track deep-link (`?i=`) points into. Used by the one-off
  * repair script for links the old artist-only search pass got wrong.
+ *
+ * A repair must never trade whole-record playback for one track: when the
+ * stored link already names an album, only another album may replace it —
+ * MusicBrainz naming just a song or playlist leaves the album alone.
  */
 export function appleMusicRepairTarget(storedUrl: string, mbUrl: string | null): string | null {
-  const target = mbUrl ?? appleMusicAlbumUrl(storedUrl);
+  const storedAlbum = appleMusicAlbumUrl(storedUrl);
+  const mbAlbum = mbUrl ? appleMusicAlbumUrl(mbUrl) : null;
+  const target = mbAlbum ?? (storedAlbum ? null : mbUrl) ?? storedAlbum;
   return target && target !== storedUrl ? target : null;
 }
 

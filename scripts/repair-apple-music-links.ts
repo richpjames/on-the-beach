@@ -21,6 +21,9 @@
  *   --limit N    Process at most N links (default: all).
  *   --delay MS   Delay between items in ms (default: 1000).
  *   --dry-run    List planned repairs without writing.
+ *
+ * Refuses to run with OTB_DISABLE_EXTERNAL_LOOKUPS set: the MusicBrainz half
+ * would be silently skipped and the summary would overstate what was done.
  */
 import { and, eq } from "drizzle-orm";
 import { db } from "../adapters/db/index";
@@ -91,6 +94,16 @@ async function findRepairableLinks(limit: number | null) {
 async function main() {
   const args = parseArgs(process.argv.slice(2));
 
+  // The MusicBrainz half of the repair no-ops under the test/dev kill switch.
+  // Running with it set would report success while silently skipping every
+  // wrong-record repair — refuse instead.
+  if (process.env.OTB_DISABLE_EXTERNAL_LOOKUPS) {
+    console.error(
+      "OTB_DISABLE_EXTERNAL_LOOKUPS is set: the MusicBrainz lookups this repair relies on would be silently skipped. Unset it and re-run.",
+    );
+    process.exit(1);
+  }
+
   const rows = await findRepairableLinks(args.limit);
   console.log(`Found ${rows.length} secondary Apple Music link(s).`);
 
@@ -108,7 +121,7 @@ async function main() {
         continue;
       }
 
-      const via = mbUrl ? "musicbrainz" : "album-url";
+      const via = target === mbUrl ? "musicbrainz" : "album-url";
       if (!args.dryRun) {
         await db.update(musicLinks).set({ url: target }).where(eq(musicLinks.id, row.linkId));
       }
