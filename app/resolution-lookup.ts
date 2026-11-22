@@ -22,6 +22,11 @@ import {
 // Eligibility mirrors `findResolutionBackfillRows` (resolution-backfill.ts),
 // and the guarded write below is shared with the sweep, so the two triggers
 // can never disagree about what a resolution may overwrite.
+//
+// The page is an impatient trigger, so it gets two courtesies the paced sweep
+// does not need: a failed attempt is left alone for a cooldown (back/forward,
+// a refresh or a second tab must not each re-earn the same throttled answer),
+// and concurrent opens of the same release share one in-flight ask.
 // ---------------------------------------------------------------------------
 
 export interface ItemForResolution {
@@ -31,6 +36,7 @@ export interface ItemForResolution {
   artistName: string | null;
   year: number | null;
   resolutionStatus: string | null;
+  resolutionAttemptedAt: Date | null;
   /** Carried so the write never overwrites one that already exists. */
   musicbrainzArtistId: string | null;
   musicbrainzReleaseId: string | null;
@@ -48,6 +54,7 @@ export async function fetchItemForResolution(id: number): Promise<ItemForResolut
       artistName: artists.name,
       year: musicItems.year,
       resolutionStatus: musicItems.resolutionStatus,
+      resolutionAttemptedAt: musicItems.resolutionAttemptedAt,
       musicbrainzArtistId: musicItems.musicbrainzArtistId,
       musicbrainzReleaseId: musicItems.musicbrainzReleaseId,
       musicbrainzReleaseGroupId: musicItems.musicbrainzReleaseGroupId,
@@ -65,6 +72,7 @@ export async function fetchItemForResolution(id: number): Promise<ItemForResolut
 export type ResolutionSkipReason =
   | "lookups_disabled"
   | "already_resolved"
+  | "recently_attempted"
   | "carries_ids"
   | "no_artist"
   | "untitled";
@@ -72,13 +80,30 @@ export type ResolutionSkipReason =
 const UNTITLED = normalize("Untitled");
 
 /**
+ * How long a failed attempt is left alone before the page may ask again. The
+ * resolver already backs off within one attempt, so a `failed` verdict means
+ * the provider kept throttling or the transport stayed down — re-asking on
+ * every view would only re-earn the same answer. The sweep stays the patient
+ * retry path: paced, off-peak, and not subject to this cooldown.
+ */
+export const FAILED_RETRY_COOLDOWN_MS = 5 * 60 * 1000;
+
+/**
  * Why this row is not asked about, or null when it is. The sweep's finder
- * rules, one row at a time: never attempted (or last attempt failed), no
- * release-level ids of any kind, a named artist and a real title. `absent` is
- * terminal — both catalogues were asked and neither holds the record.
+ * rules, one row at a time: never attempted (or last attempt failed and left
+ * alone long enough), no release-level ids of any kind, a named artist and a
+ * real title. `absent` is terminal — both catalogues were asked and neither
+ * holds the record.
  */
 export function resolutionSkipReason(item: ItemForResolution): ResolutionSkipReason | null {
   if (item.resolutionStatus && item.resolutionStatus !== "failed") return "already_resolved";
+  if (
+    item.resolutionStatus === "failed" &&
+    item.resolutionAttemptedAt &&
+    Date.now() - item.resolutionAttemptedAt.getTime() < FAILED_RETRY_COOLDOWN_MS
+  ) {
+    return "recently_attempted";
+  }
   if (
     item.musicbrainzReleaseId ||
     item.musicbrainzReleaseGroupId ||
@@ -150,10 +175,29 @@ export type ResolutionLookupOutcome =
  * own provider requests; the page fires this without blocking the render, so
  * a slow catalogue answers into the provenance line when it lands.
  *
- * A throw reads as a failed attempt — stamped, retryable — exactly as the
- * sweep treats it, so a throttled request is never recorded as an absence.
+ * Concurrent opens of the same release — two tabs, a double-fired mount —
+ * share the one in-flight ask instead of each starting their own. The guarded
+ * write already keeps concurrent verdicts from fighting; this keeps them from
+ * asking twice.
  */
-export async function lookupResolutionForItem(itemId: number): Promise<ResolutionLookupOutcome> {
+export function lookupResolutionForItem(itemId: number): Promise<ResolutionLookupOutcome> {
+  const existing = inFlight.get(itemId);
+  if (existing) return existing;
+  const pending = resolveItemForView(itemId).finally(() => {
+    inFlight.delete(itemId);
+  });
+  inFlight.set(itemId, pending);
+  return pending;
+}
+
+const inFlight = new Map<number, Promise<ResolutionLookupOutcome>>();
+
+/**
+ * A throw reads as a failed attempt — stamped, retryable after the cooldown —
+ * exactly as the sweep treats it, so a throttled request is never recorded as
+ * an absence.
+ */
+async function resolveItemForView(itemId: number): Promise<ResolutionLookupOutcome> {
   if (process.env.OTB_DISABLE_EXTERNAL_LOOKUPS) {
     return { kind: "skipped", reason: "lookups_disabled" };
   }
