@@ -3,6 +3,7 @@ import { db } from "../adapters/db/index";
 import { artists, musicItems } from "../adapters/db/schema";
 import { normalize } from "../domain/text";
 import { resolveRelease, type ResolutionStatus } from "./release-resolver";
+import { writeResolutionOutcome } from "./resolution-lookup";
 
 // ---------------------------------------------------------------------------
 // Resolution backfill — rollout step 3 of the resolver integration
@@ -11,7 +12,9 @@ import { resolveRelease, type ResolutionStatus } from "./release-resolver";
 // New scans resolve as they land; rows that predate the resolver carry no
 // work-level ids and no status, so work-key duplicate matching, artist watch
 // and artwork fall back to nothing for exactly the records that have been
-// there longest. This sweep resolves them.
+// there longest. This sweep resolves them in bulk; opening a release resolves
+// it one at a time (resolution-lookup.ts), under the same rules and the same
+// shared write.
 //
 // Eligibility is deliberately narrow: rows with no status and no release-
 // level ids of any kind. A row that already carries a release id from another
@@ -71,10 +74,10 @@ export async function findResolutionBackfillRows(
 }
 
 /**
- * Resolve one row and stamp the verdict. Ids are written only when something
- * verified; `absent` and `failed` stamp status alone so the row stops (or, for
- * `failed`, stays) eligible on the next run. `updatedAt` is untouched — a
- * metadata backfill is not an edit.
+ * Resolve one row and stamp the verdict, under the shared write's guards
+ * (resolution-lookup.ts): ids only when something verified, no release id
+ * from another path ever overwritten. `absent` and `failed` stamp status
+ * alone so the row stops (or, for `failed`, stays) eligible on the next run.
  *
  * Exposed for tests; the sweep calls it via `runResolutionBackfill`.
  */
@@ -82,42 +85,8 @@ export async function backfillResolutionForRow(
   row: ResolutionBackfillRow,
 ): Promise<ResolutionStatus | "skipped"> {
   const outcome = await resolveRelease({ artist: row.artist, title: row.title, year: row.year });
-
-  const ids = outcome.status === "matched" || outcome.status === "partial" ? outcome.ids : null;
-  // An artist MBID from another path (the artist-identity backfill, a hand
-  // correction) outranks the resolver's — only write one where none exists.
-  const artistIdWrite =
-    ids?.musicbrainzArtistId && !row.musicbrainzArtistId
-      ? { musicbrainzArtistId: ids.musicbrainzArtistId }
-      : {};
-  const written = await db
-    .update(musicItems)
-    .set({
-      ...(ids?.musicbrainzReleaseId ? { musicbrainzReleaseId: ids.musicbrainzReleaseId } : {}),
-      ...(ids?.musicbrainzReleaseGroupId
-        ? { musicbrainzReleaseGroupId: ids.musicbrainzReleaseGroupId }
-        : {}),
-      ...artistIdWrite,
-      ...(ids?.discogsReleaseId ? { discogsReleaseId: ids.discogsReleaseId } : {}),
-      ...(ids?.discogsMasterId ? { discogsMasterId: ids.discogsMasterId } : {}),
-      resolutionStatus: outcome.status,
-      resolutionAttemptedAt: new Date(),
-    })
-    // Re-assert no-release-ids eligibility at write time: a paced sweep runs
-    // alongside live scans and other backfills, and a row that gained ids
-    // since selection keeps them — this update simply matches nothing.
-    .where(
-      and(
-        eq(musicItems.id, row.id),
-        isNull(musicItems.musicbrainzReleaseId),
-        isNull(musicItems.musicbrainzReleaseGroupId),
-        isNull(musicItems.discogsReleaseId),
-        isNull(musicItems.discogsMasterId),
-      ),
-    )
-    .returning({ id: musicItems.id });
-
-  return written.length === 0 ? "skipped" : outcome.status;
+  const written = await writeResolutionOutcome(row, outcome);
+  return written ? outcome.status : "skipped";
 }
 
 export interface ResolutionBackfillSummary {
