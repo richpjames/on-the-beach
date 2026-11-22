@@ -17,8 +17,10 @@ import {
   lookupSecondaryLinkForItem,
   type SecondaryLookupOutcome,
 } from "../../app/secondary-link-enrichment";
+import { lookupResolutionForItem, type ResolutionLookupOutcome } from "../../app/resolution-lookup";
 
 export type LookupSecondaryLinkFn = (itemId: number) => Promise<SecondaryLookupOutcome>;
+export type LookupResolutionFn = (itemId: number) => Promise<ResolutionLookupOutcome>;
 
 interface ScanRequestBody {
   imageBase64?: unknown;
@@ -55,6 +57,7 @@ export function createReleaseRoutes(
   resolveReleaseFn: ResolveReleaseFn = resolveRelease,
   fetchCoverArtFn: FetchCoverArtFn = fetchAndSaveCoverArt,
   lookupSecondaryLinkFn: LookupSecondaryLinkFn = lookupSecondaryLinkForItem,
+  lookupResolutionFn: LookupResolutionFn = lookupResolutionForItem,
 ): Hono {
   const routes = new Hono();
 
@@ -203,6 +206,41 @@ export function createReleaseRoutes(
             url: outcome.url,
             service: outcome.service,
             serviceDisplayName: outcome.serviceDisplayName,
+          },
+          200,
+        );
+    }
+  });
+
+  // The on-view catalogue lookup: opening a release asks the resolver what
+  // the record is when nothing has asked before (or the last attempt failed).
+  // The page fires it without blocking the render; the verdict is stamped on
+  // the row and answered back for the provenance line. All skip rules live in
+  // the lookup itself — `absent` is terminal, ids from any path keep their
+  // provenance — so a re-open never re-asks a settled question.
+  routes.post("/resolution-lookup/:id", async (c) => {
+    const rawId = c.req.param("id");
+    const id = Number(rawId);
+    if (!Number.isInteger(id) || id <= 0) {
+      return c.json({ error: "Invalid ID" }, 400);
+    }
+
+    const outcome = await lookupResolutionFn(id);
+
+    switch (outcome.kind) {
+      case "not_found":
+        return c.json({ error: "Not found" }, 404);
+      case "skipped":
+        return c.json({ skipped: true }, 200);
+      case "result":
+        return c.json(
+          {
+            resolutionStatus: outcome.status,
+            musicbrainzReleaseId: outcome.ids?.musicbrainzReleaseId ?? null,
+            musicbrainzReleaseGroupId: outcome.ids?.musicbrainzReleaseGroupId ?? null,
+            musicbrainzArtistId: outcome.ids?.musicbrainzArtistId ?? null,
+            discogsReleaseId: outcome.ids?.discogsReleaseId ?? null,
+            discogsMasterId: outcome.ids?.discogsMasterId ?? null,
           },
           200,
         );

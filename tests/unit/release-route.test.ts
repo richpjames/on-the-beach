@@ -7,6 +7,7 @@ const mockSaveImage = mock();
 const mockResolveRelease = mock();
 const mockFetchCoverArt = mock();
 const mockLookupSecondaryLink = mock();
+const mockLookupResolution = mock();
 
 function makeApp(): Hono {
   const app = new Hono();
@@ -18,6 +19,7 @@ function makeApp(): Hono {
       mockResolveRelease,
       mockFetchCoverArt,
       mockLookupSecondaryLink,
+      mockLookupResolution,
     ),
   );
   return app;
@@ -430,5 +432,89 @@ describe("POST /api/release/secondary-link-lookup/:id", () => {
     const body = await res.json();
     expect(body.url).toBeNull();
     expect(body.service).toBe("spotify");
+  });
+});
+
+describe("POST /api/release/resolution-lookup/:id", () => {
+  beforeEach(() => {
+    mockLookupResolution.mockReset();
+  });
+
+  test("returns 400 for non-numeric id", async () => {
+    const app = makeApp();
+    const res = await app.request("http://localhost/api/release/resolution-lookup/abc", {
+      method: "POST",
+    });
+    expect(res.status).toBe(400);
+    expect(mockLookupResolution).not.toHaveBeenCalled();
+  });
+
+  test("returns 404 when the lookup reports not_found", async () => {
+    mockLookupResolution.mockResolvedValue({ kind: "not_found" });
+    const app = makeApp();
+    const res = await app.request("http://localhost/api/release/resolution-lookup/99", {
+      method: "POST",
+    });
+    expect(res.status).toBe(404);
+    expect(mockLookupResolution).toHaveBeenCalledWith(99);
+  });
+
+  test("returns { skipped: true } when the lookup is skipped", async () => {
+    mockLookupResolution.mockResolvedValue({ kind: "skipped", reason: "already_resolved" });
+    const app = makeApp();
+    const res = await app.request("http://localhost/api/release/resolution-lookup/1", {
+      method: "POST",
+    });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ skipped: true });
+  });
+
+  test("returns the status and ids on a matched verdict", async () => {
+    mockLookupResolution.mockResolvedValue({
+      kind: "result",
+      status: "matched",
+      ids: {
+        musicbrainzReleaseId: "mb-release",
+        musicbrainzReleaseGroupId: "mb-group",
+        musicbrainzArtistId: "mb-artist",
+        discogsReleaseId: 12345,
+        discogsMasterId: 6789,
+        year: 1978,
+        label: "Bronze",
+        country: "GB",
+        catalogueNumber: "BRON 511",
+        confidence: 0.95,
+      },
+    });
+    const app = makeApp();
+    const res = await app.request("http://localhost/api/release/resolution-lookup/1", {
+      method: "POST",
+    });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({
+      resolutionStatus: "matched",
+      musicbrainzReleaseId: "mb-release",
+      musicbrainzReleaseGroupId: "mb-group",
+      musicbrainzArtistId: "mb-artist",
+      discogsReleaseId: 12345,
+      discogsMasterId: 6789,
+    });
+  });
+
+  test("an absent verdict answers the status with null ids", async () => {
+    mockLookupResolution.mockResolvedValue({ kind: "result", status: "absent", ids: null });
+    const app = makeApp();
+    const res = await app.request("http://localhost/api/release/resolution-lookup/1", {
+      method: "POST",
+    });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({
+      resolutionStatus: "absent",
+      musicbrainzReleaseId: null,
+      musicbrainzReleaseGroupId: null,
+      musicbrainzArtistId: null,
+      discogsReleaseId: null,
+      discogsMasterId: null,
+    });
   });
 });
