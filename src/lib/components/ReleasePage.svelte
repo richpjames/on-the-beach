@@ -603,9 +603,10 @@
   const catalogueItem = $derived({ ...item, ...resolved });
 
   // Opening a release asks the catalogues what it is when nothing has asked
-  // before. The server enforces all skip rules (absent is terminal, ids from
-  // any path keep their provenance); we only avoid an obviously redundant
-  // request, the same courtesy the secondary-link lookup extends.
+  // before. The server enforces all skip rules (absent is terminal, a fresh
+  // failure is left alone for a cooldown, ids from any path keep their
+  // provenance); we only avoid an obviously redundant request, the same
+  // courtesy the secondary-link lookup extends.
   const resolutionEligible =
     !item.musicbrainz_release_id &&
     !item.musicbrainz_release_group_id &&
