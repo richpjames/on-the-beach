@@ -751,6 +751,51 @@ describe("findAppleMusicUrlViaMusicBrainz", () => {
 
     expect(url).toBeNull();
   });
+
+  test("a throttled release lookup still tries the release group", async () => {
+    // The release's 503 must not take the group's answer down with it.
+    const fetchSpy = spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+      if (String(input).includes("/release/r1")) {
+        return new Response("rate limited", { status: 503 });
+      }
+      return mbResponse({
+        relations: [{ type: "streaming", url: { resource: "https://music.apple.com/gb/album/1" } }],
+      });
+    });
+
+    const url = await findAppleMusicUrlViaMusicBrainz({
+      musicbrainzReleaseId: "r1",
+      musicbrainzReleaseGroupId: "rg1",
+    });
+
+    expect(url).toBe("https://music.apple.com/gb/album/1");
+    expect(
+      fetchSpy.mock.calls.some((call) => String(call[0]).includes("/release-group/rg1?")),
+    ).toBe(true);
+  });
+
+  test("a release that no longer exists still tries the release group", async () => {
+    // A merged or removed release answers 404; the group often carries the
+    // same streaming links.
+    const fetchSpy = spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+      if (String(input).includes("/release/r1")) {
+        return new Response("not found", { status: 404 });
+      }
+      return mbResponse({
+        relations: [{ type: "streaming", url: { resource: "https://music.apple.com/gb/album/1" } }],
+      });
+    });
+
+    const url = await findAppleMusicUrlViaMusicBrainz({
+      musicbrainzReleaseId: "r1",
+      musicbrainzReleaseGroupId: "rg1",
+    });
+
+    expect(url).toBe("https://music.apple.com/gb/album/1");
+    expect(
+      fetchSpy.mock.calls.some((call) => String(call[0]).includes("/release-group/rg1?")),
+    ).toBe(true);
+  });
 });
 
 describe("defaultFindAppleMusicLink", () => {
@@ -852,6 +897,41 @@ describe("appleMusicRepairTarget", () => {
 
   test("a song URL with no MusicBrainz page is left alone — no album to reduce to", () => {
     expect(appleMusicRepairTarget("https://music.apple.com/gb/song/foo/2", null)).toBeNull();
+  });
+
+  test("an album link is never downgraded to the song MusicBrainz names", () => {
+    // The repair must not trade whole-record playback for one track: MB
+    // naming only a song leaves an existing album link alone.
+    expect(
+      appleMusicRepairTarget(
+        "https://music.apple.com/gb/album/my-song/952587922",
+        "https://music.apple.com/gb/song/foo/2",
+      ),
+    ).toBeNull();
+  });
+
+  test("an album link is never downgraded to the playlist MusicBrainz names", () => {
+    expect(
+      appleMusicRepairTarget(
+        "https://music.apple.com/gb/album/my-song/952587922",
+        "https://music.apple.com/gb/playlist/foo/pl.u-abc",
+      ),
+    ).toBeNull();
+  });
+
+  test("a deep-link reduces to its own album even when MusicBrainz names only a song", () => {
+    expect(appleMusicRepairTarget(stored, "https://music.apple.com/gb/song/foo/2")).toBe(
+      "https://music.apple.com/gb/album/my-song/952587922",
+    );
+  });
+
+  test("a stored song link adopts the song MusicBrainz names — no album to preserve", () => {
+    expect(
+      appleMusicRepairTarget(
+        "https://music.apple.com/gb/song/wrong/1",
+        "https://music.apple.com/gb/song/right/2",
+      ),
+    ).toBe("https://music.apple.com/gb/song/right/2");
   });
 });
 
