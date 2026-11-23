@@ -21,15 +21,19 @@
   import SuggestionPickerModal from "./SuggestionPickerModal.svelte";
   import { linkService, sourceDisplayName } from "../../ui/logic/link-service";
 
-  // The page wraps this component in {#key item.id}, so all state below is
-  // (re)initialised per release — the same lifecycle as the old full-page SSR.
+  // The page wraps this component in {#key item.id}, so the local state below
+  // is (re)initialised per release. `item` itself stays derived from the load
+  // data: saving edits re-runs the loads (invalidateAll) and view mode catches
+  // up without a full page reload — a reload would reset the whole client and
+  // take the now-playing player (module scope, see player.svelte.ts) with it.
   let { data }: { data: PageData } = $props();
 
-  // svelte-ignore state_referenced_locally
-  const item = data.item;
+  const item = $derived(data.item);
 
   // ── Status & reminder ──────────────────────────────────────────────────────
+  // svelte-ignore state_referenced_locally
   let currentListenStatus = $state<string>(item.listen_status);
+  // svelte-ignore state_referenced_locally
   let currentRemindAt = $state<string | null>(
     item.remind_at ? new Date(item.remind_at as unknown as string).toISOString() : null,
   );
@@ -282,21 +286,33 @@
 
   // ── Edit mode ──────────────────────────────────────────────────────────────
   let editMode = $state(false);
+  // svelte-ignore state_referenced_locally
   let editTitle = $state(item.title);
+  // svelte-ignore state_referenced_locally
   let editArtist = $state(item.artist_name ?? "");
+  // svelte-ignore state_referenced_locally
   let editYear = $state(item.year != null ? String(item.year) : "");
+  // svelte-ignore state_referenced_locally
   let editLabel = $state(item.label ?? "");
+  // svelte-ignore state_referenced_locally
   let editCountry = $state(item.country ?? "");
+  // svelte-ignore state_referenced_locally
   let editGenre = $state(item.genre ?? "");
+  // svelte-ignore state_referenced_locally
   let editCatalogue = $state(item.catalogue_number ?? "");
+  // svelte-ignore state_referenced_locally
   let editDiscogs = $state(item.discogs_release_id != null ? String(item.discogs_release_id) : "");
+  // svelte-ignore state_referenced_locally
   let editMbRelease = $state(item.musicbrainz_release_id ?? "");
+  // svelte-ignore state_referenced_locally
   let editNotes = $state(item.notes ?? "");
+  // svelte-ignore state_referenced_locally
   let editArtworkUrl = $state(item.artwork_url ?? "");
 
   // ── Inline notes editing ─────────────────────────────────────────────────
   // A dedicated add/edit-notes control that lives with the notes in view mode,
   // so notes can be changed without opening the full edit form.
+  // svelte-ignore state_referenced_locally
   let currentNotes = $state<string | null>(item.notes ?? null);
   let notesState = $state<"idle" | "editing" | "saving">("idle");
   let notesDraft = $state("");
@@ -355,7 +371,23 @@
       body: JSON.stringify(body),
     });
     if (res.ok) {
-      window.location.reload();
+      // Re-run the loads rather than reloading the window: a full reload
+      // resets the client-side player and stops whatever is playing, whatever
+      // the source. `item` is derived, so view mode picks up the saved fields;
+      // the two pieces of local state the save can change are synced by hand.
+      await invalidateAll();
+      currentNotes = editNotes.trim() || null;
+      // The resolution line layers local state over the row, and the server
+      // re-stamps the verdict on a hand-corrected match — take the fresh row's
+      // rather than keeping the one from open.
+      resolved = {
+        resolution_status: item.resolution_status,
+        musicbrainz_release_id: item.musicbrainz_release_id,
+        musicbrainz_release_group_id: item.musicbrainz_release_group_id,
+        discogs_release_id: item.discogs_release_id,
+        discogs_master_id: item.discogs_master_id,
+      };
+      editMode = false;
     } else {
       alert("Failed to save changes.");
     }
@@ -393,7 +425,9 @@
   }
 
   // ── Stacks ─────────────────────────────────────────────────────────────────
+  // svelte-ignore state_referenced_locally
   let allStacks = $state<Array<{ id: number; name: string }>>([...item.stacks]);
+  // svelte-ignore state_referenced_locally
   let assignedIds = $state<Set<number>>(new Set(item.stacks.map((s) => s.id)));
   let stackQuery = $state("");
 
@@ -435,6 +469,7 @@
   }
 
   // ── Links ──────────────────────────────────────────────────────────────────
+  // svelte-ignore state_referenced_locally
   let itemLinks = $state([...item.links]);
   let allSources = $state<Array<{ displayName: string }>>([]);
   let sourceQuery = $state("");
@@ -587,6 +622,7 @@
   // What the resolver made of this record, as the page knows it. Starts from
   // the stored row; the on-view lookup below updates it in place when a
   // verdict lands, so the provenance line appears without a reload.
+  // svelte-ignore state_referenced_locally
   let resolved = $state({
     resolution_status: item.resolution_status,
     musicbrainz_release_id: item.musicbrainz_release_id,
@@ -607,13 +643,14 @@
   // failure is left alone for a cooldown, ids from any path keep their
   // provenance); we only avoid an obviously redundant request, the same
   // courtesy the secondary-link lookup extends.
-  const resolutionEligible =
+  const resolutionEligible = $derived(
     !item.musicbrainz_release_id &&
-    !item.musicbrainz_release_group_id &&
-    !item.discogs_release_id &&
-    !item.discogs_master_id &&
-    (item.resolution_status === null || item.resolution_status === "failed") &&
-    !!item.artist_name;
+      !item.musicbrainz_release_group_id &&
+      !item.discogs_release_id &&
+      !item.discogs_master_id &&
+      (item.resolution_status === null || item.resolution_status === "failed") &&
+      !!item.artist_name,
+  );
 
   onMount(() => {
     if (!resolutionEligible) return;
