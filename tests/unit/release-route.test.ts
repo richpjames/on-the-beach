@@ -7,6 +7,7 @@ const mockSaveImage = mock();
 const mockResolveRelease = mock();
 const mockFetchCoverArt = mock();
 const mockLookupSecondaryLink = mock();
+const mockLookupNotes = mock();
 const mockLookupResolution = mock();
 
 function makeApp(): Hono {
@@ -20,6 +21,7 @@ function makeApp(): Hono {
       mockFetchCoverArt,
       mockLookupSecondaryLink,
       mockLookupResolution,
+      mockLookupNotes,
     ),
   );
   return app;
@@ -516,5 +518,67 @@ describe("POST /api/release/resolution-lookup/:id", () => {
       discogsReleaseId: null,
       discogsMasterId: null,
     });
+  });
+});
+
+describe("POST /api/release/notes-lookup/:id", () => {
+  beforeEach(() => {
+    mockLookupNotes.mockReset();
+  });
+
+  test("returns 400 for non-numeric id", async () => {
+    const app = makeApp();
+    const res = await app.request("http://localhost/api/release/notes-lookup/abc", {
+      method: "POST",
+    });
+    expect(res.status).toBe(400);
+    expect(mockLookupNotes).not.toHaveBeenCalled();
+  });
+
+  test("returns 404 when the lookup reports not_found", async () => {
+    mockLookupNotes.mockResolvedValue({ kind: "not_found" });
+    const app = makeApp();
+    const res = await app.request("http://localhost/api/release/notes-lookup/99", {
+      method: "POST",
+    });
+    expect(res.status).toBe(404);
+    expect(mockLookupNotes).toHaveBeenCalledWith(99);
+  });
+
+  test("returns { skipped: true } when the lookup is skipped", async () => {
+    mockLookupNotes.mockResolvedValue({ kind: "skipped", reason: "already_attempted" });
+    const app = makeApp();
+    const res = await app.request("http://localhost/api/release/notes-lookup/1", {
+      method: "POST",
+    });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ skipped: true });
+  });
+
+  test("returns the notes and their source on a hit", async () => {
+    mockLookupNotes.mockResolvedValue({
+      kind: "result",
+      notes: "A paragraph. — From Wikipedia (https://en.wikipedia.org/wiki/X)",
+      source: { displayName: "Wikipedia", url: "https://en.wikipedia.org/wiki/X" },
+    });
+    const app = makeApp();
+    const res = await app.request("http://localhost/api/release/notes-lookup/1", {
+      method: "POST",
+    });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({
+      notes: "A paragraph. — From Wikipedia (https://en.wikipedia.org/wiki/X)",
+      source: { displayName: "Wikipedia", url: "https://en.wikipedia.org/wiki/X" },
+    });
+  });
+
+  test("returns null notes on a settled miss", async () => {
+    mockLookupNotes.mockResolvedValue({ kind: "result", notes: null, source: null });
+    const app = makeApp();
+    const res = await app.request("http://localhost/api/release/notes-lookup/2", {
+      method: "POST",
+    });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ notes: null, source: null });
   });
 });

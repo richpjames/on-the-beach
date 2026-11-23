@@ -10,6 +10,7 @@ import {
 } from "../adapters/db/schema";
 import { normalize, capitalize } from "../domain/text";
 import { enrichSecondaryLinkInBackground } from "./secondary-link-enrichment";
+import { enrichNotesInBackground } from "./notes-enrichment";
 import { fetchSuggestionInBackground } from "./suggestions";
 import { fullItemSelect } from "./queries/full-item-select";
 import {
@@ -332,6 +333,10 @@ export async function createMusicItemDirect(
   if (!options.skipLinkEnrichment) {
     enrichSecondaryLinkInBackground(inserted.id);
   }
+  // Notes enrichment runs either way: it reads the release's MusicBrainz
+  // external links, not the streaming services, so even a record that isn't
+  // out yet can carry a Wikipedia paragraph. Non-blocking.
+  enrichNotesInBackground(inserted.id);
   // The suggestion prefetch runs either way: it's keyed to the artist, not to
   // this release, so it's just as useful for a record that isn't out yet.
   queueSuggestionPrefetch(item);

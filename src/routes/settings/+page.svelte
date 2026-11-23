@@ -608,5 +608,14 @@
         </p>
       {/if}
     </section>
+
+    <section class="settings__section" id="admin-settings">
+      <h2 class="settings__heading">Admin</h2>
+      <p class="settings__hint">
+        Rank the external link sources whose prose becomes a record's notes — Wikipedia,
+        Pitchfork, AllMusic and anything else MusicBrainz points at.
+      </p>
+      <a href="/admin" class="btn settings__back">Open admin…</a>
+    </section>
   </div>
 </main>

@@ -425,6 +425,10 @@ export async function acceptAlert(
         itemType: itemTypeForReleaseGroup(alert.primaryType),
         listenStatus: "to-listen",
         year: alert.firstReleaseYear ?? undefined,
+        // The watcher already knows the work's group id — carry it so the
+        // notes enrichment can read the release's external links without a
+        // second resolution pass.
+        musicbrainzReleaseGroupId: alert.mbReleaseGroupId,
         origin: "alert",
       },
       // Nothing to gain from the eager background lookup in either case: the

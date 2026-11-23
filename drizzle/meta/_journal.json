@@ -148,6 +148,13 @@
       "when": 1792697600000,
       "tag": "0020_rating_out_of_100",
       "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "6",
+      "when": 1795461427303,
+      "tag": "0021_thin_eddie_brock",
+      "breakpoints": true
     }
   ]
 }
