@@ -136,9 +136,12 @@ test("saving release edits does not interrupt playback", async ({ page, request 
   await expect(page.locator("#now-playing-player")).toBeVisible();
 
   // Tag the live embed so a remount (which would restart the track) is visible.
-  await page.evaluate(() => {
-    const f = document.querySelector("#player-body iframe");
-    if (f) (f as unknown as Record<string, unknown>).__otbTag = "original";
+  // Wait for the frame first: a missing embed must fail here, not later look
+  // like a remount.
+  const embed = page.locator("#player-body iframe");
+  await expect(embed).toBeVisible();
+  await embed.evaluate((f) => {
+    (f as unknown as Record<string, unknown>).__otbTag = "original";
   });
 
   // The floating window covers the footer's Edit button — minimise first;
@@ -159,12 +162,9 @@ test("saving release edits does not interrupt playback", async ({ page, request 
 
   await page.locator("#taskbar-np-btn").click();
   await expect(page.locator("#now-playing-player")).toBeVisible();
-  expect(
-    await page.evaluate(() => {
-      const f = document.querySelector("#player-body iframe") as unknown as Record<string, unknown>;
-      return f?.__otbTag === "original";
-    }),
-  ).toBe(true);
+  expect(await embed.evaluate((f) => (f as unknown as Record<string, unknown>).__otbTag)).toBe(
+    "original",
+  );
 
   // And the saved edit shows in view mode without a reload.
   await expect(page.locator(".release-page__meta")).toContainText("1999");
