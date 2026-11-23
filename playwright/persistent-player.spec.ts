@@ -131,6 +131,13 @@ test("saving release edits does not interrupt playback", async ({ page, request 
     }),
   );
 
+  // The seeded row is eligible for the on-view catalogue lookup; the worker
+  // fixture already disables external lookups server-side, but stub the
+  // endpoint too so no verdict can land mid-test, as release-edit.spec does.
+  await page.route(`**/api/release/resolution-lookup/${id}`, (route) =>
+    route.fulfill({ json: { skipped: true } }),
+  );
+
   await page.goto(`/r/${id}`);
   await page.locator(".release-page__actions .release-page__listen-btn").click();
   await expect(page.locator("#now-playing-player")).toBeVisible();
