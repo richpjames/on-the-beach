@@ -373,13 +373,14 @@
     if (res.ok) {
       // Re-run the loads rather than reloading the window: a full reload
       // resets the client-side player and stops whatever is playing, whatever
-      // the source. `item` is derived, so view mode picks up the saved fields;
-      // the two pieces of local state the save can change are synced by hand.
+      // the source. `item` is derived, so view mode picks up the saved fields.
       await invalidateAll();
-      currentNotes = editNotes.trim() || null;
-      // The resolution line layers local state over the row, and the server
-      // re-stamps the verdict on a hand-corrected match — take the fresh row's
-      // rather than keeping the one from open.
+      // Nothing is re-initialised on save any more (no reload), so re-seed the
+      // notes line and the whole form from the fresh row — otherwise the next
+      // save writes the values captured at open back over it. The resolution
+      // line layers local state over the row, and the server re-stamps the
+      // verdict on a hand-corrected match, so it takes the fresh row's too.
+      currentNotes = item.notes ?? null;
       resolved = {
         resolution_status: item.resolution_status,
         musicbrainz_release_id: item.musicbrainz_release_id,
@@ -387,6 +388,17 @@
         discogs_release_id: item.discogs_release_id,
         discogs_master_id: item.discogs_master_id,
       };
+      editTitle = item.title;
+      editArtist = item.artist_name ?? "";
+      editYear = item.year != null ? String(item.year) : "";
+      editLabel = item.label ?? "";
+      editCountry = item.country ?? "";
+      editGenre = item.genre ?? "";
+      editCatalogue = item.catalogue_number ?? "";
+      editDiscogs = item.discogs_release_id != null ? String(item.discogs_release_id) : "";
+      editMbRelease = item.musicbrainz_release_id ?? "";
+      editNotes = item.notes ?? "";
+      editArtworkUrl = item.artwork_url ?? "";
       editMode = false;
     } else {
       alert("Failed to save changes.");
