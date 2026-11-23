@@ -39,9 +39,12 @@ function resolveWorkers(): number {
     return fromEnv;
   }
 
-  // Keep CI deterministic and conservative; use more local workers by default.
+  // Oversubscribe the 4-vCPU hosted runner: the smoke tests are I/O-bound and
+  // even the rendering-heavy visual suite runs faster parallel than serial, so
+  // more workers than cores wins. Retries cover occasional CPU-contention
+  // flakes. Use more local workers by default.
   if (process.env.CI) {
-    return 4;
+    return 6;
   }
 
   return Math.min(6, Math.max(2, os.availableParallelism() - 1));
