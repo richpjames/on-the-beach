@@ -117,6 +117,11 @@ export const musicItems = sqliteTable(
     // against the new service. The column keeps its original name for migration
     // continuity; the field name is service-agnostic.
     lookupAttemptedAt: integer("apple_music_lookup_at", { mode: "timestamp" }),
+    // Last notes-enrichment attempt (the first paragraph of the release's
+    // best-ranked MusicBrainz external link), set on both a hit and a miss so
+    // an item with nothing to ingest isn't re-fetched on every page view.
+    // Same role as `lookupAttemptedAt` above, for the notes rather than links.
+    notesEnrichmentAttemptedAt: integer("notes_enrichment_attempted_at", { mode: "timestamp" }),
     remindAt: integer("remind_at", { mode: "timestamp" }),
     reminderPending: integer("reminder_pending", { mode: "boolean" }).notNull().default(false),
     // How the item entered the list: 'manual' | 'link' | 'email' | 'photo' |
@@ -216,6 +221,23 @@ export const appSettings = sqliteTable("app_settings", {
   key: text("key").primaryKey(),
   value: text("value").notNull(),
   updatedAt: integer("updated_at", { mode: "timestamp" })
+    .notNull()
+    .$defaultFn(() => new Date()),
+});
+
+/**
+ * The hosts encountered among MusicBrainz external links, and how much their
+ * prose is worth when several links compete to supply an item's notes. Rows
+ * appear as links are met (one per host, `www.` stripped, subdomains folded
+ * into their known parent — en.wikipedia.org is wikipedia.org); the rank is
+ * the user's to change on the admin page. Unknown hosts start at 0 and are
+ * still fetched when nothing better is attached.
+ */
+export const externalLinkSources = sqliteTable("external_link_sources", {
+  host: text("host").primaryKey(),
+  displayName: text("display_name").notNull(),
+  rank: integer("rank").notNull().default(0),
+  firstSeenAt: integer("first_seen_at", { mode: "timestamp" })
     .notNull()
     .$defaultFn(() => new Date()),
 });

@@ -17,9 +17,11 @@ import {
   lookupSecondaryLinkForItem,
   type SecondaryLookupOutcome,
 } from "../../app/secondary-link-enrichment";
+import { lookupNotesForItem, type NotesEnrichmentOutcome } from "../../app/notes-enrichment";
 import { lookupResolutionForItem, type ResolutionLookupOutcome } from "../../app/resolution-lookup";
 
 export type LookupSecondaryLinkFn = (itemId: number) => Promise<SecondaryLookupOutcome>;
+export type LookupNotesFn = (itemId: number) => Promise<NotesEnrichmentOutcome>;
 export type LookupResolutionFn = (itemId: number) => Promise<ResolutionLookupOutcome>;
 
 interface ScanRequestBody {
@@ -58,6 +60,7 @@ export function createReleaseRoutes(
   fetchCoverArtFn: FetchCoverArtFn = fetchAndSaveCoverArt,
   lookupSecondaryLinkFn: LookupSecondaryLinkFn = lookupSecondaryLinkForItem,
   lookupResolutionFn: LookupResolutionFn = lookupResolutionForItem,
+  lookupNotesFn: LookupNotesFn = lookupNotesForItem,
 ): Hono {
   const routes = new Hono();
 
@@ -244,6 +247,30 @@ export function createReleaseRoutes(
           },
           200,
         );
+    }
+  });
+
+  // The on-view notes lookup: opening a release whose notes are empty (or
+  // less than a sentence) fetches the first paragraph of its best-ranked
+  // MusicBrainz external link. The page fires it without blocking the render;
+  // all skip rules live in the lookup itself, so a re-open never re-fetches a
+  // settled item.
+  routes.post("/notes-lookup/:id", async (c) => {
+    const rawId = c.req.param("id");
+    const id = Number(rawId);
+    if (!Number.isInteger(id) || id <= 0) {
+      return c.json({ error: "Invalid ID" }, 400);
+    }
+
+    const outcome = await lookupNotesFn(id);
+
+    switch (outcome.kind) {
+      case "not_found":
+        return c.json({ error: "Not found" }, 404);
+      case "skipped":
+        return c.json({ skipped: true }, 200);
+      case "result":
+        return c.json({ notes: outcome.notes, source: outcome.source }, 200);
     }
   });
 

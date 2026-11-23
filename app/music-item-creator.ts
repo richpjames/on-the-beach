@@ -8,6 +8,7 @@ import { scrapeUrl, UnsupportedMusicLinkError } from "./scrape";
 import { remindAtForReleaseDate } from "../domain/release-dates";
 import { getArtistWatchSettings } from "./settings";
 import { enrichSecondaryLinkInBackground } from "./secondary-link-enrichment";
+import { enrichNotesInBackground } from "./notes-enrichment";
 import { pickPrimaryReleaseCandidate } from "../adapters/web/link-extractor";
 import { fullItemSelect } from "./queries/full-item-select";
 import {
@@ -303,6 +304,9 @@ async function insertMusicItemWithLink(
   // background so it's ready by the time the item is viewed. Non-blocking —
   // never delays creation.
   enrichSecondaryLinkInBackground(inserted.id);
+  // Same fire-and-forget terms for the notes: the best-ranked MusicBrainz
+  // external link's first paragraph, when the item's notes need it.
+  enrichNotesInBackground(inserted.id);
   queueSuggestionPrefetch(item);
 
   return item;

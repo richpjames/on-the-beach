@@ -11,6 +11,7 @@
     SourceName,
   } from "../../../domain/types";
   import { parseAppleMusicCatalogUrl, type AppleMusicResource } from "../../../domain/apple-music";
+  import { isAtLeastASentence } from "../../../domain/link-sources";
   import { catalogueMatchUpdates } from "../../ui/logic/catalogue-match";
   import { api, apiFetch } from "../api";
   import { encodeImageFile } from "../encode-image";
@@ -628,6 +629,30 @@
         })
         .catch(() => {});
     }
+  });
+
+  // ── Notes enrichment ───────────────────────────────────────────────────────
+  // Opening a release whose notes are empty (or less than a sentence) fetches
+  // the first paragraph of its best-ranked MusicBrainz external link. Usually
+  // a no-op for new items (the eager hook has already run); this is the
+  // on-view fallback for older items. The server enforces all skip rules; we
+  // only avoid an obviously redundant request when the notes already read as
+  // prose.
+  onMount(() => {
+    if (currentNotes && isAtLeastASentence(currentNotes)) return;
+    apiFetch(`/api/release/notes-lookup/${item.id}`, { method: "POST" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((result) => {
+        if (!result?.notes) return;
+        currentNotes = result.notes;
+        // Fill the edit form's notes gap-only, as the link form fills artwork
+        // and label: an enrichment that lands while the form is open must not
+        // be written back over by the form's initial emptiness.
+        if (!editNotes) {
+          editNotes = result.notes;
+        }
+      })
+      .catch(() => {});
   });
 
   // ── Catalogue resolution ───────────────────────────────────────────────────

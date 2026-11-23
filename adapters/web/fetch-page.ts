@@ -13,6 +13,13 @@ export const MAX_HEAD_BYTES = 100_000;
 /** Enough for Bandcamp's `TralbumData` and SoundCloud's hydra state in a body. */
 export const MAX_BODY_BYTES = 250_000;
 
+/**
+ * Enough for a review page's article body. Pitchfork's review prose starts
+ * around a third of a megabyte into the document — well past `MAX_BODY_BYTES`
+ * — so notes enrichment reads further than the metadata scrapes do.
+ */
+export const MAX_REVIEW_BYTES = 1_500_000;
+
 export interface FetchPageOptions {
   /** Read no more than this many bytes of HTML. */
   maxBytes: number;
