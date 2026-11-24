@@ -32,6 +32,22 @@ const KNOWN_LINK_SOURCES: ReadonlyArray<{
 export const DEFAULT_LINK_SOURCE_RANK = 0;
 
 /**
+ * Host suffixes that name this machine or a private network rather than a
+ * public site: loopback aliases, mDNS, and the special-use/conventional
+ * local-network domains. Matched as a whole label — `home.arpa` itself and
+ * `foo.home.arpa` alike.
+ */
+const LOCAL_HOST_SUFFIXES = [
+  "localhost",
+  "local",
+  "localdomain",
+  "internal",
+  "lan",
+  "home",
+  "home.arpa",
+];
+
+/**
  * The source a URL belongs to, or null when it isn't a usable http(s) URL.
  * An unrecognised host is keyed by its own hostname — it still appears on the
  * admin page and can still be ranked, it just starts at 0. Hosts that name
@@ -53,19 +69,13 @@ export function linkSourceForUrl(url: string): LinkSourceInfo | null {
   // page is fetched server-side: a relation must never aim that fetch at
   // this machine or its private network (SSRF). IP literals are refused
   // outright — the URL parser normalises decimal/hex/octal forms to dotted
-  // quads, and brackets mark IPv6 — as are loopback names, single-label
-  // intranet names, and local-network suffixes. A review source is always a
-  // public, named site.
+  // quads, and brackets mark IPv6 — as are single-label intranet names and
+  // the local suffixes above. A review source is always a public, named site.
   if (
     hostname.startsWith("[") ||
     /^\d{1,3}(\.\d{1,3}){3}$/.test(hostname) ||
     !hostname.includes(".") ||
-    hostname === "localhost" ||
-    hostname.endsWith(".localhost") ||
-    hostname.endsWith(".local") ||
-    hostname.endsWith(".internal") ||
-    hostname.endsWith(".lan") ||
-    hostname.endsWith(".home")
+    LOCAL_HOST_SUFFIXES.some((suffix) => hostname === suffix || hostname.endsWith(`.${suffix}`))
   ) {
     return null;
   }

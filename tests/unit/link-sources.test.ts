@@ -87,6 +87,11 @@ describe("linkSourceForUrl", () => {
     expect(linkSourceForUrl("http://server.internal/")).toBeNull();
     expect(linkSourceForUrl("http://nas.lan/")).toBeNull();
     expect(linkSourceForUrl("http://box.home/")).toBeNull();
+    // localhost.localdomain is a loopback alias in many hosts files.
+    expect(linkSourceForUrl("http://localhost.localdomain:3000/api/music-items")).toBeNull();
+    expect(linkSourceForUrl("http://foo.localdomain/")).toBeNull();
+    expect(linkSourceForUrl("http://home.arpa/")).toBeNull();
+    expect(linkSourceForUrl("http://printer.home.arpa/")).toBeNull();
   });
 
   test("a trailing dot does not smuggle a host past the gate or the known table", () => {
