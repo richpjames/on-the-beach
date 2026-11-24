@@ -8,9 +8,10 @@ import { decodeHtmlEntities } from "./html-metadata";
 // hatnotes and empty template shells. Scope to the wrapper first, then take
 // the first paragraph that strips to real text. An unknown host gets the
 // whole document and a minimum length, so a navigation fragment doesn't read
-// as prose. Consent notices and site chrome are stripped before the pick,
-// and a paragraph that reads as a cookie banner is skipped even though it
-// is sentence-shaped.
+// as prose. Scripts, styles and comments go first — their text can carry
+// paragraph markup of its own — then consent notices and site chrome are
+// stripped before the pick, and a paragraph that reads as a cookie banner is
+// skipped even though it is sentence-shaped.
 // ---------------------------------------------------------------------------
 
 /** Where each known host's article body starts, as an HTML fragment to find. */
@@ -93,10 +94,20 @@ export type ExtractedParagraph = { text: string; scoped: boolean };
  * picks the wrapper to scope to, not the URL's own hostname.
  */
 export function extractFirstParagraph(html: string, host: string): ExtractedParagraph | null {
+  // Scripts, styles and comments are not prose, and their text can carry
+  // `<p>` markup (ad snippets, hydration payloads) that would otherwise win
+  // the paragraph match — or fake the scope marker. Remove them before
+  // anything else reads the document. An unclosed block (the byte cap can
+  // cut mid-script) is stripped to the end, as a browser would read it.
+  const cleaned = html
+    .replace(/<script\b[\s\S]*?(?:<\/script>|$)/gi, " ")
+    .replace(/<style\b[\s\S]*?(?:<\/style>|$)/gi, " ")
+    .replace(/<!--[\s\S]*?(?:-->|$)/g, " ");
+
   const scope = SITE_SCOPES[host];
-  const scopeAt = scope ? html.indexOf(scope) : -1;
+  const scopeAt = scope ? cleaned.indexOf(scope) : -1;
   const scoped = scopeAt >= 0;
-  const body = (scoped ? html.slice(scopeAt) : html)
+  const body = (scoped ? cleaned.slice(scopeAt) : cleaned)
     .replace(CHROME_BLOCKS, "")
     .replace(CONSENT_BLOCKS, "");
   const minChars = scoped ? 1 : MIN_GENERIC_PARAGRAPH_CHARS;

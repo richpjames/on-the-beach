@@ -53,6 +53,48 @@ describe("linkSourceForUrl", () => {
     expect(linkSourceForUrl("ftp://wikipedia.org/wiki/x")).toBeNull();
     expect(linkSourceForUrl("")).toBeNull();
   });
+
+  // MusicBrainz url-rels are editable by anyone: a relation must never aim
+  // the server-side page fetch at this machine or its private network.
+  test("loopback names and addresses are never a source", () => {
+    expect(linkSourceForUrl("http://localhost:3000/api/music-items")).toBeNull();
+    expect(linkSourceForUrl("http://localhost.:3000/")).toBeNull();
+    expect(linkSourceForUrl("http://www.localhost/")).toBeNull();
+    expect(linkSourceForUrl("http://sub.localhost/")).toBeNull();
+    expect(linkSourceForUrl("http://127.0.0.1:3000/")).toBeNull();
+    expect(linkSourceForUrl("http://127.1/")).toBeNull();
+  });
+
+  test("IP literals in every form the URL parser accepts are refused", () => {
+    // Decimal, hex and octal forms normalise to dotted quads before the gate.
+    expect(linkSourceForUrl("http://2130706433/")).toBeNull();
+    expect(linkSourceForUrl("http://0x7f000001/")).toBeNull();
+    expect(linkSourceForUrl("http://0177.0.0.1/")).toBeNull();
+    // Private, link-local (cloud metadata) and public literals alike: a
+    // review source is always a named site.
+    expect(linkSourceForUrl("http://10.0.0.5/")).toBeNull();
+    expect(linkSourceForUrl("http://192.168.1.1/")).toBeNull();
+    expect(linkSourceForUrl("http://169.254.169.254/latest/meta-data/")).toBeNull();
+    expect(linkSourceForUrl("http://93.184.216.34/")).toBeNull();
+    expect(linkSourceForUrl("http://[::1]:3000/")).toBeNull();
+    expect(linkSourceForUrl("http://[fe80::1]/")).toBeNull();
+    expect(linkSourceForUrl("http://[::ffff:127.0.0.1]/")).toBeNull();
+  });
+
+  test("single-label and local-network names are never a source", () => {
+    expect(linkSourceForUrl("http://intranet/")).toBeNull();
+    expect(linkSourceForUrl("http://printer.local/")).toBeNull();
+    expect(linkSourceForUrl("http://server.internal/")).toBeNull();
+    expect(linkSourceForUrl("http://nas.lan/")).toBeNull();
+    expect(linkSourceForUrl("http://box.home/")).toBeNull();
+  });
+
+  test("a trailing dot does not smuggle a host past the gate or the known table", () => {
+    expect(linkSourceForUrl("http://localhost./")).toBeNull();
+    expect(linkSourceForUrl("https://en.wikipedia.org./wiki/In_Rainbows")?.host).toBe(
+      "wikipedia.org",
+    );
+  });
 });
 
 describe("defaultRankForHost", () => {

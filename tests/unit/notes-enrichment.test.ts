@@ -186,6 +186,39 @@ describe("enrichNotesForItem — finding the links", () => {
     expect(deps.stamp).toHaveBeenCalledWith(1);
   });
 
+  test("a relation aiming at this machine or a private network is never fetched", async () => {
+    // MusicBrainz url-rels are editable by anyone: a hostile relation must
+    // not turn the enrichment into a probe of the local network (SSRF).
+    const deps = fakeDeps({
+      fetchUrlRelations: mock(async () => [
+        { type: "other", url: "http://127.0.0.1:3000/api/music-items" },
+        { type: "other", url: "http://169.254.169.254/latest/meta-data/" },
+        { type: "other", url: "http://localhost/admin" },
+        { type: "other", url: "http://[::1]:3000/" },
+      ]),
+    });
+    expect(await enrichNotesForItem(1, deps)).toEqual({
+      kind: "result",
+      notes: null,
+      source: null,
+    });
+    expect(deps.recordSource).not.toHaveBeenCalled();
+    expect(deps.fetchHtml).not.toHaveBeenCalled();
+    expect(deps.stamp).toHaveBeenCalledWith(1);
+  });
+
+  test("a private relation does not shield the public one beside it", async () => {
+    const deps = fakeDeps({
+      fetchUrlRelations: mock(async () => [
+        { type: "other", url: "http://192.168.1.1/" },
+        { type: "wikipedia", url: WIKI_URL },
+      ]),
+    });
+    await enrichNotesForItem(1, deps);
+    expect(deps.fetchHtml).toHaveBeenCalledWith(WIKI_URL);
+    expect(deps.recordSource).toHaveBeenCalledTimes(1);
+  });
+
   test("no relations at all settles as a miss", async () => {
     const deps = fakeDeps({ fetchUrlRelations: mock(async () => []) });
     expect(await enrichNotesForItem(1, deps)).toEqual({
@@ -266,6 +299,24 @@ describe("enrichNotesForItem — writing the notes", () => {
     expect(deps.stamp).toHaveBeenCalledWith(1);
   });
 
+  test("a thrown extraction settles as a miss, not an error", async () => {
+    // Parsing up to MAX_REVIEW_BYTES of hostile markup can throw too; that
+    // is a page-level failure like any other — settled and stamped, not a
+    // 500 that leaves the item re-fetching on every view.
+    const deps = fakeDeps({
+      extractParagraph: mock(() => {
+        throw new Error("malformed markup");
+      }),
+    });
+    expect(await enrichNotesForItem(1, deps)).toEqual({
+      kind: "result",
+      notes: null,
+      source: null,
+    });
+    expect(deps.writeNotes).not.toHaveBeenCalled();
+    expect(deps.stamp).toHaveBeenCalledWith(1);
+  });
+
   test("a page with no extractable paragraph settles as a miss", async () => {
     const deps = fakeDeps({ extractParagraph: mock(() => null) });
     expect(await enrichNotesForItem(1, deps)).toEqual({
@@ -318,7 +369,10 @@ describe("enrichNotesForItem — the sentence gate for untrusted paragraphs", ()
   test("an unknown host's boilerplate is not ingested", async () => {
     const deps = fakeDeps({
       fetchUrlRelations: mock(async () => [{ type: "official", url: GUARDIAN_URL }]),
-      extractParagraph: mock(() => ({ text: "We use cookies to improve your experience", scoped: false })),
+      extractParagraph: mock(() => ({
+        text: "We use cookies to improve your experience",
+        scoped: false,
+      })),
     });
     expect(await enrichNotesForItem(1, deps)).toEqual({
       kind: "result",

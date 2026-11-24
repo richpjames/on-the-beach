@@ -126,6 +126,58 @@ describe("extractFirstParagraph — cleaning and scoping rules", () => {
   });
 });
 
+describe("extractFirstParagraph — script, style and comment markup", () => {
+  const PROSE = "A paragraph of prose long enough to clear the bar for an unknown source.";
+
+  test("an inline script carrying paragraph markup never supplies the pick", () => {
+    const html =
+      '<script>var ad = "<p>Buy our stuff now, long enough to pass the bar.</p>";</script>' +
+      `<p>${PROSE}</p>`;
+    expect(extractFirstParagraph(html, "theguardian.com")?.text).toBe(PROSE);
+  });
+
+  test("a hydration payload in the head is not prose", () => {
+    const html =
+      '<head><script type="application/ld+json">' +
+      '{"text":"<p>A hydration payload paragraph long enough to pass.</p>"}' +
+      `</script></head><body><p>${PROSE}</p></body>`;
+    expect(extractFirstParagraph(html, "theguardian.com")?.text).toBe(PROSE);
+  });
+
+  test("style and comment blocks carrying paragraph markup are stripped too", () => {
+    const style =
+      '<style>.x{content:"<p>Style template prose long enough to pass.</p>"}</style>' +
+      `<p>${PROSE}</p>`;
+    expect(extractFirstParagraph(style, "theguardian.com")?.text).toBe(PROSE);
+    const comment =
+      "<!-- <p>A commented-out paragraph long enough to pass the bar.</p> -->" + `<p>${PROSE}</p>`;
+    expect(extractFirstParagraph(comment, "theguardian.com")?.text).toBe(PROSE);
+  });
+
+  test("a script cut off by the byte cap is stripped to the end", () => {
+    // The read can stop mid-script; everything after an unclosed <script>
+    // is script text, not prose.
+    const html = `<p>${PROSE}</p><script>var x = "<p>Truncated payload paragraph.</p>`;
+    expect(extractFirstParagraph(html, "theguardian.com")?.text).toBe(PROSE);
+    expect(
+      extractFirstParagraph('<script>var x = "<p>Only payload, no prose.</p>', "theguardian.com"),
+    ).toBeNull();
+  });
+
+  test("a scope marker inside a script does not make the page scoped", () => {
+    const html = `<script>var t = 'class="mw-parser-output"';</script><p>${PROSE}</p>`;
+    expect(extractFirstParagraph(html, "wikipedia.org")).toEqual({ text: PROSE, scoped: false });
+  });
+
+  test("a real wrapper after a script still scopes the pick", () => {
+    const html = '<script>var a = 1;</script><div class="mw-parser-output"><p>The lead.</p></div>';
+    expect(extractFirstParagraph(html, "wikipedia.org")).toEqual({
+      text: "The lead.",
+      scoped: true,
+    });
+  });
+});
+
 describe("extractFirstParagraph — consent and chrome furniture", () => {
   const PROSE = "A paragraph of prose long enough to clear the bar for an unknown source.";
 
@@ -155,8 +207,7 @@ describe("extractFirstParagraph — consent and chrome furniture", () => {
 
   test("a privacy notice without the word cookies is still boilerplate", () => {
     const html =
-      "<p>We value your privacy and collect data to improve our services.</p>" +
-      `<p>${PROSE}</p>`;
+      "<p>We value your privacy and collect data to improve our services.</p>" + `<p>${PROSE}</p>`;
     expect(extractFirstParagraph(html, "theguardian.com")?.text).toBe(PROSE);
   });
 

@@ -34,18 +34,41 @@ export const DEFAULT_LINK_SOURCE_RANK = 0;
 /**
  * The source a URL belongs to, or null when it isn't a usable http(s) URL.
  * An unrecognised host is keyed by its own hostname — it still appears on the
- * admin page and can still be ranked, it just starts at 0.
+ * admin page and can still be ranked, it just starts at 0. Hosts that name
+ * this machine or a private network are never usable sources (see below).
  */
 export function linkSourceForUrl(url: string): LinkSourceInfo | null {
   let hostname: string;
   try {
     const parsed = new URL(url);
     if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return null;
-    hostname = parsed.hostname.toLowerCase();
+    // A trailing dot is the same host ("localhost." is localhost).
+    hostname = parsed.hostname.toLowerCase().replace(/\.+$/, "");
   } catch {
     return null;
   }
   if (!hostname) return null;
+
+  // MusicBrainz url-rels are editable by anyone, and the winning relation's
+  // page is fetched server-side: a relation must never aim that fetch at
+  // this machine or its private network (SSRF). IP literals are refused
+  // outright — the URL parser normalises decimal/hex/octal forms to dotted
+  // quads, and brackets mark IPv6 — as are loopback names, single-label
+  // intranet names, and local-network suffixes. A review source is always a
+  // public, named site.
+  if (
+    hostname.startsWith("[") ||
+    /^\d{1,3}(\.\d{1,3}){3}$/.test(hostname) ||
+    !hostname.includes(".") ||
+    hostname === "localhost" ||
+    hostname.endsWith(".localhost") ||
+    hostname.endsWith(".local") ||
+    hostname.endsWith(".internal") ||
+    hostname.endsWith(".lan") ||
+    hostname.endsWith(".home")
+  ) {
+    return null;
+  }
 
   const bare = hostname.replace(/^www\./, "");
   for (const known of KNOWN_LINK_SOURCES) {

@@ -641,10 +641,14 @@
   onMount(() => {
     if (currentNotes && isAtLeastASentence(currentNotes)) return;
     const notesAtRequest = currentNotes;
-    apiFetch(`/api/release/notes-lookup/${item.id}`, { method: "POST" })
+    const itemIdAtRequest = item.id;
+    apiFetch(`/api/release/notes-lookup/${itemIdAtRequest}`, { method: "POST" })
       .then((r) => (r.ok ? r.json() : null))
       .then((result) => {
         if (!result?.notes) return;
+        // Prose fetched for one record must never land on another: the page
+        // keys this component by item.id, but the guard is stated here too.
+        if (item.id !== itemIdAtRequest) return;
         // Notes saved while the lookup was in flight win — apply only when
         // nothing has changed since the ask, the client-side mirror of the
         // server's guarded write.

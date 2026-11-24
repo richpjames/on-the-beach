@@ -3,6 +3,7 @@ import { eq, inArray } from "drizzle-orm";
 import { db } from "../../adapters/db/index";
 import {
   appSettings,
+  externalLinkSources,
   musicItemStacks,
   musicLinks,
   musicItems,
@@ -15,6 +16,7 @@ import {
   itemSuggestions,
   sources,
 } from "../../adapters/db/schema";
+import { recordLinkSource, setLinkSourceRank } from "../../app/notes-enrichment";
 import { RATING_KEYS } from "../../app/settings";
 import { normalize } from "../../domain/text";
 
@@ -32,6 +34,9 @@ testRoutes.post("/reset", async (c) => {
   await db.delete(musicItemOrder);
   await db.delete(artists);
   await db.delete(stacks);
+  // Encountered link-source hosts are per-spec state (the admin rankings
+  // list), not static seed data like the music sources below.
+  await db.delete(externalLinkSources);
   // sources are seeded/static — leave them alone. The rating scale is a
   // per-spec setting, so it goes back to the default instead of leaking
   // between specs.
@@ -170,4 +175,20 @@ testRoutes.post("/release-alerts", async (c) => {
     .returning();
 
   return c.json(alert, 201);
+});
+
+// Seed an encountered external-link source directly, standing in for the
+// notes enrichment's record-as-met pass (external lookups are disabled under
+// test). First sight wins, as in production; an explicit rank re-ranks the
+// row so the admin page can be exercised without a live MusicBrainz.
+testRoutes.post("/link-sources", async (c) => {
+  const body = await c.req.json();
+  const host: string = body.host;
+  await recordLinkSource(host, body.displayName ?? host);
+  if (body.rank !== undefined) await setLinkSourceRank(host, body.rank);
+  const [row] = await db
+    .select()
+    .from(externalLinkSources)
+    .where(eq(externalLinkSources.host, host));
+  return c.json(row, 201);
 });
