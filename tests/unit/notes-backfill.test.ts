@@ -1,5 +1,9 @@
-import { afterAll, describe, expect, spyOn, test } from "bun:test";
+import { afterAll, describe, expect, mock, spyOn, test } from "bun:test";
 import { eq } from "drizzle-orm";
+// Held before mock.module below so the real resolver can be handed back when
+// this file is done — bun's mock.module() persists process-wide (see
+// fetch-page.test.ts).
+import * as realDns from "node:dns/promises";
 import { db } from "../../adapters/db/index";
 import { musicItems } from "../../adapters/db/schema";
 import { createMusicItemDirect } from "../../app/music-item-store";
@@ -19,7 +23,16 @@ const ENV_BEFORE = {
 };
 process.env.OTB_DISABLE_EXTERNAL_LOOKUPS = "1";
 
+// The sweep runs the enrichment's default wiring, and the page fetch resolves
+// the host before connecting (publicHostsOnly). The resolver is mocked
+// alongside fetch so the suite never touches live DNS — offline, or on a
+// DNS-blocked runner, the sweep must behave exactly the same.
+const realLookup = realDns.lookup;
+const lookupMock = mock(async () => [{ address: "93.184.216.34", family: 4 }]);
+mock.module("node:dns/promises", () => ({ ...realDns, lookup: lookupMock }));
+
 afterAll(() => {
+  mock.module("node:dns/promises", () => ({ ...realDns, lookup: realLookup }));
   for (const [key, value] of Object.entries(ENV_BEFORE)) {
     if (value === undefined) delete process.env[key];
     else process.env[key] = value;
@@ -149,6 +162,10 @@ describe("runNotesBackfill", () => {
       expect(summary.processed).toBe(2);
       expect(summary.written).toBe(2);
       expect(summary.failed).toBe(0);
+
+      // The page fetch went through the public-address gate, not around it:
+      // the default wiring resolves the host before connecting.
+      expect(lookupMock.mock.calls.some(([host]) => host === "en.wikipedia.org")).toBe(true);
 
       expect(await notesOf(first.item.id)).toBe(`${PARAGRAPH} — From Wikipedia (${WIKI_URL})`);
       expect(await notesOf(second.item.id)).toBe(
