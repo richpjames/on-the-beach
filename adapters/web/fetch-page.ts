@@ -8,6 +8,9 @@
  */
 
 import { lookup } from "node:dns/promises";
+import * as http from "node:http";
+import * as https from "node:https";
+import { Readable } from "node:stream";
 import { isPublicIpAddress } from "../../domain/ip-address";
 
 /** Enough for any `<head>`, OG tags included. */
@@ -46,8 +49,84 @@ const PAGE_HEADERS = {
 const MAX_PUBLIC_REDIRECTS = 5;
 
 /**
- * Fetch with every hop checked against the resolver: the name must answer
- * with public addresses only, and each redirect is re-checked the same way
+ * Settle a promise against an abort signal. Bun's `lookup` ignores the signal
+ * option, so the resolver is raced against the same timeout the fetch runs
+ * under: a hostname whose server drops queries can no longer stall the
+ * request past its budget (the abandoned query still finishes in the
+ * threadpool, but nothing waits on it).
+ */
+function abortable<T>(promise: Promise<T>, signal: AbortSignal): Promise<T> {
+  if (signal.aborted) return Promise.reject(new Error("aborted"));
+  return new Promise<T>((resolve, reject) => {
+    const onAbort = () => reject(new Error("aborted"));
+    signal.addEventListener("abort", onAbort, { once: true });
+    promise.then(
+      (value) => {
+        signal.removeEventListener("abort", onAbort);
+        resolve(value);
+      },
+      (err) => {
+        signal.removeEventListener("abort", onAbort);
+        reject(err);
+      },
+    );
+  });
+}
+
+/**
+ * Connect to the vetted addresses, never re-resolving the name. The hostname
+ * still sets Host and SNI, but the custom `lookup` hands the socket exactly
+ * the addresses the gate approved — so a rebinding name (TTL 0, alternating
+ * answers) cannot answer public for the check and loopback for the connection.
+ * The node response is wrapped as a web Response so the reader downstream is
+ * the same one the plain fetch uses.
+ */
+function pinnedRequest(
+  parsed: URL,
+  hostname: string,
+  addresses: { address: string; family: number }[],
+  signal: AbortSignal,
+): Promise<Response> {
+  return new Promise<Response>((resolve, reject) => {
+    const transport = parsed.protocol === "https:" ? https : http;
+    const req = transport.request(
+      {
+        hostname,
+        port: parsed.port ? Number(parsed.port) : undefined,
+        path: parsed.pathname + parsed.search,
+        method: "GET",
+        // node:http does not negotiate or undo content compression the way
+        // fetch does; ask for plain text so the body reads as HTML.
+        headers: { ...PAGE_HEADERS, "Accept-Encoding": "identity" },
+        lookup: (_host, _options, callback) => callback(null, addresses),
+      } as http.RequestOptions,
+      (res) => {
+        const headers = new Headers();
+        for (const [name, value] of Object.entries(res.headers)) {
+          if (value === undefined) continue;
+          if (Array.isArray(value)) for (const item of value) headers.append(name, item);
+          else headers.append(name, value);
+        }
+        resolve(
+          new Response(Readable.toWeb(res) as unknown as ReadableStream, {
+            status: res.statusCode,
+            headers,
+          }),
+        );
+      },
+    );
+    req.on("error", reject);
+    const onAbort = () => req.destroy(new Error("aborted"));
+    if (signal.aborted) onAbort();
+    else signal.addEventListener("abort", onAbort, { once: true });
+    req.end();
+  });
+}
+
+/**
+ * Fetch with every hop checked against the resolver and pinned to the answer:
+ * the name must resolve to public addresses only, the connection uses exactly
+ * those addresses, and each redirect is re-checked and re-pinned the same way
  * before it is followed. A refusal throws — the caller settles it as a miss.
  */
 async function fetchPublicPage(url: string, signal: AbortSignal): Promise<Response> {
@@ -61,13 +140,14 @@ async function fetchPublicPage(url: string, signal: AbortSignal): Promise<Respon
     // Resolve before connecting. An IP literal answers with itself; a name
     // answers with every address it has — one private answer is enough to
     // refuse, since the connection could pick any of them.
-    const addresses = await lookup(hostname, { all: true, verbatim: true });
+    const addresses = await abortable(lookup(hostname, { all: true, verbatim: true }), signal);
     if (addresses.length === 0 || addresses.some((a) => !isPublicIpAddress(a.address))) {
       throw new Error(`refusing non-public address for ${hostname}`);
     }
-    const response = await fetch(current, { signal, redirect: "manual", headers: PAGE_HEADERS });
+    const response = await pinnedRequest(parsed, hostname, addresses, signal);
     const location = response.headers.get("location");
     if (response.status >= 300 && response.status < 400 && location) {
+      await response.body?.cancel();
       if (hop >= MAX_PUBLIC_REDIRECTS) throw new Error("too many redirects");
       current = new URL(location, current).toString();
       continue;

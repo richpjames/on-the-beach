@@ -286,3 +286,40 @@ describe("extractFirstParagraph — unclosed furniture is a linear read", () => 
     expect(performance.now() - started).toBeLessThan(2_000);
   });
 });
+
+describe("extractFirstParagraph — opener walls with no '>' are a linear read", () => {
+  // The end anchors fixed the unclosed-container scans, but the opener's
+  // attribute run (`[^>]*>`) was still unbounded: a wall of openers whose
+  // `>` never arrives cost a full scan each. The bounded run stops at the
+  // next `<` or `>`, so these shapes — all well under MAX_REVIEW_BYTES —
+  // settle in milliseconds instead of minutes.
+  const PROSE = "A paragraph of prose long enough to clear the bar for an unknown source.";
+
+  test("a wall of nav openers whose '>' never arrives settles instantly", () => {
+    const html = "<nav ".repeat(200_000);
+    const started = performance.now();
+    expect(extractFirstParagraph(html, "theguardian.com")).toBeNull();
+    expect(performance.now() - started).toBeLessThan(2_000);
+  });
+
+  test("a consent keyword run with no '>' settles instantly", () => {
+    const html = "<div " + "cookie".repeat(100_000);
+    const started = performance.now();
+    expect(extractFirstParagraph(html, "theguardian.com")).toBeNull();
+    expect(performance.now() - started).toBeLessThan(2_000);
+  });
+
+  test("a wall of paragraph openers with no '>' settles instantly", () => {
+    const html = "<p ".repeat(200_000);
+    const started = performance.now();
+    expect(extractFirstParagraph(html, "theguardian.com")).toBeNull();
+    expect(performance.now() - started).toBeLessThan(2_000);
+  });
+
+  test("a wall of bare tags inside a paragraph is read in linear time", () => {
+    const html = `<p>${PROSE}` + "<x ".repeat(100_000);
+    const started = performance.now();
+    extractFirstParagraph(html, "theguardian.com");
+    expect(performance.now() - started).toBeLessThan(2_000);
+  });
+});

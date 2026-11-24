@@ -39,10 +39,17 @@ const MIN_GENERIC_PARAGRAPH_CHARS = 40;
  * `<nav>`s is quadratic — minutes of synchronous regex on the one event
  * loop. With it, an unclosed container is stripped to the end in one pass,
  * as a browser would read it, and the whole read stays linear.
+ *
+ * The opener's attribute run is bounded too (`[^><]{0,2000}`): it stops at
+ * the next `<` or `>` and never runs past 2000 characters, so a wall of
+ * openers whose `>` never arrives (`"<nav ".repeat(…)`) cannot cost a full
+ * scan each. A real opening tag fits comfortably; an attribute carrying a
+ * `<` (malformed, rare) simply escapes the match, which the text gates below
+ * still catch.
  */
-const CHROME_BLOCKS = /<(header|footer|nav|aside|dialog)\b[^>]*>[\s\S]*?(?:<\/\1>|$)/gi;
+const CHROME_BLOCKS = /<(header|footer|nav|aside|dialog)\b[^><]{0,2000}>[\s\S]*?(?:<\/\1>|$)/gi;
 const CONSENT_BLOCKS =
-  /<(div|section)\b[^>]*(cookie|consent|gdpr|onetrust|cookiebot|quantcast|truste|didomi|sp_message|cmp-)[^>]*>[\s\S]*?(?:<\/\1>|$)/gi;
+  /<(div|section)\b[^><]{0,2000}?(cookie|consent|gdpr|onetrust|cookiebot|quantcast|truste|didomi|sp_message|cmp-)[^><]{0,2000}>[\s\S]*?(?:<\/\1>|$)/gi;
 
 /**
  * Whether a paragraph reads as a consent notice rather than prose about the
@@ -79,10 +86,12 @@ function htmlToText(fragment: string): string {
   // Line and block breaks become spaces before the tags go, or words on
   // either side of a <br> or a block boundary would glue together
   // ("Foo<br>bar" → "Foobar"). The later whitespace collapse keeps it tidy.
+  // The attribute runs are bounded like the container openers above, so a
+  // fragment full of tags whose `>` never arrives stays a linear read.
   const withoutTags = withoutBlocks
     .replace(/<br\s*\/?>/gi, " ")
-    .replace(/<\/?(?:p|div|li|h[1-6]|blockquote|hr)\b[^>]*>/gi, " ")
-    .replace(/<[^>]+>/g, "");
+    .replace(/<\/?(?:p|div|li|h[1-6]|blockquote|hr)\b[^><]{0,2000}>/gi, " ")
+    .replace(/<[^><]{1,2000}>/g, "");
   return decodeHtmlEntities(withoutTags)
     .replace(/&nbsp;/gi, " ")
     .replace(/\s+/g, " ")
@@ -127,7 +136,7 @@ export function extractFirstParagraph(html: string, host: string): ExtractedPara
   // paragraph's own content, up to its explicit close; the next opener has
   // already ended it, and anything after the close is inter-paragraph
   // furniture, not part of the pick.
-  const chunks = body.split(/<p\b[^>]*>/i).slice(1);
+  const chunks = body.split(/<p\b[^><]{0,2000}>/i).slice(1);
   for (const chunk of chunks) {
     const text = htmlToText(chunk.split(/<\/p>/i)[0]!);
     if (text.length >= minChars && !isConsentBoilerplate(text)) return { text, scoped };

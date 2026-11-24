@@ -1,9 +1,13 @@
-import { afterAll, describe, expect, mock, spyOn, test } from "bun:test";
+import { afterAll, afterEach, describe, expect, mock, spyOn, test } from "bun:test";
 import { eq } from "drizzle-orm";
-// Held before mock.module below so the real resolver can be handed back when
+import { EventEmitter } from "node:events";
+import { Readable } from "node:stream";
+// Held before mock.module below so the real modules can be handed back when
 // this file is done — bun's mock.module() persists process-wide (see
 // fetch-page.test.ts).
 import * as realDns from "node:dns/promises";
+import * as realHttp from "node:http";
+import * as realHttps from "node:https";
 import { db } from "../../adapters/db/index";
 import { musicItems } from "../../adapters/db/schema";
 import { createMusicItemDirect } from "../../app/music-item-store";
@@ -15,8 +19,9 @@ import {
 
 // The sweep's contract: never-attempted rows with a MusicBrainz id and notes
 // to fill get enriched and stamped; prose notes and id-less rows are left
-// alone; a MusicBrainz failure stays retryable. The network is mocked at the
-// fetch boundary — MusicBrainz answers url-rels, the link's page answers HTML.
+// alone; a MusicBrainz failure stays retryable. The network is mocked at its
+// boundaries — fetch carries the MusicBrainz url-rels, the pinned node:http
+// transport carries the link's page, and the resolver answers public addresses.
 
 const ENV_BEFORE = {
   OTB_DISABLE_EXTERNAL_LOOKUPS: process.env.OTB_DISABLE_EXTERNAL_LOOKUPS,
@@ -24,15 +29,38 @@ const ENV_BEFORE = {
 process.env.OTB_DISABLE_EXTERNAL_LOOKUPS = "1";
 
 // The sweep runs the enrichment's default wiring, and the page fetch resolves
-// the host before connecting (publicHostsOnly). The resolver is mocked
-// alongside fetch so the suite never touches live DNS — offline, or on a
-// DNS-blocked runner, the sweep must behave exactly the same.
+// the host before connecting (publicHostsOnly), then connects through
+// node:http(s) pinned to the vetted address. The resolver and the page
+// transport are mocked alongside fetch (which still carries the MusicBrainz
+// ask) so the suite never touches live DNS or the live network — offline, or
+// on a DNS-blocked runner, the sweep must behave exactly the same.
 const realLookup = realDns.lookup;
 const lookupMock = mock(async () => [{ address: "93.184.216.34", family: 4 }]);
 mock.module("node:dns/promises", () => ({ ...realDns, lookup: lookupMock }));
 
+// The page the guarded fetch reads. The sweep only ever fetches the wiki
+// link, so one canned answer serves; the unreachable-page test overrides it.
+let pageStatus = 200;
+let pageBody = "";
+function fakePageRequest(_options: unknown, cb: (res: unknown) => void) {
+  const req = new EventEmitter() as any;
+  req.end = () => {
+    const res = Readable.from([Buffer.from(pageBody)]) as any;
+    res.statusCode = pageStatus;
+    res.headers = { "content-type": "text/html; charset=utf-8" };
+    queueMicrotask(() => cb(res));
+  };
+  req.destroy = (err?: Error) =>
+    queueMicrotask(() => req.emit("error", err ?? new Error("destroyed")));
+  return req;
+}
+mock.module("node:http", () => ({ ...realHttp, request: fakePageRequest }));
+mock.module("node:https", () => ({ ...realHttps, request: fakePageRequest }));
+
 afterAll(() => {
   mock.module("node:dns/promises", () => ({ ...realDns, lookup: realLookup }));
+  mock.module("node:http", () => ({ ...realHttp, request: realHttp.request }));
+  mock.module("node:https", () => ({ ...realHttps, request: realHttps.request }));
   for (const [key, value] of Object.entries(ENV_BEFORE)) {
     if (value === undefined) delete process.env[key];
     else process.env[key] = value;
@@ -41,6 +69,11 @@ afterAll(() => {
 
 const WIKI_URL = "https://en.wikipedia.org/wiki/In_Rainbows";
 const PARAGRAPH = "In Rainbows is the seventh studio album by Radiohead.";
+
+afterEach(() => {
+  pageStatus = 200;
+  pageBody = `<div class="mw-parser-output"><p>${PARAGRAPH}</p></div>`;
+});
 
 function mockNetwork(fetchImpl: (url: string) => Promise<Response>) {
   return spyOn(globalThis, "fetch").mockImplementation((async (input: RequestInfo | URL) => {
@@ -218,6 +251,10 @@ describe("runNotesBackfill", () => {
       musicbrainzReleaseGroupId: "rg-bf-unreachable",
     });
 
+    // The page itself answers 403 with no body — the guarded fetch reads it
+    // through the (mocked) transport, not through fetch.
+    pageStatus = 403;
+    pageBody = "";
     const fetchSpy = mockNetwork(async (url) => {
       if (url.startsWith("https://musicbrainz.org/")) {
         return Response.json({
