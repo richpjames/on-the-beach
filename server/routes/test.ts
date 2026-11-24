@@ -182,13 +182,23 @@ testRoutes.post("/release-alerts", async (c) => {
 // test). First sight wins, as in production; an explicit rank re-ranks the
 // row so the admin page can be exercised without a live MusicBrainz.
 testRoutes.post("/link-sources", async (c) => {
-  const body = await c.req.json();
-  const host: string = body.host;
+  const body = await c.req.json().catch(() => null);
+  const host = typeof body?.host === "string" ? body.host.trim() : "";
+  if (!host) {
+    return c.json({ error: "host is required" }, 400);
+  }
+  const rank = body.rank;
+  if (rank !== undefined && (typeof rank !== "number" || !Number.isInteger(rank))) {
+    return c.json({ error: "rank must be an integer" }, 400);
+  }
   await recordLinkSource(host, body.displayName ?? host);
-  if (body.rank !== undefined) await setLinkSourceRank(host, body.rank);
+  if (rank !== undefined) await setLinkSourceRank(host, rank);
   const [row] = await db
     .select()
     .from(externalLinkSources)
     .where(eq(externalLinkSources.host, host));
+  if (!row) {
+    return c.json({ error: "Unknown link source" }, 404);
+  }
   return c.json(row, 201);
 });

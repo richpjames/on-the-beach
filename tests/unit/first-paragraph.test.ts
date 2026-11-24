@@ -178,6 +178,32 @@ describe("extractFirstParagraph — script, style and comment markup", () => {
   });
 });
 
+describe("extractFirstParagraph — implicitly closed paragraphs", () => {
+  const PROSE = "A paragraph of prose long enough to clear the bar for an unknown source.";
+
+  test("a paragraph closed by the next opener never merges with it", () => {
+    const html = `<p>Short intro.<p>${PROSE}</p>`;
+    expect(extractFirstParagraph(html, "theguardian.com")?.text).toBe(PROSE);
+  });
+
+  test("implicitly closed paragraphs are picked even with no explicit close", () => {
+    const html = `<p>Short intro.<p>${PROSE}`;
+    expect(extractFirstParagraph(html, "theguardian.com")?.text).toBe(PROSE);
+  });
+
+  test("a scoped pick stops at the next opener too", () => {
+    const html = '<div class="mw-parser-output"><p>The lead.<p>Second paragraph.</p></div>';
+    expect(extractFirstParagraph(html, "wikipedia.org")?.text).toBe("The lead.");
+  });
+
+  test("furniture between explicit closes stays out of the pick", () => {
+    const html = `<p>${PROSE}</p><div>chrome</div><p>Another paragraph of prose.</p>`;
+    const text = extractFirstParagraph(html, "theguardian.com")?.text;
+    expect(text).toBe(PROSE);
+    expect(text).not.toContain("chrome");
+  });
+});
+
 describe("extractFirstParagraph — consent and chrome furniture", () => {
   const PROSE = "A paragraph of prose long enough to clear the bar for an unknown source.";
 

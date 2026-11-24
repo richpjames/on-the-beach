@@ -112,9 +112,15 @@ export function extractFirstParagraph(html: string, host: string): ExtractedPara
     .replace(CONSENT_BLOCKS, "");
   const minChars = scoped ? 1 : MIN_GENERIC_PARAGRAPH_CHARS;
 
-  const paragraphs = body.match(/<p\b[^>]*>[\s\S]*?<\/p>/gi) ?? [];
-  for (const paragraph of paragraphs) {
-    const text = htmlToText(paragraph);
+  // A `<p>` may be closed implicitly by the next `<p>`, so matching to the
+  // first `</p>` can swallow several paragraphs — and the markup between
+  // them — into one blob. Split at every opener instead: each chunk is one
+  // paragraph's own content, up to its explicit close; the next opener has
+  // already ended it, and anything after the close is inter-paragraph
+  // furniture, not part of the pick.
+  const chunks = body.split(/<p\b[^>]*>/i).slice(1);
+  for (const chunk of chunks) {
+    const text = htmlToText(chunk.split(/<\/p>/i)[0]!);
     if (text.length >= minChars && !isConsentBoilerplate(text)) return { text, scoped };
   }
   return null;
