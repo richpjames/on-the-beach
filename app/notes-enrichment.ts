@@ -276,14 +276,15 @@ export async function enrichNotesForItem(
   // A page-level failure is a settled miss, not an error: the fetch already
   // degrades to null on its own, and a thrown one (a reset, a TLS failure)
   // must not surface as a 500 or leave the item re-fetching on every view.
-  let html: string | null;
+  // Extraction sits inside the same guard — parsing up to MAX_REVIEW_BYTES
+  // of hostile markup can throw too, and that must settle as a miss as well.
+  let extracted: ExtractedParagraph | null = null;
   try {
-    html = await deps.fetchHtml(best.url);
+    const html = await deps.fetchHtml(best.url);
+    extracted = html ? deps.extractParagraph(html, best.host) : null;
   } catch (err) {
-    console.error("[notes-enrichment] page fetch failed for item", itemId, best.url, err);
-    html = null;
+    console.error("[notes-enrichment] page read failed for item", itemId, best.url, err);
   }
-  const extracted = html ? deps.extractParagraph(html, best.host) : null;
   // A curated host's paragraph is trusted only when it actually came from
   // the scoped article body. When the wrapper is missing (a markup change,
   // an AMP variant, an interstitial) the pick falls back to the whole

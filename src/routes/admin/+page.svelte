@@ -22,12 +22,29 @@
     );
   }
 
-  async function saveRank(source: LinkSourceView, raw: string): Promise<void> {
+  // Per-host save tickets: two quick edits to one host can resolve out of
+  // order, and only the newest save's response may settle the row and the
+  // status line — a slow earlier response is ignored.
+  const pendingRankWrites = new Map<string, number>();
+
+  async function saveRank(source: LinkSourceView, input: HTMLInputElement): Promise<void> {
+    // The field must always show the stored rank: a rejected edit reverts
+    // to the authoritative row, since `sources` (and so the value binding)
+    // never changes on a failed save.
+    const resetInput = () => {
+      const saved = sources.find((row) => row.host === source.host);
+      input.value = String(saved?.rank ?? source.rank);
+    };
+
+    const raw = input.value;
     const rank = Number(raw);
     if (raw.trim() === "" || !Number.isInteger(rank)) {
       statusMessage = "Ranks must be whole numbers.";
+      resetInput();
       return;
     }
+    const ticket = (pendingRankWrites.get(source.host) ?? 0) + 1;
+    pendingRankWrites.set(source.host, ticket);
     statusMessage = "Saving…";
     try {
       const res = await apiFetch("/api/link-sources", {
@@ -35,17 +52,22 @@
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ host: source.host, rank }),
       });
+      if (pendingRankWrites.get(source.host) !== ticket) return;
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
         statusMessage = err.error || "Failed to save.";
+        resetInput();
         return;
       }
       sources = sortSources(
         sources.map((row) => (row.host === source.host ? { ...row, rank } : row)),
       );
       statusMessage = "Saved. The new ranking applies to the next lookup.";
+      resetInput();
     } catch {
+      if (pendingRankWrites.get(source.host) !== ticket) return;
       statusMessage = "Failed to save.";
+      resetInput();
     }
   }
 
@@ -99,7 +121,7 @@
                   step="1"
                   inputmode="numeric"
                   value={source.rank}
-                  onchange={(event) => saveRank(source, event.currentTarget.value)}
+                  onchange={(event) => saveRank(source, event.currentTarget)}
                 />
               </label>
             </li>
