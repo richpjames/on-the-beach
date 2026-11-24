@@ -100,4 +100,62 @@ describe("extractFirstParagraph — cleaning and scoping rules", () => {
     const html = '<div class="review"><p>One\n  line\twith   gaps.</p></div>';
     expect(extractFirstParagraph(html, "allmusic.com")).toBe("One line with gaps.");
   });
+
+  test("line and block breaks separate words instead of gluing them", () => {
+    const breaks = '<div class="review"><p>Foo<br>bar<br/>baz</p></div>';
+    expect(extractFirstParagraph(breaks, "allmusic.com")).toBe("Foo bar baz");
+    const blocks = '<div class="review"><p>One<div>two</div>three</p></div>';
+    expect(extractFirstParagraph(blocks, "allmusic.com")).toBe("One two three");
+  });
+});
+
+describe("extractFirstParagraph — consent and chrome furniture", () => {
+  const PROSE = "A paragraph of prose long enough to clear the bar for an unknown source.";
+
+  test("a server-rendered cookie banner container is stripped", () => {
+    const html =
+      '<div id="cookie-banner"><div class="inner">' +
+      "<p>We use cookies to ensure you get the best experience on our website.</p>" +
+      "</div></div>" +
+      `<p>${PROSE}</p>`;
+    expect(extractFirstParagraph(html, "theguardian.com")).toBe(PROSE);
+  });
+
+  test("a banner whose nested markup escapes the block match is caught by its text", () => {
+    const html =
+      '<div class="cookie-consent"><div>x</div>' +
+      "<p>This site uses cookies to deliver our services.</p></div>" +
+      `<p>${PROSE}</p>`;
+    expect(extractFirstParagraph(html, "theguardian.com")).toBe(PROSE);
+  });
+
+  test("a bare consent paragraph with no wrapper is skipped", () => {
+    const html =
+      "<p>We use cookies. By continuing to browse you accept our privacy policy.</p>" +
+      `<p>${PROSE}</p>`;
+    expect(extractFirstParagraph(html, "theguardian.com")).toBe(PROSE);
+  });
+
+  test("a privacy notice without the word cookies is still boilerplate", () => {
+    const html =
+      "<p>We value your privacy and collect data to improve our services.</p>" +
+      `<p>${PROSE}</p>`;
+    expect(extractFirstParagraph(html, "theguardian.com")).toBe(PROSE);
+  });
+
+  test("site chrome never supplies the paragraph", () => {
+    const html =
+      "<header><p>The site tagline, long enough to clear the bar for an unknown source.</p></header>" +
+      "<nav><p>Menu items and navigation fragments long enough to pass the bar.</p></nav>" +
+      `<p>${PROSE}</p>`;
+    expect(extractFirstParagraph(html, "theguardian.com")).toBe(PROSE);
+  });
+
+  test("prose that merely mentions cookies is still prose", () => {
+    const html =
+      "<p>The band handed out cookies at the gate, a joke that became the album's title.</p>";
+    expect(extractFirstParagraph(html, "theguardian.com")).toBe(
+      "The band handed out cookies at the gate, a joke that became the album's title.",
+    );
+  });
 });

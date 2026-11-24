@@ -69,8 +69,9 @@
         When a record's notes are empty, the first paragraph of its best-ranked MusicBrainz
         external link is fetched and kept as the notes. These are the sources met so far —
         set a rank to say which prose you trust most. The highest rank wins; a source ranked
-        0 is still fetched when nothing better is attached. New sources start at Wikipedia
-        11, Pitchfork 10, AllMusic 9, everything else 0.
+        0 is still fetched when nothing better is attached. An unknown source only supplies
+        notes when its first paragraph reads as a sentence — cookie and consent notices never
+        count. New sources start at Wikipedia 11, Pitchfork 10, AllMusic 9, everything else 0.
       </p>
 
       {#if sources.length === 0}

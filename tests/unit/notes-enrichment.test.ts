@@ -6,9 +6,11 @@ import { createMusicItemDirect } from "../../app/music-item-store";
 import {
   defaultNotesEnrichmentDeps,
   enrichNotesForItem,
+  enrichNotesInBackground,
   fetchItemForNotesEnrichment,
   getLinkSourceRanks,
   listLinkSources,
+  lookupNotesForItem,
   recordLinkSource,
   setLinkSourceRank,
   stampNotesEnrichment,
@@ -249,6 +251,21 @@ describe("enrichNotesForItem — writing the notes", () => {
     expect(deps.stamp).toHaveBeenCalledWith(1);
   });
 
+  test("a thrown page fetch settles as a miss, not an error", async () => {
+    const deps = fakeDeps({
+      fetchHtml: mock(async () => {
+        throw new Error("connection reset");
+      }),
+    });
+    expect(await enrichNotesForItem(1, deps)).toEqual({
+      kind: "result",
+      notes: null,
+      source: null,
+    });
+    expect(deps.writeNotes).not.toHaveBeenCalled();
+    expect(deps.stamp).toHaveBeenCalledWith(1);
+  });
+
   test("a page with no extractable paragraph settles as a miss", async () => {
     const deps = fakeDeps({ extractParagraph: mock(() => null) });
     expect(await enrichNotesForItem(1, deps)).toEqual({
@@ -294,6 +311,45 @@ describe("enrichNotesForItem — writing the notes", () => {
       source: null,
     });
     expect(deps.stamp).toHaveBeenCalledWith(1);
+  });
+});
+
+describe("enrichNotesForItem — the unknown-host sentence gate", () => {
+  test("an unknown host's boilerplate is not ingested", async () => {
+    const deps = fakeDeps({
+      fetchUrlRelations: mock(async () => [{ type: "official", url: GUARDIAN_URL }]),
+      extractParagraph: mock(() => "We use cookies to improve your experience"),
+    });
+    expect(await enrichNotesForItem(1, deps)).toEqual({
+      kind: "result",
+      notes: null,
+      source: null,
+    });
+    expect(deps.writeNotes).not.toHaveBeenCalled();
+    expect(deps.stamp).toHaveBeenCalledWith(1);
+  });
+
+  test("an unknown host's sentence-shaped paragraph is ingested", async () => {
+    const deps = fakeDeps({
+      fetchUrlRelations: mock(async () => [{ type: "official", url: GUARDIAN_URL }]),
+      extractParagraph: mock(() => "In Rainbows arrived as a pay-what-you-want download."),
+    });
+    const outcome = await enrichNotesForItem(1, deps);
+    expect(outcome.kind).toBe("result");
+    expect(deps.writeNotes).toHaveBeenCalledWith(
+      1,
+      `In Rainbows arrived as a pay-what-you-want download. — From theguardian.com (${GUARDIAN_URL})`,
+      null,
+    );
+  });
+
+  test("a curated host's paragraph is trusted without the sentence gate", async () => {
+    const deps = fakeDeps({
+      extractParagraph: mock(() => "In Rainbows is the seventh studio album by Radiohead"),
+    });
+    const outcome = await enrichNotesForItem(1, deps);
+    expect(outcome.kind).toBe("result");
+    expect(deps.writeNotes).toHaveBeenCalled();
   });
 });
 
@@ -404,5 +460,58 @@ describe("enrichNotesForItem — against the database", () => {
       kind: "skipped",
       reason: "already_attempted",
     });
+  });
+});
+
+describe("the eager hook and the on-view lookup", () => {
+  // Both triggers settle through the same in-flight map, so adding a release
+  // and opening it right away is one ask. The flag is lifted for these tests
+  // only; the items carry no MusicBrainz ids, so nothing reaches the network.
+  function withLookupsEnabled<T>(run: () => T): T {
+    const prev = process.env.OTB_DISABLE_EXTERNAL_LOOKUPS;
+    delete process.env.OTB_DISABLE_EXTERNAL_LOOKUPS;
+    try {
+      return run();
+    } finally {
+      if (prev === undefined) delete process.env.OTB_DISABLE_EXTERNAL_LOOKUPS;
+      else process.env.OTB_DISABLE_EXTERNAL_LOOKUPS = prev;
+    }
+  }
+
+  test("concurrent opens of one release share a single ask", async () => {
+    const { item: created } = await createMusicItemDirect({
+      artistName: "Notes Artist",
+      title: "Shared Ask",
+    });
+    await withLookupsEnabled(async () => {
+      const first = lookupNotesForItem(created.id);
+      const second = lookupNotesForItem(created.id);
+      expect(second).toBe(first);
+      expect(await first).toEqual({ kind: "skipped", reason: "no_musicbrainz_id" });
+    });
+  });
+
+  test("adding a release and opening it right away is one enrichment, not two", async () => {
+    const realFetchItem = defaultNotesEnrichmentDeps.fetchItem;
+    let fetches = 0;
+    let openGate!: (value: ItemForNotesEnrichment | null) => void;
+    const gate = new Promise<ItemForNotesEnrichment | null>((resolve) => (openGate = resolve));
+    defaultNotesEnrichmentDeps.fetchItem = async () => {
+      fetches++;
+      return gate;
+    };
+    try {
+      await withLookupsEnabled(async () => {
+        enrichNotesInBackground(424_242);
+        const onView = lookupNotesForItem(424_242);
+        openGate(
+          item({ id: 424_242, musicbrainzReleaseGroupId: null, musicbrainzReleaseId: null }),
+        );
+        expect(await onView).toEqual({ kind: "skipped", reason: "no_musicbrainz_id" });
+        expect(fetches).toBe(1);
+      });
+    } finally {
+      defaultNotesEnrichmentDeps.fetchItem = realFetchItem;
+    }
   });
 });

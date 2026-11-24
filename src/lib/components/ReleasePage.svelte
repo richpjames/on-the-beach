@@ -640,10 +640,15 @@
   // prose.
   onMount(() => {
     if (currentNotes && isAtLeastASentence(currentNotes)) return;
+    const notesAtRequest = currentNotes;
     apiFetch(`/api/release/notes-lookup/${item.id}`, { method: "POST" })
       .then((r) => (r.ok ? r.json() : null))
       .then((result) => {
         if (!result?.notes) return;
+        // Notes saved while the lookup was in flight win — apply only when
+        // nothing has changed since the ask, the client-side mirror of the
+        // server's guarded write.
+        if (currentNotes !== notesAtRequest) return;
         currentNotes = result.notes;
         // Fill the edit form's notes gap-only, as the link form fills artwork
         // and label: an enrichment that lands while the form is open must not

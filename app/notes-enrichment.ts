@@ -12,6 +12,7 @@ import {
   composeEnrichedNotes,
   defaultRankForHost,
   isAtLeastASentence,
+  isKnownLinkSource,
   linkSourceForUrl,
 } from "../domain/link-sources";
 
@@ -22,7 +23,10 @@ import {
 // the work: a Wikipedia article, a Pitchfork review, an AllMusic entry, the
 // band's own page. When an item's notes are empty (or less than a sentence),
 // the highest-ranked link's page is fetched and its first paragraph stored as
-// the notes, with a "From X (url)" provenance line. Rankings are the user's —
+// the notes, with a "From X (url)" provenance line. A curated host's scoped
+// article body is trusted; an unrecognised host's paragraph must read as a
+// sentence first, so player-page boilerplate doesn't become notes. Rankings
+// are the user's —
 // recorded per host as links are met, re-rankable on /admin — and even a
 // rank-0 link is fetched when nothing better is attached.
 //
@@ -269,9 +273,24 @@ export async function enrichNotesForItem(
   // Strict `>` keeps MusicBrainz's own ordering on a tie.
   const best = candidates.reduce((a, b) => (rankOf(b) > rankOf(a) ? b : a));
 
-  const html = await deps.fetchHtml(best.url);
+  // A page-level failure is a settled miss, not an error: the fetch already
+  // degrades to null on its own, and a thrown one (a reset, a TLS failure)
+  // must not surface as a 500 or leave the item re-fetching on every view.
+  let html: string | null;
+  try {
+    html = await deps.fetchHtml(best.url);
+  } catch (err) {
+    console.error("[notes-enrichment] page fetch failed for item", itemId, best.url, err);
+    html = null;
+  }
   const paragraph = html ? deps.extractParagraph(html, best.host) : null;
-  if (!paragraph) {
+  // A curated host's paragraph comes from its scoped article body and is
+  // trusted. An unrecognised host has no wrapper to scope to, so its first
+  // paragraph must read as a sentence before it may become notes — a player
+  // page's cookie banner or nav furniture is not prose.
+  const usable =
+    paragraph !== null && (isKnownLinkSource(best.host) || isAtLeastASentence(paragraph));
+  if (!usable) {
     await deps.stamp(itemId);
     return { kind: "result", notes: null, source: null };
   }
@@ -291,11 +310,15 @@ export async function enrichNotesForItem(
  * and never blocks the caller — fetching a review page can take seconds.
  * No-ops under `OTB_DISABLE_EXTERNAL_LOOKUPS` (tests); the remaining skip
  * rules are enforced by the core enrichment.
+ *
+ * Routed through the on-view lookup so both triggers share one in-flight
+ * ask: adding a release and opening it right away is a single enrichment,
+ * and the page sees the eager run's result instead of a stale "no change".
  */
 export function enrichNotesInBackground(itemId: number): void {
   if (process.env.OTB_DISABLE_EXTERNAL_LOOKUPS) return;
 
-  void enrichNotesForItem(itemId).catch((err) => {
+  void lookupNotesForItem(itemId).catch((err) => {
     console.error("[notes-enrichment] eager enrichment failed for item", itemId, err);
   });
 }

@@ -8,7 +8,9 @@ import { decodeHtmlEntities } from "./html-metadata";
 // hatnotes and empty template shells. Scope to the wrapper first, then take
 // the first paragraph that strips to real text. An unknown host gets the
 // whole document and a minimum length, so a navigation fragment doesn't read
-// as prose.
+// as prose. Consent notices and site chrome are stripped before the pick,
+// and a paragraph that reads as a cookie banner is skipped even though it
+// is sentence-shaped.
 // ---------------------------------------------------------------------------
 
 /** Where each known host's article body starts, as an HTML fragment to find. */
@@ -23,6 +25,39 @@ const SITE_SCOPES: Record<string, string> = {
 /** Below this, an unscoped paragraph is more likely furniture than prose. */
 const MIN_GENERIC_PARAGRAPH_CHARS = 40;
 
+/**
+ * Page chrome and consent banners are furniture, not prose: a cookie notice
+ * is usually the first paragraph-shaped thing in an unscoped document. Strip
+ * the containers before picking. Best-effort — a banner whose nested markup
+ * escapes the block match is still caught by `isConsentBoilerplate` below.
+ * (JavaScript-injected consent managers never arrive at all: the fetch reads
+ * static HTML.)
+ */
+const CHROME_BLOCKS = /<(header|footer|nav|aside|dialog)\b[^>]*>[\s\S]*?<\/\1>/gi;
+const CONSENT_BLOCKS =
+  /<(div|section)\b[^>]*(cookie|consent|gdpr|onetrust|cookiebot|quantcast|truste|didomi|sp_message|cmp-)[^>]*>[\s\S]*?<\/\1>/gi;
+
+/**
+ * Whether a paragraph reads as a consent notice rather than prose about the
+ * record. Cookie banners are sentences, so the sentence gate alone accepts
+ * them; but they nearly always name cookies or consent alongside what the
+ * site does with them, or tell the reader what continuing implies — phrasing
+ * an album paragraph has no business carrying.
+ */
+export function isConsentBoilerplate(text: string): boolean {
+  if (
+    /\b(cookies?|consent|gdpr)\b/i.test(text) &&
+    /\b(use|uses|using|accept|accepting|agree|policy|policies|preferences|settings|help|ensure|deliver|store|collect)\b/i.test(
+      text,
+    )
+  ) {
+    return true;
+  }
+  return /privacy (policy|notice|statement)|your privacy|by (continuing|clicking|using (this|our))/i.test(
+    text,
+  );
+}
+
 /** Strip a fragment to its text: no scripts, styles, citations or tags. */
 function htmlToText(fragment: string): string {
   const withoutBlocks = fragment
@@ -31,7 +66,13 @@ function htmlToText(fragment: string): string {
     // Wikipedia's citation markers — [1] is not part of the sentence.
     .replace(/<sup\b[\s\S]*?<\/sup>/gi, "")
     .replace(/<!--[\s\S]*?-->/g, "");
-  const withoutTags = withoutBlocks.replace(/<[^>]+>/g, "");
+  // Line and block breaks become spaces before the tags go, or words on
+  // either side of a <br> or a block boundary would glue together
+  // ("Foo<br>bar" → "Foobar"). The later whitespace collapse keeps it tidy.
+  const withoutTags = withoutBlocks
+    .replace(/<br\s*\/?>/gi, " ")
+    .replace(/<\/?(?:p|div|li|h[1-6]|blockquote|hr)\b[^>]*>/gi, " ")
+    .replace(/<[^>]+>/g, "");
   return decodeHtmlEntities(withoutTags)
     .replace(/&nbsp;/gi, " ")
     .replace(/\s+/g, " ")
@@ -46,13 +87,15 @@ function htmlToText(fragment: string): string {
 export function extractFirstParagraph(html: string, host: string): string | null {
   const scope = SITE_SCOPES[host];
   const scoped = scope ? html.indexOf(scope) : -1;
-  const body = scoped >= 0 ? html.slice(scoped) : html;
+  const body = (scoped >= 0 ? html.slice(scoped) : html)
+    .replace(CHROME_BLOCKS, "")
+    .replace(CONSENT_BLOCKS, "");
   const minChars = scoped >= 0 ? 1 : MIN_GENERIC_PARAGRAPH_CHARS;
 
   const paragraphs = body.match(/<p\b[^>]*>[\s\S]*?<\/p>/gi) ?? [];
   for (const paragraph of paragraphs) {
     const text = htmlToText(paragraph);
-    if (text.length >= minChars) return text;
+    if (text.length >= minChars && !isConsentBoilerplate(text)) return text;
   }
   return null;
 }
