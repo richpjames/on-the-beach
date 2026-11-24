@@ -14,17 +14,18 @@ describe("extractFirstParagraph — Pitchfork", () => {
   );
 
   test("the lead paragraph of the review body, not the score furniture", () => {
-    const paragraph = extractFirstParagraph(fixture, "pitchfork.com");
-    expect(paragraph).toStartWith("Like many music lovers of a certain age");
-    expect(paragraph).toContain("hitting play.");
-    expect(paragraph).not.toContain("Reader Score");
+    const paragraph = extractFirstParagraph(fixture, "pitchfork.com")!;
+    expect(paragraph.scoped).toBe(true);
+    expect(paragraph.text).toStartWith("Like many music lovers of a certain age");
+    expect(paragraph.text).toContain("hitting play.");
+    expect(paragraph.text).not.toContain("Reader Score");
   });
 
   test("entities are decoded and tags stripped", () => {
     const paragraph = extractFirstParagraph(fixture, "pitchfork.com")!;
-    expect(paragraph).toContain("can't remember");
-    expect(paragraph).not.toContain("<");
-    expect(paragraph).not.toContain("&#x27;");
+    expect(paragraph.text).toContain("can't remember");
+    expect(paragraph.text).not.toContain("<");
+    expect(paragraph.text).not.toContain("&#x27;");
   });
 });
 
@@ -35,10 +36,11 @@ describe("extractFirstParagraph — Wikipedia", () => {
   );
 
   test("the lead paragraph, past the hatnote and empty template shells", () => {
-    const paragraph = extractFirstParagraph(fixture, "wikipedia.org");
-    expect(paragraph).toStartWith("In Rainbows is the seventh studio album");
-    expect(paragraph).toContain("by the English rock band Radiohead.");
-    expect(paragraph).not.toContain("For the video album, see");
+    const paragraph = extractFirstParagraph(fixture, "wikipedia.org")!;
+    expect(paragraph.scoped).toBe(true);
+    expect(paragraph.text).toStartWith("In Rainbows is the seventh studio album");
+    expect(paragraph.text).toContain("by the English rock band Radiohead.");
+    expect(paragraph.text).not.toContain("For the video album, see");
   });
 
   test("citation markers and wiki link markup are stripped", () => {
@@ -46,7 +48,7 @@ describe("extractFirstParagraph — Wikipedia", () => {
       '<div class="mw-parser-output">' +
       '<p>Some claim.<sup id="cite_ref-1" class="reference"><a href="#cite_note-1">[1]</a></sup></p>' +
       "</div>";
-    expect(extractFirstParagraph(html, "wikipedia.org")).toBe("Some claim.");
+    expect(extractFirstParagraph(html, "wikipedia.org")?.text).toBe("Some claim.");
   });
 });
 
@@ -55,7 +57,7 @@ describe("extractFirstParagraph — cleaning and scoping rules", () => {
     const html =
       "<style>.x{color:red}</style><script>var a = 1;</script>" +
       '<div class="review"><p>The actual review text.</p></div>';
-    expect(extractFirstParagraph(html, "allmusic.com")).toBe("The actual review text.");
+    expect(extractFirstParagraph(html, "allmusic.com")?.text).toBe("The actual review text.");
   });
 
   test("empty paragraphs are skipped for the first real one", () => {
@@ -65,20 +67,20 @@ describe("extractFirstParagraph — cleaning and scoping rules", () => {
       "<p>   </p>" +
       "<p>The lead.</p>" +
       "</div>";
-    expect(extractFirstParagraph(html, "wikipedia.org")).toBe("The lead.");
+    expect(extractFirstParagraph(html, "wikipedia.org")?.text).toBe("The lead.");
   });
 
   test("paragraphs before the scoped wrapper are ignored", () => {
     const html =
       "<p>Navigation furniture that is quite long enough to pass as prose.</p>" +
       '<div class="body__inner-container"><p>The review itself.</p></div>';
-    expect(extractFirstParagraph(html, "pitchfork.com")).toBe("The review itself.");
+    expect(extractFirstParagraph(html, "pitchfork.com")?.text).toBe("The review itself.");
   });
 
   test("an unknown host reads the whole document, skipping short fragments", () => {
     const html =
       "<p>Menu</p><p>A paragraph of prose long enough to clear the bar for an unknown source.</p>";
-    expect(extractFirstParagraph(html, "theguardian.com")).toBe(
+    expect(extractFirstParagraph(html, "theguardian.com")?.text).toBe(
       "A paragraph of prose long enough to clear the bar for an unknown source.",
     );
   });
@@ -91,21 +93,36 @@ describe("extractFirstParagraph — cleaning and scoping rules", () => {
   test("a known host whose wrapper is missing falls back to the whole document", () => {
     const html =
       "<p>A paragraph of prose long enough to clear the bar when the wrapper is absent.</p>";
-    expect(extractFirstParagraph(html, "allmusic.com")).toBe(
-      "A paragraph of prose long enough to clear the bar when the wrapper is absent.",
-    );
+    expect(extractFirstParagraph(html, "allmusic.com")).toEqual({
+      text: "A paragraph of prose long enough to clear the bar when the wrapper is absent.",
+      scoped: false,
+    });
+  });
+
+  test("the unscoped fallback keeps the minimum length even for a known host", () => {
+    expect(extractFirstParagraph("<p>Too short.</p>", "allmusic.com")).toBeNull();
+  });
+
+  test("a scoped pick reports scoped; a fallback or unknown host does not", () => {
+    const scopedHtml = '<div class="review"><p>The actual review text.</p></div>';
+    expect(extractFirstParagraph(scopedHtml, "allmusic.com")).toEqual({
+      text: "The actual review text.",
+      scoped: true,
+    });
+    const prose = "A paragraph of prose long enough to clear the bar for an unknown source.";
+    expect(extractFirstParagraph(`<p>${prose}</p>`, "theguardian.com")?.scoped).toBe(false);
   });
 
   test("whitespace collapses to single spaces", () => {
     const html = '<div class="review"><p>One\n  line\twith   gaps.</p></div>';
-    expect(extractFirstParagraph(html, "allmusic.com")).toBe("One line with gaps.");
+    expect(extractFirstParagraph(html, "allmusic.com")?.text).toBe("One line with gaps.");
   });
 
   test("line and block breaks separate words instead of gluing them", () => {
     const breaks = '<div class="review"><p>Foo<br>bar<br/>baz</p></div>';
-    expect(extractFirstParagraph(breaks, "allmusic.com")).toBe("Foo bar baz");
+    expect(extractFirstParagraph(breaks, "allmusic.com")?.text).toBe("Foo bar baz");
     const blocks = '<div class="review"><p>One<div>two</div>three</p></div>';
-    expect(extractFirstParagraph(blocks, "allmusic.com")).toBe("One two three");
+    expect(extractFirstParagraph(blocks, "allmusic.com")?.text).toBe("One two three");
   });
 });
 
@@ -118,7 +135,7 @@ describe("extractFirstParagraph — consent and chrome furniture", () => {
       "<p>We use cookies to ensure you get the best experience on our website.</p>" +
       "</div></div>" +
       `<p>${PROSE}</p>`;
-    expect(extractFirstParagraph(html, "theguardian.com")).toBe(PROSE);
+    expect(extractFirstParagraph(html, "theguardian.com")?.text).toBe(PROSE);
   });
 
   test("a banner whose nested markup escapes the block match is caught by its text", () => {
@@ -126,21 +143,21 @@ describe("extractFirstParagraph — consent and chrome furniture", () => {
       '<div class="cookie-consent"><div>x</div>' +
       "<p>This site uses cookies to deliver our services.</p></div>" +
       `<p>${PROSE}</p>`;
-    expect(extractFirstParagraph(html, "theguardian.com")).toBe(PROSE);
+    expect(extractFirstParagraph(html, "theguardian.com")?.text).toBe(PROSE);
   });
 
   test("a bare consent paragraph with no wrapper is skipped", () => {
     const html =
       "<p>We use cookies. By continuing to browse you accept our privacy policy.</p>" +
       `<p>${PROSE}</p>`;
-    expect(extractFirstParagraph(html, "theguardian.com")).toBe(PROSE);
+    expect(extractFirstParagraph(html, "theguardian.com")?.text).toBe(PROSE);
   });
 
   test("a privacy notice without the word cookies is still boilerplate", () => {
     const html =
       "<p>We value your privacy and collect data to improve our services.</p>" +
       `<p>${PROSE}</p>`;
-    expect(extractFirstParagraph(html, "theguardian.com")).toBe(PROSE);
+    expect(extractFirstParagraph(html, "theguardian.com")?.text).toBe(PROSE);
   });
 
   test("site chrome never supplies the paragraph", () => {
@@ -148,13 +165,13 @@ describe("extractFirstParagraph — consent and chrome furniture", () => {
       "<header><p>The site tagline, long enough to clear the bar for an unknown source.</p></header>" +
       "<nav><p>Menu items and navigation fragments long enough to pass the bar.</p></nav>" +
       `<p>${PROSE}</p>`;
-    expect(extractFirstParagraph(html, "theguardian.com")).toBe(PROSE);
+    expect(extractFirstParagraph(html, "theguardian.com")?.text).toBe(PROSE);
   });
 
   test("prose that merely mentions cookies is still prose", () => {
     const html =
       "<p>The band handed out cookies at the gate, a joke that became the album's title.</p>";
-    expect(extractFirstParagraph(html, "theguardian.com")).toBe(
+    expect(extractFirstParagraph(html, "theguardian.com")?.text).toBe(
       "The band handed out cookies at the gate, a joke that became the album's title.",
     );
   });

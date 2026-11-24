@@ -65,7 +65,7 @@ function fakeDeps(overrides: Partial<NotesEnrichmentDeps> = {}): NotesEnrichment
     recordSource: mock(async () => {}),
     getRanks: mock(async () => new Map<string, number>()),
     fetchHtml: mock(async () => "<p>the page</p>"),
-    extractParagraph: mock(() => "A paragraph."),
+    extractParagraph: mock(() => ({ text: "A paragraph.", scoped: true })),
     writeNotes: mock(async () => true),
     stamp: mock(async () => {}),
     ...overrides,
@@ -314,11 +314,11 @@ describe("enrichNotesForItem — writing the notes", () => {
   });
 });
 
-describe("enrichNotesForItem — the unknown-host sentence gate", () => {
+describe("enrichNotesForItem — the sentence gate for untrusted paragraphs", () => {
   test("an unknown host's boilerplate is not ingested", async () => {
     const deps = fakeDeps({
       fetchUrlRelations: mock(async () => [{ type: "official", url: GUARDIAN_URL }]),
-      extractParagraph: mock(() => "We use cookies to improve your experience"),
+      extractParagraph: mock(() => ({ text: "We use cookies to improve your experience", scoped: false })),
     });
     expect(await enrichNotesForItem(1, deps)).toEqual({
       kind: "result",
@@ -332,7 +332,10 @@ describe("enrichNotesForItem — the unknown-host sentence gate", () => {
   test("an unknown host's sentence-shaped paragraph is ingested", async () => {
     const deps = fakeDeps({
       fetchUrlRelations: mock(async () => [{ type: "official", url: GUARDIAN_URL }]),
-      extractParagraph: mock(() => "In Rainbows arrived as a pay-what-you-want download."),
+      extractParagraph: mock(() => ({
+        text: "In Rainbows arrived as a pay-what-you-want download.",
+        scoped: false,
+      })),
     });
     const outcome = await enrichNotesForItem(1, deps);
     expect(outcome.kind).toBe("result");
@@ -343,9 +346,40 @@ describe("enrichNotesForItem — the unknown-host sentence gate", () => {
     );
   });
 
-  test("a curated host's paragraph is trusted without the sentence gate", async () => {
+  test("a curated host's scoped paragraph is trusted without the sentence gate", async () => {
     const deps = fakeDeps({
-      extractParagraph: mock(() => "In Rainbows is the seventh studio album by Radiohead"),
+      extractParagraph: mock(() => ({
+        text: "In Rainbows is the seventh studio album by Radiohead",
+        scoped: true,
+      })),
+    });
+    const outcome = await enrichNotesForItem(1, deps);
+    expect(outcome.kind).toBe("result");
+    expect(deps.writeNotes).toHaveBeenCalled();
+  });
+
+  test("a curated host whose wrapper vanished is gated like an unknown host", async () => {
+    const deps = fakeDeps({
+      extractParagraph: mock(() => ({
+        text: "In Rainbows is the seventh studio album by Radiohead",
+        scoped: false,
+      })),
+    });
+    expect(await enrichNotesForItem(1, deps)).toEqual({
+      kind: "result",
+      notes: null,
+      source: null,
+    });
+    expect(deps.writeNotes).not.toHaveBeenCalled();
+    expect(deps.stamp).toHaveBeenCalledWith(1);
+  });
+
+  test("a curated host's unscoped fallback still ingests when it reads as a sentence", async () => {
+    const deps = fakeDeps({
+      extractParagraph: mock(() => ({
+        text: "In Rainbows is the seventh studio album by Radiohead.",
+        scoped: false,
+      })),
     });
     const outcome = await enrichNotesForItem(1, deps);
     expect(outcome.kind).toBe("result");
@@ -432,7 +466,10 @@ describe("enrichNotesForItem — against the database", () => {
         { type: "wikipedia", url: WIKI_URL },
       ],
       fetchHtml: async () => "<p>the page</p>",
-      extractParagraph: () => "In Rainbows is the seventh studio album by Radiohead.",
+      extractParagraph: () => ({
+        text: "In Rainbows is the seventh studio album by Radiohead.",
+        scoped: true,
+      }),
     };
 
     const outcome = await enrichNotesForItem(created.id, deps);
