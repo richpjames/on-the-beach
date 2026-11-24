@@ -80,22 +80,31 @@ function htmlToText(fragment: string): string {
 }
 
 /**
+ * The picked paragraph, and whether it came from the host's article wrapper.
+ * A curated host whose wrapper has vanished (a markup change, an AMP variant,
+ * an interstitial) falls back to the whole document; the caller uses `scoped`
+ * to decide whether that fallback may be trusted without further checks.
+ */
+export type ExtractedParagraph = { text: string; scoped: boolean };
+
+/**
  * The first paragraph of prose in the page, or null when none survives the
  * cleaning. `host` is the bare source key (see domain/link-sources.ts) — it
  * picks the wrapper to scope to, not the URL's own hostname.
  */
-export function extractFirstParagraph(html: string, host: string): string | null {
+export function extractFirstParagraph(html: string, host: string): ExtractedParagraph | null {
   const scope = SITE_SCOPES[host];
-  const scoped = scope ? html.indexOf(scope) : -1;
-  const body = (scoped >= 0 ? html.slice(scoped) : html)
+  const scopeAt = scope ? html.indexOf(scope) : -1;
+  const scoped = scopeAt >= 0;
+  const body = (scoped ? html.slice(scopeAt) : html)
     .replace(CHROME_BLOCKS, "")
     .replace(CONSENT_BLOCKS, "");
-  const minChars = scoped >= 0 ? 1 : MIN_GENERIC_PARAGRAPH_CHARS;
+  const minChars = scoped ? 1 : MIN_GENERIC_PARAGRAPH_CHARS;
 
   const paragraphs = body.match(/<p\b[^>]*>[\s\S]*?<\/p>/gi) ?? [];
   for (const paragraph of paragraphs) {
     const text = htmlToText(paragraph);
-    if (text.length >= minChars && !isConsentBoilerplate(text)) return text;
+    if (text.length >= minChars && !isConsentBoilerplate(text)) return { text, scoped };
   }
   return null;
 }

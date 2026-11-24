@@ -7,7 +7,7 @@ import {
   type MbUrlRelation,
 } from "../adapters/musicbrainz/index";
 import { fetchPageHtml, MAX_REVIEW_BYTES } from "../adapters/web/fetch-page";
-import { extractFirstParagraph } from "../adapters/web/first-paragraph";
+import { extractFirstParagraph, type ExtractedParagraph } from "../adapters/web/first-paragraph";
 import {
   composeEnrichedNotes,
   defaultRankForHost,
@@ -150,7 +150,7 @@ export type FetchUrlRelationsFn = (releaseGroupId: string) => Promise<MbUrlRelat
 export type RecordSourceFn = (host: string, displayName: string) => Promise<void>;
 export type GetRanksFn = () => Promise<Map<string, number>>;
 export type FetchHtmlFn = (url: string) => Promise<string | null>;
-export type ExtractParagraphFn = (html: string, host: string) => string | null;
+export type ExtractParagraphFn = (html: string, host: string) => ExtractedParagraph | null;
 export type WriteNotesFn = (
   itemId: number,
   notes: string,
@@ -283,19 +283,19 @@ export async function enrichNotesForItem(
     console.error("[notes-enrichment] page fetch failed for item", itemId, best.url, err);
     html = null;
   }
-  const paragraph = html ? deps.extractParagraph(html, best.host) : null;
-  // A curated host's paragraph comes from its scoped article body and is
-  // trusted. An unrecognised host has no wrapper to scope to, so its first
-  // paragraph must read as a sentence before it may become notes — a player
-  // page's cookie banner or nav furniture is not prose.
-  const usable =
-    paragraph !== null && (isKnownLinkSource(best.host) || isAtLeastASentence(paragraph));
-  if (!usable) {
+  const extracted = html ? deps.extractParagraph(html, best.host) : null;
+  // A curated host's paragraph is trusted only when it actually came from
+  // the scoped article body. When the wrapper is missing (a markup change,
+  // an AMP variant, an interstitial) the pick falls back to the whole
+  // document, and that fallback must read as a sentence before it may
+  // become notes — the same gate an unrecognised host passes.
+  const trusted = extracted !== null && isKnownLinkSource(best.host) && extracted.scoped;
+  if (!extracted || (!trusted && !isAtLeastASentence(extracted.text))) {
     await deps.stamp(itemId);
     return { kind: "result", notes: null, source: null };
   }
 
-  const notes = composeEnrichedNotes(item.notes, paragraph, best.displayName, best.url);
+  const notes = composeEnrichedNotes(item.notes, extracted.text, best.displayName, best.url);
   const written = await deps.writeNotes(itemId, notes, item.notes);
   await deps.stamp(itemId);
   return {
