@@ -4,6 +4,7 @@ import {
   defaultRankForHost,
   formatLinkSourceNote,
   isAtLeastASentence,
+  isKnownLinkSource,
   linkSourceForUrl,
 } from "../../domain/link-sources";
 
@@ -64,6 +65,16 @@ describe("defaultRankForHost", () => {
   test("everything else starts at 0", () => {
     expect(defaultRankForHost("theguardian.com")).toBe(0);
     expect(defaultRankForHost("bandcamp.com")).toBe(0);
+  });
+});
+
+describe("isKnownLinkSource", () => {
+  test("the curated three are known; every other host is not", () => {
+    expect(isKnownLinkSource("wikipedia.org")).toBe(true);
+    expect(isKnownLinkSource("pitchfork.com")).toBe(true);
+    expect(isKnownLinkSource("allmusic.com")).toBe(true);
+    expect(isKnownLinkSource("theguardian.com")).toBe(false);
+    expect(isKnownLinkSource("spotify.com")).toBe(false);
   });
 });
 

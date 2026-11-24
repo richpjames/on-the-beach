@@ -62,6 +62,15 @@ export function defaultRankForHost(host: string): number {
 }
 
 /**
+ * Whether the host is a curated source whose article body the extractor knows
+ * how to scope. An unrecognised host has no such wrapper to trust, so its
+ * paragraph is held to the sentence test before it may become notes.
+ */
+export function isKnownLinkSource(host: string): boolean {
+  return KNOWN_LINK_SOURCES.some((known) => known.host === host);
+}
+
+/**
  * Whether a note already reads as at least one sentence — the bar the user
  * set for leaving existing notes alone. A sentence ends in a terminator
  * followed by whitespace or the end of the text (optionally behind a closing
