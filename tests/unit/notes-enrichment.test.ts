@@ -466,12 +466,14 @@ describe("enrichNotesForItem — against the database", () => {
 describe("the eager hook and the on-view lookup", () => {
   // Both triggers settle through the same in-flight map, so adding a release
   // and opening it right away is one ask. The flag is lifted for these tests
-  // only; the items carry no MusicBrainz ids, so nothing reaches the network.
-  function withLookupsEnabled<T>(run: () => T): T {
+  // only, and stays lifted until the callback settles — a sync helper would
+  // restore it at the first await and leave the rest of the test guarded.
+  // The items carry no MusicBrainz ids, so nothing reaches the network.
+  async function withLookupsEnabled<T>(run: () => Promise<T>): Promise<T> {
     const prev = process.env.OTB_DISABLE_EXTERNAL_LOOKUPS;
     delete process.env.OTB_DISABLE_EXTERNAL_LOOKUPS;
     try {
-      return run();
+      return await run();
     } finally {
       if (prev === undefined) delete process.env.OTB_DISABLE_EXTERNAL_LOOKUPS;
       else process.env.OTB_DISABLE_EXTERNAL_LOOKUPS = prev;
