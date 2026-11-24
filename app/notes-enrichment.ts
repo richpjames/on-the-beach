@@ -175,7 +175,13 @@ async function defaultResolveGroupId(releaseId: string): Promise<string | null> 
 }
 
 async function defaultFetchHtml(url: string): Promise<string | null> {
-  return fetchPageHtml(url, 10_000, { maxBytes: MAX_REVIEW_BYTES, stopAt: "</body>" });
+  // The URL came from a MusicBrainz editor, not the user: every hop must
+  // resolve to a public address, or the fetch settles as a miss.
+  return fetchPageHtml(url, 10_000, {
+    maxBytes: MAX_REVIEW_BYTES,
+    stopAt: "</body>",
+    publicHostsOnly: true,
+  });
 }
 
 export const defaultNotesEnrichmentDeps: NotesEnrichmentDeps = {

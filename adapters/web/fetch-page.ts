@@ -7,6 +7,9 @@
  * source's business.
  */
 
+import { lookup } from "node:dns/promises";
+import { isPublicIpAddress } from "../../domain/ip-address";
+
 /** Enough for any `<head>`, OG tags included. */
 export const MAX_HEAD_BYTES = 100_000;
 
@@ -25,6 +28,52 @@ export interface FetchPageOptions {
   maxBytes: number;
   /** Stop once this marker has been seen (`"</head>"` or `"</body>"`). */
   stopAt: "</head>" | "</body>";
+  /**
+   * Refuse any host — or redirect hop — that resolves to a non-public
+   * address. For pages whose URL a third party chose (MusicBrainz url-rels
+   * are editable by anyone): a public-looking name can answer with loopback
+   * or a private address, and a redirect can aim the fetch there too.
+   */
+  publicHostsOnly?: boolean;
+}
+
+const PAGE_HEADERS = {
+  "User-Agent": "Mozilla/5.0 (compatible; MusicBot/1.0)",
+  Accept: "text/html",
+};
+
+/** Redirect hops followed under `publicHostsOnly` before giving up. */
+const MAX_PUBLIC_REDIRECTS = 5;
+
+/**
+ * Fetch with every hop checked against the resolver: the name must answer
+ * with public addresses only, and each redirect is re-checked the same way
+ * before it is followed. A refusal throws — the caller settles it as a miss.
+ */
+async function fetchPublicPage(url: string, signal: AbortSignal): Promise<Response> {
+  let current = url;
+  for (let hop = 0; ; hop++) {
+    const parsed = new URL(current);
+    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+      throw new Error(`refusing non-http(s) URL: ${current}`);
+    }
+    const hostname = parsed.hostname.replace(/^\[|\]$/g, "");
+    // Resolve before connecting. An IP literal answers with itself; a name
+    // answers with every address it has — one private answer is enough to
+    // refuse, since the connection could pick any of them.
+    const addresses = await lookup(hostname, { all: true, verbatim: true });
+    if (addresses.length === 0 || addresses.some((a) => !isPublicIpAddress(a.address))) {
+      throw new Error(`refusing non-public address for ${hostname}`);
+    }
+    const response = await fetch(current, { signal, redirect: "manual", headers: PAGE_HEADERS });
+    const location = response.headers.get("location");
+    if (response.status >= 300 && response.status < 400 && location) {
+      if (hop >= MAX_PUBLIC_REDIRECTS) throw new Error("too many redirects");
+      current = new URL(location, current).toString();
+      continue;
+    }
+    return response;
+  }
 }
 
 /**
@@ -37,19 +86,21 @@ export interface FetchPageOptions {
 export async function fetchPageHtml(
   url: string,
   timeoutMs: number,
-  { maxBytes, stopAt }: FetchPageOptions,
+  { maxBytes, stopAt, publicHostsOnly = false }: FetchPageOptions,
 ): Promise<string | null> {
   try {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeoutMs);
 
-    const response = await fetch(url, {
-      signal: controller.signal,
-      headers: {
-        "User-Agent": "Mozilla/5.0 (compatible; MusicBot/1.0)",
-        Accept: "text/html",
-      },
-    });
+    let response: Response;
+    try {
+      response = publicHostsOnly
+        ? await fetchPublicPage(url, controller.signal)
+        : await fetch(url, { signal: controller.signal, headers: PAGE_HEADERS });
+    } catch (err) {
+      clearTimeout(timer);
+      throw err;
+    }
 
     clearTimeout(timer);
 
