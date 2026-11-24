@@ -253,3 +253,36 @@ describe("extractFirstParagraph — consent and chrome furniture", () => {
     );
   });
 });
+
+describe("extractFirstParagraph — unclosed furniture is a linear read", () => {
+  // The page is attacker-chosen (MusicBrainz url-rels are editable by
+  // anyone). Without the end anchor, every unclosed opener costs a full
+  // lazy scan of the remaining text — a wall of openers is quadratic,
+  // minutes of synchronous regex on the one event loop. These inputs are
+  // sized so the old scans would run for minutes; the end-anchored strips
+  // must settle them in milliseconds. The generous bound is the guard.
+  const PROSE = "A paragraph of prose long enough to clear the bar for an unknown source.";
+
+  test("a wall of unclosed nav openers settles as a miss, instantly", () => {
+    const html = "<nav>".repeat(100_000) + `<p>${PROSE}</p>`;
+    const started = performance.now();
+    // The first unclosed nav reads to the end, as a browser would: the
+    // prose after it is inside the nav, and no paragraph survives.
+    expect(extractFirstParagraph(html, "theguardian.com")).toBeNull();
+    expect(performance.now() - started).toBeLessThan(2_000);
+  });
+
+  test("a wall of unclosed consent containers settles as a miss, instantly", () => {
+    const html = '<div class="cookie-banner">'.repeat(30_000) + `<p>${PROSE}</p>`;
+    const started = performance.now();
+    expect(extractFirstParagraph(html, "theguardian.com")).toBeNull();
+    expect(performance.now() - started).toBeLessThan(2_000);
+  });
+
+  test("a wall of unclosed citation markers inside a paragraph keeps the prose before it", () => {
+    const html = `<p>${PROSE}` + "<sup>".repeat(50_000);
+    const started = performance.now();
+    expect(extractFirstParagraph(html, "theguardian.com")?.text).toBe(PROSE);
+    expect(performance.now() - started).toBeLessThan(2_000);
+  });
+});

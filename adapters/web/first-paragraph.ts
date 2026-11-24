@@ -33,10 +33,16 @@ const MIN_GENERIC_PARAGRAPH_CHARS = 40;
  * escapes the block match is still caught by `isConsentBoilerplate` below.
  * (JavaScript-injected consent managers never arrive at all: the fetch reads
  * static HTML.)
+ *
+ * The end anchor matters on hostile markup: without it, every unclosed
+ * opener costs a full lazy scan of the remaining text, so a page of unclosed
+ * `<nav>`s is quadratic — minutes of synchronous regex on the one event
+ * loop. With it, an unclosed container is stripped to the end in one pass,
+ * as a browser would read it, and the whole read stays linear.
  */
-const CHROME_BLOCKS = /<(header|footer|nav|aside|dialog)\b[^>]*>[\s\S]*?<\/\1>/gi;
+const CHROME_BLOCKS = /<(header|footer|nav|aside|dialog)\b[^>]*>[\s\S]*?(?:<\/\1>|$)/gi;
 const CONSENT_BLOCKS =
-  /<(div|section)\b[^>]*(cookie|consent|gdpr|onetrust|cookiebot|quantcast|truste|didomi|sp_message|cmp-)[^>]*>[\s\S]*?<\/\1>/gi;
+  /<(div|section)\b[^>]*(cookie|consent|gdpr|onetrust|cookiebot|quantcast|truste|didomi|sp_message|cmp-)[^>]*>[\s\S]*?(?:<\/\1>|$)/gi;
 
 /**
  * Whether a paragraph reads as a consent notice rather than prose about the
@@ -61,12 +67,15 @@ export function isConsentBoilerplate(text: string): boolean {
 
 /** Strip a fragment to its text: no scripts, styles, citations or tags. */
 function htmlToText(fragment: string): string {
+  // End-anchored like the document-level cleaning: an unclosed block (the
+  // byte cap can cut mid-tag) goes to the end in one pass, never a rescan
+  // per opener on a fragment full of unclosed tags.
   const withoutBlocks = fragment
-    .replace(/<script\b[\s\S]*?<\/script>/gi, "")
-    .replace(/<style\b[\s\S]*?<\/style>/gi, "")
+    .replace(/<script\b[\s\S]*?(?:<\/script>|$)/gi, "")
+    .replace(/<style\b[\s\S]*?(?:<\/style>|$)/gi, "")
     // Wikipedia's citation markers — [1] is not part of the sentence.
-    .replace(/<sup\b[\s\S]*?<\/sup>/gi, "")
-    .replace(/<!--[\s\S]*?-->/g, "");
+    .replace(/<sup\b[\s\S]*?(?:<\/sup>|$)/gi, "")
+    .replace(/<!--[\s\S]*?(?:-->|$)/g, "");
   // Line and block breaks become spaces before the tags go, or words on
   // either side of a <br> or a block boundary would glue together
   // ("Foo<br>bar" → "Foobar"). The later whitespace collapse keeps it tidy.
