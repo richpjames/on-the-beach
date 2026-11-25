@@ -150,6 +150,58 @@ function romanNumeralValue(token: string): number | null {
 }
 
 /**
+ * The value of a purely additive Roman spelling — letters in non-increasing
+ * order, summed — or null when the token is not one. This reads the non-canonical
+ * forms a sleeve sometimes uses where the canonical regex refuses: "IIII" for 4
+ * (the clock-face four), "VIIII" for 9. A rise in value ("vx", "il") is not an
+ * additive spelling and stays null, so the malformed strings the canonical rule
+ * rejects are not quietly admitted. Only consulted after a series marker (see
+ * `numberSequence`), never for a bare token.
+ */
+function additiveRomanValue(token: string): number | null {
+  if (!/^[ivxlcdm]+$/.test(token)) return null;
+  let total = 0;
+  let prev = Number.POSITIVE_INFINITY;
+  for (const letter of token) {
+    const value = ROMAN_VALUES[letter]!;
+    if (value > prev) return null;
+    total += value;
+    prev = value;
+  }
+  return total > 0 ? total : null;
+}
+
+/**
+ * Spelled-out volume numbers, English and Spanish, one to ten. Like the additive
+ * Roman forms these are only read after a series marker (see `numberSequence`),
+ * so "One Love" or "Dos Palmas" in a title never sprout a number — only "Part
+ * One" / "Parte Uno" do. The Spanish forms are here for the same reason the
+ * markers are: the catalogue is largely Latin American and Iberian.
+ */
+const WORD_NUMBERS: Record<string, number> = {
+  one: 1,
+  two: 2,
+  three: 3,
+  four: 4,
+  five: 5,
+  six: 6,
+  seven: 7,
+  eight: 8,
+  nine: 9,
+  ten: 10,
+  uno: 1,
+  dos: 2,
+  tres: 3,
+  cuatro: 4,
+  cinco: 5,
+  seis: 6,
+  siete: 7,
+  ocho: 8,
+  nueve: 9,
+  diez: 10,
+};
+
+/**
  * The numbers in a string, in order. Digits do not behave like letters here.
  * One letter apart is usually a typo or a transliteration; one digit apart is
  * a different record — "Guaco 76" and "Guaco 77" are 87% similar by edit
@@ -251,20 +303,24 @@ export function similarity(a: string, b: string, allowContainment = true): numbe
 
 /**
  * Every number a string carries, read notation-independently and in token
- * order: the Arabic digit runs plus the value of each token that is a canonical
- * Roman numeral. "…II (1979)" and "…Vol. II (1979)" both read "2 1979"; "…II"
- * and "…Vol. 2" both read "2".
+ * order: the Arabic digit runs, the value of each token that is a canonical
+ * Roman numeral, and — only after a series marker — the additive Roman spellings
+ * ("IIII") and the spelled-out numbers ("Part One", "Parte Uno"). "…II (1979)"
+ * and "…Vol. II (1979)" both read "2 1979"; "…II" and "…Vol. 2" both read "2";
+ * "…Part I" and "…Part One" both read "1".
  *
  * This is the ceiling's escape hatch, consulted only when the marker-gated
  * signatures already disagree, and it can only relax the cap, never raise it.
- * The signatures disagree over notation in three shapes the folding must not
- * turn into wrong abstains: a provider drops the marker ("…II" vs "…Vol. II"),
- * the mirror of that with the Arabic side marked ("…II" vs "…Vol. 2"), and a
- * marker drop alongside another number both titles share ("…II (1979)" vs
- * "…Vol. II (1979)"). When the two sides carry the same numbers read either
- * way, the disagreement is notation, not volume, and the raw similarity stands.
- * Different numbers — "…II" vs "…Vol. III", "Guaco 76" vs "Guaco 77" — still
- * disagree here and keep the ceiling.
+ * The signatures disagree over notation in the shapes the folding must not turn
+ * into wrong abstains: a provider drops the marker ("…II" vs "…Vol. II"), the
+ * mirror of that with the Arabic side marked ("…II" vs "…Vol. 2"), a marker drop
+ * alongside another number both titles share ("…II (1979)" vs "…Vol. II (1979)"),
+ * and one side spelling the volume as a word or a non-canonical Roman where the
+ * other folds a canonical one ("…Part One" / "…Vol. IIII" vs "…Part I" / "…Vol.
+ * IV"). When the two sides carry the same numbers read either way, the
+ * disagreement is notation, not volume, and the raw similarity stands. Different
+ * numbers — "…II" vs "…Vol. III", "Guaco 76" vs "Guaco 77" — still disagree here
+ * and keep the ceiling.
  *
  * Order is kept, not sorted away: every notation-only shape above carries its
  * numbers in the same order, while the same values in swapped roles are
@@ -272,18 +328,31 @@ export function similarity(a: string, b: string, allowContainment = true): numbe
  * must keep the ceiling, exactly as the ordered digit signatures did before
  * the folding existed.
  *
- * Reading unmarked tokens as Roman is safe because of the gate above: letter
- * pairs that are valid Roman ("MC" = 1100, "CD" = 400) only reach this
- * comparison when a series marker made the signatures differ; without a
- * marker both sides sign empty and the ceiling never fires at all.
+ * The ambiguous readings are gated so they cannot invent numbers. Canonical
+ * Roman is read anywhere (a bare "II" dropped its marker), but letter pairs that
+ * are valid Roman ("MC" = 1100, "CD" = 400) only reach this comparison when a
+ * series marker made the signatures differ; without a marker both sides sign
+ * empty and the ceiling never fires at all. Additive Roman and word numbers are
+ * read only after a marker, so "One Love" or "IIII" sitting in a name never
+ * counts — only "Part One" / "Vol. IIII" do. `digitSignature` itself stays
+ * canonical-and-marked, so this wider vocabulary only ever relaxes a cap the
+ * strict signature raised; it never caps a pair the pre-folding rule matched.
  */
 function numberSequence(normalized: string): string {
+  const tokens = normalized.split(" ");
   const numbers: number[] = [];
-  for (const token of normalized.split(" ")) {
+  for (let i = 0; i < tokens.length; i += 1) {
+    const token = tokens[i]!;
     const runs = token.match(/\d+/g);
-    if (runs) numbers.push(...runs.map(Number));
-    const roman = romanNumeralValue(token);
-    if (roman !== null) numbers.push(roman);
+    if (runs) {
+      numbers.push(...runs.map(Number));
+      continue;
+    }
+    const marked = i > 0 && SERIES_MARKERS.has(tokens[i - 1]!);
+    const value =
+      romanNumeralValue(token) ??
+      (marked ? (additiveRomanValue(token) ?? WORD_NUMBERS[token] ?? null) : null);
+    if (value !== null && value !== undefined) numbers.push(value);
   }
   return numbers.join(" ");
 }

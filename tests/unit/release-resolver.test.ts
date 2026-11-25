@@ -611,6 +611,45 @@ describe("roman numeral volumes", () => {
     ).toBe(false);
   });
 
+  test("reads a spelled-out or non-canonical volume as the same number", () => {
+    // The fold signs a marked Roman numeral, but before this the escape hatch
+    // read only Arabic and canonical Roman, so "Part One" / "Vol. IIII" signed
+    // empty against "Part I" / "Vol. IV" and the pair was newly capped — both
+    // sides signed empty and matched before the folding existed. The wider
+    // vocabulary is marker-gated, so it only relaxes, never caps.
+    expect(
+      scoreCandidate(
+        { artist: "Sugar Minott", title: "Dance Hall Showcase Part I" },
+        { artist: "Sugar Minott", title: "Dance Hall Showcase Part One" },
+      ).accepted,
+    ).toBe(true);
+    expect(
+      scoreCandidate(
+        { artist: "Sugar Minott", title: "Dance Hall Showcase Vol. IV" },
+        { artist: "Sugar Minott", title: "Dance Hall Showcase Vol. IIII" },
+      ).accepted,
+    ).toBe(true);
+    expect(
+      scoreCandidate(
+        { artist: "Pipo", title: "O Encontro Parte I" },
+        { artist: "Pipo", title: "O Encontro Parte Uno" },
+      ).accepted,
+    ).toBe(true);
+    // A different number still caps, whichever notation each side uses.
+    expect(
+      scoreCandidate(
+        { artist: "Sugar Minott", title: "Dance Hall Showcase Part I" },
+        { artist: "Sugar Minott", title: "Dance Hall Showcase Part Two" },
+      ).accepted,
+    ).toBe(false);
+    expect(
+      scoreCandidate(
+        { artist: "Sugar Minott", title: "Dance Hall Showcase Vol. IIII" },
+        { artist: "Sugar Minott", title: "Dance Hall Showcase Vol. III" },
+      ).accepted,
+    ).toBe(false);
+  });
+
   test("a dropped marker does not forgive a different volume", () => {
     // The bypass is for notation only: "…II" against "…Vol. III" is a different
     // record, and relaxing the ceiling there would admit the exact wrong-volume

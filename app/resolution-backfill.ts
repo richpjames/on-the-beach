@@ -236,17 +236,26 @@ export async function findNumberedAbsentRows(limit: number | null): Promise<Numb
  * guard the shared resolution write applies. Returns only the rows whose
  * verdict was really reset — a guarded update that matched nothing is not a
  * requeue, and the caller's count must not overstate what was reopened.
+ *
+ * The reset is batched, not one statement per row: a catalogue-wide heal is a
+ * handful of guarded updates rather than thousands of sequential round trips.
+ * Each batch is chunked to stay well under SQLite's bound-parameter limit, and
+ * `returning` still yields exactly the ids really reset, so the count stays
+ * honest however the rows are grouped.
  */
 export async function requeueNumberedAbsents(limit: number | null): Promise<NumberedAbsentRow[]> {
   const rows = await findNumberedAbsentRows(limit);
-  const requeued: NumberedAbsentRow[] = [];
-  for (const row of rows) {
+  if (rows.length === 0) return [];
+  const reset = new Set<number>();
+  const CHUNK = 500;
+  for (let i = 0; i < rows.length; i += CHUNK) {
+    const ids = rows.slice(i, i + CHUNK).map((row) => row.id);
     const updated = await db
       .update(musicItems)
       .set({ resolutionStatus: null, resolutionAttemptedAt: null })
       .where(
         and(
-          eq(musicItems.id, row.id),
+          inArray(musicItems.id, ids),
           eq(musicItems.resolutionStatus, "absent"),
           isNull(musicItems.musicbrainzReleaseId),
           isNull(musicItems.musicbrainzReleaseGroupId),
@@ -255,7 +264,7 @@ export async function requeueNumberedAbsents(limit: number | null): Promise<Numb
         ),
       )
       .returning({ id: musicItems.id });
-    if (updated.length > 0) requeued.push(row);
+    for (const row of updated) reset.add(row.id);
   }
-  return requeued;
+  return rows.filter((row) => reset.has(row.id));
 }
