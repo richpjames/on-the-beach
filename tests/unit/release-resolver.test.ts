@@ -664,6 +664,83 @@ describe("roman numeral volumes", () => {
     ).toBe(false);
   });
 
+  test("reads cardinals and ordinals beyond ten, in English and Spanish", () => {
+    // The bounded one-to-ten table left "Vol. Eleven" / "Volumen Once" /
+    // "Parte Primera" signing empty against a marked Roman that now signs a
+    // number — a new wrong abstain the pre-folding rule did not have. The wider
+    // table reads them, so the notation-only pair verifies again.
+    expect(
+      scoreCandidate(
+        { artist: "Sugar Minott", title: "Dance Hall Showcase Vol. XI" },
+        { artist: "Sugar Minott", title: "Dance Hall Showcase Vol. Eleven" },
+      ).accepted,
+    ).toBe(true);
+    expect(
+      scoreCandidate(
+        { artist: "Pipo", title: "O Encontro Volumen Once" },
+        { artist: "Pipo", title: "O Encontro Volumen XI" },
+      ).accepted,
+    ).toBe(true);
+    expect(
+      scoreCandidate(
+        { artist: "Pipo", title: "O Encontro Parte Primera" },
+        { artist: "Pipo", title: "O Encontro Parte I" },
+      ).accepted,
+    ).toBe(true);
+    // A shared year does not re-cap it either.
+    expect(
+      scoreCandidate(
+        { artist: "Sugar Minott", title: "Dance Hall Showcase Vol. XI (1979)" },
+        { artist: "Sugar Minott", title: "Dance Hall Showcase Vol. Eleven (1979)" },
+      ).accepted,
+    ).toBe(true);
+    // Different volumes still cap, whichever notation each side uses.
+    expect(
+      scoreCandidate(
+        { artist: "Sugar Minott", title: "Dance Hall Showcase Vol. Eleven" },
+        { artist: "Sugar Minott", title: "Dance Hall Showcase Vol. XII" },
+      ).accepted,
+    ).toBe(false);
+    expect(
+      scoreCandidate(
+        { artist: "Pipo", title: "O Encontro Parte Primera" },
+        { artist: "Pipo", title: "O Encontro Parte Segunda" },
+      ).accepted,
+    ).toBe(false);
+  });
+
+  test("a dropped marker beside a word or additive spelling still reads the number", () => {
+    // The escape hatch reads the full vocabulary on both sides, marker or not:
+    // it can only relax a cap the strict signature raised, so "…IIII" against
+    // "…Vol. IV" and "…One" against "…Part I" must read the same number even
+    // though the unmarked side dropped its marker.
+    expect(
+      scoreCandidate(
+        { artist: "Sugar Minott", title: "Dance Hall Showcase IIII" },
+        { artist: "Sugar Minott", title: "Dance Hall Showcase Vol. IV" },
+      ).accepted,
+    ).toBe(true);
+    expect(
+      scoreCandidate(
+        { artist: "Sugar Minott", title: "Dance Hall Showcase One" },
+        { artist: "Sugar Minott", title: "Dance Hall Showcase Part I" },
+      ).accepted,
+    ).toBe(true);
+    // A different volume keeps the ceiling even with the marker dropped.
+    expect(
+      scoreCandidate(
+        { artist: "Sugar Minott", title: "Dance Hall Showcase IIII" },
+        { artist: "Sugar Minott", title: "Dance Hall Showcase Vol. III" },
+      ).accepted,
+    ).toBe(false);
+    expect(
+      scoreCandidate(
+        { artist: "Sugar Minott", title: "Dance Hall Showcase One" },
+        { artist: "Sugar Minott", title: "Dance Hall Showcase Part Two" },
+      ).accepted,
+    ).toBe(false);
+  });
+
   test("a dropped marker does not forgive a different volume", () => {
     // The bypass is for notation only: "…II" against "…Vol. III" is a different
     // record, and relaxing the ceiling there would admit the exact wrong-volume
@@ -704,13 +781,18 @@ describe("roman numeral volumes", () => {
     // word table is a Map, so "constructor"/"toString" cannot masquerade as one.
     expect(carriesSeriesNumber(normalizeForMatch("Part Constructor"))).toBe(false);
     expect(carriesSeriesNumber(normalizeForMatch("Part toString"))).toBe(false);
-    // A dropped marker leaves a multi-letter canonical numeral closing the
-    // title — the same trap, so it qualifies; a single closing letter does not.
+    // A dropped marker leaves a multi-letter canonical numeral in the title —
+    // the same trap, so it qualifies; a single letter does not. Any token, not
+    // just the last: a year after the numeral ("…II (1979)") is still a victim.
     expect(carriesSeriesNumber(normalizeForMatch("Dance Hall Showcase II"))).toBe(true);
     expect(carriesSeriesNumber(normalizeForMatch("Dance Hall Showcase III"))).toBe(true);
     expect(carriesSeriesNumber(normalizeForMatch("Dance Hall Showcase IV"))).toBe(true);
     expect(carriesSeriesNumber(normalizeForMatch("Dance Hall Showcase XII"))).toBe(true);
+    expect(carriesSeriesNumber(normalizeForMatch("Dance Hall Showcase II (1979)"))).toBe(true);
     expect(carriesSeriesNumber(normalizeForMatch("Dance Hall Showcase I"))).toBe(false);
+    // The extended word vocabulary qualifies marked rows for the heal too.
+    expect(carriesSeriesNumber(normalizeForMatch("Dance Hall Showcase Vol. Eleven"))).toBe(true);
+    expect(carriesSeriesNumber(normalizeForMatch("O Encontro Parte Primera"))).toBe(true);
     // A closing abbreviation or name that is valid Roman is not a volume — the
     // marker-less fallback is bounded to the volume-range letters i/v/x.
     expect(carriesSeriesNumber(normalizeForMatch("Club Mix"))).toBe(false);

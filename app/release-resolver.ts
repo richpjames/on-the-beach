@@ -172,17 +172,24 @@ function additiveRomanValue(token: string): number | null {
 }
 
 /**
- * Spelled-out volume numbers, English and Spanish, one to ten. Like the additive
- * Roman forms these are only read after a series marker (see `numberSequence`),
- * so "One Love" or "Dos Palmas" in a title never sprout a number — only "Part
- * One" / "Parte Uno" do. The Spanish forms are here for the same reason the
- * markers are: the catalogue is largely Latin American and Iberian.
+ * Spelled-out volume numbers, English and Spanish: the cardinals and the
+ * ordinals, one to twenty. A bounded table cannot read every spelling, but it
+ * covers the range a volume number realistically takes — "Vol. Eleven",
+ * "Volumen Once", "Parte Primera" — so a marked Roman is not left signing a
+ * number against a word side that signs empty (a wrong abstain the pre-folding
+ * rule did not have). Like the additive Roman forms the strict signature reads
+ * these only after a series marker, so "One Love" or "Dos Palmas" in a title
+ * never sprout a number — only "Part One" / "Parte Uno" do. The Spanish forms
+ * are here for the same reason the markers are: the catalogue is largely Latin
+ * American and Iberian. Diacritics are already stripped by `normalizeForMatch`,
+ * so "séptimo" arrives as "septimo".
  *
  * A Map, not an object literal: the lookup is keyed by an arbitrary title token,
  * and a plain object would also resolve inherited keys ("constructor",
  * "toString"), letting a marked word like that masquerade as a number.
  */
 const WORD_NUMBERS = new Map<string, number>([
+  // English cardinals.
   ["one", 1],
   ["two", 2],
   ["three", 3],
@@ -193,6 +200,17 @@ const WORD_NUMBERS = new Map<string, number>([
   ["eight", 8],
   ["nine", 9],
   ["ten", 10],
+  ["eleven", 11],
+  ["twelve", 12],
+  ["thirteen", 13],
+  ["fourteen", 14],
+  ["fifteen", 15],
+  ["sixteen", 16],
+  ["seventeen", 17],
+  ["eighteen", 18],
+  ["nineteen", 19],
+  ["twenty", 20],
+  // Spanish cardinals.
   ["uno", 1],
   ["dos", 2],
   ["tres", 3],
@@ -203,6 +221,78 @@ const WORD_NUMBERS = new Map<string, number>([
   ["ocho", 8],
   ["nueve", 9],
   ["diez", 10],
+  ["once", 11],
+  ["doce", 12],
+  ["trece", 13],
+  ["catorce", 14],
+  ["quince", 15],
+  ["dieciseis", 16],
+  ["diecisiete", 17],
+  ["dieciocho", 18],
+  ["diecinueve", 19],
+  ["veinte", 20],
+  // English ordinals.
+  ["first", 1],
+  ["second", 2],
+  ["third", 3],
+  ["fourth", 4],
+  ["fifth", 5],
+  ["sixth", 6],
+  ["seventh", 7],
+  ["eighth", 8],
+  ["ninth", 9],
+  ["tenth", 10],
+  ["eleventh", 11],
+  ["twelfth", 12],
+  ["thirteenth", 13],
+  ["fourteenth", 14],
+  ["fifteenth", 15],
+  ["sixteenth", 16],
+  ["seventeenth", 17],
+  ["eighteenth", 18],
+  ["nineteenth", 19],
+  ["twentieth", 20],
+  // Spanish ordinals, masculine and feminine.
+  ["primero", 1],
+  ["primera", 1],
+  ["segundo", 2],
+  ["segunda", 2],
+  ["tercero", 3],
+  ["tercera", 3],
+  ["cuarto", 4],
+  ["cuarta", 4],
+  ["quinto", 5],
+  ["quinta", 5],
+  ["sexto", 6],
+  ["sexta", 6],
+  ["septimo", 7],
+  ["septima", 7],
+  ["octavo", 8],
+  ["octava", 8],
+  ["noveno", 9],
+  ["novena", 9],
+  ["decimo", 10],
+  ["decima", 10],
+  ["undecimo", 11],
+  ["undecima", 11],
+  ["duodecimo", 12],
+  ["duodecima", 12],
+  ["decimotercero", 13],
+  ["decimotercera", 13],
+  ["decimocuarto", 14],
+  ["decimocuarta", 14],
+  ["decimoquinto", 15],
+  ["decimoquinta", 15],
+  ["decimosexto", 16],
+  ["decimosexta", 16],
+  ["decimoseptimo", 17],
+  ["decimoseptima", 17],
+  ["decimoctavo", 18],
+  ["decimoctava", 18],
+  ["decimonoveno", 19],
+  ["decimonovena", 19],
+  ["vigesimo", 20],
+  ["vigesima", 20],
 ]);
 
 /**
@@ -269,12 +359,13 @@ function digitSignature(normalized: string): string {
  *
  * The ambiguous Roman/word readings are gated by a series marker exactly as in
  * `digitSignature`, so a bare "One" or "IIII" in a name does not qualify a row.
- * A multi-letter canonical numeral of volume-range letters (i/v/x) closing the
- * title also qualifies without a marker: a sleeve that dropped "Vol." ("Dance
- * Hall Showcase II") is the same trap, capped against the catalogue's "Vol. 2"
- * by the old rule. A leading letter pair ("MC Hammer"), a single closing letter
- * ("… I"), a bare digit run ("Guaco 76") and a closing abbreviation or name that
- * happens to be valid Roman ("Bonus CD", "Club Mix", "Li") stay out.
+ * A multi-letter canonical numeral of volume-range letters (i/v/x) anywhere in
+ * the title also qualifies without a marker: a sleeve that dropped "Vol."
+ * ("Dance Hall Showcase II", or "Dance Hall Showcase II (1979)" with a year
+ * after it) is the same trap, capped against the catalogue's "Vol. 2" by the old
+ * rule. A leading letter pair ("MC Hammer"), a single letter ("… I"), a bare
+ * digit run ("Guaco 76") and an abbreviation or name that happens to be valid
+ * Roman ("Bonus CD", "Club Mix", "Li") stay out.
  */
 export function carriesSeriesNumber(normalized: string): boolean {
   const tokens = normalized.split(" ");
@@ -283,11 +374,13 @@ export function carriesSeriesNumber(normalized: string): boolean {
     const token = tokens[i]!;
     if (/\d/.test(token) || markedSeriesValue(token) !== null) return true;
   }
-  const last = tokens[tokens.length - 1]!;
   // Volume-range letters only: "CD" (400), "MC" (1100), "Li" (51) and "Mix"
-  // (1009) are valid numerals but are abbreviations or names when they close a
-  // title, not volumes. "II", "III", "IV", "XII" still qualify.
-  return last.length > 1 && /^[ivx]+$/.test(last) && romanNumeralValue(last) !== null;
+  // (1009) are valid numerals but are abbreviations or names, not volumes.
+  // Any token, not just the last: a dropped marker followed by a year
+  // ("Dance Hall Showcase II (1979)") is the same trap and must be requeued.
+  return tokens.some(
+    (token) => token.length > 1 && /^[ivx]+$/.test(token) && romanNumeralValue(token) !== null,
+  );
 }
 
 /**
@@ -338,11 +431,12 @@ export function similarity(a: string, b: string, allowContainment = true): numbe
 
 /**
  * Every number a string carries, read notation-independently and in token
- * order: the Arabic digit runs, the value of each token that is a canonical
- * Roman numeral, and — only after a series marker — the additive Roman spellings
- * ("IIII") and the spelled-out numbers ("Part One", "Parte Uno"). "…II (1979)"
- * and "…Vol. II (1979)" both read "2 1979"; "…II" and "…Vol. 2" both read "2";
- * "…Part I" and "…Part One" both read "1".
+ * order: the Arabic digit runs plus the full marked vocabulary — canonical
+ * Roman, additive Roman ("IIII") and the spelled-out cardinals and ordinals
+ * ("Part One", "Parte Primera") — read on every token, marker or not. "…II
+ * (1979)" and "…Vol. II (1979)" both read "2 1979"; "…II" and "…Vol. 2" both
+ * read "2"; "…Part I" and "…Part One" both read "1"; "…IIII" and "…Vol. IV"
+ * both read "4".
  *
  * This is the ceiling's escape hatch, consulted only when the marker-gated
  * signatures already disagree, and it can only relax the cap, never raise it.
@@ -363,28 +457,31 @@ export function similarity(a: string, b: string, allowContainment = true): numbe
  * must keep the ceiling, exactly as the ordered digit signatures did before
  * the folding existed.
  *
- * The ambiguous readings are gated so they cannot invent numbers. Canonical
- * Roman is read anywhere (a bare "II" dropped its marker), but letter pairs that
- * are valid Roman ("MC" = 1100, "CD" = 400) only reach this comparison when a
- * series marker made the signatures differ; without a marker both sides sign
- * empty and the ceiling never fires at all. Additive Roman and word numbers are
- * read only after a marker, so "One Love" or "IIII" sitting in a name never
- * counts — only "Part One" / "Vol. IIII" do. `digitSignature` itself stays
- * canonical-and-marked, so this wider vocabulary only ever relaxes a cap the
- * strict signature raised; it never caps a pair the pre-folding rule matched.
+ * The full vocabulary is read on both sides without a marker gate precisely
+ * because this comparison can only relax. A dropped marker beside a word or
+ * additive spelling ("…IIII" vs "…Vol. IV", "…One" vs "…Part I") must still read
+ * the same number, or the pair would be newly capped. Reading an unmarked "One"
+ * or "IIII" here cannot invent a wrong match: the ceiling only fires when the
+ * strict signatures already differ, and a bare word in a name ("One Love")
+ * either matches by containment or leaves both signatures empty so the ceiling
+ * never fires at all. `digitSignature` keeps its marker gate, so this wider
+ * reading only ever relaxes a cap the strict signature raised; it never caps a
+ * pair the pre-folding rule matched.
  */
 function numberSequence(normalized: string): string {
   const tokens = normalized.split(" ");
   const numbers: number[] = [];
-  for (let i = 0; i < tokens.length; i += 1) {
-    const token = tokens[i]!;
+  for (const token of tokens) {
     const runs = token.match(/\d+/g);
     if (runs) {
       numbers.push(...runs.map(Number));
       continue;
     }
-    const marked = i > 0 && SERIES_MARKERS.has(tokens[i - 1]!);
-    const value = marked ? markedSeriesValue(token) : romanNumeralValue(token);
+    // Read the full vocabulary on both sides, marker or not: this comparison
+    // only ever relaxes a cap the strict signature raised, so a dropped marker
+    // beside a word/additive spelling ("…IIII" vs "…Vol. IV", "…One" vs
+    // "…Part I") must still read the same number.
+    const value = markedSeriesValue(token);
     if (value !== null) numbers.push(value);
   }
   return numbers.join(" ");
