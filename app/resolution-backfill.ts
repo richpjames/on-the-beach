@@ -233,12 +233,15 @@ export async function findNumberedAbsentRows(limit: number | null): Promise<Numb
  * Clear the terminal verdict on the numbered absent rows so they become
  * eligible again. The update re-asserts absent-and-id-less: a row that gained
  * an id or changed status since selection keeps its own provenance, the same
- * guard the shared resolution write applies. Returns the rows requeued.
+ * guard the shared resolution write applies. Returns only the rows whose
+ * verdict was really reset — a guarded update that matched nothing is not a
+ * requeue, and the caller's count must not overstate what was reopened.
  */
 export async function requeueNumberedAbsents(limit: number | null): Promise<NumberedAbsentRow[]> {
   const rows = await findNumberedAbsentRows(limit);
+  const requeued: NumberedAbsentRow[] = [];
   for (const row of rows) {
-    await db
+    const updated = await db
       .update(musicItems)
       .set({ resolutionStatus: null, resolutionAttemptedAt: null })
       .where(
@@ -250,7 +253,9 @@ export async function requeueNumberedAbsents(limit: number | null): Promise<Numb
           isNull(musicItems.discogsReleaseId),
           isNull(musicItems.discogsMasterId),
         ),
-      );
+      )
+      .returning({ id: musicItems.id });
+    if (updated.length > 0) requeued.push(row);
   }
-  return rows;
+  return requeued;
 }

@@ -324,4 +324,20 @@ describe("requeueing numbered absents", () => {
     const eligible = await findResolutionBackfillRows(null);
     expect(eligible.some((r) => r.id === item.id)).toBe(true);
   });
+
+  test("reports only rows whose verdict was really reset — a second run requeues nothing", async () => {
+    const { item } = await createMusicItemDirect({
+      artistName: "Sugar Minott",
+      title: "Dance Hall Showcase, Vol. 2",
+    });
+    await stampAbsent(item.id);
+
+    const first = await requeueNumberedAbsents(null);
+    expect(first.some((row) => row.id === item.id)).toBe(true);
+
+    // No longer absent, so the guarded update matches nothing and the row must
+    // not be counted again — the script's "Requeued N" stays honest.
+    const second = await requeueNumberedAbsents(null);
+    expect(second.some((row) => row.id === item.id)).toBe(false);
+  });
 });

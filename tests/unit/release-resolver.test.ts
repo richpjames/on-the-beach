@@ -529,6 +529,28 @@ describe("roman numeral volumes", () => {
     ).toBe(false);
   });
 
+  test("accepts a sleeve that drops the marker against a catalogue that keeps it", () => {
+    // The folding is marker-gated, so without care it is one-sided: "Vol. II"
+    // signs 2 while a bare "II" signs empty, and the ceiling would newly cap a
+    // pair that matched before the folding existed. Providers differ routinely
+    // on whether "Vol." is present — the disagreement is notation, not volume.
+    expect(similarity("Dance Hall Showcase II", "Dance Hall Showcase Vol. II")).toBeGreaterThan(
+      0.8,
+    );
+    expect(
+      scoreCandidate(
+        { artist: "Sugar Minott", title: "Dance Hall Showcase II" },
+        { artist: "Sugar Minott", title: "Dance Hall Showcase Vol. II" },
+      ).accepted,
+    ).toBe(true);
+    expect(
+      scoreCandidate(
+        { artist: "Sugar Minott", title: "Dance Hall Showcase Vol. II" },
+        { artist: "Sugar Minott", title: "Dance Hall Showcase II" },
+      ).accepted,
+    ).toBe(true);
+  });
+
   test("does not read a letter pair that is valid Roman as a number", () => {
     // "MC" is 1100 in Roman and "CD" is 400; folding them unconditionally would
     // cap "MC Hammer" against "M.C. Hammer" at 0.5. Only a series marker makes
