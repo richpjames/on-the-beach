@@ -551,6 +551,24 @@ describe("roman numeral volumes", () => {
     ).toBe(true);
   });
 
+  test("a dropped marker does not forgive a different volume", () => {
+    // The bypass is for notation only: "…II" against "…Vol. III" is a different
+    // record, and relaxing the ceiling there would admit the exact wrong-volume
+    // match the digit rule exists to prevent.
+    expect(
+      scoreCandidate(
+        { artist: "Sugar Minott", title: "Dance Hall Showcase II" },
+        { artist: "Sugar Minott", title: "Dance Hall Showcase Vol. III" },
+      ).accepted,
+    ).toBe(false);
+    expect(
+      scoreCandidate(
+        { artist: "Sugar Minott", title: "Dance Hall Showcase Vol. III" },
+        { artist: "Sugar Minott", title: "Dance Hall Showcase II" },
+      ).accepted,
+    ).toBe(false);
+  });
+
   test("does not read a letter pair that is valid Roman as a number", () => {
     // "MC" is 1100 in Roman and "CD" is 400; folding them unconditionally would
     // cap "MC Hammer" against "M.C. Hammer" at 0.5. Only a series marker makes

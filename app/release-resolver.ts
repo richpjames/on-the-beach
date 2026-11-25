@@ -258,14 +258,30 @@ export function similarity(a: string, b: string, allowContainment = true): numbe
  * "2", yet they are one record. When one side expresses no number at all and the
  * other's whole signature came from Roman folding, capping the pair would
  * reintroduce the very abstain the folding exists to prevent — providers differ
- * routinely on whether "Vol." is present. A side that printed an Arabic digit
- * keeps the full force of the rule, so "Vol. 2" against an unnumbered sleeve is
- * unchanged, and two non-empty signatures ("Vol. II" vs "Vol. III") still cap.
+ * routinely on whether "Vol." is present.
+ *
+ * The dropped marker is forgiven only when the unmarked side still carries the
+ * same number in Roman: "…II" against "…Vol. II" is notation, but "…II" against
+ * "…Vol. III" is a different volume and keeps the ceiling. A side that printed
+ * an Arabic digit keeps the full force of the rule, so "Vol. 2" against an
+ * unnumbered sleeve is unchanged, and two non-empty signatures still cap.
  */
 function romanOnlyAgainstEmpty(na: string, nb: string, sigA: string, sigB: string): boolean {
   const romanOnly = (normalized: string, signature: string) =>
     signature !== "" && !/\d/.test(normalized);
-  return (sigA === "" && romanOnly(nb, sigB)) || (sigB === "" && romanOnly(na, sigA));
+  const bareRomanValues = (normalized: string) =>
+    normalized
+      .split(" ")
+      .map((token) => romanNumeralValue(token))
+      .filter((value): value is number => value !== null)
+      .map(String);
+  const carriesSameNumber = (empty: string, signature: string) => {
+    const bare = bareRomanValues(empty);
+    return signature.split(" ").every((number) => bare.includes(number));
+  };
+  if (sigA === "" && romanOnly(nb, sigB)) return carriesSameNumber(na, sigB);
+  if (sigB === "" && romanOnly(na, sigA)) return carriesSameNumber(nb, sigA);
+  return false;
 }
 
 function tokensOf(value: string): string[] {
