@@ -592,6 +592,25 @@ describe("roman numeral volumes", () => {
     ).toBe(false);
   });
 
+  test("the same numbers in swapped roles keep the ceiling", () => {
+    // The escape hatch compares numbers in token order, not as a sorted bag:
+    // a multi-disc set's volume and disc numbers are different records when
+    // swapped, even though both titles carry the same two values. Notation
+    // differences never reorder the numbers, so order costs no legitimate case.
+    expect(
+      scoreCandidate(
+        { artist: "Various", title: "Exitos Vol. 1 CD 2" },
+        { artist: "Various", title: "Exitos Vol. 2 CD 1" },
+      ).accepted,
+    ).toBe(false);
+    expect(
+      scoreCandidate(
+        { artist: "Various", title: "Vol. 2 Exitos 3" },
+        { artist: "Various", title: "Vol. 3 Exitos 2" },
+      ).accepted,
+    ).toBe(false);
+  });
+
   test("a dropped marker does not forgive a different volume", () => {
     // The bypass is for notation only: "…II" against "…Vol. III" is a different
     // record, and relaxing the ceiling there would admit the exact wrong-volume

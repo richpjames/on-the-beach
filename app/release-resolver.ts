@@ -243,17 +243,17 @@ export function similarity(a: string, b: string, allowContainment = true): numbe
   if (contained) return CONTAINMENT_SIMILARITY;
 
   const raw = 1 - editDistance(na, nb) / longer.length;
-  if (digitSignature(na) !== digitSignature(nb) && numberMultiset(na) !== numberMultiset(nb)) {
+  if (digitSignature(na) !== digitSignature(nb) && numberSequence(na) !== numberSequence(nb)) {
     return Math.min(raw, DIGIT_MISMATCH_CEILING);
   }
   return raw;
 }
 
 /**
- * Every number a string carries, read notation-independently: the Arabic digit
- * runs plus the value of each token that is a canonical Roman numeral, sorted
- * numerically so order does not matter. "…II (1979)" and "…Vol. II (1979)" both
- * read "2 1979"; "…II" and "…Vol. 2" both read "2".
+ * Every number a string carries, read notation-independently and in token
+ * order: the Arabic digit runs plus the value of each token that is a canonical
+ * Roman numeral. "…II (1979)" and "…Vol. II (1979)" both read "2 1979"; "…II"
+ * and "…Vol. 2" both read "2".
  *
  * This is the ceiling's escape hatch, consulted only when the marker-gated
  * signatures already disagree, and it can only relax the cap, never raise it.
@@ -266,12 +266,18 @@ export function similarity(a: string, b: string, allowContainment = true): numbe
  * Different numbers — "…II" vs "…Vol. III", "Guaco 76" vs "Guaco 77" — still
  * disagree here and keep the ceiling.
  *
+ * Order is kept, not sorted away: every notation-only shape above carries its
+ * numbers in the same order, while the same values in swapped roles are
+ * different records — a multi-disc set "…Vol. 1 CD 2" against "…Vol. 2 CD 1"
+ * must keep the ceiling, exactly as the ordered digit signatures did before
+ * the folding existed.
+ *
  * Reading unmarked tokens as Roman is safe because of the gate above: letter
  * pairs that are valid Roman ("MC" = 1100, "CD" = 400) only reach this
  * comparison when a series marker made the signatures differ; without a
  * marker both sides sign empty and the ceiling never fires at all.
  */
-function numberMultiset(normalized: string): string {
+function numberSequence(normalized: string): string {
   const numbers: number[] = [];
   for (const token of normalized.split(" ")) {
     const runs = token.match(/\d+/g);
@@ -279,7 +285,7 @@ function numberMultiset(normalized: string): string {
     const roman = romanNumeralValue(token);
     if (roman !== null) numbers.push(roman);
   }
-  return numbers.sort((a, b) => a - b).join(" ");
+  return numbers.join(" ");
 }
 
 function tokensOf(value: string): string[] {
