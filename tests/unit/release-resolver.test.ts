@@ -708,7 +708,16 @@ describe("roman numeral volumes", () => {
     // title — the same trap, so it qualifies; a single closing letter does not.
     expect(carriesSeriesNumber(normalizeForMatch("Dance Hall Showcase II"))).toBe(true);
     expect(carriesSeriesNumber(normalizeForMatch("Dance Hall Showcase III"))).toBe(true);
+    expect(carriesSeriesNumber(normalizeForMatch("Dance Hall Showcase IV"))).toBe(true);
+    expect(carriesSeriesNumber(normalizeForMatch("Dance Hall Showcase XII"))).toBe(true);
     expect(carriesSeriesNumber(normalizeForMatch("Dance Hall Showcase I"))).toBe(false);
+    // A closing abbreviation or name that is valid Roman is not a volume — the
+    // marker-less fallback is bounded to the volume-range letters i/v/x.
+    expect(carriesSeriesNumber(normalizeForMatch("Club Mix"))).toBe(false);
+    expect(carriesSeriesNumber(normalizeForMatch("Greatest Hits CD"))).toBe(false);
+    expect(carriesSeriesNumber(normalizeForMatch("Bonus CD"))).toBe(false);
+    expect(carriesSeriesNumber(normalizeForMatch("Li"))).toBe(false);
+    expect(carriesSeriesNumber(normalizeForMatch("Dix"))).toBe(false);
   });
 });
 
