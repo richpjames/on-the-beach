@@ -199,34 +199,55 @@ export interface NumberedAbsentRow {
   artist: string;
 }
 
-/** Absent, id-less rows whose title carries a numbered series — the trap's victims. */
+/**
+ * Absent, id-less rows whose title carries a numbered series — the trap's
+ * victims. Walked in keyset batches rather than loaded whole: even `--limit 5`
+ * or `--dry-run` must not materialise the catalogue's entire absent set, and the
+ * walk stops as soon as `limit` numbered rows are collected. Ordering (by id)
+ * and selection are the same as a single filtered query.
+ */
 export async function findNumberedAbsentRows(limit: number | null): Promise<NumberedAbsentRow[]> {
-  const rows = await db
-    .select({
-      id: musicItems.id,
-      title: musicItems.title,
-      artist: artists.name,
-    })
-    .from(musicItems)
-    .innerJoin(artists, eq(musicItems.artistId, artists.id))
-    .where(
-      and(
-        eq(musicItems.resolutionStatus, "absent"),
-        isNull(musicItems.musicbrainzReleaseId),
-        isNull(musicItems.musicbrainzReleaseGroupId),
-        isNull(musicItems.discogsReleaseId),
-        isNull(musicItems.discogsMasterId),
-        sql`${musicItems.normalizedTitle} != ''`,
-        sql`${musicItems.normalizedTitle} != ${UNTITLED}`,
-      ),
-    )
-    .orderBy(musicItems.id);
-
   // The series test reads the matcher's own normalisation, not the stored
   // lowercase-only `normalized_title`, so punctuation and diacritics collapse
-  // the same way the resolver sees them.
-  const numbered = rows.filter((row) => carriesSeriesNumber(normalizeForMatch(row.title)));
-  return limit !== null ? numbered.slice(0, limit) : numbered;
+  // the same way the resolver sees them. Walk in keyset batches so a large
+  // absent set is never materialised all at once, and stop early on `limit`.
+  if (limit !== null && limit <= 0) return [];
+  const numbered: NumberedAbsentRow[] = [];
+  const BATCH = 1000;
+  let cursor = 0;
+  for (;;) {
+    const rows = await db
+      .select({
+        id: musicItems.id,
+        title: musicItems.title,
+        artist: artists.name,
+      })
+      .from(musicItems)
+      .innerJoin(artists, eq(musicItems.artistId, artists.id))
+      .where(
+        and(
+          eq(musicItems.resolutionStatus, "absent"),
+          isNull(musicItems.musicbrainzReleaseId),
+          isNull(musicItems.musicbrainzReleaseGroupId),
+          isNull(musicItems.discogsReleaseId),
+          isNull(musicItems.discogsMasterId),
+          sql`${musicItems.normalizedTitle} != ''`,
+          sql`${musicItems.normalizedTitle} != ${UNTITLED}`,
+          sql`${musicItems.id} > ${cursor}`,
+        ),
+      )
+      .orderBy(musicItems.id)
+      .limit(BATCH);
+    if (rows.length === 0) break;
+    cursor = rows[rows.length - 1]!.id;
+    for (const row of rows) {
+      if (!carriesSeriesNumber(normalizeForMatch(row.title))) continue;
+      numbered.push(row);
+      if (limit !== null && numbered.length >= limit) return numbered;
+    }
+    if (rows.length < BATCH) break;
+  }
+  return numbered;
 }
 
 /**

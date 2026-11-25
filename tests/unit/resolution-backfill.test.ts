@@ -340,4 +340,38 @@ describe("requeueing numbered absents", () => {
     const second = await requeueNumberedAbsents(null);
     expect(second.some((row) => row.id === item.id)).toBe(false);
   });
+
+  test("the keyset walk keeps id order and a limit is a prefix of the full walk", async () => {
+    const first = await createMusicItemDirect({
+      artistName: "Sugar Minott",
+      title: "Dance Hall Showcase Vol. II",
+    });
+    const plain = await createMusicItemDirect({
+      artistName: "The Earons",
+      title: "Land of Hunger",
+    });
+    const second = await createMusicItemDirect({
+      artistName: "Sugar Minott",
+      title: "Dance Hall Showcase Vol. III",
+    });
+    await stampAbsent(first.item.id);
+    await stampAbsent(plain.item.id);
+    await stampAbsent(second.item.id);
+
+    const all = await findNumberedAbsentRows(null);
+    const ids = all.map((row) => row.id);
+    // Ascending id order with no repeats — the cursor never skips or revisits a
+    // row — and the plain row is filtered out while both numbered rows are in.
+    expect(ids).toEqual([...ids].sort((a, b) => a - b));
+    expect(new Set(ids).size).toBe(ids.length);
+    expect(ids).toContain(first.item.id);
+    expect(ids).toContain(second.item.id);
+    expect(ids).not.toContain(plain.item.id);
+
+    // A limit returns exactly the first `limit` rows of the same ordered walk,
+    // and zero returns nothing — the same selection a single filtered query made.
+    const two = await findNumberedAbsentRows(2);
+    expect(two.map((row) => row.id)).toEqual(all.slice(0, 2).map((row) => row.id));
+    expect((await findNumberedAbsentRows(0)).length).toBe(0);
+  });
 });
