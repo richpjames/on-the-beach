@@ -549,6 +549,47 @@ describe("roman numeral volumes", () => {
         { artist: "Sugar Minott", title: "Dance Hall Showcase II" },
       ).accepted,
     ).toBe(true);
+    // The mirror: the bare Roman side against the marked Arabic side is the
+    // same notation-only disagreement and must pass too.
+    expect(
+      scoreCandidate(
+        { artist: "Sugar Minott", title: "Dance Hall Showcase II" },
+        { artist: "Sugar Minott", title: "Dance Hall Showcase Vol. 2" },
+      ).accepted,
+    ).toBe(true);
+    expect(
+      scoreCandidate(
+        { artist: "Sugar Minott", title: "Dance Hall Showcase Vol. 2" },
+        { artist: "Sugar Minott", title: "Dance Hall Showcase II" },
+      ).accepted,
+    ).toBe(true);
+  });
+
+  test("a shared year does not re-cap a marker drop", () => {
+    // With a year in both titles neither signature is empty ("1979" vs
+    // "2 1979"), so a bypass that demanded one wholly empty signature still
+    // capped the pair — a new wrong abstain against the pre-folding behaviour,
+    // where both sides signed "1979". The numbers read notation-independently
+    // agree, so the disagreement is still only the dropped marker.
+    expect(
+      scoreCandidate(
+        { artist: "Sugar Minott", title: "Dance Hall Showcase II (1979)" },
+        { artist: "Sugar Minott", title: "Dance Hall Showcase Vol. II (1979)" },
+      ).accepted,
+    ).toBe(true);
+    expect(
+      scoreCandidate(
+        { artist: "Sugar Minott", title: "Dance Hall Showcase Vol. II (1979)" },
+        { artist: "Sugar Minott", title: "Dance Hall Showcase II (1979)" },
+      ).accepted,
+    ).toBe(true);
+    // A different volume keeps the ceiling even with the year shared.
+    expect(
+      scoreCandidate(
+        { artist: "Sugar Minott", title: "Dance Hall Showcase II (1979)" },
+        { artist: "Sugar Minott", title: "Dance Hall Showcase Vol. III (1979)" },
+      ).accepted,
+    ).toBe(false);
   });
 
   test("a dropped marker does not forgive a different volume", () => {

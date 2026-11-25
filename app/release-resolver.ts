@@ -243,45 +243,43 @@ export function similarity(a: string, b: string, allowContainment = true): numbe
   if (contained) return CONTAINMENT_SIMILARITY;
 
   const raw = 1 - editDistance(na, nb) / longer.length;
-  const sigA = digitSignature(na);
-  const sigB = digitSignature(nb);
-  if (sigA !== sigB && !romanOnlyAgainstEmpty(na, nb, sigA, sigB)) {
+  if (digitSignature(na) !== digitSignature(nb) && numberMultiset(na) !== numberMultiset(nb)) {
     return Math.min(raw, DIGIT_MISMATCH_CEILING);
   }
   return raw;
 }
 
 /**
- * Whether a digit disagreement is only notation, not volume. A Roman numeral
- * folded by `digitSignature` is a reading aid, not a digit the sleeve printed:
- * "Dance Hall Showcase II" signs empty while "Dance Hall Showcase Vol. II" signs
- * "2", yet they are one record. When one side expresses no number at all and the
- * other's whole signature came from Roman folding, capping the pair would
- * reintroduce the very abstain the folding exists to prevent — providers differ
- * routinely on whether "Vol." is present.
+ * Every number a string carries, read notation-independently: the Arabic digit
+ * runs plus the value of each token that is a canonical Roman numeral, sorted
+ * numerically so order does not matter. "…II (1979)" and "…Vol. II (1979)" both
+ * read "2 1979"; "…II" and "…Vol. 2" both read "2".
  *
- * The dropped marker is forgiven only when the unmarked side still carries the
- * same number in Roman: "…II" against "…Vol. II" is notation, but "…II" against
- * "…Vol. III" is a different volume and keeps the ceiling. A side that printed
- * an Arabic digit keeps the full force of the rule, so "Vol. 2" against an
- * unnumbered sleeve is unchanged, and two non-empty signatures still cap.
+ * This is the ceiling's escape hatch, consulted only when the marker-gated
+ * signatures already disagree, and it can only relax the cap, never raise it.
+ * The signatures disagree over notation in three shapes the folding must not
+ * turn into wrong abstains: a provider drops the marker ("…II" vs "…Vol. II"),
+ * the mirror of that with the Arabic side marked ("…II" vs "…Vol. 2"), and a
+ * marker drop alongside another number both titles share ("…II (1979)" vs
+ * "…Vol. II (1979)"). When the two sides carry the same numbers read either
+ * way, the disagreement is notation, not volume, and the raw similarity stands.
+ * Different numbers — "…II" vs "…Vol. III", "Guaco 76" vs "Guaco 77" — still
+ * disagree here and keep the ceiling.
+ *
+ * Reading unmarked tokens as Roman is safe because of the gate above: letter
+ * pairs that are valid Roman ("MC" = 1100, "CD" = 400) only reach this
+ * comparison when a series marker made the signatures differ; without a
+ * marker both sides sign empty and the ceiling never fires at all.
  */
-function romanOnlyAgainstEmpty(na: string, nb: string, sigA: string, sigB: string): boolean {
-  const romanOnly = (normalized: string, signature: string) =>
-    signature !== "" && !/\d/.test(normalized);
-  const bareRomanValues = (normalized: string) =>
-    normalized
-      .split(" ")
-      .map((token) => romanNumeralValue(token))
-      .filter((value): value is number => value !== null)
-      .map(String);
-  const carriesSameNumber = (empty: string, signature: string) => {
-    const bare = bareRomanValues(empty);
-    return signature.split(" ").every((number) => bare.includes(number));
-  };
-  if (sigA === "" && romanOnly(nb, sigB)) return carriesSameNumber(na, sigB);
-  if (sigB === "" && romanOnly(na, sigA)) return carriesSameNumber(nb, sigA);
-  return false;
+function numberMultiset(normalized: string): string {
+  const numbers: number[] = [];
+  for (const token of normalized.split(" ")) {
+    const runs = token.match(/\d+/g);
+    if (runs) numbers.push(...runs.map(Number));
+    const roman = romanNumeralValue(token);
+    if (roman !== null) numbers.push(roman);
+  }
+  return numbers.sort((a, b) => a - b).join(" ");
 }
 
 function tokensOf(value: string): string[] {
