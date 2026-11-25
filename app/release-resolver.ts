@@ -206,6 +206,19 @@ const WORD_NUMBERS = new Map<string, number>([
 ]);
 
 /**
+ * The number a series marker introduces, read in any notation: canonical Roman
+ * ("II"), additive Roman ("IIII") or a spelled-out word ("One"). Null when the
+ * marked token is none of these. Shared by `digitSignature` and `numberSequence`
+ * so the strict signature and the escape hatch read the same vocabulary — two
+ * different spelled-out volumes ("Part One" vs "Part Two") sign different
+ * numbers and keep the ceiling, while a notation-only difference ("Part One" vs
+ * "Part I") signs the same number, or is rescued by `numberSequence`.
+ */
+function markedSeriesValue(token: string): number | null {
+  return romanNumeralValue(token) ?? additiveRomanValue(token) ?? WORD_NUMBERS.get(token) ?? null;
+}
+
+/**
  * The numbers in a string, in order. Digits do not behave like letters here.
  * One letter apart is usually a typo or a transliteration; one digit apart is
  * a different record — "Guaco 76" and "Guaco 77" are 87% similar by edit
@@ -216,9 +229,13 @@ const WORD_NUMBERS = new Map<string, number>([
  * "Dance Hall Showcase, Vol. 2" and both catalogues file it as "Dance Hall
  * Showcase Vol. II". Read as letters, "ii" carries no digit signature at all,
  * so the mismatch ceiling below capped the pair at 0.5 and the resolver
- * abstained on a record both databases hold. A Roman numeral immediately after
- * a series marker is therefore folded to its Arabic value — "vol ii" and
- * "vol 2" both sign "2", while "vol ii" and "vol iii" still disagree.
+ * abstained on a record both databases hold. A number immediately after a
+ * series marker is therefore folded to its Arabic value, in every notation the
+ * resolver reads — canonical Roman ("vol ii"), additive Roman ("vol iiii") and
+ * the spelled-out word ("part one") all sign their value, so "vol ii" and
+ * "vol 2" both sign "2", while "vol ii" and "vol iii", and "part one" and
+ * "part two", still disagree. `numberSequence` rescues the notation-only
+ * differences this strict signature raises.
  *
  * The marker is the whole safeguard. Without it, common letter pairs that are
  * valid Roman numerals — "MC" (1100), "CD" (400), "Li" (51) — would sprout digit
@@ -235,7 +252,7 @@ function digitSignature(normalized: string): string {
     if (runs) {
       parts.push(...runs);
     } else if (i > 0 && SERIES_MARKERS.has(tokens[i - 1]!)) {
-      const value = romanNumeralValue(token);
+      const value = markedSeriesValue(token);
       if (value !== null) parts.push(String(value));
     }
   }
@@ -248,25 +265,25 @@ function digitSignature(normalized: string): string {
  * or a spelled-out number ("Part One"). Takes the `normalizeForMatch` form. The
  * requeue sweep (resolution-backfill.ts) uses this to find `absent` rows the
  * Roman-numeral trap may have wrongly abstained on, so they can be asked again
- * now that the digit rule reads every notation. The ambiguous forms are gated by
- * a series marker exactly as in `numberSequence`, so a bare "One" or "IIII" in a
- * name does not qualify a row.
+ * now that the digit rule reads every notation.
+ *
+ * The ambiguous Roman/word readings are gated by a series marker exactly as in
+ * `digitSignature`, so a bare "One" or "IIII" in a name does not qualify a row.
+ * A multi-letter canonical numeral closing the title also qualifies without a
+ * marker: a sleeve that dropped "Vol." ("Dance Hall Showcase II") is the same
+ * trap, capped against the catalogue's "Vol. 2" by the old rule. A leading
+ * letter pair ("MC Hammer"), a single closing letter ("… I") and a bare digit
+ * run ("Guaco 76") stay out.
  */
 export function carriesSeriesNumber(normalized: string): boolean {
   const tokens = normalized.split(" ");
   for (let i = 1; i < tokens.length; i += 1) {
     if (!SERIES_MARKERS.has(tokens[i - 1]!)) continue;
     const token = tokens[i]!;
-    if (
-      /\d/.test(token) ||
-      romanNumeralValue(token) !== null ||
-      additiveRomanValue(token) !== null ||
-      WORD_NUMBERS.has(token)
-    ) {
-      return true;
-    }
+    if (/\d/.test(token) || markedSeriesValue(token) !== null) return true;
   }
-  return false;
+  const last = tokens[tokens.length - 1]!;
+  return last.length > 1 && romanNumeralValue(last) !== null;
 }
 
 /**
@@ -363,10 +380,8 @@ function numberSequence(normalized: string): string {
       continue;
     }
     const marked = i > 0 && SERIES_MARKERS.has(tokens[i - 1]!);
-    const value =
-      romanNumeralValue(token) ??
-      (marked ? (additiveRomanValue(token) ?? WORD_NUMBERS.get(token) ?? null) : null);
-    if (value !== null && value !== undefined) numbers.push(value);
+    const value = marked ? markedSeriesValue(token) : romanNumeralValue(token);
+    if (value !== null) numbers.push(value);
   }
   return numbers.join(" ");
 }
