@@ -239,18 +239,28 @@ function digitSignature(normalized: string): string {
 }
 
 /**
- * Whether a title carries a numbered series — a volume, part or chapter, in
- * Arabic or Roman. Takes the `normalizeForMatch` form. The requeue sweep
- * (resolution-backfill.ts) uses this to find `absent` rows the Roman-numeral
- * trap may have wrongly abstained on, so they can be asked again now that the
- * digit rule reads both notations.
+ * Whether a title carries a numbered series — a volume, part or chapter, in any
+ * notation the resolver reads: Arabic, canonical Roman, additive Roman ("IIII")
+ * or a spelled-out number ("Part One"). Takes the `normalizeForMatch` form. The
+ * requeue sweep (resolution-backfill.ts) uses this to find `absent` rows the
+ * Roman-numeral trap may have wrongly abstained on, so they can be asked again
+ * now that the digit rule reads every notation. The ambiguous forms are gated by
+ * a series marker exactly as in `numberSequence`, so a bare "One" or "IIII" in a
+ * name does not qualify a row.
  */
 export function carriesSeriesNumber(normalized: string): boolean {
   const tokens = normalized.split(" ");
   for (let i = 1; i < tokens.length; i += 1) {
     if (!SERIES_MARKERS.has(tokens[i - 1]!)) continue;
     const token = tokens[i]!;
-    if (/\d/.test(token) || romanNumeralValue(token) !== null) return true;
+    if (
+      /\d/.test(token) ||
+      romanNumeralValue(token) !== null ||
+      additiveRomanValue(token) !== null ||
+      WORD_NUMBERS[token] !== undefined
+    ) {
+      return true;
+    }
   }
   return false;
 }

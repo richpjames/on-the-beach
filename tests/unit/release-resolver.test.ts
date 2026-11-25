@@ -680,9 +680,12 @@ describe("roman numeral volumes", () => {
     expect(carriesSeriesNumber(normalizeForMatch("Dance Hall Showcase, Vol. 2"))).toBe(true);
     expect(carriesSeriesNumber(normalizeForMatch("Dance Hall Showcase Vol. II"))).toBe(true);
     expect(carriesSeriesNumber(normalizeForMatch("O Encontro da Massa Parte III"))).toBe(true);
+    expect(carriesSeriesNumber(normalizeForMatch("Dance Hall Showcase Part One"))).toBe(true);
+    expect(carriesSeriesNumber(normalizeForMatch("Dance Hall Showcase Vol. IIII"))).toBe(true);
     expect(carriesSeriesNumber(normalizeForMatch("Land of Hunger"))).toBe(false);
     expect(carriesSeriesNumber(normalizeForMatch("Guaco 76"))).toBe(false);
     expect(carriesSeriesNumber(normalizeForMatch("MC Hammer"))).toBe(false);
+    expect(carriesSeriesNumber(normalizeForMatch("One Love"))).toBe(false);
   });
 });
 
