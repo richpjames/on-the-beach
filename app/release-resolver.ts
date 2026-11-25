@@ -177,29 +177,33 @@ function additiveRomanValue(token: string): number | null {
  * so "One Love" or "Dos Palmas" in a title never sprout a number — only "Part
  * One" / "Parte Uno" do. The Spanish forms are here for the same reason the
  * markers are: the catalogue is largely Latin American and Iberian.
+ *
+ * A Map, not an object literal: the lookup is keyed by an arbitrary title token,
+ * and a plain object would also resolve inherited keys ("constructor",
+ * "toString"), letting a marked word like that masquerade as a number.
  */
-const WORD_NUMBERS: Record<string, number> = {
-  one: 1,
-  two: 2,
-  three: 3,
-  four: 4,
-  five: 5,
-  six: 6,
-  seven: 7,
-  eight: 8,
-  nine: 9,
-  ten: 10,
-  uno: 1,
-  dos: 2,
-  tres: 3,
-  cuatro: 4,
-  cinco: 5,
-  seis: 6,
-  siete: 7,
-  ocho: 8,
-  nueve: 9,
-  diez: 10,
-};
+const WORD_NUMBERS = new Map<string, number>([
+  ["one", 1],
+  ["two", 2],
+  ["three", 3],
+  ["four", 4],
+  ["five", 5],
+  ["six", 6],
+  ["seven", 7],
+  ["eight", 8],
+  ["nine", 9],
+  ["ten", 10],
+  ["uno", 1],
+  ["dos", 2],
+  ["tres", 3],
+  ["cuatro", 4],
+  ["cinco", 5],
+  ["seis", 6],
+  ["siete", 7],
+  ["ocho", 8],
+  ["nueve", 9],
+  ["diez", 10],
+]);
 
 /**
  * The numbers in a string, in order. Digits do not behave like letters here.
@@ -257,7 +261,7 @@ export function carriesSeriesNumber(normalized: string): boolean {
       /\d/.test(token) ||
       romanNumeralValue(token) !== null ||
       additiveRomanValue(token) !== null ||
-      WORD_NUMBERS[token] !== undefined
+      WORD_NUMBERS.has(token)
     ) {
       return true;
     }
@@ -361,7 +365,7 @@ function numberSequence(normalized: string): string {
     const marked = i > 0 && SERIES_MARKERS.has(tokens[i - 1]!);
     const value =
       romanNumeralValue(token) ??
-      (marked ? (additiveRomanValue(token) ?? WORD_NUMBERS[token] ?? null) : null);
+      (marked ? (additiveRomanValue(token) ?? WORD_NUMBERS.get(token) ?? null) : null);
     if (value !== null && value !== undefined) numbers.push(value);
   }
   return numbers.join(" ");

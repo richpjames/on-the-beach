@@ -686,6 +686,10 @@ describe("roman numeral volumes", () => {
     expect(carriesSeriesNumber(normalizeForMatch("Guaco 76"))).toBe(false);
     expect(carriesSeriesNumber(normalizeForMatch("MC Hammer"))).toBe(false);
     expect(carriesSeriesNumber(normalizeForMatch("One Love"))).toBe(false);
+    // A marked token that is an inherited object key is not a number — the
+    // word table is a Map, so "constructor"/"toString" cannot masquerade as one.
+    expect(carriesSeriesNumber(normalizeForMatch("Part Constructor"))).toBe(false);
+    expect(carriesSeriesNumber(normalizeForMatch("Part toString"))).toBe(false);
   });
 });
 
