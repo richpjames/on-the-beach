@@ -2,7 +2,12 @@ import { and, eq, inArray, isNotNull, isNull, or, sql } from "drizzle-orm";
 import { db } from "../adapters/db/index";
 import { artists, musicItems } from "../adapters/db/schema";
 import { normalize } from "../domain/text";
-import { resolveRelease, type ResolutionStatus } from "./release-resolver";
+import {
+  carriesSeriesNumber,
+  normalizeForMatch,
+  resolveRelease,
+  type ResolutionStatus,
+} from "./release-resolver";
 import { writeResolutionOutcome } from "./resolution-lookup";
 
 // ---------------------------------------------------------------------------
@@ -171,4 +176,81 @@ export async function countEligibleByStatus(): Promise<{ neverAttempted: number;
     else neverAttempted += Number(row.count);
   }
   return { neverAttempted, failed };
+}
+
+// ---------------------------------------------------------------------------
+// Requeueing numbered absents — healing the Roman-numeral trap
+//
+// `absent` is terminal, so a row the resolver wrongly abstained on is never
+// asked again. Before the digit rule read Roman numerals (release-resolver.ts),
+// a sleeve numbered "Vol. 2" against a catalogue filing "Vol. II" hit the
+// digit-mismatch ceiling and was stamped absent — a record both databases hold.
+// This requeues the obvious victims: absent, id-less rows whose title carries a
+// numbered series, in either notation. Clearing the status and the attempt
+// timestamp puts them back on the sweep's and the on-view lookup's eligibility,
+// so the next run asks again with the fixed rule. Idempotent: a requeued row
+// that resolves leaves the absent set, and one that genuinely is absent is
+// stamped absent again and drops out.
+// ---------------------------------------------------------------------------
+
+export interface NumberedAbsentRow {
+  id: number;
+  title: string;
+  artist: string;
+}
+
+/** Absent, id-less rows whose title carries a numbered series — the trap's victims. */
+export async function findNumberedAbsentRows(limit: number | null): Promise<NumberedAbsentRow[]> {
+  const rows = await db
+    .select({
+      id: musicItems.id,
+      title: musicItems.title,
+      artist: artists.name,
+    })
+    .from(musicItems)
+    .innerJoin(artists, eq(musicItems.artistId, artists.id))
+    .where(
+      and(
+        eq(musicItems.resolutionStatus, "absent"),
+        isNull(musicItems.musicbrainzReleaseId),
+        isNull(musicItems.musicbrainzReleaseGroupId),
+        isNull(musicItems.discogsReleaseId),
+        isNull(musicItems.discogsMasterId),
+        sql`${musicItems.normalizedTitle} != ''`,
+        sql`${musicItems.normalizedTitle} != ${UNTITLED}`,
+      ),
+    )
+    .orderBy(musicItems.id);
+
+  // The series test reads the matcher's own normalisation, not the stored
+  // lowercase-only `normalized_title`, so punctuation and diacritics collapse
+  // the same way the resolver sees them.
+  const numbered = rows.filter((row) => carriesSeriesNumber(normalizeForMatch(row.title)));
+  return limit !== null ? numbered.slice(0, limit) : numbered;
+}
+
+/**
+ * Clear the terminal verdict on the numbered absent rows so they become
+ * eligible again. The update re-asserts absent-and-id-less: a row that gained
+ * an id or changed status since selection keeps its own provenance, the same
+ * guard the shared resolution write applies. Returns the rows requeued.
+ */
+export async function requeueNumberedAbsents(limit: number | null): Promise<NumberedAbsentRow[]> {
+  const rows = await findNumberedAbsentRows(limit);
+  for (const row of rows) {
+    await db
+      .update(musicItems)
+      .set({ resolutionStatus: null, resolutionAttemptedAt: null })
+      .where(
+        and(
+          eq(musicItems.id, row.id),
+          eq(musicItems.resolutionStatus, "absent"),
+          isNull(musicItems.musicbrainzReleaseId),
+          isNull(musicItems.musicbrainzReleaseGroupId),
+          isNull(musicItems.discogsReleaseId),
+          isNull(musicItems.discogsMasterId),
+        ),
+      );
+  }
+  return rows;
 }

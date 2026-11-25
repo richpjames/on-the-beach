@@ -32,8 +32,13 @@ mock.module("../../app/release-resolver", () => ({
   resolveRelease: (query: unknown) => resolveRelease(query),
 }));
 
-const { findResolutionBackfillRows, backfillResolutionForRow, runResolutionBackfill } =
-  await import("../../app/resolution-backfill");
+const {
+  findResolutionBackfillRows,
+  backfillResolutionForRow,
+  runResolutionBackfill,
+  findNumberedAbsentRows,
+  requeueNumberedAbsents,
+} = await import("../../app/resolution-backfill");
 
 afterAll(() => {
   mock.module("../../app/release-resolver", () => ({
@@ -251,5 +256,72 @@ describe("runResolutionBackfill", () => {
     expect(summary.processed).toBe(
       summary.matched + summary.partial + summary.absent + summary.failed + summary.skipped,
     );
+  });
+});
+
+describe("requeueing numbered absents", () => {
+  async function stampAbsent(id: number) {
+    await db
+      .update(musicItems)
+      .set({ resolutionStatus: "absent", resolutionAttemptedAt: new Date() })
+      .where(eq(musicItems.id, id));
+  }
+
+  test("finds an absent row whose title carries a numbered series, in either notation", async () => {
+    const arabic = await createMusicItemDirect({
+      artistName: "Sugar Minott",
+      title: "Dance Hall Showcase, Vol. 2",
+    });
+    const roman = await createMusicItemDirect({
+      artistName: "Sugar Minott",
+      title: "Dance Hall Showcase Vol. II",
+    });
+    await stampAbsent(arabic.item.id);
+    await stampAbsent(roman.item.id);
+
+    const rows = await findNumberedAbsentRows(null);
+    expect(rows.some((row) => row.id === arabic.item.id)).toBe(true);
+    expect(rows.some((row) => row.id === roman.item.id)).toBe(true);
+  });
+
+  test("leaves an absent row with no numbered series out", async () => {
+    const plain = await createMusicItemDirect({
+      artistName: "The Earons",
+      title: "Land of Hunger",
+    });
+    await stampAbsent(plain.item.id);
+
+    const rows = await findNumberedAbsentRows(null);
+    expect(rows.some((row) => row.id === plain.item.id)).toBe(false);
+  });
+
+  test("never requeues a numbered row that carries an id from another path", async () => {
+    const withId = await createMusicItemDirect({
+      artistName: "Sugar Minott",
+      title: "Dance Hall Showcase, Vol. 2",
+      discogsReleaseId: 3733877,
+    });
+    await stampAbsent(withId.item.id);
+
+    const rows = await findNumberedAbsentRows(null);
+    expect(rows.some((row) => row.id === withId.item.id)).toBe(false);
+  });
+
+  test("clears the verdict so the row is eligible for the sweep again", async () => {
+    const { item } = await createMusicItemDirect({
+      artistName: "Sugar Minott",
+      title: "Dance Hall Showcase, Vol. 2",
+    });
+    await stampAbsent(item.id);
+
+    const requeued = await requeueNumberedAbsents(null);
+    expect(requeued.some((row) => row.id === item.id)).toBe(true);
+
+    const [row] = await db.select().from(musicItems).where(eq(musicItems.id, item.id));
+    expect(row.resolutionStatus).toBeNull();
+    expect(row.resolutionAttemptedAt).toBeNull();
+
+    const eligible = await findResolutionBackfillRows(null);
+    expect(eligible.some((r) => r.id === item.id)).toBe(true);
   });
 });
