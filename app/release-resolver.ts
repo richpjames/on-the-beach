@@ -243,8 +243,29 @@ export function similarity(a: string, b: string, allowContainment = true): numbe
   if (contained) return CONTAINMENT_SIMILARITY;
 
   const raw = 1 - editDistance(na, nb) / longer.length;
-  if (digitSignature(na) !== digitSignature(nb)) return Math.min(raw, DIGIT_MISMATCH_CEILING);
+  const sigA = digitSignature(na);
+  const sigB = digitSignature(nb);
+  if (sigA !== sigB && !romanOnlyAgainstEmpty(na, nb, sigA, sigB)) {
+    return Math.min(raw, DIGIT_MISMATCH_CEILING);
+  }
   return raw;
+}
+
+/**
+ * Whether a digit disagreement is only notation, not volume. A Roman numeral
+ * folded by `digitSignature` is a reading aid, not a digit the sleeve printed:
+ * "Dance Hall Showcase II" signs empty while "Dance Hall Showcase Vol. II" signs
+ * "2", yet they are one record. When one side expresses no number at all and the
+ * other's whole signature came from Roman folding, capping the pair would
+ * reintroduce the very abstain the folding exists to prevent — providers differ
+ * routinely on whether "Vol." is present. A side that printed an Arabic digit
+ * keeps the full force of the rule, so "Vol. 2" against an unnumbered sleeve is
+ * unchanged, and two non-empty signatures ("Vol. II" vs "Vol. III") still cap.
+ */
+function romanOnlyAgainstEmpty(na: string, nb: string, sigA: string, sigB: string): boolean {
+  const romanOnly = (normalized: string, signature: string) =>
+    signature !== "" && !/\d/.test(normalized);
+  return (sigA === "" && romanOnly(nb, sigB)) || (sigB === "" && romanOnly(na, sigA));
 }
 
 function tokensOf(value: string): string[] {
