@@ -100,14 +100,107 @@ const MIN_CONTAINMENT_LENGTH = 4;
 const DIGIT_MISMATCH_CEILING = 0.5;
 
 /**
+ * Words that introduce a numbered series — a volume, part or chapter. A Roman
+ * numeral only counts as a number when one of these precedes it (see
+ * `digitSignature`); the marker is what tells "Vol. II" (a volume) apart from
+ * the letters "ii" happening to sit in a name.
+ *
+ * The Spanish forms are here because the catalogue is largely Latin American
+ * and Iberian — "Volumen" and "Parte" appear on sleeves as often as "Vol." and
+ * "Part", the same reason `normalizeForMatch` strips diacritics.
+ */
+const SERIES_MARKERS = new Set([
+  "vol",
+  "volume",
+  "volumen",
+  "part",
+  "parte",
+  "pt",
+  "chapter",
+  "no",
+  "number",
+  "series",
+  "book",
+  "edition",
+]);
+
+/** Canonical Roman numerals only — "iiii", "vx" and "il" are not numbers. */
+const ROMAN_NUMERAL = /^m{0,4}(cm|cd|d?c{0,3})(xc|xl|l?x{0,3})(ix|iv|v?i{0,3})$/;
+const ROMAN_VALUES: Record<string, number> = { i: 1, v: 5, x: 10, l: 50, c: 100, d: 500, m: 1000 };
+
+/**
+ * The value of a canonical Roman numeral, or null when the token is not one.
+ * The regex already rejects non-canonical spellings, so the right-to-left
+ * subtractive walk below always reads a well-formed number.
+ */
+function romanNumeralValue(token: string): number | null {
+  if (!ROMAN_NUMERAL.test(token)) return null;
+  let total = 0;
+  let prev = 0;
+  for (let i = token.length - 1; i >= 0; i -= 1) {
+    const value = ROMAN_VALUES[token[i]!]!;
+    if (value < prev) {
+      total -= value;
+    } else {
+      total += value;
+      prev = value;
+    }
+  }
+  return total > 0 ? total : null;
+}
+
+/**
  * The numbers in a string, in order. Digits do not behave like letters here.
  * One letter apart is usually a typo or a transliteration; one digit apart is
  * a different record — "Guaco 76" and "Guaco 77" are 87% similar by edit
  * distance and are two separate albums. Accepting that pair is how a wrong id
  * reached the fixture manifest on an earlier pass.
+ *
+ * A volume number is still a number when it is written in Roman: a sleeve says
+ * "Dance Hall Showcase, Vol. 2" and both catalogues file it as "Dance Hall
+ * Showcase Vol. II". Read as letters, "ii" carries no digit signature at all,
+ * so the mismatch ceiling below capped the pair at 0.5 and the resolver
+ * abstained on a record both databases hold. A Roman numeral immediately after
+ * a series marker is therefore folded to its Arabic value — "vol ii" and
+ * "vol 2" both sign "2", while "vol ii" and "vol iii" still disagree.
+ *
+ * The marker is the whole safeguard. Without it, common letter pairs that are
+ * valid Roman numerals — "MC" (1100), "CD" (400), "Li" (51) — would sprout digit
+ * signatures and cap matches against sleeves that spell them out ("M.C.
+ * Hammer"). Only a numeral a series marker introduces is converted; a bare "I"
+ * or "V" in a title stays the letter it usually is.
  */
 function digitSignature(normalized: string): string {
-  return (normalized.match(/\d+/g) ?? []).join(" ");
+  const tokens = normalized.split(" ");
+  const parts: string[] = [];
+  for (let i = 0; i < tokens.length; i += 1) {
+    const token = tokens[i]!;
+    const runs = token.match(/\d+/g);
+    if (runs) {
+      parts.push(...runs);
+    } else if (i > 0 && SERIES_MARKERS.has(tokens[i - 1]!)) {
+      const value = romanNumeralValue(token);
+      if (value !== null) parts.push(String(value));
+    }
+  }
+  return parts.join(" ");
+}
+
+/**
+ * Whether a title carries a numbered series — a volume, part or chapter, in
+ * Arabic or Roman. Takes the `normalizeForMatch` form. The requeue sweep
+ * (resolution-backfill.ts) uses this to find `absent` rows the Roman-numeral
+ * trap may have wrongly abstained on, so they can be asked again now that the
+ * digit rule reads both notations.
+ */
+export function carriesSeriesNumber(normalized: string): boolean {
+  const tokens = normalized.split(" ");
+  for (let i = 1; i < tokens.length; i += 1) {
+    if (!SERIES_MARKERS.has(tokens[i - 1]!)) continue;
+    const token = tokens[i]!;
+    if (/\d/.test(token) || romanNumeralValue(token) !== null) return true;
+  }
+  return false;
 }
 
 /**

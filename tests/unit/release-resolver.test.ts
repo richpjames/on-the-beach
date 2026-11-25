@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, mock, spyOn, test } from "bun:test";
 import {
   artistSimilarity,
+  carriesSeriesNumber,
   normalizeForMatch,
   pickBest,
   recoverMusicBrainzArtistId,
@@ -489,6 +490,60 @@ describe("compilation volumes", () => {
       title: "PIPO'S 2 - O Encontro Da Massa",
     });
     expect(score.accepted).toBe(false);
+  });
+});
+
+describe("roman numeral volumes", () => {
+  // The live miss: a sleeve says "Dance Hall Showcase, Vol. 2" and both
+  // catalogues file it as "Dance Hall Showcase Vol. II". Read as letters, "ii"
+  // has no digit signature, so the mismatch ceiling capped the pair at 0.5 and
+  // the resolver abstained on a record both databases hold.
+  const SUGAR = { artist: "Sugar Minott", title: "Dance Hall Showcase, Vol. 2" };
+  const CATALOGUE = { artist: "Sugar Minott", title: "Dance Hall Showcase Vol. II" };
+
+  test("accepts one volume written in Arabic against the same volume in Roman", () => {
+    const score = scoreCandidate(SUGAR, CATALOGUE);
+    expect(score.accepted).toBe(true);
+    expect(score.title).toBeGreaterThan(0.9);
+  });
+
+  test("still refuses a different volume, whichever notation each side uses", () => {
+    expect(
+      scoreCandidate(SUGAR, { artist: "Sugar Minott", title: "Dance Hall Showcase Vol. III" })
+        .accepted,
+    ).toBe(false);
+    expect(
+      scoreCandidate(
+        { artist: "Sugar Minott", title: "Dance Hall Showcase Vol. II" },
+        { artist: "Sugar Minott", title: "Dance Hall Showcase Vol. 3" },
+      ).accepted,
+    ).toBe(false);
+  });
+
+  test("keeps the Arabic digit guard intact", () => {
+    // The rule the Roman folding must not weaken: one digit apart is a
+    // different record, not a typo.
+    expect(
+      scoreCandidate({ artist: "Guaco", title: "Guaco 76" }, { artist: "Guaco", title: "Guaco 77" })
+        .accepted,
+    ).toBe(false);
+  });
+
+  test("does not read a letter pair that is valid Roman as a number", () => {
+    // "MC" is 1100 in Roman and "CD" is 400; folding them unconditionally would
+    // cap "MC Hammer" against "M.C. Hammer" at 0.5. Only a series marker makes
+    // a numeral a number.
+    expect(similarity("MC Hammer", "M.C. Hammer", false)).toBeGreaterThan(0.8);
+    expect(artistSimilarity("MC Hammer", "M.C. Hammer")).toBeGreaterThan(0.8);
+  });
+
+  test("carriesSeriesNumber spots a numbered series in either notation", () => {
+    expect(carriesSeriesNumber(normalizeForMatch("Dance Hall Showcase, Vol. 2"))).toBe(true);
+    expect(carriesSeriesNumber(normalizeForMatch("Dance Hall Showcase Vol. II"))).toBe(true);
+    expect(carriesSeriesNumber(normalizeForMatch("O Encontro da Massa Parte III"))).toBe(true);
+    expect(carriesSeriesNumber(normalizeForMatch("Land of Hunger"))).toBe(false);
+    expect(carriesSeriesNumber(normalizeForMatch("Guaco 76"))).toBe(false);
+    expect(carriesSeriesNumber(normalizeForMatch("MC Hammer"))).toBe(false);
   });
 });
 
