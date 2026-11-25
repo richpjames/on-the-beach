@@ -648,6 +648,20 @@ describe("roman numeral volumes", () => {
         { artist: "Sugar Minott", title: "Dance Hall Showcase Vol. III" },
       ).accepted,
     ).toBe(false);
+    // Two different spelled-out / additive volumes both sign a number now, so
+    // they keep the ceiling rather than matching on raw similarity alone.
+    expect(
+      scoreCandidate(
+        { artist: "Sugar Minott", title: "Dance Hall Showcase Part One" },
+        { artist: "Sugar Minott", title: "Dance Hall Showcase Part Two" },
+      ).accepted,
+    ).toBe(false);
+    expect(
+      scoreCandidate(
+        { artist: "Sugar Minott", title: "Dance Hall Showcase Vol. IIII" },
+        { artist: "Sugar Minott", title: "Dance Hall Showcase Vol. VIIII" },
+      ).accepted,
+    ).toBe(false);
   });
 
   test("a dropped marker does not forgive a different volume", () => {
@@ -690,6 +704,11 @@ describe("roman numeral volumes", () => {
     // word table is a Map, so "constructor"/"toString" cannot masquerade as one.
     expect(carriesSeriesNumber(normalizeForMatch("Part Constructor"))).toBe(false);
     expect(carriesSeriesNumber(normalizeForMatch("Part toString"))).toBe(false);
+    // A dropped marker leaves a multi-letter canonical numeral closing the
+    // title — the same trap, so it qualifies; a single closing letter does not.
+    expect(carriesSeriesNumber(normalizeForMatch("Dance Hall Showcase II"))).toBe(true);
+    expect(carriesSeriesNumber(normalizeForMatch("Dance Hall Showcase III"))).toBe(true);
+    expect(carriesSeriesNumber(normalizeForMatch("Dance Hall Showcase I"))).toBe(false);
   });
 });
 
