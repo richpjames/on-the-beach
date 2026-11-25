@@ -269,11 +269,12 @@ function digitSignature(normalized: string): string {
  *
  * The ambiguous Roman/word readings are gated by a series marker exactly as in
  * `digitSignature`, so a bare "One" or "IIII" in a name does not qualify a row.
- * A multi-letter canonical numeral closing the title also qualifies without a
- * marker: a sleeve that dropped "Vol." ("Dance Hall Showcase II") is the same
- * trap, capped against the catalogue's "Vol. 2" by the old rule. A leading
- * letter pair ("MC Hammer"), a single closing letter ("… I") and a bare digit
- * run ("Guaco 76") stay out.
+ * A multi-letter canonical numeral of volume-range letters (i/v/x) closing the
+ * title also qualifies without a marker: a sleeve that dropped "Vol." ("Dance
+ * Hall Showcase II") is the same trap, capped against the catalogue's "Vol. 2"
+ * by the old rule. A leading letter pair ("MC Hammer"), a single closing letter
+ * ("… I"), a bare digit run ("Guaco 76") and a closing abbreviation or name that
+ * happens to be valid Roman ("Bonus CD", "Club Mix", "Li") stay out.
  */
 export function carriesSeriesNumber(normalized: string): boolean {
   const tokens = normalized.split(" ");
@@ -283,7 +284,10 @@ export function carriesSeriesNumber(normalized: string): boolean {
     if (/\d/.test(token) || markedSeriesValue(token) !== null) return true;
   }
   const last = tokens[tokens.length - 1]!;
-  return last.length > 1 && romanNumeralValue(last) !== null;
+  // Volume-range letters only: "CD" (400), "MC" (1100), "Li" (51) and "Mix"
+  // (1009) are valid numerals but are abbreviations or names when they close a
+  // title, not volumes. "II", "III", "IV", "XII" still qualify.
+  return last.length > 1 && /^[ivx]+$/.test(last) && romanNumeralValue(last) !== null;
 }
 
 /**
