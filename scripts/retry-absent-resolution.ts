@@ -8,10 +8,11 @@
  * never asked again even though both databases hold it (e.g. Sugar Minott's
  * "Dance Hall Showcase, Vol. 2", Discogs master 122464). This clears the verdict
  * on absent, id-less rows whose title carries a numbered series — a series
- * marker in any notation ("Vol. 2", "Vol. II", "Part One") or a volume-range
- * Roman numeral (i/v/x) closing the title ("Dance Hall Showcase II") — putting
- * them back on the backfill sweep's and the on-view lookup's eligibility so the
- * next run resolves them with the fixed rule.
+ * marker in any notation ("Vol. 2", "Vol. II", "Part One", "Parte Primera") or a
+ * volume-range Roman numeral (i/v/x) anywhere in the title ("Dance Hall Showcase
+ * II", "Dance Hall Showcase II (1979)") — putting them back on the backfill
+ * sweep's and the on-view lookup's eligibility so the next run resolves them
+ * with the fixed rule.
  *
  * A sleeve numbered with a bare Arabic digit and no marker ("Dance Hall
  * Showcase 2") is not selected: syntactically it is indistinguishable from a
