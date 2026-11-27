@@ -28,8 +28,10 @@ The account credentials are a fallback for the day anonymous reads stop
 working, and for installs that would rather ask as a signed-in listener.
 When both email and password are set, the adapter logs in once and caches
 the returned `user_auth_token`; a 401 on the cached token re-logs in and
-retries the request once. A token in `QOBUZ_USER_AUTH_TOKEN` wins over the
-login pair.
+retries the request once. Concurrent requests share one in-flight login,
+and a failed login is remembered for a minute — a wrong password must not
+make every request re-attempt it. A token in `QOBUZ_USER_AUTH_TOKEN` wins
+over the login pair.
 
 ## Scraping a link
 

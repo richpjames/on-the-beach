@@ -71,6 +71,13 @@ describe("parseQobuzUrl", () => {
     });
   });
 
+  test("a store artist URL parses the same as an interpreter one", () => {
+    expect(parseQobuzUrl("https://www.qobuz.com/us-en/artist/miles-davis/6760")).toEqual({
+      kind: "artist",
+      id: "6760",
+    });
+  });
+
   test("pages that name no resource we model parse to null", () => {
     expect(parseQobuzUrl("https://www.qobuz.com/us-en/label/columbia/4592")).toBeNull();
     expect(parseQobuzUrl("https://www.qobuz.com/us-en/album/")).toBeNull();
@@ -386,5 +393,43 @@ describe("Qobuz account authentication", () => {
     const result = await scrapeQobuz("https://play.qobuz.com/album/5099749522428", 5000);
     expect(result).toBeNull();
     expect(fetchSpy).toHaveBeenCalledTimes(1);
+  });
+
+  test("concurrent requests share one login", async () => {
+    process.env.QOBUZ_EMAIL = "listener@example.com";
+    process.env.QOBUZ_PASSWORD = "secret";
+    const fetchSpy = spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+      const url = String(input);
+      return url.includes("user/login")
+        ? jsonResponse({ user_auth_token: "login-token" })
+        : jsonResponse(ALBUM);
+    });
+
+    const results = await Promise.all([
+      scrapeQobuz("https://play.qobuz.com/album/5099749522428", 5000),
+      scrapeQobuz("https://play.qobuz.com/album/5099749522428", 5000),
+      scrapeQobuz("https://play.qobuz.com/album/5099749522428", 5000),
+    ]);
+
+    expect(results.every((r) => r?.potentialTitle === "Kind Of Blue")).toBe(true);
+    const loginCalls = fetchSpy.mock.calls.filter(([url]) => String(url).includes("user/login"));
+    expect(loginCalls).toHaveLength(1);
+  });
+
+  test("a failed login is remembered — the next request asks anonymously without retrying", async () => {
+    process.env.QOBUZ_EMAIL = "listener@example.com";
+    process.env.QOBUZ_PASSWORD = "wrong";
+    const fetchSpy = spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+      const url = String(input);
+      return url.includes("user/login") ? new Response(null, { status: 401 }) : jsonResponse(ALBUM);
+    });
+
+    await scrapeQobuz("https://play.qobuz.com/album/5099749522428", 5000);
+    const second = await scrapeQobuz("https://play.qobuz.com/album/5099749522428", 5000);
+
+    expect(second?.potentialTitle).toBe("Kind Of Blue");
+    const loginCalls = fetchSpy.mock.calls.filter(([url]) => String(url).includes("user/login"));
+    expect(loginCalls).toHaveLength(1);
+    expect(fetchSpy).toHaveBeenCalledTimes(3);
   });
 });
