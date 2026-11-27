@@ -54,14 +54,22 @@ Each gets:
   for currency and for any later API enricher):
   `https://www.ebay.es/itm/800867457219?itmprp=…` → `https://www.ebay.es/itm/800867457219`
   (dedupe is on source + listing id, not this URL — see Edge decisions);
+- a `listingId(match)` hook on the same entry. The registry already carries
+  per-entry `normalizer`/`extractor` functions; this is one more of the same
+  kind: eBay's returns the digits after `/itm/`, Wallapop's the trailing
+  digits of `/item/<words>-<id>`. It feeds the dedupe key (see Edge
+  decisions); when it returns nothing, dedupe falls back to the exact
+  normalised URL;
 - a `SEED_SOURCES` row with `canPlay: false, canBuy: true, isEditorial: false`;
 - a static `sourceIsMarketplace(source)` in the registry, beside
   `sourceNamesReleaseDate` — the same static-capability-query pattern. The
   `sources` table stays the display authority.
 
 Adding a marketplace is then a registry entry + a seed row + a union member —
-no new code, per the architecture rule. Phase 1 ships eBay (all TLDs) and
-Wallapop; Vinted and Mercadolibre are the same recipe when wanted.
+no new module, per the architecture rule. The per-site knowledge (URL shape,
+listing id, slug words) is data on the entry, exactly as Bandcamp's extractor
+is today — not an adapter. Phase 1 ships eBay (all TLDs) and Wallapop; Vinted
+and Mercadolibre are the same recipe when wanted.
 
 ### 2. The share clients keep the title
 
@@ -74,7 +82,9 @@ Wallapop; Vinted and Mercadolibre are the same recipe when wanted.
   from "Get URLs from Input", title from the text before it — and post
   `pageTitle`. `docs/ios-shortcut.md` updated accordingly.
 
-Both keep working exactly as today when no title is present.
+Both keep working exactly as today when no title is present — and only post a
+title line that exists: the URL is never sent as its own `pageTitle` (the
+server's acceptance rule in §3 is the guard either way).
 
 ### 3. One generic listing path on the server
 
@@ -99,6 +109,15 @@ source takes a new branch **before** any fetch:
    title becomes a single release-shaped candidate (`itemType: "album"`
    default, evidence "listing title") — not the unknown-page path's "mix"
    fallback. The user corrects it in the form if needed.
+
+   The fallback only fires on a **usable** title. `pageTitle` is rejected
+   when, trimmed, it is the URL itself (the `"Title\nURL"` split yields the
+   URL when no title line exists) or a bare site name ("eBay", "Wallapop" —
+   what a still-loading page shares); `stripSiteSuffix` already answers empty
+   for a title that is only the site's own name, and the same rule applies
+   here. A rejected title reads as *no title*: slug evidence where the entry
+   offers any, otherwise the honest "paste the listing title" error — never a
+   library item titled `https://…` or "eBay".
 
 The new branch lives in the creator; `scrapeUrl` and the streaming sources are
 untouched. A marketplace with a bespoke adapter later (below) takes precedence
@@ -131,14 +150,17 @@ Where an official API exists, an adapter enriches — never required:
 
 ## Edge decisions
 
-- **No title, marketplace URL, share path**: the slug is the only evidence.
-  Wallapop slugs carry words (`vinilo-camaron-la-leyenda-del-tiempo-1979`);
-  hyphens-to-spaces, drop the trailing numeric id, and offer it to the
-  extraction as supplementary text. eBay's numeric slug carries nothing —
-  answer with the honest "paste the listing title" error rather than inventing
-  an item.
-- **No `MISTRAL_API_KEY`**: the raw-title fallback (3) still creates the item;
-  a share is never held up by extraction, same principle as the link preview.
+- **No usable title, marketplace URL, share path**: no title line, or a
+  `pageTitle` rejected by the fallback's acceptance rule (URL-only, bare site
+  name). The slug is the only evidence left — per-entry data, like the
+  listing id. Wallapop slugs carry words
+  (`vinilo-camaron-la-leyenda-del-tiempo-1979`); hyphens-to-spaces, drop the
+  trailing numeric id, and offer it to the extraction as supplementary text.
+  eBay's numeric slug carries nothing — answer with the honest "paste the
+  listing title" error rather than inventing an item.
+- **No `MISTRAL_API_KEY`**: a usable raw title still creates the item via the
+  fallback (3); a share is never held up by extraction, same principle as the
+  link preview.
 - **Several releases in one listing** (a lot of 5 LPs): extraction may name
   several candidates; the existing `ambiguous_link` picker handles it. The
   fallback stays single-candidate — one listing, one item.
@@ -148,10 +170,12 @@ Where an official API exists, an adapter enriches — never required:
   `ebay.es/itm/<id>` and `ebay.com/itm/<id>` are the same listing, and the
   TLD-preserving normaliser alone would file it twice (today's URL check is an
   exact match, `fetchItemsByUrls`). The dedupe key for a marketplace is
-  therefore **source + listing id**, not the full URL: the URL check matches
-  any site variant of the same id, while the TLD-bearing URL is still what
-  gets stored, for currency and the enricher's marketplace header. The
-  library-wide artist/title check stays the second net, not the first.
+  therefore **source + listing id** — the id from the entry's `listingId`
+  hook, or the exact normalised URL when the hook returns nothing — not the
+  full URL: the URL check matches any site variant of the same id, while the
+  TLD-bearing URL is still what gets stored, for currency and the enricher's
+  marketplace header. The library-wide artist/title check stays the second
+  net, not the first.
 - **Ended listings**: the client captured the title while the page was live;
   the item is still created. Nothing re-fetches the page later.
 - **`pageTitle` is untrusted input**: length-capped at the route, fed to the
@@ -172,11 +196,14 @@ Where an official API exists, an adapter enriches — never required:
 
 ## Phasing
 
-1. **Foundation** — registry + seed rows (eBay, Wallapop), `pageTitle` on
-   `/link`, the creator's marketplace branch, `response.ok` fix, honest paste
-   errors. Unit tests: classification/normalisation, the branch extracts from
-   the title **without fetching**, fallbacks (no key, no title, slug-only),
-   non-2xx reads as null. Layer boundaries stay green.
+1. **Foundation** — registry + seed rows (eBay, Wallapop) with `listingId`
+   hooks, `pageTitle` on `/link`, the creator's marketplace branch,
+   `response.ok` fix, honest paste errors. Unit tests:
+   classification/normalisation, `listingId` per site and cross-TLD dedupe
+   (including the no-id fallback to exact URL), the branch extracts from the
+   title **without fetching**, junk-title rejection (URL-only, bare site
+   name), fallbacks (no key, no usable title, slug-only), non-2xx reads as
+   null. Layer boundaries stay green.
 2. **Clients** — native extension and Shortcut keep and post the title; docs
    updated.
 3. **Enrichers** — `adapters/ebay/` with the Browse API when keys are set.
