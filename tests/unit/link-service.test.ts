@@ -12,6 +12,8 @@ describe("serviceFromUrl", () => {
     expect(serviceFromUrl("https://www.discogs.com/release/123")).toBe("discogs");
     expect(serviceFromUrl("https://tidal.com/browse/album/123")).toBe("tidal");
     expect(serviceFromUrl("https://www.deezer.com/gb/album/123")).toBe("deezer");
+    expect(serviceFromUrl("https://www.qobuz.com/us-en/album/x/123")).toBe("qobuz");
+    expect(serviceFromUrl("https://play.qobuz.com/album/123")).toBe("qobuz");
     expect(serviceFromUrl("https://www.mixcloud.com/host/show/")).toBe("mixcloud");
     expect(serviceFromUrl("https://www.nts.live/shows/some-show")).toBe("nts");
     expect(serviceFromUrl("https://pitchfork.com/reviews/albums/slug/")).toBe("pitchfork");
@@ -60,5 +62,6 @@ describe("sourceDisplayName", () => {
     expect(sourceDisplayName("youtube")).toBe("YouTube");
     expect(sourceDisplayName("nts")).toBe("NTS");
     expect(sourceDisplayName("bandcamp")).toBe("Bandcamp");
+    expect(sourceDisplayName("qobuz")).toBe("Qobuz");
   });
 });

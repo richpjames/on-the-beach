@@ -251,3 +251,64 @@ describe("parseUrl - apple music", () => {
     expect(result.source).toBe("apple_music");
   });
 });
+
+describe("parseUrl - qobuz", () => {
+  test("identifies a store album link and strips query params", () => {
+    const result = parseUrl(
+      "https://www.qobuz.com/us-en/album/kind-of-blue-miles-davis/5099749522428?utm_source=share",
+    );
+
+    expect(result.source).toBe("qobuz");
+    expect(result.normalizedUrl).toBe(
+      "https://www.qobuz.com/us-en/album/kind-of-blue-miles-davis/5099749522428",
+    );
+  });
+
+  test("does not extract artist or title from an album slug (ambiguous)", () => {
+    const result = parseUrl(
+      "https://www.qobuz.com/fr-fr/album/kind-of-blue-miles-davis/5099749522428",
+    );
+
+    expect(result.potentialArtist).toBeUndefined();
+    expect(result.potentialTitle).toBeUndefined();
+  });
+
+  test("identifies track and playlist links", () => {
+    expect(parseUrl("https://www.qobuz.com/gb-en/track/so-what-miles-davis/13176083").source).toBe(
+      "qobuz",
+    );
+    expect(parseUrl("https://www.qobuz.com/us-en/playlist/lucinda-williams/4458346").source).toBe(
+      "qobuz",
+    );
+  });
+
+  test("identifies an interpreter link and extracts the artist slug", () => {
+    const result = parseUrl("https://www.qobuz.com/us-en/interpreter/miles-davis/6760");
+
+    expect(result.source).toBe("qobuz");
+    expect(result.potentialArtist).toBe("miles davis");
+  });
+
+  test("identifies player share links", () => {
+    const result = parseUrl("https://play.qobuz.com/album/5099749522428");
+
+    expect(result.source).toBe("qobuz");
+    expect(result.normalizedUrl).toBe("https://play.qobuz.com/album/5099749522428");
+    expect(parseUrl("https://play.qobuz.com/track/13176083").source).toBe("qobuz");
+    expect(parseUrl("https://play.qobuz.com/playlist/4458346").source).toBe("qobuz");
+  });
+
+  test("accepts the newer opaque album ids", () => {
+    const result = parseUrl(
+      "https://www.qobuz.com/us-en/album/some-record-some-artist/g0xt6qab8z8lb",
+    );
+
+    expect(result.source).toBe("qobuz");
+  });
+
+  test("a qobuz page that names no resource we model is unknown", () => {
+    expect(parseUrl("https://www.qobuz.com/us-en/label/columbia/4592").source).toBe("unknown");
+    expect(parseUrl("https://www.qobuz.com/us-en/album/").source).toBe("unknown");
+    expect(parseUrl("https://qobuz.com.evil.test/album/x/123").source).toBe("unknown");
+  });
+});

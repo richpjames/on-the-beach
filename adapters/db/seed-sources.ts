@@ -88,6 +88,17 @@ export const SEED_SOURCES = [
     isEditorial: false,
   },
   {
+    // Qobuz sells downloads as well as streams, but like Apple Music its
+    // primary function here is playback — `canBuy` stays false on the same
+    // terms (see the apple_music note above).
+    name: "qobuz",
+    displayName: "Qobuz",
+    urlPattern: "qobuz.com",
+    canPlay: true,
+    canBuy: false,
+    isEditorial: false,
+  },
+  {
     name: "mixcloud",
     displayName: "Mixcloud",
     urlPattern: "mixcloud.com",

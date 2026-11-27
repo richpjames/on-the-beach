@@ -51,6 +51,7 @@ export const PLAYABLE_SOURCES = new Set([
   "apple_music",
   "tidal",
   "deezer",
+  "qobuz",
   "mixcloud",
 ]);
 

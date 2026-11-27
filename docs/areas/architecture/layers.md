@@ -13,7 +13,7 @@ app/      use cases: item creation, reminders, suggestions, scrape orchestration
           plus app/queries/ for the read models
 adapters/ one folder per outside thing: apple-music/, discogs/, musicbrainz/,
           soundcloud/, mixcloud/, youtube/, nts/, pitchfork/, bandcamp/,
-          spotify/, acrcloud/, google-vision/, mistral/, web/, db/
+          spotify/, qobuz/, acrcloud/, google-vision/, mistral/, web/, db/
           adapters/registry.ts wires a source's URLs and scrape in
 server/   the HTTP host: Hono route groups, uploads, CSRF, preview seeding
 src/      the SvelteKit app (the other driving adapter)

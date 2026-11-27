@@ -1,0 +1,159 @@
+/**
+ * The Qobuz API client: configuration, optional authentication, and the
+ * request helper the scrape and search share.
+ *
+ * Qobuz publishes no documented public API — the JSON API at
+ * `www.qobuz.com/api.json/0.2` is the one their own players use, and every
+ * request carries an `app_id`. The id defaulted here is one Qobuz ship in
+ * their public web bundle; it answers catalogue reads anonymously. Set
+ * `QOBUZ_APP_ID` to use another.
+ *
+ * An account is optional. With `QOBUZ_EMAIL` + `QOBUZ_PASSWORD` the client
+ * logs in via `user/login` and caches the returned token; a
+ * `QOBUZ_USER_AUTH_TOKEN` supplies one directly (e.g. lifted from a
+ * signed-in browser session). Neither is needed while anonymous reads work
+ * — they are there for the day Qobuz tighten them, and for installs that
+ * would rather ask as a signed-in listener.
+ */
+import { isRecord } from "../web/html-metadata";
+
+const API_BASE = "https://www.qobuz.com/api.json/0.2";
+
+/** An app id published in Qobuz's own web bundle; catalogue reads answer it anonymously. */
+const DEFAULT_APP_ID = "425621600";
+
+export function getAppId(): string {
+  return process.env.QOBUZ_APP_ID?.trim() || DEFAULT_APP_ID;
+}
+
+/**
+ * The storefront locale (`cc-ll`) returned URLs are rewritten to, so a link
+ * found through the API opens in the listener's own store rather than the
+ * French one the API answers with by default.
+ */
+export function getStorefront(): string {
+  const raw = process.env.QOBUZ_STOREFRONT?.trim().toLowerCase();
+  return raw && /^[a-z]{2}-[a-z]{2}$/.test(raw) ? raw : "gb-en";
+}
+
+/** Rewrite a qobuz.com URL's locale segment to the configured storefront. */
+export function qobuzStorefrontUrl(url: string): string {
+  return url.replace(
+    /^(https?:\/\/(?:www\.)?qobuz\.com\/)[a-z]{2}-[a-z]{2}(\/)/i,
+    `$1${getStorefront()}$2`,
+  );
+}
+
+export interface QobuzCredentials {
+  email: string;
+  password: string;
+}
+
+/** Read the account credentials, returning null unless both are present. */
+export function readQobuzCredentials(): QobuzCredentials | null {
+  const email = process.env.QOBUZ_EMAIL?.trim();
+  const password = process.env.QOBUZ_PASSWORD;
+  if (!email || !password) return null;
+  return { email, password };
+}
+
+/** Whether an account is configured — anonymous catalogue reads need nothing. */
+export function isQobuzConfigured(): boolean {
+  return Boolean(process.env.QOBUZ_USER_AUTH_TOKEN?.trim()) || readQobuzCredentials() !== null;
+}
+
+let cachedToken: string | null = null;
+
+/** Clear the cached login token. Exported for tests. */
+export function resetQobuzAuthCache(): void {
+  cachedToken = null;
+}
+
+async function login(credentials: QobuzCredentials, timeoutMs: number): Promise<string | null> {
+  const params = new URLSearchParams({
+    email: credentials.email,
+    password: credentials.password,
+    app_id: getAppId(),
+  });
+
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+
+    const response = await fetch(`${API_BASE}/user/login?${params.toString()}`, {
+      signal: controller.signal,
+      headers: { Accept: "application/json", "X-App-Id": getAppId() },
+    });
+
+    clearTimeout(timer);
+
+    if (!response.ok) return null;
+
+    const data = (await response.json()) as unknown;
+    if (!isRecord(data)) return null;
+    return typeof data.user_auth_token === "string" && data.user_auth_token
+      ? data.user_auth_token
+      : null;
+  } catch (err) {
+    console.error("[qobuz] login failed:", err);
+    return null;
+  }
+}
+
+async function getAuthToken(timeoutMs: number): Promise<string | null> {
+  const direct = process.env.QOBUZ_USER_AUTH_TOKEN?.trim();
+  if (direct) return direct;
+  if (cachedToken) return cachedToken;
+
+  const credentials = readQobuzCredentials();
+  if (!credentials) return null;
+
+  cachedToken = await login(credentials, timeoutMs);
+  return cachedToken;
+}
+
+/**
+ * GET an API endpoint, returning the parsed JSON object, or null on any
+ * failure — a scrape or a search reports "nothing found", never a transport
+ * error. A 401 on a cached login token clears the cache and retries once
+ * (tokens expire); anonymous reads and env-supplied tokens are not retried.
+ */
+export async function fetchQobuzApi(
+  endpoint: string,
+  params: Record<string, string>,
+  timeoutMs: number,
+): Promise<Record<string, unknown> | null> {
+  for (let attempt = 0; ; attempt += 1) {
+    const token = await getAuthToken(timeoutMs);
+    const query = new URLSearchParams({ ...params, app_id: getAppId() });
+
+    try {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), timeoutMs);
+
+      const response = await fetch(`${API_BASE}/${endpoint}?${query.toString()}`, {
+        signal: controller.signal,
+        headers: {
+          Accept: "application/json",
+          "X-App-Id": getAppId(),
+          ...(token ? { "X-User-Auth-Token": token } : {}),
+        },
+      });
+
+      clearTimeout(timer);
+
+      const tokenIsCachedLogin = token !== null && !process.env.QOBUZ_USER_AUTH_TOKEN?.trim();
+      if (response.status === 401 && attempt === 0 && tokenIsCachedLogin) {
+        resetQobuzAuthCache();
+        continue;
+      }
+
+      if (!response.ok) return null;
+
+      const data = (await response.json()) as unknown;
+      return isRecord(data) ? data : null;
+    } catch {
+      return null;
+    }
+  }
+}

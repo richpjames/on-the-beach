@@ -25,6 +25,7 @@ import { fetchDiscogsRelease } from "./discogs";
 import { scrapeMixcloud } from "./mixcloud";
 import { scrapeNts } from "./nts";
 import { scrapePitchfork } from "./pitchfork";
+import { scrapeQobuz } from "./qobuz/index";
 import { scrapeSoundcloud } from "./soundcloud";
 import { scrapeYouTube } from "./youtube";
 
@@ -111,6 +112,28 @@ const URL_PATTERNS: Array<{
     pattern: /^https?:\/\/(?:www\.)?deezer\.com\/[a-z]{2}\/(album|track|playlist)\/(\d+)/,
   },
   {
+    // Qobuz store URLs carry a locale and a slug that concatenates title and
+    // artist ("kind-of-blue-miles-davis") — too ambiguous to split, so names
+    // come from the API scrape instead. Artist pages are filed under
+    // "interpreter"; their slug is the artist alone.
+    source: "qobuz",
+    pattern:
+      /^https?:\/\/(?:www\.)?qobuz\.com\/[a-z]{2}-[a-z]{2}\/(album|track|playlist|interpreter|artist)\/([^/]+)\/([a-zA-Z0-9]+)/,
+    extractor: (match) => {
+      if (match[1] === "interpreter" || match[1] === "artist") {
+        return { potentialArtist: match[2]?.replace(/-/g, " ") };
+      }
+      return {};
+    },
+  },
+  {
+    // The player's share links carry no slug or locale — the same resource
+    // under a second spelling, classified but not normalised into the store
+    // form (the slug needed for that is only knowable from the API).
+    source: "qobuz",
+    pattern: /^https?:\/\/play\.qobuz\.com\/(album|track|playlist|artist)\/([a-zA-Z0-9]+)/,
+  },
+  {
     source: "nts",
     pattern: /^https?:\/\/(?:www\.)?nts\.live\/shows\/([^/]+)(?:\/episodes\/([^/?]+))?/,
     extractor: (match) => ({
@@ -162,11 +185,12 @@ export const SOURCE_SCRAPERS: Partial<Record<SourceName, SourceScrape>> = {
   mixcloud: scrapeMixcloud,
   nts: scrapeNts,
   pitchfork: scrapePitchfork,
+  qobuz: scrapeQobuz,
   soundcloud: scrapeSoundcloud,
   youtube: scrapeYouTube,
 };
 
 /** Whether a source's pages state a release date worth scraping for. */
 export function sourceNamesReleaseDate(source: SourceName): boolean {
-  return source === "bandcamp";
+  return source === "bandcamp" || source === "qobuz";
 }

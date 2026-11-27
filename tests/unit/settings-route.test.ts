@@ -97,7 +97,7 @@ describe("GET /api/settings", () => {
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.lookupService).toBe("apple_music");
-    expect(body.lookupServices).toEqual(["apple_music", "spotify"]);
+    expect(body.lookupServices).toEqual(["apple_music", "spotify", "qobuz"]);
     expect(body.releaseLengthPreference).toBe("longer");
     expect(body.releaseLengthPreferences).toEqual(["longer", "shorter"]);
   });

@@ -29,6 +29,7 @@ export type SourceName =
   | "discogs"
   | "tidal"
   | "deezer"
+  | "qobuz"
   | "mixcloud"
   | "nts"
   | "pitchfork"

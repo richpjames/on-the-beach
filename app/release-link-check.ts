@@ -20,7 +20,8 @@ import { parseUrl } from "../adapters/registry";
 // So an alert now has to bring evidence that the record exists somewhere you
 // could go and hear it, in one of two forms:
 //
-//   1. The provider of choice (Apple Music, or Spotify when selected) has it.
+//   1. The provider of choice (Apple Music, Spotify or Qobuz, when selected)
+//      has it.
 //   2. MusicBrainz's own "external links" — the url relationships on the
 //      release group — point somewhere.
 //

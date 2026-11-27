@@ -9,9 +9,9 @@ import { appSettings, itemSuggestions, musicItems } from "../adapters/db/schema"
 // ---------------------------------------------------------------------------
 
 /** Streaming service used for secondary-link lookups. */
-export type LookupService = "apple_music" | "spotify";
+export type LookupService = "apple_music" | "spotify" | "qobuz";
 
-export const LOOKUP_SERVICES: readonly LookupService[] = ["apple_music", "spotify"];
+export const LOOKUP_SERVICES: readonly LookupService[] = ["apple_music", "spotify", "qobuz"];
 
 export function isLookupService(value: unknown): value is LookupService {
   return typeof value === "string" && (LOOKUP_SERVICES as readonly string[]).includes(value);
