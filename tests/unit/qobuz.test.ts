@@ -432,4 +432,35 @@ describe("Qobuz account authentication", () => {
     expect(loginCalls).toHaveLength(1);
     expect(fetchSpy).toHaveBeenCalledTimes(3);
   });
+
+  test("parallel requests on an expired token share one re-login", async () => {
+    process.env.QOBUZ_EMAIL = "listener@example.com";
+    process.env.QOBUZ_PASSWORD = "secret";
+    let logins = 0;
+    const fetchSpy = spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
+      const url = String(input);
+      if (url.includes("user/login")) {
+        logins += 1;
+        return jsonResponse({ user_auth_token: logins === 1 ? "stale-token" : "fresh-token" });
+      }
+      const headers = (init?.headers ?? {}) as Record<string, string>;
+      return headers["X-User-Auth-Token"] === "stale-token"
+        ? new Response(null, { status: 401 })
+        : jsonResponse(ALBUM);
+    });
+
+    // Prime the cache with a token that is about to expire.
+    await scrapeQobuz("https://play.qobuz.com/album/5099749522428", 5000);
+
+    const results = await Promise.all([
+      scrapeQobuz("https://play.qobuz.com/album/5099749522428", 5000),
+      scrapeQobuz("https://play.qobuz.com/album/5099749522428", 5000),
+      scrapeQobuz("https://play.qobuz.com/album/5099749522428", 5000),
+    ]);
+
+    expect(results.every((r) => r?.potentialTitle === "Kind Of Blue")).toBe(true);
+    // One login to prime, one shared re-login — not one per parallel request.
+    const loginCalls = fetchSpy.mock.calls.filter(([url]) => String(url).includes("user/login"));
+    expect(loginCalls).toHaveLength(2);
+  });
 });
