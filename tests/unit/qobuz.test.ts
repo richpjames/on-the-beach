@@ -437,6 +437,9 @@ describe("Qobuz account authentication", () => {
     process.env.QOBUZ_EMAIL = "listener@example.com";
     process.env.QOBUZ_PASSWORD = "secret";
     let logins = 0;
+    // The token expires only after priming, so all three parallel requests
+    // carry the same stale token and 401 together.
+    let tokenExpired = false;
     const fetchSpy = spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
       const url = String(input);
       if (url.includes("user/login")) {
@@ -444,13 +447,14 @@ describe("Qobuz account authentication", () => {
         return jsonResponse({ user_auth_token: logins === 1 ? "stale-token" : "fresh-token" });
       }
       const headers = (init?.headers ?? {}) as Record<string, string>;
-      return headers["X-User-Auth-Token"] === "stale-token"
+      return tokenExpired && headers["X-User-Auth-Token"] === "stale-token"
         ? new Response(null, { status: 401 })
         : jsonResponse(ALBUM);
     });
 
     // Prime the cache with a token that is about to expire.
     await scrapeQobuz("https://play.qobuz.com/album/5099749522428", 5000);
+    tokenExpired = true;
 
     const results = await Promise.all([
       scrapeQobuz("https://play.qobuz.com/album/5099749522428", 5000),
