@@ -52,7 +52,8 @@ Each gets:
 - a `URL_PATTERNS` entry in `adapters/registry.ts` with a normaliser that
   strips tracking params but **keeps the site's TLD** (the marketplace matters
   for currency and for any later API enricher):
-  `https://www.ebay.es/itm/800867457219?itmprp=…` → `https://www.ebay.es/itm/800867457219`;
+  `https://www.ebay.es/itm/800867457219?itmprp=…` → `https://www.ebay.es/itm/800867457219`
+  (dedupe is on source + listing id, not this URL — see Edge decisions);
 - a `SEED_SOURCES` row with `canPlay: false, canBuy: true, isEditorial: false`;
 - a static `sourceIsMarketplace(source)` in the registry, beside
   `sourceNamesReleaseDate` — the same static-capability-query pattern. The
@@ -142,7 +143,15 @@ Where an official API exists, an adapter enriches — never required:
   several candidates; the existing `ambiguous_link` picker handles it. The
   fallback stays single-candidate — one listing, one item.
 - **Duplicate shares**: normalisation strips tracking params, so the same
-  listing shared twice dedupes on the clean URL.
+  listing shared twice on one site dedupes on the clean URL. But listing ids
+  are global across country sites — eBay's item ids and Wallapop's alike — so
+  `ebay.es/itm/<id>` and `ebay.com/itm/<id>` are the same listing, and the
+  TLD-preserving normaliser alone would file it twice (today's URL check is an
+  exact match, `fetchItemsByUrls`). The dedupe key for a marketplace is
+  therefore **source + listing id**, not the full URL: the URL check matches
+  any site variant of the same id, while the TLD-bearing URL is still what
+  gets stored, for currency and the enricher's marketplace header. The
+  library-wide artist/title check stays the second net, not the first.
 - **Ended listings**: the client captured the title while the page was live;
   the item is still created. Nothing re-fetches the page later.
 - **`pageTitle` is untrusted input**: length-capped at the route, fed to the
