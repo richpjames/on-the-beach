@@ -176,6 +176,15 @@ Where an official API exists, an adapter enriches — never required:
   TLD-bearing URL is still what gets stored, for currency and the enricher's
   marketplace header. The library-wide artist/title check stays the second
   net, not the first.
+
+  The mechanism: a nullable, indexed `listingKey` column on `musicLinks`,
+  stamped `<source>:<listing id>` at insert for marketplace links only. The
+  duplicate check looks up by that key when the entry's hook yields an id —
+  one indexed query that matches every site variant, present and future —
+  and keeps today's exact-URL match for everything else. No backfill:
+  marketplace sources are new, so no existing row carries a key; Discogs
+  listings stay on the `discogs` source's own path, untouched. This is a
+  one-time platform change (migration + check), not per-site work.
 - **Ended listings**: the client captured the title while the page was live;
   the item is still created. Nothing re-fetches the page later.
 - **`pageTitle` is untrusted input**: length-capped at the route, fed to the
@@ -197,8 +206,9 @@ Where an official API exists, an adapter enriches — never required:
 ## Phasing
 
 1. **Foundation** — registry + seed rows (eBay, Wallapop) with `listingId`
-   hooks, `pageTitle` on `/link`, the creator's marketplace branch,
-   `response.ok` fix, honest paste errors. Unit tests:
+   hooks, the `listingKey` migration + stamp on insert, `pageTitle` on
+   `/link`, the creator's marketplace branch, `response.ok` fix, honest paste
+   errors. Unit tests:
    classification/normalisation, `listingId` per site and cross-TLD dedupe
    (including the no-id fallback to exact URL), the branch extracts from the
    title **without fetching**, junk-title rejection (URL-only, bare site
