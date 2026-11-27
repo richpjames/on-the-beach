@@ -4,7 +4,7 @@ A full-stack music tracker for collecting links and keeping tabs on listening st
 
 ## Features
 
-- Add music links from Bandcamp, SoundCloud, Apple Music, Mixcloud, YouTube, and more
+- Add music links from Bandcamp, SoundCloud, Apple Music, Qobuz, Mixcloud, YouTube, and more
 - Metadata auto-populated by scraping OG tags, JSON-LD, and oEmbed APIs
 - Track listening status (To Listen, Listening, Listened, Revisit, Done)
 - Rate releases and track purchase intent

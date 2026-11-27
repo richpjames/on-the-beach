@@ -140,6 +140,7 @@ const LINK_LABELS: ReadonlyArray<{ host: string; label: string; listenable: bool
   { host: "youtu.be", label: "YouTube", listenable: true },
   { host: "tidal.com", label: "Tidal", listenable: true },
   { host: "deezer.com", label: "Deezer", listenable: true },
+  { host: "qobuz.com", label: "Qobuz", listenable: true },
   { host: "mixcloud.com", label: "Mixcloud", listenable: true },
   { host: "discogs.com", label: "Discogs", listenable: false },
   { host: "wikidata.org", label: "Wikidata", listenable: false },

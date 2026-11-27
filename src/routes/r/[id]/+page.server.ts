@@ -24,6 +24,7 @@ const SOURCE_DISPLAY_NAMES: Record<string, string> = {
   discogs: "Discogs",
   tidal: "Tidal",
   deezer: "Deezer",
+  qobuz: "Qobuz",
   mixcloud: "Mixcloud",
   nts: "NTS",
   physical: "Physical",

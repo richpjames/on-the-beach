@@ -24,7 +24,7 @@ export interface ServiceSearchResult {
 /**
  * Search a service for a release by title and artist, returning the best match
  * or null when there isn't one. Implemented by `searchAppleMusic`,
- * `searchAppleMusicCatalog`, `searchSpotify` and `searchYouTube`.
+ * `searchAppleMusicCatalog`, `searchSpotify`, `searchQobuz` and `searchYouTube`.
  */
 export type ServiceSearch = (
   title: string,

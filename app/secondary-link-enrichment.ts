@@ -5,6 +5,7 @@ import { parseUrl } from "../adapters/registry";
 import type { ServiceSearchResult } from "../ports/service-search";
 import { scrapeAppleMusic, searchAppleMusic } from "../adapters/apple-music/index";
 import { searchSpotify } from "../adapters/spotify/index";
+import { searchQobuz } from "../adapters/qobuz/index";
 import { searchYouTube } from "../adapters/youtube/index";
 import {
   fetchReleaseGroupIdForRelease,
@@ -21,9 +22,9 @@ import { getLookupService, type LookupService } from "./settings";
 //
 // A music item that isn't itself a link on the active streaming service can be
 // enriched with a secondary link looked up from that service's catalogue. The
-// active service (Apple Music or Spotify) is configurable via settings. This
-// logic runs in three places that share the orchestration below so the skip
-// rules and the lookup marker stay consistent:
+// active service (Apple Music, Spotify or Qobuz) is configurable via settings.
+// This logic runs in three places that share the orchestration below so the
+// skip rules and the lookup marker stay consistent:
 //   1. Eagerly, fire-and-forget, when an item is created (music-item-creator).
 //   2. Lazily, on demand, when a release page is viewed (routes/release).
 //   3. In bulk, via the one-off backfill script for pre-existing items.
@@ -62,6 +63,12 @@ export const LOOKUP_SERVICE_CONFIG: Record<LookupService, ServiceConfig> = {
     displayName: "Spotify",
     urlFragment: "open.spotify.com",
     search: searchSpotify,
+  },
+  qobuz: {
+    sourceName: "qobuz",
+    displayName: "Qobuz",
+    urlFragment: "qobuz.com",
+    search: searchQobuz,
   },
 };
 
