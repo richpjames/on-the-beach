@@ -63,10 +63,17 @@ export function isQobuzConfigured(): boolean {
 }
 
 let cachedToken: string | null = null;
+let loginInFlight: Promise<string | null> | null = null;
+let loginBlockedUntil = 0;
 
-/** Clear the cached login token. Exported for tests. */
+/** How long a failed login is remembered before another attempt is made. */
+const FAILED_LOGIN_RETRY_MS = 60_000;
+
+/** Clear the cached login state (token, in-flight login, failure memory). Exported for tests. */
 export function resetQobuzAuthCache(): void {
   cachedToken = null;
+  loginInFlight = null;
+  loginBlockedUntil = 0;
 }
 
 async function login(credentials: QobuzCredentials, timeoutMs: number): Promise<string | null> {
@@ -76,16 +83,13 @@ async function login(credentials: QobuzCredentials, timeoutMs: number): Promise<
     app_id: getAppId(),
   });
 
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), timeoutMs);
-
     const response = await fetch(`${API_BASE}/user/login?${params.toString()}`, {
       signal: controller.signal,
       headers: { Accept: "application/json", "X-App-Id": getAppId() },
     });
-
-    clearTimeout(timer);
 
     if (!response.ok) return null;
 
@@ -95,8 +99,12 @@ async function login(credentials: QobuzCredentials, timeoutMs: number): Promise<
       ? data.user_auth_token
       : null;
   } catch (err) {
-    console.error("[qobuz] login failed:", err);
+    // The request URL carries the password, and a fetch error can embed it —
+    // log the error's name only, never the object.
+    console.error("[qobuz] login failed:", err instanceof Error ? err.name : "unknown error");
     return null;
+  } finally {
+    clearTimeout(timer);
   }
 }
 
@@ -107,9 +115,21 @@ async function getAuthToken(timeoutMs: number): Promise<string | null> {
 
   const credentials = readQobuzCredentials();
   if (!credentials) return null;
+  // A failed login is remembered briefly: a wrong password must not make
+  // every request re-attempt it before falling back to anonymous.
+  if (Date.now() < loginBlockedUntil) return null;
 
-  cachedToken = await login(credentials, timeoutMs);
-  return cachedToken;
+  // Share one in-flight login between concurrent callers (a bulk backfill
+  // fires many at once) rather than logging in once per request.
+  if (!loginInFlight) {
+    loginInFlight = login(credentials, timeoutMs).then((token) => {
+      loginInFlight = null;
+      if (token) cachedToken = token;
+      else loginBlockedUntil = Date.now() + FAILED_LOGIN_RETRY_MS;
+      return token;
+    });
+  }
+  return loginInFlight;
 }
 
 /**
@@ -127,10 +147,9 @@ export async function fetchQobuzApi(
     const token = await getAuthToken(timeoutMs);
     const query = new URLSearchParams({ ...params, app_id: getAppId() });
 
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
     try {
-      const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), timeoutMs);
-
       const response = await fetch(`${API_BASE}/${endpoint}?${query.toString()}`, {
         signal: controller.signal,
         headers: {
@@ -139,8 +158,6 @@ export async function fetchQobuzApi(
           ...(token ? { "X-User-Auth-Token": token } : {}),
         },
       });
-
-      clearTimeout(timer);
 
       const tokenIsCachedLogin = token !== null && !process.env.QOBUZ_USER_AUTH_TOKEN?.trim();
       if (response.status === 401 && attempt === 0 && tokenIsCachedLogin) {
@@ -154,6 +171,8 @@ export async function fetchQobuzApi(
       return isRecord(data) ? data : null;
     } catch {
       return null;
+    } finally {
+      clearTimeout(timer);
     }
   }
 }
