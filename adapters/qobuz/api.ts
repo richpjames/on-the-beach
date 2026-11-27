@@ -135,8 +135,9 @@ async function getAuthToken(timeoutMs: number): Promise<string | null> {
 /**
  * GET an API endpoint, returning the parsed JSON object, or null on any
  * failure — a scrape or a search reports "nothing found", never a transport
- * error. A 401 on a cached login token clears the cache and retries once
- * (tokens expire); anonymous reads and env-supplied tokens are not retried.
+ * error. A 401 on a cached login token invalidates it and retries once
+ * (tokens expire), sharing any re-login already in flight; anonymous reads
+ * and env-supplied tokens are not retried.
  */
 export async function fetchQobuzApi(
   endpoint: string,
@@ -161,7 +162,10 @@ export async function fetchQobuzApi(
 
       const tokenIsCachedLogin = token !== null && !process.env.QOBUZ_USER_AUTH_TOKEN?.trim();
       if (response.status === 401 && attempt === 0 && tokenIsCachedLogin) {
-        resetQobuzAuthCache();
+        // Invalidate only the token this request used — a concurrent re-login
+        // may already have cached a fresh one, and wiping the shared
+        // in-flight login would make every parallel 401 issue its own.
+        if (cachedToken === token) cachedToken = null;
         continue;
       }
 
