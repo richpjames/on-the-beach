@@ -60,9 +60,10 @@ different locales onto one item.
 `searchQobuz` satisfies the `ServiceSearch` port: `catalog/search` scoped to
 albums, matched with the same two passes as the Apple Music searches (exact
 title + artist, then a prefix-compatible title + artist; an artist-only hit
-never counts). A title that normalizes to nothing — punctuation-only or
-non-Latin, since matching keeps ASCII word characters — is not searched at
-all: an empty prefix would match every result. It is wired into
+never counts). A title or artist that normalizes to nothing — punctuation-only
+or non-Latin, since matching keeps ASCII word characters — is not searched at
+all: an empty prefix would match every result, and an unverifiable artist
+would let any artist's album through. It is wired into
 `LOOKUP_SERVICE_CONFIG`, so selecting Qobuz
 in Settings → Lookup streaming service routes secondary-link enrichment and
 the release link gate through it, with the usual Bandcamp and YouTube
