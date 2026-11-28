@@ -481,7 +481,11 @@ final class ShareViewController: UIViewController {
             provider.loadItem(forTypeIdentifier: textType, options: nil) { item, _ in
                 DispatchQueue.main.async {
                     if let link = Self.link(from: item) {
-                        completion(.content(.link(link.url, pageTitle: link.title)))
+                        // A bare URL in the text provider can still ride with
+                        // the page title in the attributed text — consult it
+                        // just as the attachment branch does.
+                        let title = link.title ?? Self.pageTitle(from: items, url: link.url)
+                        completion(.content(.link(link.url, pageTitle: title)))
                     } else {
                         fallback()
                     }
@@ -532,7 +536,15 @@ final class ShareViewController: UIViewController {
                 .trimmingCharacters(in: .whitespacesAndNewlines)
             return before.isEmpty ? nil : before
         }
-        if firstURL(in: text) != nil { return nil }
+        // The attachment URL may be normalised or percent-encoded differently
+        // from the text, so an exact search can miss it. Split with the
+        // detector instead, keeping its title only when the detected link is
+        // on the same host — words beside some other link say nothing here.
+        if let found = linkAndTitle(in: text) {
+            guard let host = found.url.host?.lowercased(),
+                  host == url.host?.lowercased() else { return nil }
+            return found.title
+        }
         return text
     }
 
@@ -681,8 +693,11 @@ final class ShareViewController: UIViewController {
         // Only a whitespace-free string is a bare URL — see `link(from:)`:
         // iOS 17's `URL(string:)` encodes invalid characters rather than
         // failing, so a "URL\ntitle" blob must go to the detector instead.
-        if !text.contains(where: { $0.isWhitespace }),
-           let url = URL(string: text), url.scheme != nil {
+        // Trim first: a bare URL with a trailing newline (common for public.url
+        // Data) is still a bare URL, not text for the detector to truncate.
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !trimmed.contains(where: { $0.isWhitespace }),
+           let url = URL(string: trimmed), url.scheme != nil {
             return url
         }
         return firstURL(in: text)
@@ -707,9 +722,11 @@ final class ShareViewController: UIViewController {
         // Only a whitespace-free string is a bare URL: on iOS 17+ `URL(string:)`
         // percent-encodes invalid characters rather than failing, so a
         // "URL\ntitle" blob would otherwise be swallowed whole as one mangled
-        // link. Anything with whitespace goes to the splitter instead.
-        if !text.contains(where: { $0.isWhitespace }),
-           let url = URL(string: text), url.scheme != nil {
+        // link. Anything with whitespace goes to the splitter instead. Trim
+        // first so a bare URL with a trailing newline still takes this path.
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !trimmed.contains(where: { $0.isWhitespace }),
+           let url = URL(string: trimmed), url.scheme != nil {
             return (url, nil)
         }
         return linkAndTitle(in: text)

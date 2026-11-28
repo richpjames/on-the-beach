@@ -409,7 +409,12 @@ function usableListingTitle(pageTitle: string | undefined, parsed: ParsedUrl): s
   }
 
   const stripped = stripSiteSuffix(trimmed, parsed.source);
-  return (hostLabel ? stripSiteSuffix(stripped, hostLabel) : stripped) || undefined;
+  const usable = (hostLabel ? stripSiteSuffix(stripped, hostLabel) : stripped).trim();
+  // The site suffix can hide the URL ("https://…/itm/123 | eBay"): the check
+  // above saw whitespace and let it through, so re-check the stripped value —
+  // a URL is never filed as the listing's evidence.
+  if (!usable || (!/\s/.test(usable) && isValidUrl(usable))) return undefined;
+  return usable;
 }
 
 /**
