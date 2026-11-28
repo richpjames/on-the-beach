@@ -344,6 +344,16 @@ describe("parseUrl - ebay", () => {
     expect(parseUrl("https://www.ebay.com/str/recordshop").source).toBe("unknown");
   });
 
+  test("a look-alike country domain is not eBay", () => {
+    // ebay.com.de / ebay.co.com are registrable by anyone: they must not earn
+    // the eBay source, nor a listing key that collides with genuine listings.
+    expect(parseUrl("https://www.ebay.com.de/itm/800867457219").source).toBe("unknown");
+    expect(parseUrl("https://www.ebay.co.com/itm/800867457219").source).toBe("unknown");
+    expect(marketplaceListingKey("https://www.ebay.com.de/itm/800867457219")).toBeNull();
+    // A real country site the adapter exercises still classifies.
+    expect(parseUrl("https://www.ebay.pt/itm/1").source).toBe("ebay");
+  });
+
   test("carries no slug evidence — a numeric id names nothing", () => {
     const result = parseUrl("https://www.ebay.es/itm/800867457219");
     expect(result.slugText).toBeUndefined();

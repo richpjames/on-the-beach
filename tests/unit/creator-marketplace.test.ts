@@ -500,6 +500,70 @@ describe("POST /api/music-items sanitises untrusted body fields", () => {
     });
     expect(stringly.status).toBe(201);
     expect(((await stringly.json()) as { price_cents: number | null }).price_cents).toBeNull();
+
+    // 1e21 is finite and non-negative but no safe integer even once rounded —
+    // the SQLite integer bind would reject or float it, so it drops too.
+    const huge = await postItem({
+      url: wallapopUrl("1320305376"),
+      pageTitle: title,
+      priceCents: 1e21,
+    });
+    expect(huge.status).toBe(201);
+    expect(((await huge.json()) as { price_cents: number | null }).price_cents).toBeNull();
+  });
+
+  test("currency is a three-letter code, upper-cased; anything else drops", async () => {
+    mockExtraction(CAMARON_JSON);
+    const title = "Vinilo Camarón – La leyenda del tiempo (1979)";
+
+    const lower = await postItem({
+      url: wallapopUrl("1320305377"),
+      pageTitle: title,
+      priceCents: 100,
+      currency: "eur",
+    });
+    expect(lower.status).toBe(201);
+    expect(((await lower.json()) as { currency: string }).currency).toBe("EUR");
+
+    const notACode = await postItem({
+      url: wallapopUrl("1320305378"),
+      pageTitle: title,
+      priceCents: 100,
+      currency: "EURO",
+    });
+    expect(notACode.status).toBe(201);
+    expect(((await notACode.json()) as { currency: string }).currency).toBe("USD");
+  });
+
+  test("a URL hidden behind the site suffix is still rejected as a title", async () => {
+    // "https://…/itm/123 | eBay" carries whitespace, so the bare-URL guard lets
+    // it through; stripping the site suffix must not then file the URL as
+    // evidence. With no slug on an eBay numeric id, the honest answer is 400.
+    const fetchSpy = spyOn(globalThis, "fetch");
+    const url = ebayUrl("com", "232323232323");
+
+    const response = await postItem({ url, pageTitle: `${url} | eBay` });
+
+    expect(response.status).toBe(400);
+    const body = (await response.json()) as { error: string };
+    expect(body.error).toBe("This site blocks server requests — paste the listing title");
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  test("a user-supplied artwork URL survives the marketplace extraction", async () => {
+    // The candidates carry no artwork of their own, but the insert applies
+    // overrides.artworkUrl first — a user-supplied URL must still land.
+    mockExtraction(CAMARON_JSON);
+
+    const response = await postItem({
+      url: wallapopUrl("1320305375"),
+      pageTitle: "Vinilo Camarón – La leyenda del tiempo (1979)",
+      artworkUrl: "https://example.com/camaron.jpg",
+    });
+
+    expect(response.status).toBe(201);
+    const item = (await response.json()) as { artwork_url: string | null };
+    expect(item.artwork_url).toBe("https://example.com/camaron.jpg");
   });
 
   test("a valid price and currency pass through, the currency trimmed", async () => {

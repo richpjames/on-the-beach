@@ -175,9 +175,13 @@ const URL_PATTERNS: Array<{
     // listings. The normaliser keeps the TLD — it sets the currency and the
     // Browse API's marketplace header — while dedupe runs on the listing id,
     // which is global across every country site. The id is the digits after
-    // /itm/, optionally behind a title slug.
+    // /itm/, optionally behind a title slug. Only eBay's own country domains
+    // match: a look-alike such as ebay.com.de is registrable by anyone and
+    // must not earn the eBay source, its listing key, or an enricher lookup.
+    // Keep in step with the client's badge match in src/ui/logic/link-service.ts.
     source: "ebay",
-    pattern: /^https?:\/\/(?:www\.)?ebay\.([a-z]{2,3}(?:\.[a-z]{2})?)\/itm\/(?:[^/?]+\/)?(\d+)/,
+    pattern:
+      /^https?:\/\/(?:www\.)?ebay\.(com|es|co\.uk|de|fr|it|com\.au|ca|at|ch|ie|nl|pl|be|com\.hk|com\.my|com\.sg|ph|in|pt)\/itm\/(?:[^/?]+\/)?(\d+)/,
     normalizer: (match) => `https://www.ebay.${match[1]}/itm/${match[2]}`,
     listingId: (match) => match[2],
   },

@@ -59,8 +59,15 @@ export function serviceFromUrl(url: string | null | undefined): SourceName {
     return /^(music|itunes|beta\.music)\.apple\.com$/.test(hostname) ? "apple_music" : "unknown";
   }
   // eBay's country sites (ebay.es, ebay.co.uk, …) are one marketplace, the way
-  // music.apple.com's country paths are one service.
-  if (/(?:^|\.)ebay\.[a-z]{2,3}(?:\.[a-z]{2})?$/.test(hostname)) return "ebay";
+  // music.apple.com's country paths are one service. Only eBay's own country
+  // domains match — a look-alike such as ebay.com.de must not borrow the mark.
+  // Keep in step with the registry's eBay pattern in adapters/registry.ts.
+  if (
+    /(?:^|\.)ebay\.(com|es|co\.uk|de|fr|it|com\.au|ca|at|ch|ie|nl|pl|be|com\.hk|com\.my|com\.sg|ph|in|pt)$/.test(
+      hostname,
+    )
+  )
+    return "ebay";
   for (const [host, source] of HOSTS) {
     if (hostname === host || hostname.endsWith(`.${host}`)) return source;
   }

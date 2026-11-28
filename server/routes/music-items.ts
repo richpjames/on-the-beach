@@ -481,21 +481,23 @@ musicItemRoutes.post("/", async (c) => {
   } else {
     delete input.pageTitle;
   }
-  // Price and currency are untrusted body fields like pageTitle: integer cents
-  // and a currency code only. Anything else is dropped here, not bound to the
-  // insert — a non-number would throw at the SQLite bind as a 500. Fractional
-  // cents round; a negative price is no price at all.
+  // Price and currency are untrusted body fields like pageTitle: a whole,
+  // non-negative number of cents and a three-letter currency code only.
+  // Anything else is dropped here, not bound to the insert — a non-number
+  // would throw at the SQLite bind as a 500, and an oversized value such as
+  // 1e21 is no safe integer even once rounded. Fractional cents round.
   if (
     typeof input.priceCents === "number" &&
     Number.isFinite(input.priceCents) &&
-    input.priceCents >= 0
+    input.priceCents >= 0 &&
+    Number.isSafeInteger(Math.round(input.priceCents))
   ) {
     input.priceCents = Math.round(input.priceCents);
   } else {
     delete input.priceCents;
   }
-  if (typeof input.currency === "string" && input.currency.trim()) {
-    input.currency = input.currency.trim();
+  if (typeof input.currency === "string" && /^[a-z]{3}$/i.test(input.currency.trim())) {
+    input.currency = input.currency.trim().toUpperCase();
   } else {
     delete input.currency;
   }

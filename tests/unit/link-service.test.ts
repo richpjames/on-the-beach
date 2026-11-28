@@ -39,6 +39,13 @@ describe("serviceFromUrl", () => {
     expect(serviceFromUrl("https://notbandcamp.com/album/x")).toBe("unknown");
     expect(serviceFromUrl("https://bandcamp.com.evil.test/album/x")).toBe("unknown");
   });
+
+  test("eBay's country sites are one marketplace; look-alikes are not", () => {
+    expect(serviceFromUrl("https://www.ebay.es/itm/123")).toBe("ebay");
+    expect(serviceFromUrl("https://www.ebay.co.uk/itm/123")).toBe("ebay");
+    expect(serviceFromUrl("https://www.ebay.com.de/itm/123")).toBe("unknown");
+    expect(serviceFromUrl("https://www.ebay.co.com/itm/123")).toBe("unknown");
+  });
 });
 
 describe("linkService", () => {
