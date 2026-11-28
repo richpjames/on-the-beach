@@ -366,11 +366,21 @@ describe("parseUrl - wallapop", () => {
   });
 
   test("matches the bare wallapop.com host", () => {
-    const result = parseUrl("https://wallapop.com/item/some-record-42");
+    const result = parseUrl("https://wallapop.com/item/some-record-1320305399");
 
     expect(result.source).toBe("wallapop");
-    expect(result.listingId).toBe("42");
+    expect(result.listingId).toBe("1320305399");
     expect(result.slugText).toBe("some record");
+  });
+
+  test("a year ending the words is not a listing id — it stays as evidence", () => {
+    // Without its trailing id, a slug ending in a year must not mistake the
+    // year for the id: that would collide every listing ending in that year.
+    const result = parseUrl("https://es.wallapop.com/item/vinilo-camaron-1979");
+
+    expect(result.source).toBe("wallapop");
+    expect(result.listingId).toBeUndefined();
+    expect(result.slugText).toBe("vinilo camaron 1979");
   });
 
   test("a slug with no trailing digits yields no listing id", () => {
@@ -415,6 +425,13 @@ describe("marketplace capability and listing keys", () => {
 
   test("no key without a listing id — those links dedupe on the exact URL", () => {
     expect(marketplaceListingKey("https://es.wallapop.com/item/vinilo-camaron")).toBeNull();
+  });
+
+  test("two listings ending in the same year don't collide on one key", () => {
+    // Neither slug carries a real id, so neither gets a key — they dedupe on
+    // their distinct exact URLs, not on a shared `wallapop:1979`.
+    expect(marketplaceListingKey("https://es.wallapop.com/item/vinilo-camaron-1979")).toBeNull();
+    expect(marketplaceListingKey("https://es.wallapop.com/item/vinilo-sade-1979")).toBeNull();
   });
 
   test("no key for non-marketplace sources", () => {

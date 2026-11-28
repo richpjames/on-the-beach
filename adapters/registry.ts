@@ -41,6 +41,15 @@ export interface ParsedUrl {
   slugText?: string;
 }
 
+/**
+ * A Wallapop listing id is a long numeric suffix (~10 digits). A year or other
+ * short number ending the title words (`…-1979`) is not an id: accepting it
+ * would collide two different listings on one key (`wallapop:1979`) and strip
+ * the year out of the slug's evidence. A shorter suffix is left as words, and
+ * the link dedupes on its exact URL instead.
+ */
+const WALLAPOP_LISTING_ID = /(\d{8,})$/;
+
 const URL_PATTERNS: Array<{
   source: SourceName;
   pattern: RegExp;
@@ -174,14 +183,17 @@ const URL_PATTERNS: Array<{
   },
   {
     // Wallapop slugs carry the seller's words ("vinilo-camaron-la-leyenda-del-
-    // tiempo-1979-1320305358"): the trailing digits are the listing id, the
-    // words before them are evidence when the share arrived with no title.
+    // tiempo-1979-1320305358"): a long trailing digit run is the listing id,
+    // the words before it are evidence when the share arrived with no title. A
+    // year ending the words is not an id — it stays in the slug's evidence.
     source: "wallapop",
     pattern: /^https?:\/\/(?:[a-z]{2}\.)?wallapop\.com\/item\/([^/?]+)/,
-    listingId: (match) => match[1]?.match(/(\d+)$/)?.[1],
+    listingId: (match) => match[1]?.match(WALLAPOP_LISTING_ID)?.[1],
     slugText: (match) => {
-      const words = (match[1] ?? "")
-        .replace(/-?\d+$/, "")
+      const slug = match[1] ?? "";
+      const id = slug.match(WALLAPOP_LISTING_ID)?.[1];
+      const words = (id ? slug.slice(0, slug.length - id.length) : slug)
+        .replace(/-$/, "")
         .replace(/-/g, " ")
         .trim();
       return /[a-z]/i.test(words) ? words : undefined;
