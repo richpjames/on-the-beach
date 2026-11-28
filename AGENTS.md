@@ -24,6 +24,11 @@ If CI fails or conflicts exist, fix or surface them rather than reporting the PR
 - Never add a "Generated with Claude Code" footer (or any generated-by line) to PR bodies.
 - Always state the full PR URL prominently, on its own line, every time a PR is created or updated.
 
+### CI flakes: find and fix, never retry
+Any CI flake is dealt with aggressively: reproduce it, find the root cause, fix it. Never add retries, sleeps or looser timeouts to mask one — `playwright.config.ts` sets `retries: 0` deliberately, and a test that only passes on the second attempt is a bug to fix.
+- Order-dependent unit failures: the random-order pass prints its seed in the CI log; replay it with `bun test tests/unit --randomize --seed=<n>`. The usual cause is a file leaking state into its neighbours (env flags, `globalThis.fetch` spies, shared DB rows, test-order assumptions like an `afterEach` reset) — bun runs the whole suite in one process.
+- E2E failures: pull the `playwright-report` artifact from the run; the traces and timings tell a timing race from a real regression. Fix the race (wait on the right condition), don't re-run and hope.
+
 ### The agent review and /fix
 The `PR-Agent review` workflow (Qodo PR-Agent, self-hosted, on qwen4-max-preview through the Qwen Token Plan endpoint) reviews every pull request: a "PR Reviewer Guide" comment it keeps updated on each push, inline findings, and a "PR Code Suggestions" comment whose suggestions GitHub can apply on click. It only comments — reply `/fix` on the pull request and the `Pi fix` workflow applies the findings of the latest review and suggestions to the branch — same-repository pull requests only, and lint plus the unit tests must pass before anything is pushed.
 
