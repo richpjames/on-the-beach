@@ -52,6 +52,9 @@ interface CachedToken {
 
 let cache: CachedToken | null = null;
 
+/** The minting request currently in flight, shared by concurrent callers. */
+let tokenRequestInFlight: Promise<string | null> | null = null;
+
 /** Refresh a minute before expiry so a request never rides a stale token. */
 const REFRESH_MARGIN_MS = 60_000;
 
@@ -75,6 +78,21 @@ async function getApplicationToken(timeoutMs: number): Promise<string | null> {
     return cache.token;
   }
 
+  // Concurrent lookups (background enrichment plus a fresh share) share one
+  // minting request rather than each asking eBay's rate-limited endpoint for
+  // its own application token.
+  if (tokenRequestInFlight) return tokenRequestInFlight;
+  tokenRequestInFlight = mintApplicationToken(credentials, timeoutMs).finally(() => {
+    tokenRequestInFlight = null;
+  });
+  return tokenRequestInFlight;
+}
+
+/** Mint one application token and cache it for its lifetime. Null on refusal. */
+async function mintApplicationToken(
+  credentials: { clientId: string; clientSecret: string },
+  timeoutMs: number,
+): Promise<string | null> {
   const basic = Buffer.from(`${credentials.clientId}:${credentials.clientSecret}`).toString(
     "base64",
   );
@@ -99,9 +117,10 @@ async function getApplicationToken(timeoutMs: number): Promise<string | null> {
   return cache.token;
 }
 
-/** Clear the cached token. Exported for tests. */
+/** Clear the cached token and any in-flight mint. Exported for tests. */
 export function resetEbayTokenCache(): void {
   cache = null;
+  tokenRequestInFlight = null;
 }
 
 interface BrowseItem {
@@ -160,11 +179,17 @@ export async function scrapeEbay(url: string, timeoutMs: number): Promise<Scrape
     if (typeof item.image?.imageUrl === "string" && item.image.imageUrl) {
       metadata.imageUrl = item.image.imageUrl;
     }
-    const priceValue = Number(item.price?.value);
-    if (item.price && Number.isFinite(priceValue) && priceValue >= 0) {
+    // The Browse API sends the amount as a string. `Number()` would coerce a
+    // null/empty/boolean value into 0/1 and file the listing as free with a
+    // currency attached, so only a non-empty numeric string becomes a price.
+    const rawPrice = item.price?.value;
+    const priceValue =
+      typeof rawPrice === "string" && rawPrice.trim() !== "" ? Number(rawPrice) : NaN;
+    if (Number.isFinite(priceValue) && priceValue >= 0) {
       metadata.priceCents = Math.round(priceValue * 100);
-      if (typeof item.price.currency === "string" && item.price.currency) {
-        metadata.currency = item.price.currency;
+      const currency = item.price?.currency;
+      if (typeof currency === "string" && currency) {
+        metadata.currency = currency;
       }
     }
     return metadata;
