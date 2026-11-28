@@ -534,15 +534,23 @@ final class ShareViewController: UIViewController {
         if let range = text.range(of: url.absoluteString) {
             let before = text[..<range.lowerBound]
                 .trimmingCharacters(in: .whitespacesAndNewlines)
+            // Words sitting behind another link describe that link, not this one.
+            if linkAndTitle(in: String(before)) != nil { return nil }
             return before.isEmpty ? nil : before
         }
         // The attachment URL may be normalised or percent-encoded differently
         // from the text, so an exact search can miss it. Split with the
         // detector instead, keeping its title only when the detected link is
         // on the same host — words beside some other link say nothing here.
+        // Strip a leading "www." on both sides: the normaliser adds it to the
+        // attachment URL while the text may carry the bare country host.
         if let found = linkAndTitle(in: text) {
-            guard let host = found.url.host?.lowercased(),
-                  host == url.host?.lowercased() else { return nil }
+            let bareHost: (String?) -> String? = { host in
+                guard let lowered = host?.lowercased() else { return nil }
+                return lowered.hasPrefix("www.") ? String(lowered.dropFirst(4)) : lowered
+            }
+            guard let host = bareHost(found.url.host),
+                  host == bareHost(url.host) else { return nil }
             return found.title
         }
         return text
