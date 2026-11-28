@@ -59,6 +59,10 @@
     },
     nts: { label: "NTS", fontSize: 9 },
     pitchfork: { label: "p.", fontSize: 15 },
+    // Marketplaces with no Simple Icons mark: their wordmark's initials, the
+    // same treatment NTS and Pitchfork get.
+    ebay: { label: "eBay", fontSize: 8 },
+    wallapop: { label: "W", fontSize: 14 },
     // A record: outer edge, run-out groove, spindle hole.
     physical: {
       outline: true,

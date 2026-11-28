@@ -2,14 +2,25 @@ import { eq } from "drizzle-orm";
 import { assign, createActor, fromPromise, setup, waitFor } from "xstate";
 import { db } from "../adapters/db/index";
 import { musicItems, musicLinks, sources } from "../adapters/db/schema";
-import { parseUrl } from "../adapters/registry";
+import {
+  parseUrl,
+  sourceIsMarketplace,
+  marketplaceListingKey,
+  SOURCE_SCRAPERS,
+  type ParsedUrl,
+} from "../adapters/registry";
 import { isValidUrl, normalize, capitalize } from "../domain/text";
 import { scrapeUrl, UnsupportedMusicLinkError } from "./scrape";
 import { remindAtForReleaseDate } from "../domain/release-dates";
 import { getArtistWatchSettings } from "./settings";
 import { enrichSecondaryLinkInBackground } from "./secondary-link-enrichment";
 import { enrichNotesInBackground } from "./notes-enrichment";
-import { pickPrimaryReleaseCandidate } from "../adapters/web/link-extractor";
+import {
+  pickPrimaryReleaseCandidate,
+  extractReleaseCandidatesFromWebText,
+  buildCandidateId,
+} from "../adapters/web/link-extractor";
+import { stripSiteSuffix } from "../adapters/web/index";
 import { fullItemSelect } from "./queries/full-item-select";
 import {
   createMusicItemDirect as createMusicItemDirectInStore,
@@ -105,6 +116,9 @@ interface ReleaseCandidateInput {
   label?: string;
   /** Provenance line for a release lifted off a page that named several — see `formatPageSourceNote`. */
   sourceNote?: string;
+  /** What the copy costs, where the source names a price (the eBay enricher does). */
+  priceCents?: number;
+  currency?: string;
 }
 
 const MAX_SOURCE_NOTE_TITLE_CHARS = 120;
@@ -216,18 +230,40 @@ async function fetchItemsByUrl(url: string): Promise<MusicItemFull[]> {
   return items.filter((item): item is MusicItemFull => item !== null);
 }
 
+/** Everything already filed under a marketplace listing key — every site variant of one listing. */
+async function fetchItemsByListingKey(listingKey: string): Promise<MusicItemFull[]> {
+  const rows = await db
+    .select({ musicItemId: musicLinks.musicItemId })
+    .from(musicLinks)
+    .where(eq(musicLinks.listingKey, listingKey));
+
+  const items = await Promise.all(rows.map((row) => fetchFullItem(row.musicItemId)));
+  return items.filter((item): item is MusicItemFull => item !== null);
+}
+
 /**
  * Everything already filed under any of these URLs, de-duplicated by item.
  *
  * Releases picked off a listing page are stored under their own links, so
  * re-adding the listing has to look those up too — checking the listing URL
  * alone would find nothing and add the whole page over again.
+ *
+ * A marketplace listing additionally looks up its `listingKey` when the
+ * registry's hook yields one: listing ids are global across the site's country
+ * domains, so the key catches the same listing shared from ebay.com after
+ * ebay.es — which the exact-URL check, TLD and all, would file twice.
  */
-async function fetchItemsByUrls(urls: string[]): Promise<MusicItemFull[]> {
+async function fetchItemsByUrls(
+  urls: string[],
+  listingKey?: string | null,
+): Promise<MusicItemFull[]> {
   const seen = new Set<string>();
   const unique = urls.filter((url) => url && !seen.has(url) && (seen.add(url), true));
 
-  const found = await Promise.all(unique.map((url) => fetchItemsByUrl(url)));
+  const found = await Promise.all([
+    ...unique.map((url) => fetchItemsByUrl(url)),
+    ...(listingKey ? [fetchItemsByListingKey(listingKey)] : []),
+  ]);
   const byId = new Map<number, MusicItemFull>();
   for (const item of found.flat()) {
     byId.set(item.id, item);
@@ -283,6 +319,8 @@ async function insertMusicItemWithLink(
       // Everything through this function came in as a URL, so "link" is the
       // honest default; the email ingest overrides it with "email".
       origin: overrides?.origin ?? "link",
+      priceCents: overrides?.priceCents ?? candidate.priceCents ?? null,
+      currency: overrides?.currency ?? candidate.currency,
       remindAt,
     })
     .returning({ id: musicItems.id });
@@ -292,6 +330,9 @@ async function insertMusicItemWithLink(
     sourceId,
     url: linkUrl,
     isPrimary: true,
+    // Marketplace links only — null for everything else, which keeps deduping
+    // on the exact URL. See `marketplaceListingKey`.
+    listingKey: marketplaceListingKey(linkUrl),
     metadata: candidate.embedMetadata ? JSON.stringify(candidate.embedMetadata) : null,
   });
 
@@ -335,18 +376,218 @@ function resolveSelectedCandidates(
     .filter((candidate): candidate is ReleaseCandidateInput => candidate != null);
 }
 
+/** The honest answer for a marketplace listing with no usable title and no slug evidence. */
+const MARKETPLACE_NO_TITLE_MESSAGE = "This site blocks server requests — paste the listing title";
+
+/**
+ * The client-captured listing title, when it names something of its own.
+ * Rejects the two shapes that carry no evidence: the URL itself (what the
+ * "Title\nURL" split yields when no title line exists) and a bare site name
+ * (what a still-loading page shares). `stripSiteSuffix` already answers empty
+ * for the latter, and drops the site's name off a real title's end. The site's
+ * name is the source's name ("eBay", "Wallapop"); the hostname's first label
+ * says it too where no country subdomain stands in front (es.wallapop.com's
+ * first label is "es", so the source name is what catches "Wallapop").
+ */
+function usableListingTitle(pageTitle: string | undefined, parsed: ParsedUrl): string | undefined {
+  const trimmed = pageTitle?.trim();
+  if (!trimmed) return undefined;
+
+  if (trimmed === parsed.normalizedUrl || trimmed.split("?")[0] === parsed.normalizedUrl) {
+    return undefined;
+  }
+
+  let hostLabel: string | undefined;
+  try {
+    hostLabel = new URL(parsed.normalizedUrl).hostname.replace(/^www\./, "").split(".")[0];
+  } catch {
+    hostLabel = undefined;
+  }
+
+  const stripped = stripSiteSuffix(trimmed, parsed.source);
+  return (hostLabel ? stripSiteSuffix(stripped, hostLabel) : stripped) || undefined;
+}
+
+/**
+ * A marketplace listing: one copy of one release for sale, on a site that
+ * blocks server fetches. The evidence is what the share client captured while
+ * the page was loaded in the user's browser — the seller-written title — or,
+ * failing that, the words the URL slug carries. The page itself is never
+ * fetched.
+ *
+ * The extraction is the same one unknown pages get; the fallback is not: a
+ * listing *is* one item for sale, so a usable raw title becomes a single
+ * album-shaped candidate rather than the unknown path's "mix". With no usable
+ * title and no slug evidence, the honest answer is to ask for the title.
+ */
+async function resolveMarketplaceListing(
+  parsed: ParsedUrl,
+  overrides?: Partial<CreateMusicItemInput>,
+): Promise<ResolveOutput> {
+  // The user's own title wins outright — the web form's recovery for a listing
+  // shared with no title: one paste into the field that's already there.
+  if (overrides?.title?.trim()) {
+    return {
+      normalizedUrl: parsed.normalizedUrl,
+      source: parsed.source,
+      candidates: [
+        {
+          title: overrides.title.trim(),
+          artistName: overrides.artistName?.trim() || undefined,
+          itemType: overrides.itemType ?? "album",
+          artworkUrl: overrides.artworkUrl ?? null,
+        },
+      ],
+    };
+  }
+
+  const title = usableListingTitle(overrides?.pageTitle, parsed);
+  const evidenceText = title ?? parsed.slugText;
+
+  let releases = evidenceText
+    ? (await extractReleaseCandidatesFromWebText(parsed.normalizedUrl, evidenceText)).releases
+    : [];
+
+  if (releases.length === 0 && title) {
+    releases = [
+      {
+        candidateId: buildCandidateId(undefined, title, 0),
+        title,
+        itemType: "album",
+        isPrimary: true,
+        evidence: "listing title",
+      },
+    ];
+  }
+
+  if (releases.length === 0) {
+    throw new UnsupportedMusicLinkError(MARKETPLACE_NO_TITLE_MESSAGE);
+  }
+
+  // The marketplace URL stays the item's primary link — the place to buy it.
+  // Candidates carry no page of their own, so no provenance note is stamped:
+  // the link already says where the item came from.
+  const candidates: ReleaseCandidateInput[] = releases.map((release) => ({
+    candidateId: release.candidateId,
+    title: release.title || "Untitled",
+    artistName: release.artist,
+    itemType: release.itemType ?? "album",
+    confidence: release.confidence,
+    evidence: release.evidence,
+    isPrimary: release.isPrimary,
+  }));
+
+  return selectReleaseCandidates(parsed, candidates, overrides);
+}
+
+/**
+ * The downstream half shared by the unknown-page and marketplace paths: the
+ * user's selection, their title override, the primary-candidate pick, and the
+ * ambiguous picker when several releases remain and none stood out.
+ */
+function selectReleaseCandidates(
+  parsed: ParsedUrl,
+  extractedCandidates: ReleaseCandidateInput[],
+  overrides?: Partial<CreateMusicItemInput>,
+  pageFallback?: { artworkUrl?: string | null; sourceNote?: string },
+): ResolveOutput {
+  const selectedCandidates = resolveSelectedCandidates(extractedCandidates, overrides);
+
+  if (selectedCandidates.length === 1) {
+    const selectedCandidate = selectedCandidates[0]!;
+    return {
+      normalizedUrl: parsed.normalizedUrl,
+      source: parsed.source,
+      candidates: [
+        {
+          ...selectedCandidate,
+          title: overrides?.title || selectedCandidate.title,
+          artistName: overrides?.artistName || selectedCandidate.artistName,
+          itemType: overrides?.itemType ?? selectedCandidate.itemType,
+        },
+      ],
+    };
+  }
+
+  if (selectedCandidates.length > 1) {
+    // Several releases picked from one page: create each as extracted. The
+    // title/artist/itemType overrides are per-item corrections, so they only
+    // make sense for a single selection and are ignored here.
+    return {
+      normalizedUrl: parsed.normalizedUrl,
+      source: parsed.source,
+      candidates: selectedCandidates,
+    };
+  }
+
+  if (overrides?.title?.trim()) {
+    return {
+      normalizedUrl: parsed.normalizedUrl,
+      source: parsed.source,
+      candidates: [
+        {
+          title: overrides.title.trim(),
+          artistName: overrides.artistName?.trim() || undefined,
+          itemType: overrides?.itemType ?? "album",
+          artworkUrl: overrides?.artworkUrl ?? pageFallback?.artworkUrl ?? null,
+          sourceNote: pageFallback?.sourceNote,
+        },
+      ],
+    };
+  }
+
+  const primaryCandidate = pickPrimaryReleaseCandidate(
+    parsed.normalizedUrl,
+    extractedCandidates.map(toReleaseCandidate),
+  );
+
+  if (primaryCandidate) {
+    const chosen = extractedCandidates.find(
+      (candidate) => candidate.candidateId === primaryCandidate.candidateId,
+    );
+    if (chosen) {
+      return {
+        normalizedUrl: parsed.normalizedUrl,
+        source: parsed.source,
+        // The page mentioned others but is mainly about this release — it *is*
+        // the release's page, so its own URL is the link to keep, and a
+        // provenance note would only repeat what that link already says.
+        candidates: [{ ...chosen, url: undefined, source: undefined, sourceNote: undefined }],
+      };
+    }
+  }
+
+  throw new AmbiguousLinkSelectionError({
+    kind: "ambiguous_link",
+    url: parsed.normalizedUrl,
+    message: "This link mentions several releases. Pick one or more to add.",
+    candidates: extractedCandidates.map(toReleaseCandidate),
+  });
+}
+
 async function resolveReleaseCandidates(
   normalizedUrl: string,
   overrides?: Partial<CreateMusicItemInput>,
-): Promise<{
-  normalizedUrl: string;
-  source: ReturnType<typeof parseUrl>["source"];
-  candidates: ReleaseCandidateInput[];
-}> {
+): Promise<ResolveOutput> {
   const parsed = parseUrl(normalizedUrl);
+
+  // A marketplace without a bespoke scraper is never fetched: its pages block
+  // server traffic, and the share client already captured what the page says.
+  // A marketplace with a scraper of its own (the eBay enricher, say) takes
+  // precedence through SOURCE_SCRAPERS below, exactly as Discogs does today.
+  if (sourceIsMarketplace(parsed.source) && !SOURCE_SCRAPERS[parsed.source]) {
+    return resolveMarketplaceListing(parsed, overrides);
+  }
+
   const scraped = await scrapeUrl(parsed.normalizedUrl, parsed.source);
 
   if (parsed.source !== "unknown") {
+    // A marketplace enricher that couldn't answer — unconfigured or failed —
+    // falls back to the client-captured title, not to "Untitled".
+    if (sourceIsMarketplace(parsed.source) && scraped === null) {
+      return resolveMarketplaceListing(parsed, overrides);
+    }
+
     const title =
       overrides?.title || scraped?.potentialTitle || parsed.potentialTitle || "Untitled";
     const artistName = overrides?.artistName || scraped?.potentialArtist || parsed.potentialArtist;
@@ -365,6 +606,8 @@ async function resolveReleaseCandidates(
           year: overrides?.year ?? scraped?.year,
           genre: overrides?.genre ?? scraped?.genre,
           label: overrides?.label ?? scraped?.label,
+          priceCents: overrides?.priceCents ?? scraped?.priceCents,
+          currency: overrides?.currency ?? scraped?.currency,
         },
       ],
     };
@@ -408,77 +651,9 @@ async function resolveReleaseCandidates(
     );
   }
 
-  const selectedCandidates = resolveSelectedCandidates(extractedCandidates, overrides);
-
-  if (selectedCandidates.length === 1) {
-    const selectedCandidate = selectedCandidates[0]!;
-    return {
-      normalizedUrl: parsed.normalizedUrl,
-      source: parsed.source,
-      candidates: [
-        {
-          ...selectedCandidate,
-          title: overrides?.title || selectedCandidate.title,
-          artistName: overrides?.artistName || selectedCandidate.artistName,
-          itemType: overrides?.itemType ?? selectedCandidate.itemType,
-        },
-      ],
-    };
-  }
-
-  if (selectedCandidates.length > 1) {
-    // Several releases picked from one page: create each as extracted. The
-    // title/artist/itemType overrides are per-item corrections, so they only
-    // make sense for a single selection and are ignored here.
-    return {
-      normalizedUrl: parsed.normalizedUrl,
-      source: parsed.source,
-      candidates: selectedCandidates,
-    };
-  }
-
-  if (overrides?.title?.trim()) {
-    return {
-      normalizedUrl: parsed.normalizedUrl,
-      source: parsed.source,
-      candidates: [
-        {
-          title: overrides.title.trim(),
-          artistName: overrides.artistName?.trim() || undefined,
-          itemType: overrides.itemType ?? "album",
-          artworkUrl: overrides.artworkUrl ?? scraped?.imageUrl ?? null,
-          sourceNote,
-        },
-      ],
-    };
-  }
-
-  const primaryCandidate = pickPrimaryReleaseCandidate(
-    parsed.normalizedUrl,
-    extractedCandidates.map(toReleaseCandidate),
-  );
-
-  if (primaryCandidate) {
-    const chosen = extractedCandidates.find(
-      (candidate) => candidate.candidateId === primaryCandidate.candidateId,
-    );
-    if (chosen) {
-      return {
-        normalizedUrl: parsed.normalizedUrl,
-        source: parsed.source,
-        // The page mentioned others but is mainly about this release — it *is*
-        // the release's page, so its own URL is the link to keep, and a
-        // provenance note would only repeat what that link already says.
-        candidates: [{ ...chosen, url: undefined, source: undefined, sourceNote: undefined }],
-      };
-    }
-  }
-
-  throw new AmbiguousLinkSelectionError({
-    kind: "ambiguous_link",
-    url: parsed.normalizedUrl,
-    message: "This link mentions several releases. Pick one or more to add.",
-    candidates: extractedCandidates.map(toReleaseCandidate),
+  return selectReleaseCandidates(parsed, extractedCandidates, overrides, {
+    artworkUrl: scraped?.imageUrl ?? null,
+    sourceNote,
   });
 }
 
@@ -521,8 +696,8 @@ const scrapingMachine = setup({
     resolve: fromPromise<ResolveOutput, { url: string; overrides?: Partial<CreateMusicItemInput> }>(
       async ({ input }) => resolveReleaseCandidates(input.url, input.overrides),
     ),
-    checkDuplicates: fromPromise<MusicItemFull[], { urls: string[] }>(async ({ input }) =>
-      fetchItemsByUrls(input.urls),
+    checkDuplicates: fromPromise<MusicItemFull[], { urls: string[]; listingKey?: string | null }>(
+      async ({ input }) => fetchItemsByUrls(input.urls, input.listingKey),
     ),
     checkLibraryDuplicates: fromPromise<
       MusicItemFull[],
@@ -635,6 +810,9 @@ const scrapingMachine = setup({
               .map((candidate) => candidate.url)
               .filter((url): url is string => Boolean(url)),
           ],
+          // A marketplace listing dedupes on source + listing id, catching
+          // every country-site variant of the same listing; null elsewhere.
+          listingKey: marketplaceListingKey(context.resolvedUrl),
         }),
         onDone: [
           {

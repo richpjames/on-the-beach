@@ -123,6 +123,25 @@ export const SEED_SOURCES = [
     isEditorial: true,
   },
   {
+    // Marketplaces: one copy of one release for sale, like Discogs — but their
+    // pages block server fetches, so the share client captures the listing
+    // title instead (see docs/plans/2026-11-25-marketplace-support-design.md).
+    name: "ebay",
+    displayName: "eBay",
+    urlPattern: "ebay.com",
+    canPlay: false,
+    canBuy: true,
+    isEditorial: false,
+  },
+  {
+    name: "wallapop",
+    displayName: "Wallapop",
+    urlPattern: "wallapop.com",
+    canPlay: false,
+    canBuy: true,
+    isEditorial: false,
+  },
+  {
     // A record on the shelf: nothing on the web to play, buy or read.
     name: "physical",
     displayName: "Physical Media",

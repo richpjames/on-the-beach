@@ -34,6 +34,13 @@ for free by building the same targets with **Mac Catalyst** (see [Enable macOS
   name. On **Add** it `POST`s the URL — plus `notes` and `listName` when set — to
   `POST /api/ingest/link` with a `Bearer` token. The extension talks to the server
   directly, so a share works even when the app isn't running.
+- **The page title rides along with the link.** iOS hands the share sheet
+  "Page Title\nhttps://…", and the extension keeps the title line (from the text
+  before the URL, or the item's `attributedContentText` when the link arrived as
+  an attachment) and posts it as `pageTitle`. Marketplace pages — eBay,
+  Wallapop — block server fetches, so this captured title is what the listing's
+  item is created from; the URL itself is never sent as a title. Shares with no
+  title line work exactly as before.
 - The **Release date** switch is filled in for you where the page says what it is.
   On extracting the link the extension asks `GET /api/ingest/link-preview`, and when
   the answer names a release still to come — a Bandcamp pre-order page reads "releases

@@ -9,9 +9,18 @@ An iOS Shortcut that lets you add music links to On the Beach directly from the 
 ## Actions
 
 1. **Receive from Share Sheet** — accepts URLs shared from any app. If no input is provided, it stops and responds with "No input!".
-2. **Get URLs from Input** — extracts just the URL from the share sheet input, discarding any page title.
-3. **Get Contents of URL** — POSTs the URL to `https://onthebeach.ricojam.es/api/ingest/link`.
-4. **Show Notification** — displays the API response so you can confirm the item was added or see an error.
+2. **Get URLs from Input** — extracts the URL from the share sheet input.
+3. **Get Text from Input** → **Split Text** (by newlines) → **Get First Item** —
+   the title line of the share. iOS passes a webpage share as `title\nurl`, so
+   the first line is the page title. Keep it: marketplace pages (eBay,
+   Wallapop) block server fetches, so this captured title is the only evidence
+   the server gets about the listing.
+4. **If** the title line is not the URL itself and not empty, pass it along as
+   `pageTitle` — a URL-only share has no title to send. (The server rejects a
+   URL or a bare site name sent as `pageTitle` either way, so an unconditional
+   field is safe too.)
+5. **Get Contents of URL** — POSTs the URL (and the title, when there is one) to `https://onthebeach.ricojam.es/api/ingest/link`.
+6. **Show Notification** — displays the API response so you can confirm the item was added or see an error.
 
 ## Setup
 
@@ -20,7 +29,11 @@ The "Get Contents of URL" step is configured as:
 - **Method:** POST
 - **Headers:** `Authorization: Bearer <INGEST_API_KEY>`
 - **Request Body:** JSON
-  - Key: `url`, Type: **URL**, Value: `Shortcut Input**
+  - Key: `url`, Type: **URL**, Value: the output of **Get URLs from Input**
+  - Key: `pageTitle`, Type: **Text**, Value: the title line from step 3 (when
+    step 4 kept it). Evidence for the server to parse — the listing's
+    seller-written title — not a correction: a `title` you set yourself still
+    wins.
   - Optionally `notes` (Text), `listNames` (Text, one field per list), `remindAt`
     (Text, `yyyy-MM-dd`), and `rating` (Number, 0.5–5 in half steps) — the same
     fields the native Share Extension sends.
@@ -61,3 +74,5 @@ item, filed into the same lists.
 When sharing a webpage, iOS passes the share sheet input as `title\nurl` (page title, newline, URL) when coerced to text. If `Shortcut Input` is used directly as the `url` value in the POST body, the ingest endpoint receives a malformed URL and rejects it with 400.
 
 The fix is a **"Get URLs from Input"** action between the Receive step and the POST step. It strips the title and returns only the URL. Use its output — not `Shortcut Input` — as the `url` value in the JSON body.
+
+The title it strips is worth keeping, not discarding: split the text form of the input (step 3 above) and post the first line as `pageTitle`. A marketplace listing's page can't be fetched by the server at all — eBay and Wallapop answer datacenter traffic with 403 — so the title captured here while the page was loaded in your browser is what the item is created from. Shares with no title line keep working exactly as before: the server falls back to the URL slug's words where there are any (Wallapop), and otherwise asks you to paste the listing title into the add form.

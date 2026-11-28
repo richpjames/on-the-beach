@@ -92,8 +92,13 @@ final class ShareViewController: UIViewController {
     /// note, list picker, and reminder are identical either way — only the
     /// endpoint and payload differ, and every photo in a multi-select share is
     /// filed with the same note, lists, and reminder.
+    ///
+    /// A link carries the page title the share captured alongside it, when one
+    /// exists — the one piece of metadata a marketplace page (eBay, Wallapop)
+    /// won't give the server, whose fetches those sites block. It is posted as
+    /// `pageTitle`: evidence for the server to parse, never a fetch target.
     private enum SharedContent {
-        case link(URL)
+        case link(URL, pageTitle: String?)
         case images([Data])
     }
 
@@ -176,7 +181,7 @@ final class ShareViewController: UIViewController {
             case .content(let content):
                 self.sharedContent = content
                 switch content {
-                case .link(let url):
+                case .link(let url, _):
                     self.compose.setURL(url)
                     self.fetchLinkPreview(for: url)
                 case .images(let payloads):
@@ -274,9 +279,10 @@ final class ShareViewController: UIViewController {
 
         setPosting(true)
         switch sharedContent {
-        case .link(let url):
+        case .link(let url, let pageTitle):
             postLink(
                 url: url,
+                pageTitle: pageTitle,
                 note: note,
                 listNames: selectedListNames,
                 remindAt: remindAt,
@@ -413,11 +419,18 @@ final class ShareViewController: UIViewController {
     /// item's attributed text — some apps (e.g. Apple Music) carry the link
     /// there rather than as an attachment.
     ///
-    /// For links, `url(from:)` does the decoding, because the loaded item is
-    /// not always a `URL`: on macOS a `public.url` item arrives as `Data`
-    /// holding the URL string (see below), and text branches arrive as
-    /// `String`. Getting that coercion wrong is what left the Add button
+    /// For links, `url(from:)` / `link(from:)` do the decoding, because the
+    /// loaded item is not always a `URL`: on macOS a `public.url` item arrives
+    /// as `Data` holding the URL string (see below), and text branches arrive
+    /// as `String`. Getting that coercion wrong is what left the Add button
     /// permanently disabled when sharing from Apple Music on macOS.
+    ///
+    /// The page title is kept alongside the link wherever the share carries
+    /// one — the text before the URL in a "Page Title\nhttps://…" blob, or the
+    /// item's `attributedContentText` when the link arrived as an attachment.
+    /// Marketplace pages (eBay, Wallapop) block server fetches, so this
+    /// captured title is the only evidence the server gets; it is posted as
+    /// `pageTitle` and never as a fetch target.
     private func extractSharedContent(completion: @escaping (SharedInput) -> Void) {
         let items = (extensionContext?.inputItems as? [NSExtensionItem]) ?? []
         let providers = items.flatMap { $0.attachments ?? [] }
@@ -452,7 +465,10 @@ final class ShareViewController: UIViewController {
             provider.loadItem(forTypeIdentifier: urlType, options: nil) { item, _ in
                 DispatchQueue.main.async {
                     if let url = Self.url(from: item) {
-                        completion(.content(.link(url)))
+                        // The link arrived as an attachment, but the page title
+                        // often rides along in the item's attributed text.
+                        let title = Self.pageTitle(from: items, url: url)
+                        completion(.content(.link(url, pageTitle: title)))
                     } else {
                         fallback()
                     }
@@ -464,8 +480,8 @@ final class ShareViewController: UIViewController {
         if let provider = providers.first(where: { $0.hasItemConformingToTypeIdentifier(textType) }) {
             provider.loadItem(forTypeIdentifier: textType, options: nil) { item, _ in
                 DispatchQueue.main.async {
-                    if let url = Self.url(from: item) {
-                        completion(.content(.link(url)))
+                    if let link = Self.link(from: item) {
+                        completion(.content(.link(link.url, pageTitle: link.title)))
                     } else {
                         fallback()
                     }
@@ -480,7 +496,44 @@ final class ShareViewController: UIViewController {
     /// Recovers a link from the input items' attributed text, or `nil`.
     private nonisolated static func linkFromText(_ items: [NSExtensionItem]) -> SharedInput? {
         let text = items.compactMap { $0.attributedContentText?.string }.joined(separator: "\n")
-        return firstURL(in: text).map { .content(.link($0)) }
+        return linkAndTitle(in: text).map { .content(.link($0.url, pageTitle: $0.title)) }
+    }
+
+    /// The first link in the text and the words before it — the "Page Title"
+    /// of a "Page Title\nhttps://…" share. The words are nil when the text is
+    /// only the link: the URL is never posted as its own title.
+    private nonisolated static func linkAndTitle(in text: String) -> (url: URL, title: String?)? {
+        guard let detector = try? NSDataDetector(
+            types: NSTextCheckingResult.CheckingType.link.rawValue
+        ) else { return nil }
+        let range = NSRange(text.startIndex..<text.endIndex, in: text)
+        guard let match = detector.firstMatch(in: text, options: [], range: range),
+              let url = match.url,
+              let matchRange = Range(match.range, in: text)
+        else { return nil }
+        let before = text[..<matchRange.lowerBound]
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        return (url, before.isEmpty ? nil : before)
+    }
+
+    /// The title the extension items' attributed text carries for this link.
+    /// A `public.url` attachment often arrives with the page title in
+    /// `attributedContentText` — "Title\nURL", or the title alone. Words that
+    /// accompany some *other* link say nothing about this one, and the URL
+    /// itself is never a title.
+    private nonisolated static func pageTitle(from items: [NSExtensionItem], url: URL) -> String? {
+        let text = items.compactMap { $0.attributedContentText?.string }
+            .joined(separator: "\n")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !text.isEmpty else { return nil }
+
+        if let range = text.range(of: url.absoluteString) {
+            let before = text[..<range.lowerBound]
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            return before.isEmpty ? nil : before
+        }
+        if firstURL(in: text) != nil { return nil }
+        return text
     }
 
     /// Loads every image attachment and hands back their downscaled JPEG bytes
@@ -629,6 +682,26 @@ final class ShareViewController: UIViewController {
         return firstURL(in: text)
     }
 
+    /// Like `url(from:)`, but keeps the title a text share carries alongside
+    /// the link ("Page Title\nhttps://…"). A bare `URL` item — or text that is
+    /// only a URL — has no title; the URL is never posted as its own.
+    private nonisolated static func link(from item: NSSecureCoding?) -> (url: URL, title: String?)? {
+        if let url = item as? URL { return (url, nil) }
+
+        let text: String?
+        if let string = item as? String {
+            text = string
+        } else if let data = item as? Data {
+            text = String(data: data, encoding: .utf8)
+        } else {
+            text = nil
+        }
+        guard let text else { return nil }
+
+        if let url = URL(string: text), url.scheme != nil { return (url, nil) }
+        return linkAndTitle(in: text)
+    }
+
     private nonisolated static func firstURL(in text: String) -> URL? {
         guard let detector = try? NSDataDetector(types: NSTextCheckingResult.CheckingType.link.rawValue) else {
             return nil
@@ -702,6 +775,7 @@ final class ShareViewController: UIViewController {
 
     private func postLink(
         url: URL,
+        pageTitle: String?,
         note: String,
         listNames: [String],
         remindAt: Date?,
@@ -719,6 +793,10 @@ final class ShareViewController: UIViewController {
         }
 
         var payload: [String: Any] = ["url": url.absoluteString]
+        // The listing title the share captured while the page was loaded —
+        // evidence for a marketplace link, whose page the server can't fetch.
+        // Only a title line that exists is sent; never the URL itself.
+        if let pageTitle, !pageTitle.isEmpty { payload["pageTitle"] = pageTitle }
         if !note.isEmpty { payload["notes"] = note }
         if !listNames.isEmpty { payload["listNames"] = listNames }
         // Send the schedule as a plain yyyy-MM-dd date, matching the web reminder

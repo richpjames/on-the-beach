@@ -33,6 +33,7 @@ import { saveArtwork, saveLabel } from "../../app/secondary-link-enrichment";
 import { UnsupportedMusicLinkError } from "../../app/scrape";
 import { ensureSuggestionsForItemNow, findPendingSuggestionsForItem } from "../../app/suggestions";
 import { scheduleAppleMusicBackfill } from "../../app/apple-music-backfill";
+import { MAX_PAGE_TITLE_CHARS } from "./ingest";
 import {
   NO_SOURCE_CAPABILITIES,
   type CreateMusicItemInput,
@@ -471,6 +472,11 @@ musicItemRoutes.post("/", async (c) => {
   const input = (await c.req.json()) as CreateMusicItemInput;
   if (input.artworkUrl !== undefined && !isValidArtworkUrl(input.artworkUrl)) {
     return c.json({ error: "Invalid artwork URL" }, 400);
+  }
+  // Same untrusted-input cap as the ingest route: a captured page title is
+  // evidence text for the extractor, never a fetch target.
+  if (typeof input.pageTitle === "string") {
+    input.pageTitle = input.pageTitle.trim().slice(0, MAX_PAGE_TITLE_CHARS);
   }
 
   try {
