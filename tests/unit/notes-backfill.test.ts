@@ -1,4 +1,4 @@
-import { afterAll, afterEach, describe, expect, mock, spyOn, test } from "bun:test";
+import { afterAll, beforeEach, describe, expect, mock, spyOn, test } from "bun:test";
 import { eq } from "drizzle-orm";
 import { EventEmitter } from "node:events";
 import { Readable } from "node:stream";
@@ -70,7 +70,11 @@ afterAll(() => {
 const WIKI_URL = "https://en.wikipedia.org/wiki/In_Rainbows";
 const PARAGRAPH = "In Rainbows is the seventh studio album by Radiohead.";
 
-afterEach(() => {
+// Reset before every test, not after: under `bun test --randomize` any test
+// in this file can run first, and an afterEach reset would leave the first
+// one reading the empty initial page body — the sweep then finds no
+// paragraph and writes nothing.
+beforeEach(() => {
   pageStatus = 200;
   pageBody = `<div class="mw-parser-output"><p>${PARAGRAPH}</p></div>`;
 });
