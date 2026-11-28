@@ -33,6 +33,8 @@ export type SourceName =
   | "mixcloud"
   | "nts"
   | "pitchfork"
+  | "ebay"
+  | "wallapop"
   | "physical"
   | "unknown";
 
@@ -178,10 +180,20 @@ export interface MusicItemLink extends SourceCapabilities {
 export interface CreateMusicItemInput {
   title?: string;
   url?: string;
+  /**
+   * The listing page's own title, captured by the share client while the page
+   * was loaded in the user's browser. Evidence, not a correction: `title`
+   * remains the user's override and wins; this is raw seller text to parse.
+   * Only marketplace links read it — their pages block server fetches.
+   */
+  pageTitle?: string;
   artistName?: string;
   itemType?: ItemType;
   listenStatus?: ListenStatus;
   purchaseIntent?: PurchaseIntent;
+  /** What the copy costs, where the entry route learned a price (the eBay enricher). */
+  priceCents?: number;
+  currency?: string;
   notes?: string;
   artworkUrl?: string;
   label?: string;

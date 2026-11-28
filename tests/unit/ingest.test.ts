@@ -241,6 +241,76 @@ describe("POST /api/ingest/link", () => {
   });
 });
 
+describe("POST /api/ingest/link with a captured page title", () => {
+  const originalEnv = { ...process.env };
+  const url = "https://www.ebay.es/itm/800867457219";
+
+  beforeEach(() => {
+    process.env.INGEST_API_KEY = "test-secret";
+    delete process.env.INGEST_ENABLED;
+    mockCreateMany.mockReset();
+    mockCreateMany.mockResolvedValue([
+      { item: { id: 1, title: "Contradictions", primary_url: url } as any, created: true },
+    ]);
+  });
+
+  afterEach(() => {
+    process.env = { ...originalEnv };
+  });
+
+  it("passes the captured listing title through to the creator, trimmed", async () => {
+    const app = makeApp();
+    const res = await makeLinkRequest(
+      app,
+      { url, pageTitle: "  Thomas Leer – Contradictions LP  " },
+      { apiKey: "test-secret" },
+    );
+
+    expect(res.status).toBe(200);
+    expect(mockCreateMany).toHaveBeenCalledWith(url, {
+      pageTitle: "Thomas Leer – Contradictions LP",
+    });
+  });
+
+  it("caps an overlong title — untrusted input, evidence text only", async () => {
+    const app = makeApp();
+    const res = await makeLinkRequest(
+      app,
+      { url, pageTitle: "x".repeat(5_000) },
+      { apiKey: "test-secret" },
+    );
+
+    expect(res.status).toBe(200);
+    const overrides = mockCreateMany.mock.calls[0]?.[1] as { pageTitle?: string };
+    expect(overrides.pageTitle).toHaveLength(500);
+  });
+
+  it("reads a blank or non-string title as no title", async () => {
+    const app = makeApp();
+    await makeLinkRequest(app, { url, pageTitle: "   " }, { apiKey: "test-secret" });
+    expect(mockCreateMany).toHaveBeenCalledWith(url);
+
+    mockCreateMany.mockClear();
+    await makeLinkRequest(app, { url, pageTitle: 42 }, { apiKey: "test-secret" });
+    expect(mockCreateMany).toHaveBeenCalledWith(url);
+  });
+
+  it("carries the captured title alongside notes", async () => {
+    const app = makeApp();
+    const res = await makeLinkRequest(
+      app,
+      { url, pageTitle: "Thomas Leer – Contradictions LP", notes: "seen on the share sheet" },
+      { apiKey: "test-secret" },
+    );
+
+    expect(res.status).toBe(200);
+    expect(mockCreateMany).toHaveBeenCalledWith(url, {
+      notes: "seen on the share sheet",
+      pageTitle: "Thomas Leer – Contradictions LP",
+    });
+  });
+});
+
 describe("POST /api/ingest/link with list and notes", () => {
   const originalEnv = { ...process.env };
   const url = "https://artist.bandcamp.com/album/cool-album";

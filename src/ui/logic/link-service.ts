@@ -21,6 +21,8 @@ const KNOWN_SOURCES = new Set<string>([
   "mixcloud",
   "nts",
   "pitchfork",
+  "ebay",
+  "wallapop",
   "physical",
 ]);
 
@@ -38,6 +40,7 @@ const HOSTS: ReadonlyArray<readonly [string, SourceName]> = [
   ["mixcloud.com", "mixcloud"],
   ["nts.live", "nts"],
   ["pitchfork.com", "pitchfork"],
+  ["wallapop.com", "wallapop"],
 ];
 
 /** The service a URL belongs to, or "unknown" for anywhere else on the web. */
@@ -55,6 +58,9 @@ export function serviceFromUrl(url: string | null | undefined): SourceName {
   if (hostname === "apple.com" || hostname.endsWith(".apple.com")) {
     return /^(music|itunes|beta\.music)\.apple\.com$/.test(hostname) ? "apple_music" : "unknown";
   }
+  // eBay's country sites (ebay.es, ebay.co.uk, …) are one marketplace, the way
+  // music.apple.com's country paths are one service.
+  if (/(?:^|\.)ebay\.[a-z]{2,3}(?:\.[a-z]{2})?$/.test(hostname)) return "ebay";
   for (const [host, source] of HOSTS) {
     if (hostname === host || hostname.endsWith(`.${host}`)) return source;
   }
@@ -83,6 +89,8 @@ const DISPLAY_NAMES: Record<SourceName, string> = {
   mixcloud: "Mixcloud",
   nts: "NTS",
   pitchfork: "Pitchfork",
+  ebay: "eBay",
+  wallapop: "Wallapop",
   physical: "Physical",
   unknown: "Link",
 };

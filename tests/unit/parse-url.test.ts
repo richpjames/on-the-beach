@@ -1,5 +1,5 @@
 import { describe, test, expect } from "bun:test";
-import { parseUrl } from "../../adapters/registry";
+import { parseUrl, marketplaceListingKey, sourceIsMarketplace } from "../../adapters/registry";
 import { extractYouTubePlaylistId } from "../../adapters/youtube/index";
 
 describe("parseUrl - youtube", () => {
@@ -310,5 +310,116 @@ describe("parseUrl - qobuz", () => {
     expect(parseUrl("https://www.qobuz.com/us-en/label/columbia/4592").source).toBe("unknown");
     expect(parseUrl("https://www.qobuz.com/us-en/album/").source).toBe("unknown");
     expect(parseUrl("https://qobuz.com.evil.test/album/x/123").source).toBe("unknown");
+  });
+});
+
+describe("parseUrl - ebay", () => {
+  test("identifies a listing on a country site and keeps its TLD", () => {
+    const result = parseUrl("https://www.ebay.es/itm/800867457219?itmprp=cks%3A123");
+
+    expect(result.source).toBe("ebay");
+    expect(result.normalizedUrl).toBe("https://www.ebay.es/itm/800867457219");
+    expect(result.listingId).toBe("800867457219");
+  });
+
+  test("accepts a title slug before the listing id", () => {
+    const result = parseUrl("https://www.ebay.com/itm/Thomas-Leer-Contradictions-LP/800867457219");
+
+    expect(result.source).toBe("ebay");
+    expect(result.normalizedUrl).toBe("https://www.ebay.com/itm/800867457219");
+    expect(result.listingId).toBe("800867457219");
+  });
+
+  test("matches multi-label country TLDs like ebay.co.uk and ebay.com.au", () => {
+    expect(parseUrl("https://www.ebay.co.uk/itm/123456789").normalizedUrl).toBe(
+      "https://www.ebay.co.uk/itm/123456789",
+    );
+    expect(parseUrl("https://ebay.com.au/itm/123456789").normalizedUrl).toBe(
+      "https://www.ebay.com.au/itm/123456789",
+    );
+  });
+
+  test("does not classify an eBay search or shop page as a listing", () => {
+    expect(parseUrl("https://www.ebay.com/sch/i.html?_nkw=vinyl").source).toBe("unknown");
+    expect(parseUrl("https://www.ebay.com/str/recordshop").source).toBe("unknown");
+  });
+
+  test("carries no slug evidence — a numeric id names nothing", () => {
+    const result = parseUrl("https://www.ebay.es/itm/800867457219");
+    expect(result.slugText).toBeUndefined();
+    expect(result.potentialTitle).toBeUndefined();
+  });
+});
+
+describe("parseUrl - wallapop", () => {
+  test("identifies a listing, its id and the slug's words", () => {
+    const result = parseUrl(
+      "https://es.wallapop.com/item/vinilo-camaron-la-leyenda-del-tiempo-1979-1320305358",
+    );
+
+    expect(result.source).toBe("wallapop");
+    expect(result.listingId).toBe("1320305358");
+    expect(result.slugText).toBe("vinilo camaron la leyenda del tiempo 1979");
+    expect(result.normalizedUrl).toBe(
+      "https://es.wallapop.com/item/vinilo-camaron-la-leyenda-del-tiempo-1979-1320305358",
+    );
+  });
+
+  test("matches the bare wallapop.com host", () => {
+    const result = parseUrl("https://wallapop.com/item/some-record-42");
+
+    expect(result.source).toBe("wallapop");
+    expect(result.listingId).toBe("42");
+    expect(result.slugText).toBe("some record");
+  });
+
+  test("a slug with no trailing digits yields no listing id", () => {
+    const result = parseUrl("https://es.wallapop.com/item/vinilo-camaron");
+
+    expect(result.source).toBe("wallapop");
+    expect(result.listingId).toBeUndefined();
+    expect(result.slugText).toBe("vinilo camaron");
+  });
+
+  test("a digits-only slug carries no words", () => {
+    const result = parseUrl("https://es.wallapop.com/item/1320305358");
+
+    expect(result.source).toBe("wallapop");
+    expect(result.listingId).toBe("1320305358");
+    expect(result.slugText).toBeUndefined();
+  });
+});
+
+describe("marketplace capability and listing keys", () => {
+  test("sourceIsMarketplace names the marketplaces only", () => {
+    expect(sourceIsMarketplace("ebay")).toBe(true);
+    expect(sourceIsMarketplace("wallapop")).toBe(true);
+    expect(sourceIsMarketplace("discogs")).toBe(false);
+    expect(sourceIsMarketplace("bandcamp")).toBe(false);
+    expect(sourceIsMarketplace("unknown")).toBe(false);
+  });
+
+  test("the same listing on two country sites shares one key", () => {
+    expect(marketplaceListingKey("https://www.ebay.es/itm/800867457219?itmprp=x")).toBe(
+      "ebay:800867457219",
+    );
+    expect(marketplaceListingKey("https://www.ebay.com/itm/800867457219")).toBe(
+      "ebay:800867457219",
+    );
+    expect(
+      marketplaceListingKey(
+        "https://es.wallapop.com/item/vinilo-camaron-la-leyenda-del-tiempo-1979-1320305358",
+      ),
+    ).toBe("wallapop:1320305358");
+  });
+
+  test("no key without a listing id — those links dedupe on the exact URL", () => {
+    expect(marketplaceListingKey("https://es.wallapop.com/item/vinilo-camaron")).toBeNull();
+  });
+
+  test("no key for non-marketplace sources", () => {
+    expect(marketplaceListingKey("https://www.discogs.com/sell/item/4334240712")).toBeNull();
+    expect(marketplaceListingKey("https://bandcamp.com/album/x")).toBeNull();
+    expect(marketplaceListingKey("https://example.com/page")).toBeNull();
   });
 });

@@ -159,9 +159,12 @@ async function fetchPublicPage(url: string, signal: AbortSignal): Promise<Respon
 /**
  * The page's HTML, read up to `stopAt` or `maxBytes` — whichever comes first.
  *
- * Returns null when the page isn't reachable HTML: a non-HTML content type, a
- * missing body or a fetch that fails or times out. Callers with their own
- * fallback (an oEmbed answer, an API lookup) apply it on null.
+ * Returns null when the page isn't reachable HTML: a non-2xx answer, a
+ * non-HTML content type, a missing body or a fetch that fails or times out.
+ * A blocked page's error body is not the page — reading it as HTML is how a
+ * marketplace's 403 "Error Page" came to be judged "not music-related".
+ * Callers with their own fallback (an oEmbed answer, an API lookup) apply it
+ * on null.
  */
 export async function fetchPageHtml(
   url: string,
@@ -183,6 +186,11 @@ export async function fetchPageHtml(
     }
 
     clearTimeout(timer);
+
+    if (!response.ok) {
+      await response.body?.cancel();
+      return null;
+    }
 
     const contentType = response.headers.get("content-type") || "";
     if (!contentType.includes("text/html")) return null;

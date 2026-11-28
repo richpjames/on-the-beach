@@ -22,6 +22,7 @@ import type { ScrapedMetadata } from "./web/html-metadata";
 import { scrapeAppleMusic } from "./apple-music/index";
 import { scrapeBandcamp } from "./bandcamp";
 import { fetchDiscogsRelease } from "./discogs";
+import { scrapeEbay } from "./ebay/index";
 import { scrapeMixcloud } from "./mixcloud";
 import { scrapeNts } from "./nts";
 import { scrapePitchfork } from "./pitchfork";
@@ -34,6 +35,10 @@ export interface ParsedUrl {
   normalizedUrl: string;
   potentialArtist?: string;
   potentialTitle?: string;
+  /** The marketplace listing's own id, from the entry's `listingId` hook. */
+  listingId?: string;
+  /** Words the listing's URL slug carries — evidence when no client title arrived. */
+  slugText?: string;
 }
 
 const URL_PATTERNS: Array<{
@@ -41,6 +46,14 @@ const URL_PATTERNS: Array<{
   pattern: RegExp;
   normalizer?: (match: RegExpMatchArray) => string;
   extractor?: (match: RegExpMatchArray) => { potentialArtist?: string; potentialTitle?: string };
+  /**
+   * The listing's id on its marketplace — global across the site's country
+   * domains, so it (not the TLD-bearing URL) is what duplicate shares dedupe
+   * on. See `marketplaceListingKey`.
+   */
+  listingId?: (match: RegExpMatchArray) => string | undefined;
+  /** The slug read as words, for marketplaces whose slugs carry them. */
+  slugText?: (match: RegExpMatchArray) => string | undefined;
 }> = [
   {
     source: "bandcamp",
@@ -148,6 +161,32 @@ const URL_PATTERNS: Array<{
     source: "pitchfork",
     pattern: /^https?:\/\/(?:www\.)?pitchfork\.com\/reviews\/albums\/[^/?]+/,
   },
+  {
+    // eBay's country sites (ebay.es, ebay.co.uk, …) share one catalogue of
+    // listings. The normaliser keeps the TLD — it sets the currency and the
+    // Browse API's marketplace header — while dedupe runs on the listing id,
+    // which is global across every country site. The id is the digits after
+    // /itm/, optionally behind a title slug.
+    source: "ebay",
+    pattern: /^https?:\/\/(?:www\.)?ebay\.([a-z]{2,3}(?:\.[a-z]{2})?)\/itm\/(?:[^/?]+\/)?(\d+)/,
+    normalizer: (match) => `https://www.ebay.${match[1]}/itm/${match[2]}`,
+    listingId: (match) => match[2],
+  },
+  {
+    // Wallapop slugs carry the seller's words ("vinilo-camaron-la-leyenda-del-
+    // tiempo-1979-1320305358"): the trailing digits are the listing id, the
+    // words before them are evidence when the share arrived with no title.
+    source: "wallapop",
+    pattern: /^https?:\/\/(?:[a-z]{2}\.)?wallapop\.com\/item\/([^/?]+)/,
+    listingId: (match) => match[1]?.match(/(\d+)$/)?.[1],
+    slugText: (match) => {
+      const words = (match[1] ?? "")
+        .replace(/-?\d+$/, "")
+        .replace(/-/g, " ")
+        .trim();
+      return /[a-z]/i.test(words) ? words : undefined;
+    },
+  },
 ];
 
 function stripMobileSubdomain(url: string): string {
@@ -158,13 +197,17 @@ function stripMobileSubdomain(url: string): string {
 export function parseUrl(url: string): ParsedUrl {
   const trimmedUrl = stripMobileSubdomain(url.trim());
 
-  for (const { source, pattern, normalizer, extractor } of URL_PATTERNS) {
+  for (const { source, pattern, normalizer, extractor, listingId, slugText } of URL_PATTERNS) {
     const match = trimmedUrl.match(pattern);
     if (match) {
+      const id = listingId?.(match);
+      const words = slugText?.(match);
       return {
         source,
         normalizedUrl: normalizer ? normalizer(match) : trimmedUrl.split("?")[0],
         ...extractor?.(match),
+        ...(id ? { listingId: id } : {}),
+        ...(words ? { slugText: words } : {}),
       };
     }
   }
@@ -182,6 +225,7 @@ export const SOURCE_SCRAPERS: Partial<Record<SourceName, SourceScrape>> = {
   apple_music: scrapeAppleMusic,
   bandcamp: scrapeBandcamp,
   discogs: fetchDiscogsRelease,
+  ebay: scrapeEbay,
   mixcloud: scrapeMixcloud,
   nts: scrapeNts,
   pitchfork: scrapePitchfork,
@@ -193,4 +237,29 @@ export const SOURCE_SCRAPERS: Partial<Record<SourceName, SourceScrape>> = {
 /** Whether a source's pages state a release date worth scraping for. */
 export function sourceNamesReleaseDate(source: SourceName): boolean {
   return source === "bandcamp" || source === "qobuz";
+}
+
+/**
+ * Whether a source is a marketplace: one copy of one release for sale, on a
+ * site that blocks server fetches. The listing's metadata is captured by the
+ * share client instead (see the creator's marketplace branch). The `sources`
+ * table stays the display authority — this is the static capability query,
+ * same pattern as `sourceNamesReleaseDate`.
+ */
+export function sourceIsMarketplace(source: SourceName): boolean {
+  return source === "ebay" || source === "wallapop";
+}
+
+/**
+ * The dedupe key for a marketplace link: `<source>:<listing id>`. Listing ids
+ * are global across a marketplace's country sites, so this one key matches
+ * every site variant of the same listing — present and future — while the
+ * TLD-bearing URL is still what gets stored. Null when the source isn't a
+ * marketplace or its entry yields no id; those links dedupe on the exact
+ * normalised URL, as everything else does.
+ */
+export function marketplaceListingKey(url: string): string | null {
+  const parsed = parseUrl(url);
+  if (!sourceIsMarketplace(parsed.source) || !parsed.listingId) return null;
+  return `${parsed.source}:${parsed.listingId}`;
 }

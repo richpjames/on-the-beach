@@ -151,6 +151,14 @@ export const musicLinks = sqliteTable(
     sourceId: integer("source_id").references(() => sources.id, { onDelete: "set null" }),
     url: text("url").notNull(),
     isPrimary: integer("is_primary", { mode: "boolean" }).notNull().default(false),
+    // Marketplace dedupe key, `<source>:<listing id>`, stamped at insert for
+    // marketplace links only. Listing ids are global across a marketplace's
+    // country sites, so ebay.es/itm/<id> and ebay.com/itm/<id> are one listing:
+    // the key matches every site variant while the TLD-bearing URL stays
+    // stored (it sets the currency and the enricher's marketplace header).
+    // No backfill — marketplace sources are new, so no existing row carries a
+    // key; everything else keeps deduping on the exact URL.
+    listingKey: text("listing_key"),
     // Source-specific embed metadata as JSON (e.g. { album_id, item_type } for Bandcamp)
     metadata: text("metadata"),
     createdAt: integer("created_at", { mode: "timestamp" })
@@ -161,6 +169,7 @@ export const musicLinks = sqliteTable(
     unique("music_links_item_url").on(table.musicItemId, table.url),
     index("idx_music_links_music_item_id").on(table.musicItemId),
     index("idx_music_links_url").on(table.url),
+    index("idx_music_links_listing_key").on(table.listingKey),
   ],
 );
 

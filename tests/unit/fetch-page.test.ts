@@ -194,6 +194,27 @@ describe("fetchPageHtml — publicHostsOnly", () => {
     expect(await guarded("https://public.example/")).toBeNull();
     expect(transportCalls.length).toBe(6);
   });
+
+  test("a blocked page's non-2xx answer reads as null, not as its error body", async () => {
+    // A marketplace's 403 "Error Page" is not the listing — reading it as
+    // HTML is how a blocked page came to be judged "not music-related".
+    responseQueue = [
+      {
+        status: 403,
+        headers: { "content-type": "text/html" },
+        body: "<html><head><title>Error Page</title></head></html>",
+      },
+    ];
+    expect(await guarded("https://marketplace.example/item/1")).toBeNull();
+    expect(transportCalls.length).toBe(1);
+  });
+
+  test("a 500 answer reads as null too", async () => {
+    responseQueue = [
+      { status: 500, headers: { "content-type": "text/html" }, body: "<p>boom</p>" },
+    ];
+    expect(await guarded("https://public.example/")).toBeNull();
+  });
 });
 
 describe("fetchPageHtml — without the guard", () => {
@@ -209,5 +230,19 @@ describe("fetchPageHtml — without the guard", () => {
     expect(lookupMock).not.toHaveBeenCalled();
     expect(transportCalls.length).toBe(0);
     expect(fetchSpy.mock.calls[0]?.[1]?.redirect).toBeUndefined();
+  });
+
+  test("a non-2xx answer reads as null even when it carries HTML", async () => {
+    spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response("<html><head><title>Error Page</title></head></html>", {
+        status: 403,
+        headers: { "content-type": "text/html" },
+      }),
+    );
+    const html = await fetchPageHtml("https://www.ebay.es/itm/800867457219", 1_000, {
+      maxBytes: 10_000,
+      stopAt: "</head>",
+    });
+    expect(html).toBeNull();
   });
 });

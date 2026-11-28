@@ -248,6 +248,22 @@ function parseRating(body: unknown): { rating: number | null } | { error: string
 }
 
 /**
+ * The listing page's own title, captured by the share client while the page
+ * was loaded in the user's browser — the one piece of metadata a marketplace
+ * page won't give the server (see the marketplace design doc). Trimmed and
+ * length-capped here: it is untrusted input, fed to the extractor as text
+ * only, never a fetch target. Absent/blank reads as no title.
+ */
+export const MAX_PAGE_TITLE_CHARS = 500;
+
+function parsePageTitle(body: unknown): string {
+  if (!body || typeof body !== "object") return "";
+  const { pageTitle } = body as Record<string, unknown>;
+  if (typeof pageTitle !== "string") return "";
+  return pageTitle.trim().slice(0, MAX_PAGE_TITLE_CHARS);
+}
+
+/**
  * Gather the release candidate ids a /link request selected — the share
  * sheet's second POST after a multi-release page came back as 409
  * `ambiguous_link`. Trims each, drops blanks/non-strings, and de-dupes.
@@ -499,6 +515,11 @@ export function createIngestRoutes(deps: IngestRoutesDeps = {}): Hono {
     // clobber an existing note.
     const overrides: Partial<CreateMusicItemInput> = {};
     if (notes) overrides.notes = notes;
+
+    // The listing title the share client captured — evidence for a marketplace
+    // link, ignored by every other source. The user's own `title` still wins.
+    const pageTitle = parsePageTitle(body);
+    if (pageTitle) overrides.pageTitle = pageTitle;
 
     // The share sheet's answer to an earlier `ambiguous_link` response: which
     // of the page's releases to add. One item is created per selected id.

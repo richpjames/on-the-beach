@@ -36,6 +36,9 @@ export interface ScrapedMetadata {
   genre?: string;
   /** The releasing label, where the source names one (Discogs does). */
   label?: string;
+  /** What the copy costs, where the source names a price (the eBay enricher does). */
+  priceCents?: number;
+  currency?: string;
   canonicalUrl?: string;
 }
 
