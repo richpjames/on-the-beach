@@ -481,6 +481,24 @@ musicItemRoutes.post("/", async (c) => {
   } else {
     delete input.pageTitle;
   }
+  // Price and currency are untrusted body fields like pageTitle: integer cents
+  // and a currency code only. Anything else is dropped here, not bound to the
+  // insert — a non-number would throw at the SQLite bind as a 500. Fractional
+  // cents round; a negative price is no price at all.
+  if (
+    typeof input.priceCents === "number" &&
+    Number.isFinite(input.priceCents) &&
+    input.priceCents >= 0
+  ) {
+    input.priceCents = Math.round(input.priceCents);
+  } else {
+    delete input.priceCents;
+  }
+  if (typeof input.currency === "string" && input.currency.trim()) {
+    input.currency = input.currency.trim();
+  } else {
+    delete input.currency;
+  }
 
   try {
     // The web add form asks for duplicate warnings; everything else (ingest,
