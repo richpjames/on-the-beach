@@ -187,7 +187,7 @@ const URL_PATTERNS: Array<{
     // the words before it are evidence when the share arrived with no title. A
     // year ending the words is not an id — it stays in the slug's evidence.
     source: "wallapop",
-    pattern: /^https?:\/\/(?:[a-z]{2}\.)?wallapop\.com\/item\/([^/?]+)/,
+    pattern: /^https?:\/\/(?:www\.|[a-z]{2}\.)?wallapop\.com\/item\/([^/?]+)/,
     listingId: (match) => match[1]?.match(WALLAPOP_LISTING_ID)?.[1],
     slugText: (match) => {
       const slug = match[1] ?? "";

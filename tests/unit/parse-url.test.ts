@@ -373,6 +373,16 @@ describe("parseUrl - wallapop", () => {
     expect(result.slugText).toBe("some record");
   });
 
+  test("matches www.wallapop.com like the country sites", () => {
+    // The client's badge suffix-matches any wallapop.com host; the server must
+    // classify www shares the same way, not fall through to a blocked fetch.
+    const result = parseUrl("https://www.wallapop.com/item/some-record-1320305399");
+
+    expect(result.source).toBe("wallapop");
+    expect(result.listingId).toBe("1320305399");
+    expect(result.slugText).toBe("some record");
+  });
+
   test("a year ending the words is not a listing id — it stays as evidence", () => {
     // Without its trailing id, a slug ending in a year must not mistake the
     // year for the id: that would collide every listing ending in that year.
@@ -419,6 +429,11 @@ describe("marketplace capability and listing keys", () => {
     expect(
       marketplaceListingKey(
         "https://es.wallapop.com/item/vinilo-camaron-la-leyenda-del-tiempo-1979-1320305358",
+      ),
+    ).toBe("wallapop:1320305358");
+    expect(
+      marketplaceListingKey(
+        "https://www.wallapop.com/item/vinilo-camaron-la-leyenda-del-tiempo-1979-1320305358",
       ),
     ).toBe("wallapop:1320305358");
   });
