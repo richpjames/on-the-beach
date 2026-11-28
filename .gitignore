@@ -79,3 +79,7 @@ eval/resolution/results/search-cache.json
 # Stryker mutation testing (html report + incremental state)
 /reports/
 .stryker-tmp/
+
+# Written by the Dockerfile's build stage from the deploy tag; vite.config.ts
+# falls back to package.json's version when it's absent (dev, tests).
+.app-version

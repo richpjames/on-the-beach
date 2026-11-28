@@ -140,11 +140,25 @@ Add repository secrets:
 - `COOLIFY_WEBHOOK`: Coolify deploy webhook URL
 - `COOLIFY_TOKEN`: Coolify API token for the webhook
 
-The workflow at `.github/workflows/playwright.yml` deploys only when:
+The workflow at `.github/workflows/deploy.yml` deploys only when:
 
 1. push target is `main`
-2. Playwright test job passes
+2. the `Test` workflow passed
 3. both secrets are configured
+
+### Versioning
+
+Branch protection requires every commit to `main` to go through a PR, so the
+deploy workflow does not commit a version bump. Instead it tags the deployed
+commit `v1.0.N` (next patch after the highest existing `v*` tag, seeded from
+`package.json`'s version for the first tag) and pushes the tag — tags are not
+covered by the branch ruleset.
+
+- The Dockerfile's build stage reads the tag from `.git` (which is therefore
+  kept in the build context) into `.app-version`; `vite.config.ts` shows it in
+  the footer. Untagged builds — dev, tests — fall back to `package.json`.
+- `scripts/archive-ios.sh` stamps the TestFlight marketing version from the
+  latest reachable tag; the build number stays the git commit count.
 
 ## 7. Verification Checklist
 

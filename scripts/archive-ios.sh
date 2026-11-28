@@ -19,13 +19,14 @@
 # minutes ("No Accounts" errors), while uploading needs no session at all.
 #
 # Versioning: the generated project pins MARKETING_VERSION=1.0 and
-# CURRENT_PROJECT_VERSION=1 (Capacitor never copies package.json's version
-# across), so both are stamped here — marketing version from package.json,
-# build number from the git commit count. TestFlight rejects a version+build
-# pair it already has, so when re-uploading from the same commit pass
-# OTB_BUILD_NUMBER=<higher number>. The xcodebuild override applies to every
-# target, which is exactly what the app-extension rule wants ("CFBundleVersion
-# of an app extension must match its containing parent app").
+# CURRENT_PROJECT_VERSION=1 (Capacitor never copies the app's version
+# across), so both are stamped here — marketing version from the latest
+# deploy tag (package.json as fallback), build number from the git commit
+# count. TestFlight rejects a version+build pair it already has, so when
+# re-uploading from the same commit pass OTB_BUILD_NUMBER=<higher number>.
+# The xcodebuild override applies to every target, which is exactly what the
+# app-extension rule wants ("CFBundleVersion of an app extension must match
+# its containing parent app").
 #
 # One-time setup (details in docs/ios-native-app.md ▸ TestFlight):
 #   - a paid Apple Developer Program membership on team $DEV_TEAM
@@ -103,14 +104,20 @@ if [[ -n "${OTB_API_KEY:-}" && -n "${OTB_API_ISSUER:-}" ]]; then
   fi
 fi
 
-APP_VERSION=$(bun -e 'console.log(require("./package.json").version)')
+# Marketing version from the latest deploy tag (v1.0.N → 1.0.N); untagged
+# checkouts fall back to package.json. The commit-count build number below
+# keeps every upload unique even when two merges share a tag.
+APP_VERSION=$(git describe --tags --abbrev=0 2>/dev/null | sed 's/^v//')
+if [[ -z "$APP_VERSION" ]]; then
+  APP_VERSION=$(bun -e 'console.log(require("./package.json").version)')
+fi
 BUILD_NUMBER="${OTB_BUILD_NUMBER:-$(git rev-list --count HEAD)}"
 ARCHIVE_DIR="build/ios-archives"
 ARCHIVE="$ARCHIVE_DIR/OnTheBeach-$APP_VERSION-$BUILD_NUMBER.xcarchive"
 IPA_DIR="$ARCHIVE_DIR/upload"
 # Written after a successful export. Reuse below only fires when the stamp
 # matches the version+build being built now, so an .ipa left over from an
-# earlier commit (or an earlier package.json version) is rebuilt, not silently
+# earlier commit (or an earlier tag) is rebuilt, not silently
 # re-uploaded as this build.
 STAMP="$IPA_DIR/.built-$APP_VERSION-$BUILD_NUMBER"
 
