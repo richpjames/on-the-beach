@@ -56,7 +56,9 @@ function mockChatCompletionResponse(content: string): Response {
  */
 function mockExtraction(releasesJson: string) {
   const fetchSpy = spyOn(globalThis, "fetch");
-  fetchSpy.mockResolvedValue(mockChatCompletionResponse(releasesJson));
+  // A fresh Response per call: a body can only be read once, and one test may
+  // file several listings off the same extraction.
+  fetchSpy.mockImplementation(async () => mockChatCompletionResponse(releasesJson));
   return fetchSpy;
 }
 
@@ -424,24 +426,95 @@ describe("marketplace dedupe runs on source + listing id", () => {
   });
 });
 
-describe("POST /api/music-items sanitises the captured title", () => {
+describe("POST /api/music-items sanitises untrusted body fields", () => {
+  async function postItem(body: Record<string, unknown>) {
+    const app = new Hono();
+    app.route("/api/music-items", musicItemRoutes);
+    return app.request("http://localhost/api/music-items", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+  }
+
   test("a non-string pageTitle is dropped, not passed through to the creator", async () => {
     // The body is untrusted JSON: `pageTitle: 42` must be dropped at the route,
     // not reach the creator's `.trim()` and blow up as a 500. With it gone, an
     // eBay listing with no slug has no evidence and gets the honest 400.
     const fetchSpy = spyOn(globalThis, "fetch");
-    const app = new Hono();
-    app.route("/api/music-items", musicItemRoutes);
 
-    const response = await app.request("http://localhost/api/music-items", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ url: ebayUrl("com", "191919191919"), pageTitle: 42 }),
+    const response = await postItem({
+      url: ebayUrl("com", "191919191919"),
+      pageTitle: 42,
     });
 
     expect(response.status).toBe(400);
     const body = (await response.json()) as { error: string };
     expect(body.error).toBe("This site blocks server requests — paste the listing title");
     expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  test("a malformed price and currency are dropped, not bound to the insert", async () => {
+    // `priceCents: {a: 1}` used to reach the SQLite bind and throw a 500; a
+    // non-string currency was stored unchecked. Both are dropped at the route
+    // and the listing still files, with no price and the default currency.
+    mockExtraction(CAMARON_JSON);
+
+    const response = await postItem({
+      url: wallapopUrl("1320305370"),
+      pageTitle: "Vinilo Camarón – La leyenda del tiempo (1979)",
+      priceCents: { a: 1 },
+      currency: 42,
+    });
+
+    expect(response.status).toBe(201);
+    const item = (await response.json()) as { price_cents: number | null; currency: string };
+    expect(item.price_cents).toBeNull();
+    expect(item.currency).toBe("USD");
+  });
+
+  test("priceCents is integer cents: fractional rounds, negative and string drop", async () => {
+    mockExtraction(CAMARON_JSON);
+    const title = "Vinilo Camarón – La leyenda del tiempo (1979)";
+
+    const fractional = await postItem({
+      url: wallapopUrl("1320305371"),
+      pageTitle: title,
+      priceCents: 2499.6,
+    });
+    expect(fractional.status).toBe(201);
+    expect(((await fractional.json()) as { price_cents: number }).price_cents).toBe(2500);
+
+    const negative = await postItem({
+      url: wallapopUrl("1320305372"),
+      pageTitle: title,
+      priceCents: -5,
+    });
+    expect(negative.status).toBe(201);
+    expect(((await negative.json()) as { price_cents: number | null }).price_cents).toBeNull();
+
+    const stringly = await postItem({
+      url: wallapopUrl("1320305373"),
+      pageTitle: title,
+      priceCents: "2499",
+    });
+    expect(stringly.status).toBe(201);
+    expect(((await stringly.json()) as { price_cents: number | null }).price_cents).toBeNull();
+  });
+
+  test("a valid price and currency pass through, the currency trimmed", async () => {
+    mockExtraction(CAMARON_JSON);
+
+    const response = await postItem({
+      url: wallapopUrl("1320305374"),
+      pageTitle: "Vinilo Camarón – La leyenda del tiempo (1979)",
+      priceCents: 2499,
+      currency: " EUR ",
+    });
+
+    expect(response.status).toBe(201);
+    const item = (await response.json()) as { price_cents: number | null; currency: string };
+    expect(item.price_cents).toBe(2499);
+    expect(item.currency).toBe("EUR");
   });
 });
