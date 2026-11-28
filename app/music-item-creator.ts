@@ -393,7 +393,11 @@ function usableListingTitle(pageTitle: string | undefined, parsed: ParsedUrl): s
   const trimmed = pageTitle?.trim();
   if (!trimmed) return undefined;
 
-  if (trimmed === parsed.normalizedUrl || trimmed.split("?")[0] === parsed.normalizedUrl) {
+  // A URL posted as the title carries no evidence, whatever spelling it arrives
+  // in. Comparing against the normalised URL would let slug-bearing and
+  // tracking-param spellings through — the normaliser drops both — so reject
+  // any whitespace-free value that parses as an http(s) URL outright.
+  if (!/\s/.test(trimmed) && isValidUrl(trimmed)) {
     return undefined;
   }
 
@@ -477,7 +481,12 @@ async function resolveMarketplaceListing(
     isPrimary: release.isPrimary,
   }));
 
-  return selectReleaseCandidates(parsed, candidates, overrides);
+  const resolved = selectReleaseCandidates(parsed, candidates, overrides);
+  // A lot — several releases in one listing — dedupes per release, like a
+  // round-up page: filing release A today must not block adding release B from
+  // the same listing tomorrow. A single-release listing keeps the strong
+  // listing-key short-circuit, which survives title drift between shares.
+  return releases.length > 1 ? { ...resolved, listingNamesSeveralReleases: true } : resolved;
 }
 
 /**
@@ -665,6 +674,13 @@ type ResolveOutput = {
   normalizedUrl: string;
   source: ReturnType<typeof parseUrl>["source"];
   candidates: ReleaseCandidateInput[];
+  /**
+   * True when a marketplace listing's own text named several releases — a lot.
+   * The user's selection collapses the candidates to the picked ones before the
+   * duplicate check runs, so their count can't say it later; this flag carries
+   * the listing's nature through, so dedupe runs per release, not per listing.
+   */
+  listingNamesSeveralReleases?: boolean;
 };
 
 interface ScrapingMachineContext {
@@ -673,6 +689,7 @@ interface ScrapingMachineContext {
   resolvedUrl: string;
   resolvedSource: ReturnType<typeof parseUrl>["source"];
   candidates: ReleaseCandidateInput[];
+  listingNamesSeveralReleases: boolean;
   existingItems: MusicItemFull[];
   results: CreateResult[];
   ambiguousPayload: AmbiguousLinkPayload | null;
@@ -761,6 +778,7 @@ const scrapingMachine = setup({
     resolvedUrl: "",
     resolvedSource: "unknown" as ReturnType<typeof parseUrl>["source"],
     candidates: [],
+    listingNamesSeveralReleases: false,
     existingItems: [],
     results: [],
     ambiguousPayload: null,
@@ -781,6 +799,7 @@ const scrapingMachine = setup({
             resolvedUrl: event.output.normalizedUrl,
             resolvedSource: event.output.source,
             candidates: event.output.candidates,
+            listingNamesSeveralReleases: event.output.listingNamesSeveralReleases === true,
           })),
         },
         onError: [
@@ -826,10 +845,13 @@ const scrapingMachine = setup({
           {
             // Known source with an existing item — return it without inserting.
             // A forced add deliberately bypasses this to insert a second copy.
+            // A lot bypasses it too: its releases dedupe one by one at insert,
+            // so picking another release from the same listing still adds it.
             guard: ({ context, event }) =>
               context.resolvedSource !== "unknown" &&
               event.output.length > 0 &&
-              !context.forceDuplicate,
+              !context.forceDuplicate &&
+              !context.listingNamesSeveralReleases,
             target: "done",
             actions: assign(({ event }) => ({
               results: [{ item: event.output[0]!, created: false }],

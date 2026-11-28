@@ -474,9 +474,12 @@ musicItemRoutes.post("/", async (c) => {
     return c.json({ error: "Invalid artwork URL" }, 400);
   }
   // Same untrusted-input cap as the ingest route: a captured page title is
-  // evidence text for the extractor, never a fetch target.
+  // evidence text for the extractor, never a fetch target. Anything that isn't
+  // a string is dropped here, not passed through to the creator's `.trim()`.
   if (typeof input.pageTitle === "string") {
     input.pageTitle = input.pageTitle.trim().slice(0, MAX_PAGE_TITLE_CHARS);
+  } else {
+    delete input.pageTitle;
   }
 
   try {

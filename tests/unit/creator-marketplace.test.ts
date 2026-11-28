@@ -1,7 +1,9 @@
 import { describe, test, expect, spyOn, mock, afterEach, afterAll } from "bun:test";
+import { Hono } from "hono";
 import { eq } from "drizzle-orm";
 import { createMusicItemsFromUrl, AmbiguousLinkSelectionError } from "../../app/music-item-creator";
 import { UnsupportedMusicLinkError } from "../../app/scrape";
+import { musicItemRoutes } from "../../server/routes/music-items";
 import { db } from "../../adapters/db/index";
 import { musicLinks } from "../../adapters/db/schema";
 
@@ -160,6 +162,32 @@ describe("marketplace junk titles are rejected, not filed", () => {
     ).rejects.toThrow(UnsupportedMusicLinkError);
   });
 
+  test("a slug-bearing URL posted as the title is still the URL, not evidence", async () => {
+    // eBay's normaliser drops the title slug, so the posted URL no longer equals
+    // the normalised one — comparing against it would let this through and file
+    // an item titled with the URL. It must still be rejected as a title.
+    const sluggedUrl = "https://www.ebay.es/itm/Thomas-Leer-Contradictions-LP/181818181818";
+    const fetchSpy = spyOn(globalThis, "fetch");
+
+    await expect(createMusicItemsFromUrl(sluggedUrl, { pageTitle: sluggedUrl })).rejects.toThrow(
+      "This site blocks server requests — paste the listing title",
+    );
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  test("a Wallapop URL posted as the title falls back to the slug's words", async () => {
+    // Rejecting the URL as a title must not kill the slug fallback: Wallapop's
+    // slug carries the seller's words, which are evidence in their own right.
+    const url = wallapopUrl("1320305361");
+    const fetchSpy = mockExtraction(CAMARON_JSON);
+
+    const results = await createMusicItemsFromUrl(url, { pageTitle: url });
+
+    expect(results[0]!.created).toBe(true);
+    expect(results[0]!.item.title).toBe("La Leyenda Del Tiempo");
+    expectNoPageFetch(fetchSpy, "wallapop.com");
+  });
+
   test("a bare site name on eBay asks for the listing title", async () => {
     await expect(
       createMusicItemsFromUrl(ebayUrl("com", "222222222222"), { pageTitle: "eBay" }),
@@ -284,6 +312,44 @@ describe("marketplace listings naming several releases", () => {
     expect(results.every((result) => result.created)).toBe(true);
     expect(results.map((result) => result.item.primary_url)).toEqual([lotUrl, lotUrl]);
   });
+
+  test("filing one release of a lot doesn't block adding another later", async () => {
+    const lotUrl = ebayUrl("es", "171717171717");
+    const lotJson =
+      '{"releases":[{"artist":"Kalte Sterne","title":"Nachtfahrt","itemType":"album"},{"artist":"Rue Basse","title":"Onze","itemType":"album"}]}';
+
+    // First share: pick just Nachtfahrt off the lot.
+    mockExtraction(lotJson);
+    const first = await createMusicItemsFromUrl(lotUrl, {
+      pageTitle: "Lot of 2 LPs: Nachtfahrt / Onze",
+      selectedCandidateIds: ["cand-1-kalte-sterne-nachtfahrt"],
+    });
+    expect(first).toHaveLength(1);
+    expect(first[0]!.created).toBe(true);
+    expect(first[0]!.item.title).toBe("Nachtfahrt");
+
+    // Re-share the same listing and pick Onze. The listing key matches the
+    // filed Nachtfahrt, but a lot dedupes per release — Onze is new, so it must
+    // be added rather than the short-circuit handing back Nachtfahrt.
+    mockExtraction(lotJson);
+    const second = await createMusicItemsFromUrl(lotUrl, {
+      pageTitle: "Lot of 2 LPs: Nachtfahrt / Onze",
+      selectedCandidateIds: ["cand-2-rue-basse-onze"],
+    });
+    expect(second).toHaveLength(1);
+    expect(second[0]!.created).toBe(true);
+    expect(second[0]!.item.title).toBe("Onze");
+    expect(second[0]!.item.id).not.toBe(first[0]!.item.id);
+
+    // Picking Nachtfahrt again still dedupes to the item already filed.
+    mockExtraction(lotJson);
+    const again = await createMusicItemsFromUrl(lotUrl, {
+      pageTitle: "Lot of 2 LPs: Nachtfahrt / Onze",
+      selectedCandidateIds: ["cand-1-kalte-sterne-nachtfahrt"],
+    });
+    expect(again[0]!.created).toBe(false);
+    expect(again[0]!.item.id).toBe(first[0]!.item.id);
+  });
 });
 
 describe("marketplace dedupe runs on source + listing id", () => {
@@ -355,5 +421,27 @@ describe("marketplace dedupe runs on source + listing id", () => {
     );
     expect(other[0]!.created).toBe(true);
     expect(other[0]!.item.id).not.toBe(first[0]!.item.id);
+  });
+});
+
+describe("POST /api/music-items sanitises the captured title", () => {
+  test("a non-string pageTitle is dropped, not passed through to the creator", async () => {
+    // The body is untrusted JSON: `pageTitle: 42` must be dropped at the route,
+    // not reach the creator's `.trim()` and blow up as a 500. With it gone, an
+    // eBay listing with no slug has no evidence and gets the honest 400.
+    const fetchSpy = spyOn(globalThis, "fetch");
+    const app = new Hono();
+    app.route("/api/music-items", musicItemRoutes);
+
+    const response = await app.request("http://localhost/api/music-items", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ url: ebayUrl("com", "191919191919"), pageTitle: 42 }),
+    });
+
+    expect(response.status).toBe(400);
+    const body = (await response.json()) as { error: string };
+    expect(body.error).toBe("This site blocks server requests — paste the listing title");
+    expect(fetchSpy).not.toHaveBeenCalled();
   });
 });
