@@ -45,6 +45,13 @@ export async function searchQobuz(
   const normalizedTitle = normalizeForMatch(title);
   if (!normalizedTitle) return null;
 
+  // The symmetric artist case: a named artist that normalizes to nothing
+  // (non-Latin or punctuation) can't be verified, and treating it as "no
+  // artist given" would accept any artist's album with a matching title.
+  // No confident match is possible — the Bandcamp/YouTube fallbacks take it.
+  const normalizedArtist = artist ? normalizeForMatch(artist) : null;
+  if (artist && !normalizedArtist) return null;
+
   const query = [artist, title].filter(Boolean).join(" ");
   const data = await fetchQobuzApi(
     "catalog/search",
@@ -56,8 +63,6 @@ export async function searchQobuz(
   const albums = isRecord(data.albums) ? data.albums : null;
   const items = albums && Array.isArray(albums.items) ? albums.items.filter(isRecord) : [];
   if (items.length === 0) return null;
-
-  const normalizedArtist = artist ? normalizeForMatch(artist) : null;
 
   function artistMatches(item: Record<string, unknown>): boolean {
     if (!normalizedArtist) return true;

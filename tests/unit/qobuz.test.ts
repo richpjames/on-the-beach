@@ -295,6 +295,15 @@ describe("searchQobuz", () => {
     expect(result).toBeNull();
   });
 
+  test("an artist that normalizes to nothing disables no filter — no search", async () => {
+    const fetchSpy = spyOn(globalThis, "fetch");
+    // A Latin title by a non-Latin artist: the artist can't be verified, so
+    // the first "Blue" album by anyone must not be filed as a match.
+    expect(await searchQobuz("Blue", "宇多田ヒカル")).toBeNull();
+    expect(await searchQobuz("First Love", "!!!")).toBeNull();
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
   test("searches the album catalogue and returns an exact match", async () => {
     const fetchSpy = spyOn(globalThis, "fetch").mockResolvedValueOnce(searchResponse([HIT]));
 
