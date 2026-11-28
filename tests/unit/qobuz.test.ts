@@ -3,13 +3,31 @@ import { parseQobuzUrl, scrapeQobuz } from "../../adapters/qobuz/scrape";
 import { searchQobuz } from "../../adapters/qobuz/search";
 import { resetQobuzAuthCache } from "../../adapters/qobuz/index";
 
+const ENV_KEYS = [
+  "QOBUZ_APP_ID",
+  "QOBUZ_EMAIL",
+  "QOBUZ_PASSWORD",
+  "QOBUZ_USER_AUTH_TOKEN",
+  "QOBUZ_STOREFRONT",
+  "OTB_DISABLE_EXTERNAL_LOOKUPS",
+] as const;
+
+// Capture what the process came in with, so clearing the slate for a test
+// never permanently deletes a value later test files (or a developer's .env)
+// rely on.
+const ORIGINAL_ENV = new Map(ENV_KEYS.map((key) => [key, process.env[key]]));
+
 function unconfigure(): void {
-  delete process.env.QOBUZ_APP_ID;
-  delete process.env.QOBUZ_EMAIL;
-  delete process.env.QOBUZ_PASSWORD;
-  delete process.env.QOBUZ_USER_AUTH_TOKEN;
-  delete process.env.QOBUZ_STOREFRONT;
-  delete process.env.OTB_DISABLE_EXTERNAL_LOOKUPS;
+  for (const key of ENV_KEYS) delete process.env[key];
+  resetQobuzAuthCache();
+}
+
+function restoreEnv(): void {
+  for (const key of ENV_KEYS) {
+    const original = ORIGINAL_ENV.get(key);
+    if (original === undefined) delete process.env[key];
+    else process.env[key] = original;
+  }
   resetQobuzAuthCache();
 }
 
@@ -42,7 +60,7 @@ function searchResponse(items: Array<Record<string, unknown>>): Response {
 
 beforeEach(unconfigure);
 afterEach(() => {
-  unconfigure();
+  restoreEnv();
   mock.restore();
 });
 
@@ -261,6 +279,22 @@ describe("searchQobuz", () => {
     expect(fetchSpy).not.toHaveBeenCalled();
   });
 
+  test("a title that normalizes to nothing is not searched at all", async () => {
+    const fetchSpy = spyOn(globalThis, "fetch");
+    // Punctuation-only and non-Latin titles both normalize to the empty
+    // string, which is a prefix of every result — an arbitrary album would
+    // be filed as a confident match.
+    expect(await searchQobuz("!!!", "Miles Davis")).toBeNull();
+    expect(await searchQobuz("坂本龍一", "Ryuichi Sakamoto")).toBeNull();
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  test("a result whose title normalizes to nothing is not a prefix match", async () => {
+    spyOn(globalThis, "fetch").mockResolvedValueOnce(searchResponse([{ ...HIT, title: "!!!" }]));
+    const result = await searchQobuz("Kind Of Blue", "Miles Davis");
+    expect(result).toBeNull();
+  });
+
   test("searches the album catalogue and returns an exact match", async () => {
     const fetchSpy = spyOn(globalThis, "fetch").mockResolvedValueOnce(searchResponse([HIT]));
 
@@ -466,5 +500,24 @@ describe("Qobuz account authentication", () => {
     // One login to prime, one shared re-login — not one per parallel request.
     const loginCalls = fetchSpy.mock.calls.filter(([url]) => String(url).includes("user/login"));
     expect(loginCalls).toHaveLength(2);
+  });
+
+  test("login and request share one timeout budget", async () => {
+    process.env.QOBUZ_EMAIL = "listener@example.com";
+    process.env.QOBUZ_PASSWORD = "secret";
+    const fetchSpy = spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+      const url = String(input);
+      if (url.includes("user/login")) {
+        // Slower than the whole call's budget.
+        await new Promise((resolve) => setTimeout(resolve, 60));
+        return jsonResponse({ user_auth_token: "login-token" });
+      }
+      return jsonResponse(ALBUM);
+    });
+
+    const result = await scrapeQobuz("https://play.qobuz.com/album/5099749522428", 30);
+    expect(result).toBeNull();
+    // The login ran, but it spent the budget — no catalogue request follows.
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
   });
 });

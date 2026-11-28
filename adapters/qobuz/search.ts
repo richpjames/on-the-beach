@@ -38,6 +38,13 @@ export async function searchQobuz(
 ): Promise<ServiceSearchResult | null> {
   if (process.env.OTB_DISABLE_EXTERNAL_LOOKUPS) return null;
 
+  // `normalizeForMatch` keeps only ASCII word characters, so a punctuation-only
+  // or non-Latin title normalizes to nothing — and an empty string is a prefix
+  // of every result, which would file an arbitrary album as a confident match.
+  // No usable title, no search (and no empty query sent to the API).
+  const normalizedTitle = normalizeForMatch(title);
+  if (!normalizedTitle) return null;
+
   const query = [artist, title].filter(Boolean).join(" ");
   const data = await fetchQobuzApi(
     "catalog/search",
@@ -50,7 +57,6 @@ export async function searchQobuz(
   const items = albums && Array.isArray(albums.items) ? albums.items.filter(isRecord) : [];
   if (items.length === 0) return null;
 
-  const normalizedTitle = normalizeForMatch(title);
   const normalizedArtist = artist ? normalizeForMatch(artist) : null;
 
   function artistMatches(item: Record<string, unknown>): boolean {
@@ -62,6 +68,8 @@ export async function searchQobuz(
 
   function titlesCompatible(resultTitle: string): boolean {
     const rn = normalizeForMatch(resultTitle);
+    // An empty result title is a prefix of ours too — same trap, other side.
+    if (!rn) return false;
     return (
       rn === normalizedTitle || rn.startsWith(normalizedTitle) || normalizedTitle.startsWith(rn)
     );

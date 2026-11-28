@@ -137,19 +137,27 @@ async function getAuthToken(timeoutMs: number): Promise<string | null> {
  * failure — a scrape or a search reports "nothing found", never a transport
  * error. A 401 on a cached login token invalidates it and retries once
  * (tokens expire), sharing any re-login already in flight; anonymous reads
- * and env-supplied tokens are not retried.
+ * and env-supplied tokens are not retried. Login, request and retry share
+ * one deadline of `timeoutMs` — the call never blocks for more than that.
  */
 export async function fetchQobuzApi(
   endpoint: string,
   params: Record<string, string>,
   timeoutMs: number,
 ): Promise<Record<string, unknown> | null> {
+  // One deadline for the whole call — login, request and any 401 retry share
+  // the caller's budget rather than each getting a fresh one.
+  const deadline = Date.now() + timeoutMs;
   for (let attempt = 0; ; attempt += 1) {
-    const token = await getAuthToken(timeoutMs);
+    const remaining = deadline - Date.now();
+    if (remaining <= 0) return null;
+    const token = await getAuthToken(remaining);
+    const budget = deadline - Date.now();
+    if (budget <= 0) return null;
     const query = new URLSearchParams({ ...params, app_id: getAppId() });
 
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    const timer = setTimeout(() => controller.abort(), budget);
     try {
       const response = await fetch(`${API_BASE}/${endpoint}?${query.toString()}`, {
         signal: controller.signal,
