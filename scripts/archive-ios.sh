@@ -109,7 +109,9 @@ fi
 # keeps every upload unique even when two merges share a tag. The || true is
 # inside the pipeline: under pipefail a bare `git describe | sed` would abort
 # the script (set -e) on an untagged checkout before the fallback ever runs.
-APP_VERSION=$( { git describe --tags --abbrev=0 || true; } 2>/dev/null | sed 's/^v//')
+# --match keeps us on the deploy tags, like the workflow and Dockerfile — a
+# stray manual tag (ios-beta, …) is not a valid CFBundleShortVersionString.
+APP_VERSION=$( { git describe --tags --abbrev=0 --match 'v[0-9]*' || true; } 2>/dev/null | sed 's/^v//')
 if [[ -z "$APP_VERSION" ]]; then
   APP_VERSION=$(bun -e 'console.log(require("./package.json").version)')
 fi
