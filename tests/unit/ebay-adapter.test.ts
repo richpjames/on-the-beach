@@ -195,6 +195,32 @@ describe("scrapeEbay — reading a listing", () => {
 
     expect(metadata).toEqual({ potentialTitle: "Some LP" });
   });
+
+  test.each([
+    ["null", null],
+    ["empty string", ""],
+    ["blank string", "   "],
+    ["boolean", true],
+    ["non-numeric string", "asking price"],
+  ])("a %s price value leaves the metadata unpriced, not free", async (_label, value) => {
+    configure();
+    // `Number()` would coerce these into 0/1 and file the listing as free with
+    // a currency attached; only a non-empty numeric string is a real price.
+    mockEbayApi({ title: "Some LP", price: { value, currency: "EUR" } });
+
+    const metadata = await scrapeEbay("https://www.ebay.es/itm/1", 1_000);
+
+    expect(metadata).toEqual({ potentialTitle: "Some LP" });
+  });
+
+  test("a genuine zero price is free with its currency", async () => {
+    configure();
+    mockEbayApi({ title: "Some LP", price: { value: "0.00", currency: "EUR" } });
+
+    const metadata = await scrapeEbay("https://www.ebay.es/itm/1", 1_000);
+
+    expect(metadata).toEqual({ potentialTitle: "Some LP", priceCents: 0, currency: "EUR" });
+  });
 });
 
 describe("scrapeEbay — token caching", () => {
@@ -219,5 +245,20 @@ describe("scrapeEbay — token caching", () => {
     await scrapeEbay("https://www.ebay.es/itm/2", 1_000);
 
     expect(calls.filter((call) => call.url.startsWith(TOKEN_URL))).toHaveLength(2);
+  });
+
+  test("concurrent lookups share one in-flight token request", async () => {
+    configure();
+    const { calls } = mockEbayApi();
+
+    // Both start before either token request resolves: the second must ride
+    // the first's minting promise, not ask eBay for a token of its own.
+    await Promise.all([
+      scrapeEbay("https://www.ebay.es/itm/1", 1_000),
+      scrapeEbay("https://www.ebay.com/itm/2", 1_000),
+    ]);
+
+    expect(calls.filter((call) => call.url.startsWith(TOKEN_URL))).toHaveLength(1);
+    expect(calls.filter((call) => call.url.startsWith(ITEM_URL_PREFIX))).toHaveLength(2);
   });
 });

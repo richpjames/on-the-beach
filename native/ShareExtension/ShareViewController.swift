@@ -678,7 +678,13 @@ final class ShareViewController: UIViewController {
         }
         guard let text else { return nil }
 
-        if let url = URL(string: text), url.scheme != nil { return url }
+        // Only a whitespace-free string is a bare URL — see `link(from:)`:
+        // iOS 17's `URL(string:)` encodes invalid characters rather than
+        // failing, so a "URL\ntitle" blob must go to the detector instead.
+        if !text.contains(where: { $0.isWhitespace }),
+           let url = URL(string: text), url.scheme != nil {
+            return url
+        }
         return firstURL(in: text)
     }
 
@@ -698,7 +704,14 @@ final class ShareViewController: UIViewController {
         }
         guard let text else { return nil }
 
-        if let url = URL(string: text), url.scheme != nil { return (url, nil) }
+        // Only a whitespace-free string is a bare URL: on iOS 17+ `URL(string:)`
+        // percent-encodes invalid characters rather than failing, so a
+        // "URL\ntitle" blob would otherwise be swallowed whole as one mangled
+        // link. Anything with whitespace goes to the splitter instead.
+        if !text.contains(where: { $0.isWhitespace }),
+           let url = URL(string: text), url.scheme != nil {
+            return (url, nil)
+        }
         return linkAndTitle(in: text)
     }
 
