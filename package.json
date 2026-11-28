@@ -11,6 +11,7 @@
     "test": "bun test tests/unit",
     "test:unit": "bun test tests/unit",
     "test:unit:watch": "bun test --watch tests/unit",
+    "test:unit:random-order": "bun test tests/unit --randomize",
     "test:mutation": "bunx --node stryker run",
     "test:e2e": "bunx playwright test playwright",
     "test:ingest:prod": "bun test tests/e2e/ingest-prod.test.ts",
