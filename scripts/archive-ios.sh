@@ -106,8 +106,10 @@ fi
 
 # Marketing version from the latest deploy tag (v1.0.N → 1.0.N); untagged
 # checkouts fall back to package.json. The commit-count build number below
-# keeps every upload unique even when two merges share a tag.
-APP_VERSION=$(git describe --tags --abbrev=0 2>/dev/null | sed 's/^v//')
+# keeps every upload unique even when two merges share a tag. The || true is
+# inside the pipeline: under pipefail a bare `git describe | sed` would abort
+# the script (set -e) on an untagged checkout before the fallback ever runs.
+APP_VERSION=$( { git describe --tags --abbrev=0 || true; } 2>/dev/null | sed 's/^v//')
 if [[ -z "$APP_VERSION" ]]; then
   APP_VERSION=$(bun -e 'console.log(require("./package.json").version)')
 fi
