@@ -444,7 +444,8 @@ bun run ios:archive -- --upload
 
 The script archives, then exports a signed `.ipa` (the upload is separate:
 Xcode 27 removed direct upload from `xcodebuild -exportArchive`, so the
-`.ipa` goes up via `altool`). The version is stamped from `package.json` and
+`.ipa` goes up via `altool`). The version is stamped from the latest deploy
+tag (`v1.0.N`, with `package.json` as the fallback for untagged checkouts) and
 the build number from the git commit count (the generated project pins both
 at 1.0/1, and Capacitor never copies the real version across). After ~10–15
 minutes of App Store Connect processing the build appears under TestFlight.

@@ -1,9 +1,12 @@
-FROM oven/bun:1-alpine
+# Build stage. .git is deliberately IN the build context (.dockerignore): the
+# Deploy workflow tags the commit it deploys (v1.0.N) because branch protection
+# rules out the old bump-commit-to-main, and the tag is read back out here so
+# the footer shows the deployed version. Only this stage sees .git — the final
+# image below copies the built app without it.
+FROM oven/bun:1-alpine AS build
 WORKDIR /app
 
-# `ts` (moreutils) stamps each log line with a timestamp; tzdata lets the
-# TZ=Europe/Madrid setting below resolve so those stamps are Madrid local time.
-RUN apk add --no-cache moreutils tzdata
+RUN apk add --no-cache git
 
 # Install dependencies
 COPY package.json bun.lock bun.lockb* ./
@@ -11,7 +14,22 @@ RUN bun install --frozen-lockfile --ignore-scripts
 
 # Copy source and build the SvelteKit app (client + server into build/)
 COPY . .
-RUN bun run build
+# Highest v* tag on HEAD → .app-version, which vite.config.ts reads. An empty
+# file means an untagged build and vite falls back to package.json's version.
+# The numeric -k sort works on busybox (no GNU coreutils in this image).
+RUN (git tag --points-at HEAD | grep '^v[0-9]' | sed 's/^v//' \
+      | sort -t. -k1,1n -k2,2n -k3,3n | tail -1 > .app-version || true) \
+ && bun run build \
+ && rm -rf .git
+
+FROM oven/bun:1-alpine
+WORKDIR /app
+
+# `ts` (moreutils) stamps each log line with a timestamp; tzdata lets the
+# TZ=Europe/Madrid setting below resolve so those stamps are Madrid local time.
+RUN apk add --no-cache moreutils tzdata
+
+COPY --from=build /app ./
 
 ENV NODE_ENV=production
 ENV PORT=3000

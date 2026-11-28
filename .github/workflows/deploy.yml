@@ -42,25 +42,33 @@ jobs:
             exit 1
           fi
 
-      - name: Checkout
+      - name: Checkout (full history and tags)
         uses: actions/checkout@v6
         with:
           ref: main
+          fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Configure git
+      - name: Tag the deployed version
+        # Branch protection requires every commit to main to go through a PR,
+        # so the version lives in a tag instead of the old bump commit — the
+        # branch ruleset doesn't cover tags. The Docker build and
+        # archive-ios.sh read the tag back out; package.json's version is only
+        # the seed for the first tag and the fallback for untagged builds.
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-
-      - name: Bump patch version
-        run: npm version patch --no-git-tag-version
-
-      - name: Commit and push version bump
-        run: |
-          git add package.json
-          git commit -m "chore: bump version"
-          git push
+          PKG="v$(node -p "require('./package.json').version")"
+          # Highest tag wins, not just tags reachable from HEAD: a cancelled
+          # run may have pushed a tag for a commit that never deployed.
+          BASE=$( { git tag -l 'v[0-9]*'; echo "$PKG"; } | sort -V | tail -1)
+          EXISTING=$(git tag --points-at HEAD | grep '^v[0-9]' | sort -V | tail -1 || true)
+          if [ -n "$EXISTING" ]; then
+            echo "HEAD is already tagged $EXISTING — reusing it (re-run?)"
+            exit 0
+          fi
+          NEXT="v$(echo "${BASE#v}" | awk -F. '{printf "%d.%d.%d", $1, $2, $3+1}')"
+          git tag "$NEXT"
+          git push origin "$NEXT"
+          echo "Deploying $NEXT"
 
       - name: Trigger Coolify deployment
         env:

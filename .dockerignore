@@ -1,7 +1,8 @@
 node_modules
 dist
 .worktrees
-.git
+# .git stays IN the context: the Dockerfile's build stage reads the deploy tag
+# from it for the app version. The final image never copies it.
 *.md
 docs
 playwright
